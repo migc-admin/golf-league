@@ -120,40 +120,85 @@ export default function EventDetail() {
 
 // ─── Tab: Overview ────────────────────────────────────────────────
 function TabOverview({ event, eventPlayers, allScores, onUpdated }) {
-  const [editModal, setEditModal] = useState(false)
+  const [editModal,   setEditModal]   = useState(false)
+  const [deleteModal, setDeleteModal] = useState(false)
 
   const holesEntered = new Set(allScores.map(s => `${s.player_id}-${s.hole_number}`)).size
   const flightA = eventPlayers.filter(e => e.flight === 'A').length
   const flightB = eventPlayers.filter(e => e.flight === 'B').length
 
+  // Scorecard link shown when event is active
+  const scorecardUrl = `${window.location.origin}/scorecard/${event.id}`
+
   return (
     <div className="grid sm:grid-cols-2 gap-4">
       <Card>
-        <CardHeader title="Event Details" action={<Button size="sm" variant="secondary" onClick={() => setEditModal(true)}>Edit</Button>} />
+        <CardHeader
+          title="Event Details"
+          action={
+            <div className="flex gap-2">
+              <Button size="sm" variant="secondary" onClick={() => setEditModal(true)}>Edit</Button>
+              {event.status !== 'complete' && (
+                <Button size="sm" variant="danger" onClick={() => setDeleteModal(true)}>Delete</Button>
+              )}
+            </div>
+          }
+        />
         <dl className="space-y-2 text-sm">
-          <Row label="Date"       value={formatDate(event.event_date)} />
-          <Row label="Course"     value={event.course?.name} />
-          <Row label="League"     value={event.league?.name} />
-          <Row label="Format"     value={FORMAT_LABELS[event.format] ?? event.format ?? 'Net Stroke Play'} />
-          <Row label="Start Time" value={event.start_time ? formatTime(event.start_time) : '—'} />
+          <Row label="Date"         value={formatDate(event.event_date)} />
+          <Row label="Course"       value={event.course?.name} />
+          <Row label="League"       value={event.league?.name} />
+          <Row label="Format"       value={FORMAT_LABELS[event.format] ?? event.format ?? 'Net Stroke Play'} />
+          <Row label="Start Time"   value={event.start_time ? formatTime(event.start_time) : '—'} />
           <Row label="Tee Interval" value={`${event.tee_time_interval_mins ?? 10} min`} />
-          <Row label="Entry Fee"  value={`$${event.entry_fee}`} />
-          <Row label="Status"     value={<StatusBadge status={event.status} />} />
+          <Row label="Entry Fee"    value={`$${event.entry_fee}`} />
+          <Row label="Status"       value={<StatusBadge status={event.status} />} />
         </dl>
       </Card>
 
-      <Card>
-        <CardHeader title="Players" />
-        <dl className="space-y-2 text-sm">
-          <Row label="Total Players" value={eventPlayers.length} />
-          <Row label="Flight A"      value={flightA} />
-          <Row label="Flight B"      value={flightB} />
-          <Row label="Scores Entered" value={`${holesEntered} hole entries`} />
-          <Row label="Total Pot"      value={`$${(event.entry_fee * eventPlayers.length).toFixed(2)}`} />
-        </dl>
-      </Card>
+      <div className="space-y-4">
+        <Card>
+          <CardHeader title="Players" />
+          <dl className="space-y-2 text-sm">
+            <Row label="Total Players"  value={eventPlayers.length} />
+            <Row label="Flight A"       value={flightA} />
+            <Row label="Flight B"       value={flightB} />
+            <Row label="Scores Entered" value={`${holesEntered} hole entries`} />
+            <Row label="Total Pot"      value={`$${(event.entry_fee * eventPlayers.length).toFixed(2)}`} />
+          </dl>
+        </Card>
+
+        {/* Scorecard link — shown when active */}
+        {event.status === 'active' && (
+          <Card>
+            <CardHeader title="Scorecard Link" subtitle="Share with scorekeepers to enter scores" />
+            <div className="flex items-center gap-2 mt-1">
+              <input
+                readOnly
+                value={scorecardUrl}
+                className="input text-xs flex-1 bg-gray-50"
+                onFocus={e => e.target.select()}
+              />
+              <Button
+                size="sm"
+                variant="secondary"
+                onClick={() => {
+                  navigator.clipboard.writeText(scorecardUrl)
+                  toast.success('Link copied!')
+                }}
+              >
+                Copy
+              </Button>
+            </div>
+            <p className="text-xs text-gray-400 mt-2">
+              Scorekeepers must have an account and be assigned to a group to enter scores.
+            </p>
+          </Card>
+        )}
+      </div>
 
       <EditEventModal open={editModal} onClose={() => setEditModal(false)} event={event} onSaved={onUpdated} />
+      <DeleteEventModal open={deleteModal} onClose={() => setDeleteModal(false)} event={event} />
     </div>
   )
 }
@@ -734,6 +779,7 @@ function EventStatusControl({ event, onUpdated }) {
 
 // ─── Edit Event Modal ──────────────────────────────────────────────
 function EditEventModal({ open, onClose, event, onSaved }) {
+  const [eventDate, setEventDate] = useState('')
   const [entryFee,  setEntryFee]  = useState('')
   const [format,    setFormat]    = useState('net_stroke')
   const [startTime, setStartTime] = useState('')
@@ -742,6 +788,7 @@ function EditEventModal({ open, onClose, event, onSaved }) {
 
   useEffect(() => {
     if (event && open) {
+      setEventDate(event.event_date ?? '')
       setEntryFee(event.entry_fee)
       setFormat(event.format ?? 'net_stroke')
       setStartTime(event.start_time ? event.start_time.slice(0, 5) : '')
@@ -754,6 +801,7 @@ function EditEventModal({ open, onClose, event, onSaved }) {
     setSaving(true)
     const { error } = await supabase.from('events')
       .update({
+        event_date:             eventDate,
         entry_fee:              parseFloat(entryFee),
         format,
         start_time:             startTime || null,
@@ -768,6 +816,13 @@ function EditEventModal({ open, onClose, event, onSaved }) {
   return (
     <Modal open={open} onClose={onClose} title="Edit Event">
       <form onSubmit={handleSave} className="space-y-4">
+        <Input
+          label="Event Date"
+          type="date"
+          value={eventDate}
+          onChange={e => setEventDate(e.target.value)}
+          required
+        />
         <div>
           <label className="label">Format</label>
           <select value={format} onChange={e => setFormat(e.target.value)} className="input bg-white">
@@ -797,6 +852,38 @@ function EditEventModal({ open, onClose, event, onSaved }) {
           <Button type="submit" loading={saving}>Save</Button>
         </div>
       </form>
+    </Modal>
+  )
+}
+
+function DeleteEventModal({ open, onClose, event }) {
+  const [saving, setSaving] = useState(false)
+  const navigate = Link // placeholder — we'll use window.history
+
+  async function handleDelete() {
+    setSaving(true)
+    const { error } = await supabase.from('events').delete().eq('id', event.id)
+    setSaving(false)
+    if (error) { toast.error(error.message); return }
+    toast.success('Event deleted')
+    window.history.back()
+  }
+
+  return (
+    <Modal open={open} onClose={onClose} title="Delete Event">
+      <div className="space-y-4">
+        <p className="text-sm text-gray-700">
+          Are you sure you want to delete <strong>Event #{event?.event_number}</strong>?
+          This will permanently remove all scores, pairings, and side game data for this event.
+        </p>
+        <div className="bg-red-50 border border-red-200 rounded-lg px-4 py-3 text-sm text-red-700">
+          This cannot be undone.
+        </div>
+        <div className="flex justify-end gap-3 pt-2">
+          <Button type="button" variant="secondary" onClick={onClose}>Cancel</Button>
+          <Button variant="danger" loading={saving} onClick={handleDelete}>Delete Event</Button>
+        </div>
+      </div>
     </Modal>
   )
 }

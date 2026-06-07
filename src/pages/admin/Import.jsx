@@ -504,10 +504,11 @@ function ImportCourse() {
 }
 
 // ─── Tab 3: Import Event Roster ────────────────────────────────────
-const ROSTER_TEMPLATE = `first_name,last_name,handicap_index,tournament_wins
-Tony,Alvarez,5.2,0
-Dave,Kowalski,11.1,1
-Bob,Nguyen,15.3,0`
+const ROSTER_TEMPLATE = `first_name,last_name,handicap_index,flight,tournament_wins
+Tony,Alvarez,5.2,A,0
+Dave,Kowalski,11.1,A,1
+Bob,Nguyen,15.3,B,0
+Sarah,Okonkwo,18.7,B,0`
 
 function ImportRoster() {
   const [events,    setEvents]    = useState([])
@@ -547,10 +548,11 @@ function ImportRoster() {
 
     for (let i = 0; i < updated.length; i++) {
       const row   = updated[i]
-      const first = row['first_name']?.trim()
-      const last  = row['last_name']?.trim()
-      const hi    = parseFloat(row['handicap_index'])
-      const wins  = parseInt(row['tournament_wins'] ?? '0', 10) || 0
+      const first  = row['first_name']?.trim()
+      const last   = row['last_name']?.trim()
+      const hi     = parseFloat(row['handicap_index'])
+      const wins   = parseInt(row['tournament_wins'] ?? '0', 10) || 0
+      const flight = row['flight']?.trim().toUpperCase() || null
 
       if (!first || !last) {
         updated[i] = { ...row, _status: 'error', _message: 'Missing name' }
@@ -558,6 +560,10 @@ function ImportRoster() {
       }
       if (isNaN(hi)) {
         updated[i] = { ...row, _status: 'error', _message: 'Invalid handicap' }
+        continue
+      }
+      if (flight && flight !== 'A' && flight !== 'B') {
+        updated[i] = { ...row, _status: 'error', _message: 'Flight must be A or B' }
         continue
       }
 
@@ -610,12 +616,13 @@ function ImportRoster() {
       }
 
       const { error } = await supabase.from('event_players').insert({
-        event_id:              eventId,
-        player_id:             playerId,
-        handicap_index:        hi,
+        event_id:                eventId,
+        player_id:               playerId,
+        handicap_index:          hi,
         adjusted_handicap_index: hi,
         course_handicap,
-        tournament_wins_prior: wins,
+        tournament_wins_prior:   wins,
+        ...(flight ? { flight } : {}),
       })
 
       if (error) {
@@ -661,10 +668,11 @@ function ImportRoster() {
         </div>
         <ul className="mt-3 text-xs text-gray-500 space-y-1 list-disc list-inside">
           <li><strong>handicap_index</strong> — current USGA handicap index (e.g. 14.2)</li>
+          <li><strong>flight</strong> — A or B. If you include this, flights are set on import and you skip the auto-assignment step</li>
           <li><strong>tournament_wins</strong> — wins <em>this season</em> for handicap reduction (0, 1, or 2+)</li>
-          <li>If a player matches by first + last name they are reused, not duplicated</li>
+          <li>If a player matches by first + last name they are reused, not duplicated — no double entries</li>
           <li>Course handicap is computed automatically from the event's course</li>
-          <li>Run <strong>Flight Assignment</strong> in the event after import to assign flights</li>
+          <li>If you leave <strong>flight</strong> blank, run <strong>Flight Assignment</strong> in the event after import</li>
         </ul>
       </Card>
 
