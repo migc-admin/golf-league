@@ -2,7 +2,6 @@ import { useEffect, useState, useCallback } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import { supabase } from '../../lib/supabase'
 import toast from 'react-hot-toast'
-import { assignFlights } from '../../lib/engines/flightAssignment'
 import { computePayouts, DEFAULT_PAYOUT_CONFIG, CATEGORY_LABELS, ctpLabel } from '../../lib/engines/payouts'
 import { computeLeaderboards } from '../../lib/engines/scoring'
 import { computeAllSkins } from '../../lib/engines/skins'
@@ -206,31 +205,9 @@ function TabOverview({ event, eventPlayers, allScores, onUpdated }) {
 // ─── Tab: Players & Flights ────────────────────────────────────────
 function TabFlights({ event, eventPlayers, course, allPlayers, onUpdated }) {
   const [addModal, setAddModal] = useState(false)
-  const [running,  setRunning]  = useState(false)
 
   const rostered = new Set(eventPlayers.map(ep => ep.player_id))
   const available = allPlayers.filter(p => !rostered.has(p.id))
-
-  async function runFlightAssignment() {
-    if (!course) { toast.error('Course data missing'); return }
-    if (eventPlayers.length < 2) { toast.error('Need at least 2 players'); return }
-    setRunning(true)
-
-    const assigned = assignFlights(eventPlayers, course)
-
-    // Upsert all flight assignments
-    const updates = assigned.map(ep => ({
-      id:                      ep.id,
-      flight:                  ep.flight,
-      adjusted_handicap_index: ep.adjusted_handicap_index,
-      course_handicap:         ep.course_handicap,
-    }))
-
-    const { error } = await supabase.from('event_players').upsert(updates)
-    setRunning(false)
-    if (error) toast.error(error.message)
-    else { toast.success('Flights assigned'); onUpdated() }
-  }
 
   async function overrideFlight(epId, newFlight) {
     const { error } = await supabase.from('event_players').update({ flight: newFlight }).eq('id', epId)
@@ -253,9 +230,6 @@ function TabFlights({ event, eventPlayers, course, allPlayers, onUpdated }) {
     <div className="space-y-4">
       <div className="flex items-center gap-3">
         <Button onClick={() => setAddModal(true)} variant="secondary">+ Add Player to Event</Button>
-        <Button onClick={runFlightAssignment} loading={running} disabled={eventPlayers.length < 2}>
-          ⚡ Run Flight Assignment
-        </Button>
         {eventPlayers.length > 0 && (
           <span className="text-sm text-gray-500">
             {eventPlayers.length} players · Flight A: {flightA.length} · Flight B: {flightB.length}
@@ -265,7 +239,7 @@ function TabFlights({ event, eventPlayers, course, allPlayers, onUpdated }) {
 
       {unassigned.length > 0 && (
         <div className="bg-yellow-50 border border-yellow-200 rounded-lg px-4 py-3 text-sm text-yellow-800">
-          {unassigned.length} player{unassigned.length !== 1 ? 's' : ''} not yet assigned to a flight. Run flight assignment above.
+          {unassigned.length} player{unassigned.length !== 1 ? 's' : ''} not yet assigned to a flight. Use the dropdown to assign flights manually.
         </div>
       )}
 
@@ -337,10 +311,11 @@ function AddPlayerModal({ open, onClose, eventId, available, course, onSaved }) 
   const [playerId,  setPlayerId]  = useState('')
   const [handicap,  setHandicap]  = useState('')
   const [wins,      setWins]      = useState(0)
+  const [flight,    setFlight]    = useState('')
   const [saving,    setSaving]    = useState(false)
 
   useEffect(() => {
-    if (!open) { setPlayerId(''); setHandicap(''); setWins(0) }
+    if (!open) { setPlayerId(''); setHandicap(''); setWins(0); setFlight('') }
   }, [open])
 
   async function handleSave(e) {
@@ -350,10 +325,11 @@ function AddPlayerModal({ open, onClose, eventId, available, course, onSaved }) 
 
     const hi = parseFloat(handicap)
     const payload = {
-      event_id:             eventId,
-      player_id:            playerId,
-      handicap_index:       hi,
+      event_id:              eventId,
+      player_id:             playerId,
+      handicap_index:        hi,
       tournament_wins_prior: parseInt(wins, 10),
+      flight:                flight || null,
     }
 
     const { error } = await supabase.from('event_players').insert(payload)
@@ -382,6 +358,14 @@ function AddPlayerModal({ open, onClose, eventId, available, course, onSaved }) 
           placeholder="e.g. 14.2"
           required
         />
+        <div>
+          <label className="label">Flight</label>
+          <select value={flight} onChange={e => setFlight(e.target.value)} className="input bg-white">
+            <option value="">— Unassigned —</option>
+            <option value="A">Flight A</option>
+            <option value="B">Flight B</option>
+          </select>
+        </div>
         <div>
           <label className="label">Tournament Wins (This Season)</label>
           <select value={wins} onChange={e => setWins(e.target.value)} className="input bg-white">
