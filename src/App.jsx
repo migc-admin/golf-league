@@ -31,12 +31,8 @@ export default function App() {
           <Route path="import"        element={<Import />} />
         </Route>
 
-        {/* Scorekeeper (any authenticated user) */}
-        <Route
-          path="/scorecard/:eventId"
-          element={<ProtectedRoute><Scorecard /></ProtectedRoute>}
-        />
-        {/* "me" resolves to the logged-in scorekeeper's active event */}
+        {/* Scorecard — public for specific eventId (shareable link), auth required for /me */}
+        <Route path="/scorecard/:eventId" element={<Scorecard />} />
         <Route
           path="/scorecard/me"
           element={<ProtectedRoute><Scorecard /></ProtectedRoute>}
