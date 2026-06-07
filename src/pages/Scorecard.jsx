@@ -145,7 +145,8 @@ export default function Scorecard() {
 
     for (const ep of groupPlayers) {
       const sc = getScore(ep.player_id, currentHole)
-      const gross = parseInt(sc.gross, 10)
+      // If gross not touched, treat displayed default (par) as the score
+      const gross = sc.gross === '' ? par : parseInt(sc.gross, 10)
       if (!gross || gross < 1) { allValid = false; continue }
 
       const putts = sc.putts !== '' ? parseInt(sc.putts, 10) : null
@@ -365,7 +366,7 @@ function PlayerScoreCard({ ep, hole, par, si, score, allHoleScores, courseStroke
         </button>
         <input
           type="number"
-          value={field === 'gross' ? (score.gross === '' ? '' : score.gross) : (score.putts === '' ? '' : score.putts)}
+          value={field === 'gross' ? (score.gross === '' ? par : score.gross) : (score.putts === '' ? '' : score.putts)}
           onChange={e => onChange(field, e.target.value)}
           className="w-12 h-10 text-center font-bold text-base border-y border-gray-200 focus:outline-none focus:bg-fairway-50"
           min={min}

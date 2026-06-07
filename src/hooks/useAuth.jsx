@@ -50,10 +50,10 @@ export function AuthProvider({ children }) {
     return data
   }
 
-  async function signOut() {
-    await supabase.auth.signOut()
+  function signOut() {
     setUser(null)
     setProfile(null)
+    supabase.auth.signOut() // fire and forget — don't block UI on network call
   }
 
   const isAdmin       = profile?.role === 'admin'
