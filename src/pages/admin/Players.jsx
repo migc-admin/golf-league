@@ -1,0 +1,159 @@
+import { useEffect, useState } from 'react'
+import { supabase } from '../../lib/supabase'
+import toast from 'react-hot-toast'
+import Card from '../../components/ui/Card'
+import Button from '../../components/ui/Button'
+import Modal from '../../components/ui/Modal'
+import Input from '../../components/ui/Input'
+
+export default function Players() {
+  const [players, setPlayers] = useState([])
+  const [search,  setSearch]  = useState('')
+  const [loading, setLoading] = useState(true)
+  const [modal,   setModal]   = useState(false)
+  const [editing, setEditing] = useState(null)
+
+  async function load() {
+    const { data } = await supabase
+      .from('players')
+      .select('*')
+      .order('last_name')
+    setPlayers(data ?? [])
+    setLoading(false)
+  }
+
+  useEffect(() => { load() }, [])
+
+  const filtered = players.filter(p =>
+    `${p.first_name} ${p.last_name} ${p.email ?? ''}`.toLowerCase()
+      .includes(search.toLowerCase())
+  )
+
+  async function handleDelete(id) {
+    if (!confirm('Remove this player from the global roster?')) return
+    const { error } = await supabase.from('players').delete().eq('id', id)
+    if (error) toast.error(error.message)
+    else { toast.success('Player removed'); load() }
+  }
+
+  return (
+    <div className="space-y-5">
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-bold text-gray-900">Players</h1>
+          <p className="text-sm text-gray-500 mt-0.5">Global player roster</p>
+        </div>
+        <Button onClick={() => { setEditing(null); setModal(true) }}>+ Add Player</Button>
+      </div>
+
+      {/* Search */}
+      <input
+        type="search"
+        value={search}
+        onChange={e => setSearch(e.target.value)}
+        placeholder="Search players…"
+        className="input w-full sm:w-72"
+      />
+
+      {loading ? (
+        <div className="space-y-2 animate-pulse">
+          {[0,1,2,3,4].map(i => <div key={i} className="h-14 bg-gray-200 rounded-xl" />)}
+        </div>
+      ) : filtered.length === 0 ? (
+        <Card className="text-center py-10">
+          <p className="text-gray-500">{search ? 'No players match your search.' : 'No players yet.'}</p>
+          {!search && <Button className="mt-3" onClick={() => { setEditing(null); setModal(true) }}>Add First Player</Button>}
+        </Card>
+      ) : (
+        <Card className="overflow-hidden p-0">
+          <div className="divide-y divide-gray-100">
+            {filtered.map(p => (
+              <div key={p.id} className="flex items-center justify-between px-5 py-3.5">
+                <div>
+                  <div className="font-medium text-gray-900">
+                    {p.last_name}, {p.first_name}
+                  </div>
+                  <div className="text-xs text-gray-500 flex items-center gap-3 mt-0.5">
+                    {p.email && <span>{p.email}</span>}
+                    {p.ghin_number && <span>GHIN: {p.ghin_number}</span>}
+                  </div>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Button variant="secondary" size="sm" onClick={() => { setEditing(p); setModal(true) }}>
+                    Edit
+                  </Button>
+                  <Button variant="danger" size="sm" onClick={() => handleDelete(p.id)}>
+                    Remove
+                  </Button>
+                </div>
+              </div>
+            ))}
+          </div>
+          <div className="px-5 py-2 bg-gray-50 text-xs text-gray-400 border-t border-gray-100">
+            {filtered.length} player{filtered.length !== 1 ? 's' : ''}
+          </div>
+        </Card>
+      )}
+
+      <PlayerModal
+        open={modal}
+        onClose={() => setModal(false)}
+        editing={editing}
+        onSaved={() => { setModal(false); load() }}
+      />
+    </div>
+  )
+}
+
+function PlayerModal({ open, onClose, editing, onSaved }) {
+  const [form, setForm] = useState({
+    first_name: '', last_name: '', email: '', ghin_number: '',
+  })
+  const [saving, setSaving] = useState(false)
+
+  useEffect(() => {
+    if (editing) setForm({
+      first_name:  editing.first_name,
+      last_name:   editing.last_name,
+      email:       editing.email ?? '',
+      ghin_number: editing.ghin_number ?? '',
+    })
+    else setForm({ first_name: '', last_name: '', email: '', ghin_number: '' })
+  }, [editing, open])
+
+  function setField(k, v) { setForm(f => ({ ...f, [k]: v })) }
+
+  async function handleSave(e) {
+    e.preventDefault()
+    setSaving(true)
+    const payload = {
+      first_name:  form.first_name.trim(),
+      last_name:   form.last_name.trim(),
+      email:       form.email.trim() || null,
+      ghin_number: form.ghin_number.trim() || null,
+    }
+    const { error } = editing
+      ? await supabase.from('players').update(payload).eq('id', editing.id)
+      : await supabase.from('players').insert(payload)
+    setSaving(false)
+    if (error) toast.error(error.message)
+    else { toast.success(editing ? 'Player updated' : 'Player added'); onSaved() }
+  }
+
+  return (
+    <Modal open={open} onClose={onClose} title={editing ? 'Edit Player' : 'Add Player'}>
+      <form onSubmit={handleSave} className="space-y-4">
+        <div className="grid grid-cols-2 gap-4">
+          <Input label="First Name" value={form.first_name} onChange={e => setField('first_name', e.target.value)} required />
+          <Input label="Last Name"  value={form.last_name}  onChange={e => setField('last_name',  e.target.value)} required />
+        </div>
+        <Input label="Email (optional)"       type="email" value={form.email}       onChange={e => setField('email',       e.target.value)} placeholder="player@example.com" />
+        <Input label="GHIN Number (optional)"             value={form.ghin_number} onChange={e => setField('ghin_number', e.target.value)} placeholder="1234567" />
+        <div className="flex justify-end gap-3 pt-2">
+          <Button type="button" variant="secondary" onClick={onClose}>Cancel</Button>
+          <Button type="submit" loading={saving}>{editing ? 'Save' : 'Add Player'}</Button>
+        </div>
+      </form>
+    </Modal>
+  )
+}
