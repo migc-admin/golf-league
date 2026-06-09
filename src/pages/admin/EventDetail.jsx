@@ -226,8 +226,46 @@ function TabFlights({ event, eventPlayers, course, allPlayers, onUpdated }) {
   const flightB = eventPlayers.filter(e => e.flight === 'B')
   const unassigned = eventPlayers.filter(e => !e.flight)
 
+  const courseTees = course?.tees ?? []
+
+  async function saveTeeAssignment(field, value) {
+    const { error } = await supabase.from('events').update({ [field]: value || null }).eq('id', event.id)
+    if (error) toast.error(error.message)
+    else onUpdated()
+  }
+
   return (
     <div className="space-y-4">
+      {/* Tee Assignment per Flight */}
+      {courseTees.length > 0 && (
+        <Card>
+          <CardHeader title="Tee Assignment" subtitle="Which tees each flight plays from" />
+          <div className="grid sm:grid-cols-2 gap-4 mt-1">
+            {['A', 'B'].map(flight => {
+              const field = `tee_flight_${flight.toLowerCase()}`
+              const current = event[field] ?? ''
+              return (
+                <div key={flight}>
+                  <label className="label">Flight {flight} Tee</label>
+                  <select
+                    value={current}
+                    onChange={e => saveTeeAssignment(field, e.target.value)}
+                    className="input bg-white"
+                  >
+                    <option value="">— Not assigned —</option>
+                    {courseTees.map(t => (
+                      <option key={t.name} value={t.name}>
+                        {t.name} ({t.color}) — Slope {t.slope} / Rating {t.rating}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )
+            })}
+          </div>
+        </Card>
+      )}
+
       <div className="flex items-center gap-3">
         <Button onClick={() => setAddModal(true)} variant="secondary">+ Add Player to Event</Button>
         {eventPlayers.length > 0 && (
