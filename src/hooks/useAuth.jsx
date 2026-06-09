@@ -22,25 +22,23 @@ export function AuthProvider({ children }) {
   }
 
   useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      const u = session?.user ?? null
-      setUser(u)
-      if (u) fetchProfile(u.id).finally(() => setLoading(false))
-      else   setLoading(false)
-    })
-
-    // Listen for auth changes — only act on meaningful events, not token refreshes
+    // Use onAuthStateChange as single source of truth.
+    // INITIAL_SESSION fires on page load (replaces getSession), SIGNED_IN on login,
+    // SIGNED_OUT on logout. TOKEN_REFRESHED is ignored to avoid re-fetching profile.
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
-        if (event === 'SIGNED_OUT') {
-          setUser(null)
-          setProfile(null)
-        } else if (event === 'SIGNED_IN') {
+        if (event === 'INITIAL_SESSION' || event === 'SIGNED_IN') {
           const u = session?.user ?? null
           setUser(u)
           if (u) await fetchProfile(u.id)
+          else   setProfile(null)
+          setLoading(false)
+        } else if (event === 'SIGNED_OUT') {
+          setUser(null)
+          setProfile(null)
+          setLoading(false)
         }
-        // TOKEN_REFRESHED and other events: do nothing, session is already valid
+        // TOKEN_REFRESHED and other events: no-op
       }
     )
 
