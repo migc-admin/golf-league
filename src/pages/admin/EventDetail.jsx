@@ -697,7 +697,11 @@ function TabPayoutConfig({ event, eventPlayers, course, onUpdated }) {
 
   useEffect(() => {
     const base = { ...DEFAULT_PAYOUT_CONFIG }
-    par3Holes.forEach(h => { base[`ctp_${h.hole}`] = 0 })
+    // CTP keys are per-flight: ctp_5_a, ctp_5_b
+    par3Holes.forEach(h => {
+      base[`ctp_${h.hole}_a`] = 0
+      base[`ctp_${h.hole}_b`] = 0
+    })
     const merged = { ...base, ...(event.payout_config ?? {}) }
     setConfig(merged)
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -715,30 +719,27 @@ function TabPayoutConfig({ event, eventPlayers, course, onUpdated }) {
     else { toast.success('Payout config saved'); onUpdated() }
   }
 
-  const totalPlayers = eventPlayers.length
-
   function getMultiplier(key) {
-    if (key === 'skins_a' || key.includes('_a_') || key === 'long_drive_a') return flightA
-    if (key === 'skins_b' || key.includes('_b_') || key === 'long_drive_b') return flightB
-    return totalPlayers // flat categories multiply by all players
+    const isB = key.endsWith('_b') || key.includes('_b_') || key === 'skins_b'
+    return isB ? flightB : flightA
   }
 
   const totalAllocated = Object.entries(config).reduce((sum, [k, v]) => sum + ((v || 0) * getMultiplier(k)), 0)
   const totalPot       = event.entry_fee * eventPlayers.length
   const overBudget     = totalAllocated > totalPot
 
-  // Group config rows by flight relevance
   const rows = Object.entries(config).map(([key, val]) => {
-    const isFlightA = key.includes('_a_') || key === 'skins_a' || key === 'long_drive_a'
-    const isFlightB = key.includes('_b_') || key === 'skins_b' || key === 'long_drive_b'
-    const isFlat    = !isFlightA && !isFlightB
-    const mult      = getMultiplier(key)
-    const total     = (val || 0) * mult
-    const label     = key.startsWith('ctp_')
-      ? ctpLabel(parseInt(key.replace('ctp_', ''), 10))
+    const isFlightB = key.endsWith('_b') || key.includes('_b_') || key === 'skins_b'
+    const mult  = getMultiplier(key)
+    const total = (val || 0) * mult
+    const label = key.startsWith('ctp_')
+      ? (() => { const parts = key.split('_'); return ctpLabel(parseInt(parts[1], 10), parts[2]?.toUpperCase()) })()
       : (CATEGORY_LABELS[key] ?? key)
-    return { key, val, label, isFlightA, isFlightB, isFlat, mult, total }
+    return { key, val, label, isFlightB, mult, total }
   })
+
+  const rowsA = rows.filter(r => !r.isFlightB)
+  const rowsB = rows.filter(r =>  r.isFlightB)
 
   return (
     <div className="space-y-4">
@@ -753,8 +754,7 @@ function TabPayoutConfig({ event, eventPlayers, course, onUpdated }) {
       </div>
 
       <p className="text-xs text-gray-500">
-        Enter <strong>$ per player</strong> for flight categories — total = amount × players in that flight.
-        Enter <strong>flat $</strong> for CTP, Low Putts, Long Drive.
+        All values are <strong>$ per player</strong> in that flight — total = amount × players in flight.
       </p>
 
       {/* Flight A categories */}
@@ -762,7 +762,7 @@ function TabPayoutConfig({ event, eventPlayers, course, onUpdated }) {
         <div className="px-4 py-2.5 bg-blue-50 border-b border-blue-100">
           <h3 className="text-xs font-semibold text-blue-700">Flight A ({flightA} players)</h3>
         </div>
-        <PayoutTable rows={rows.filter(r => r.isFlightA)} onChange={setVal} flightLabel="A" />
+        <PayoutTable rows={rowsA} onChange={setVal} flightLabel="A" />
       </Card>
 
       {/* Flight B categories */}
@@ -770,15 +770,7 @@ function TabPayoutConfig({ event, eventPlayers, course, onUpdated }) {
         <div className="px-4 py-2.5 bg-purple-50 border-b border-purple-100">
           <h3 className="text-xs font-semibold text-purple-700">Flight B ({flightB} players)</h3>
         </div>
-        <PayoutTable rows={rows.filter(r => r.isFlightB)} onChange={setVal} flightLabel="B" />
-      </Card>
-
-      {/* Flat / overall categories */}
-      <Card className="overflow-hidden p-0">
-        <div className="px-4 py-2.5 bg-gray-50 border-b border-gray-100">
-          <h3 className="text-xs font-semibold text-gray-600">Overall / Flat Amount</h3>
-        </div>
-        <PayoutTable rows={rows.filter(r => r.isFlat)} onChange={setVal} flightLabel="All" />
+        <PayoutTable rows={rowsB} onChange={setVal} flightLabel="B" />
       </Card>
     </div>
   )
@@ -791,9 +783,7 @@ function PayoutTable({ rows, onChange, flightLabel }) {
       <thead>
         <tr className="text-left text-xs font-semibold text-gray-400 border-b border-gray-100">
           <th className="px-4 py-2">Category</th>
-          <th className="px-3 py-2 w-32">
-            {flightLabel ? `$ per player (Flt ${flightLabel})` : 'Flat $'}
-          </th>
+          <th className="px-3 py-2 w-32">$ per player (Flt {flightLabel})</th>
           <th className="px-3 py-2 w-24">× Players</th>
           <th className="px-3 py-2 w-24 text-right">Total</th>
         </tr>

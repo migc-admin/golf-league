@@ -1,20 +1,25 @@
 /**
  * Payout Calculation Engine
  *
- * payout_config (stored as JSON on events) — values are DOLLAR AMOUNTS:
- * - For flight-specific keys (_a_ / _b_): value = $ per player in that flight
- *   → payout total = value × flightPlayerCount
- * - For flat keys (ctp_*, long_drive_a, long_drive_b, long_drive, low_putts): value = flat $ total
- * - For skins keys: value = $ per player in that flight → total pool divided by skin winners
+ * payout_config (stored as JSON on events) — values are $ PER PLAYER in the relevant flight:
+ * - Flight A keys (_a_ / _a suffix): value × flightA count
+ * - Flight B keys (_b_ / _b suffix): value × flightB count
+ * - Skins: value × flight count → pool split among skin winners
+ *
+ * All side games (CTP, Low Putts, Long Drive) are split by flight so each
+ * multiplies by that flight's player count.
  *
  * Example:
  * {
- *   "18_net_a_1st": 3,   // $3 × flightA players
- *   "18_net_b_1st": 3,   // $3 × flightB players
- *   "ctp_5": 15,         // flat $15 for CTP hole 5
- *   "long_drive_a": 10,  // flat $10 Flight A long drive
- *   "long_drive_b": 10,  // flat $10 Flight B long drive
- *   "skins_a": 2,        // $2 × flightA players → skins pool
+ *   "18_net_a_1st": 3,    // $3 × flightA players
+ *   "18_net_b_1st": 3,    // $3 × flightB players
+ *   "ctp_5_a": 1,         // $1 × flightA players for CTP hole 5
+ *   "ctp_5_b": 1,         // $1 × flightB players for CTP hole 5
+ *   "low_putts_a": 1,     // $1 × flightA players
+ *   "low_putts_b": 1,     // $1 × flightB players
+ *   "long_drive_a": 1,    // $1 × flightA players
+ *   "long_drive_b": 1,    // $1 × flightB players
+ *   "skins_a": 2,         // $2 × flightA players → skins pool
  * }
  */
 
@@ -35,16 +40,16 @@ export const CATEGORY_LABELS = {
   'b9_a_2nd':      'Back 9 Net — Flight A, 2nd',
   'b9_b_1st':      'Back 9 Net — Flight B, 1st',
   'b9_b_2nd':      'Back 9 Net — Flight B, 2nd',
-  'low_putts':     'Low Putts (Overall)',
+  'low_putts_a':   'Low Putts — Flight A',
+  'low_putts_b':   'Low Putts — Flight B',
   'long_drive_a':  'Long Drive — Flight A',
   'long_drive_b':  'Long Drive — Flight B',
-  'long_drive':    'Long Drive (Overall)',
   'skins_a':       'Skins — Flight A',
   'skins_b':       'Skins — Flight B',
 }
 
-export function ctpLabel(holeNumber) {
-  return `Closest to Pin — Hole ${holeNumber}`
+export function ctpLabel(holeNumber, flight) {
+  return `Closest to Pin — Hole ${holeNumber}${flight ? ` (Flt ${flight})` : ''}`
 }
 
 /** Default per-player dollar amounts (admin adjusts as needed) */
@@ -65,19 +70,19 @@ export const DEFAULT_PAYOUT_CONFIG = {
   'b9_b_2nd':     1,
   'long_drive_a': 0,
   'long_drive_b': 0,
-  'low_putts':    0,
+  'low_putts_a':  0,
+  'low_putts_b':  0,
   'skins_a':      2,
   'skins_b':      2,
 }
 
 /**
  * Determine how a config key's value should be multiplied.
- * Returns 'flight_a', 'flight_b', or 'flat'.
+ * Returns 'flight_a' or 'flight_b'. Everything multiplies by a flight count.
  */
 function keyMultiplier(key) {
-  if (key === 'skins_a' || key.includes('_a_') || key === 'long_drive_a') return 'flight_a'
-  if (key === 'skins_b' || key.includes('_b_') || key === 'long_drive_b') return 'flight_b'
-  return 'flat'
+  if (key.endsWith('_b') || key.includes('_b_') || key === 'skins_b') return 'flight_b'
+  return 'flight_a'  // default: all keys are per-flight-A or explicitly _a
 }
 
 function resolveWinner(key, leaderboards, sideGames) {
@@ -98,10 +103,12 @@ function resolveWinner(key, leaderboards, sideGames) {
     const rank   = rankMap[key.split('_').pop()]
     return leaderboards.back9[flight]?.find(p => p.rank === rank)?.player_id ?? null
   }
-  if (key === 'low_putts') {
-    const manual = sideGames.find(g => g.game_type === 'low_putts')
+  if (key === 'low_putts_a' || key === 'low_putts_b') {
+    const flight = key.endsWith('_a') ? 'A' : 'B'
+    const manual = sideGames.find(g => g.game_type === 'low_putts' && g.flight === flight)
     if (manual?.winner_player_id) return manual.winner_player_id
-    return leaderboards.putts?.[0]?.player_id ?? null
+    // Fall back to auto from leaderboard filtered by flight
+    return leaderboards.putts?.find(p => p.flight === flight)?.player_id ?? null
   }
   if (key === 'long_drive_a') {
     const g = sideGames.find(g => g.game_type === 'long_drive' && g.flight === 'A')
@@ -111,13 +118,15 @@ function resolveWinner(key, leaderboards, sideGames) {
     const g = sideGames.find(g => g.game_type === 'long_drive' && g.flight === 'B')
     return g?.winner_player_id ?? null
   }
-  if (key === 'long_drive') {
-    const g = sideGames.find(g => g.game_type === 'long_drive')
-    return g?.winner_player_id ?? null
-  }
   if (key.startsWith('ctp_')) {
-    const holeNum = parseInt(key.replace('ctp_', ''), 10)
-    const g = sideGames.find(g => g.game_type === 'ctp' && g.hole_number === holeNum)
+    // key format: ctp_5_a or ctp_5_b
+    const parts   = key.split('_')
+    const flight  = parts[parts.length - 1].toUpperCase()
+    const holeNum = parseInt(parts[1], 10)
+    const g = sideGames.find(g =>
+      g.game_type === 'ctp' && g.hole_number === holeNum &&
+      (g.flight === flight || g.flight === 'overall')
+    )
     return g?.winner_player_id ?? null
   }
   return null
@@ -146,7 +155,7 @@ export function computePayouts(event, playerCount, leaderboards, sideGames, skin
     if (!dollarVal || dollarVal <= 0) continue
 
     const multiplier = keyMultiplier(key)
-    const count = multiplier === 'flight_a' ? fcA : multiplier === 'flight_b' ? fcB : playerCount
+    const count = multiplier === 'flight_b' ? fcB : fcA
     const amount = Math.round(dollarVal * count * 100) / 100
 
     // Skins handled separately
@@ -165,7 +174,9 @@ export function computePayouts(event, playerCount, leaderboards, sideGames, skin
       continue
     }
 
-    const label    = key.startsWith('ctp_') ? ctpLabel(parseInt(key.replace('ctp_', ''), 10)) : (CATEGORY_LABELS[key] ?? key)
+    const label    = key.startsWith('ctp_')
+      ? (() => { const parts = key.split('_'); return ctpLabel(parseInt(parts[1], 10), parts[2]?.toUpperCase()) })()
+      : (CATEGORY_LABELS[key] ?? key)
     const playerId = resolveWinner(key, leaderboards, sideGames)
     byCategory.push({ key, label, amount, playerId, isSkin: false })
     if (playerId) {
