@@ -4,6 +4,7 @@ import ProtectedRoute from './components/ProtectedRoute'
 import AdminRoute     from './components/AdminRoute'
 
 import Login          from './pages/Login'
+import Home           from './pages/Home'
 import Dashboard      from './pages/admin/Dashboard'
 import Leagues        from './pages/admin/Leagues'
 import Courses        from './pages/admin/Courses'
@@ -20,6 +21,7 @@ export default function App() {
     <AuthProvider>
       <Routes>
         <Route path="/login" element={<Login />} />
+        <Route path="/home"  element={<Home />} />
 
         {/* Admin (requires admin role) */}
         <Route path="/admin" element={<AdminRoute />}>
@@ -51,8 +53,8 @@ export default function App() {
           element={<ProtectedRoute><Standings /></ProtectedRoute>}
         />
 
-        <Route path="/" element={<Navigate to="/admin" replace />} />
-        <Route path="*" element={<Navigate to="/admin" replace />} />
+        <Route path="/" element={<Navigate to="/home" replace />} />
+        <Route path="*" element={<Navigate to="/home" replace />} />
       </Routes>
     </AuthProvider>
   )

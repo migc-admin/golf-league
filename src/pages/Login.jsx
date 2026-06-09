@@ -6,7 +6,7 @@ import toast from 'react-hot-toast'
 export default function Login() {
   const { user, profileLoading, isAdmin, signIn } = useAuth()
   const location = useLocation()
-  const from = location.state?.from?.pathname ?? '/admin'
+  const from = location.state?.from?.pathname ?? '/home'
 
   const [email,    setEmail]    = useState('')
   const [password, setPassword] = useState('')
@@ -14,7 +14,7 @@ export default function Login() {
 
   // Wait until profile is resolved before redirecting — prevents race where isAdmin is false
   if (user && !profileLoading) {
-    return <Navigate to={isAdmin ? from : '/scorecard/me'} replace />
+    return <Navigate to={from} replace />
   }
 
   async function handleSubmit(e) {
