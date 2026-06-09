@@ -7,6 +7,7 @@
 import { useEffect, useState, useRef } from 'react'
 import { useParams, Link, useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
+import { useAuth } from '../hooks/useAuth'
 import { computeLeaderboards, computeStableford } from '../lib/engines/scoring'
 import { computeAllSkins } from '../lib/engines/skins'
 import { computeMatchPoints } from '../lib/engines/matchPoints'
@@ -25,6 +26,8 @@ const FORMAT_LABELS = {
 export default function Leaderboard() {
   const { eventId } = useParams()
   const navigate = useNavigate()
+  const { isAdmin } = useAuth()
+  const homeLink = isAdmin ? '/admin' : '/login'
   const [event,        setEvent]        = useState(null)
   const [eventPlayers, setEventPlayers] = useState([])
   const [allScores,    setAllScores]    = useState([])
@@ -109,7 +112,7 @@ export default function Leaderboard() {
         >
           ← Back
         </button>
-        <Link to="/admin" className="text-fairway-300 hover:text-white text-sm transition-colors">
+        <Link to={homeLink} className="text-fairway-300 hover:text-white text-sm transition-colors">
           ⛳ Dashboard
         </Link>
       </div>

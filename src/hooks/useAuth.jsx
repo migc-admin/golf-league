@@ -4,25 +4,24 @@ import { supabase } from '../lib/supabase'
 const AuthContext = createContext(null)
 
 export function AuthProvider({ children }) {
-  const [user,    setUser]    = useState(null)
-  const [profile, setProfile] = useState(null)  // { id, role, player_id, full_name }
-  const [loading, setLoading] = useState(true)
+  const [user,           setUser]           = useState(null)
+  const [profile,        setProfile]        = useState(null)
+  const [loading,        setLoading]        = useState(true)   // true while getSession + fetchProfile runs
+  const [profileLoading, setProfileLoading] = useState(false)  // true while fetchProfile alone runs
 
   async function fetchProfile(userId) {
+    setProfileLoading(true)
     try {
-      const timeout = new Promise((_, reject) =>
-        setTimeout(() => reject(new Error('timeout')), 5000)
-      )
-      const query = supabase.from('profiles').select('*').eq('id', userId).single()
-      const { data } = await Promise.race([query, timeout])
+      const { data } = await supabase.from('profiles').select('*').eq('id', userId).single()
       setProfile(data ?? null)
     } catch {
       setProfile(null)
+    } finally {
+      setProfileLoading(false)
     }
   }
 
   useEffect(() => {
-    // Get current session
     supabase.auth.getSession().then(({ data: { session } }) => {
       const u = session?.user ?? null
       setUser(u)
@@ -64,7 +63,7 @@ export function AuthProvider({ children }) {
   const isScorekeeper = profile?.role === 'scorekeeper'
 
   return (
-    <AuthContext.Provider value={{ user, profile, loading, isAdmin, isScorekeeper, signIn, signOut }}>
+    <AuthContext.Provider value={{ user, profile, loading, profileLoading, isAdmin, isScorekeeper, signIn, signOut }}>
       {children}
     </AuthContext.Provider>
   )

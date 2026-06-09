@@ -3,11 +3,11 @@ import { useAuth } from '../hooks/useAuth'
 import Layout from './Layout'
 
 export default function AdminRoute() {
-  const { user, profile, loading, isAdmin } = useAuth()
+  const { user, loading, profileLoading, isAdmin } = useAuth()
   const location = useLocation()
 
-  // Still resolving auth session
-  if (loading) {
+  // Wait for both auth session and profile fetch to complete
+  if (loading || profileLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50">
         <svg className="animate-spin h-8 w-8 text-fairway-600" fill="none" viewBox="0 0 24 24">
@@ -20,7 +20,7 @@ export default function AdminRoute() {
 
   if (!user) return <Navigate to="/login" state={{ from: location }} replace />
 
-  // loading is done — if still no profile, send to login (profile fetch failed or no row)
+  // Profile loaded — if not admin, redirect to login
   if (!isAdmin) return <Navigate to="/login" state={{ from: location }} replace />
 
   return (

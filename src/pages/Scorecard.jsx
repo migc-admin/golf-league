@@ -21,7 +21,8 @@ import toast from 'react-hot-toast'
 
 export default function Scorecard() {
   const { eventId } = useParams()
-  const { profile } = useAuth()
+  const { profile, isAdmin } = useAuth()
+  const homeLink = isAdmin ? '/admin' : '/login'
   const { saveScore, pendingCount, syncing } = useOfflineQueue()
 
   const [event,         setEvent]         = useState(null)
@@ -199,7 +200,7 @@ export default function Scorecard() {
     <div className="min-h-screen bg-fairway-800 flex flex-col items-center justify-center p-6 text-center">
       <div className="text-5xl mb-4">⛳</div>
       <p className="text-white font-semibold text-lg">{error}</p>
-      <Link to="/" className="mt-6 bg-white/10 hover:bg-white/20 text-white text-sm font-medium px-5 py-2.5 rounded-xl transition-colors">
+      <Link to={homeLink} className="mt-6 bg-white/10 hover:bg-white/20 text-white text-sm font-medium px-5 py-2.5 rounded-xl transition-colors">
         ⛳ Home
       </Link>
     </div>
@@ -225,6 +226,7 @@ export default function Scorecard() {
         scores={scores}
         isComplete={isComplete}
         onEdit={() => setShowScorecard(false)}
+        homeLink={homeLink}
       />
     )
   }
@@ -256,7 +258,7 @@ export default function Scorecard() {
               </button>
             )}
             <Link to={`/leaderboard/${event.id}`} className="text-fairway-200 text-xs hover:text-white">Board</Link>
-            <Link to="/" className="text-fairway-200 text-xs hover:text-white">⛳</Link>
+            <Link to={homeLink} className="text-fairway-200 text-xs hover:text-white">⛳</Link>
           </div>
         </div>
 
@@ -471,7 +473,7 @@ function PlayerScoreCard({ ep, hole, par, si, score, allHoleScores, courseStroke
 }
 
 // ─── Traditional Scorecard View ────────────────────────────────────
-function TraditionalScorecard({ event, course, groupPlayers, scores, isComplete, onEdit }) {
+function TraditionalScorecard({ event, course, groupPlayers, scores, isComplete, onEdit, homeLink }) {
   const pars  = course.par_per_hole  // array[18]
   const front = pars.slice(0, 9)
   const back  = pars.slice(9, 18)
@@ -532,7 +534,7 @@ function TraditionalScorecard({ event, course, groupPlayers, scores, isComplete,
           </div>
           <div className="flex items-center gap-3">
             <Link to={`/leaderboard/${event.id}`} className="text-fairway-200 text-xs hover:text-white">Board</Link>
-            <Link to="/" className="text-fairway-200 text-xs hover:text-white">⛳</Link>
+            <Link to={homeLink} className="text-fairway-200 text-xs hover:text-white">⛳</Link>
           </div>
         </div>
         <div className="px-4 pb-3 flex gap-2">
