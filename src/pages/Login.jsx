@@ -4,7 +4,7 @@ import { useAuth } from '../hooks/useAuth'
 import toast from 'react-hot-toast'
 
 export default function Login() {
-  const { user, isAdmin, signIn } = useAuth()
+  const { user, profileLoading, isAdmin, signIn } = useAuth()
   const location = useLocation()
   const from = location.state?.from?.pathname ?? '/admin'
 
@@ -12,7 +12,8 @@ export default function Login() {
   const [password, setPassword] = useState('')
   const [loading,  setLoading]  = useState(false)
 
-  if (user) {
+  // Wait until profile is resolved before redirecting — prevents race where isAdmin is false
+  if (user && !profileLoading) {
     return <Navigate to={isAdmin ? from : '/scorecard/me'} replace />
   }
 
