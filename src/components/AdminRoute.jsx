@@ -20,8 +20,8 @@ export default function AdminRoute() {
 
   if (!user) return <Navigate to="/login" state={{ from: location }} replace />
 
-  // Profile loaded — if not admin, redirect to login
-  if (!isAdmin) return <Navigate to="/login" state={{ from: location }} replace />
+  // Profile loaded — if not admin, redirect to home
+  if (!isAdmin) return <Navigate to="/home" replace />
 
   return (
     <Layout>

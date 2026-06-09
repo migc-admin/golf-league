@@ -12,7 +12,7 @@
  */
 
 import { useEffect, useState, useCallback } from 'react'
-import { useParams, Link } from 'react-router-dom'
+import { useParams, Link, useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../hooks/useAuth'
 import { useOfflineQueue } from '../hooks/useOfflineQueue'
@@ -21,8 +21,14 @@ import toast from 'react-hot-toast'
 
 export default function Scorecard() {
   const { eventId } = useParams()
-  const { user, profile, loading: authLoading, isAdmin } = useAuth()
-  const homeLink = isAdmin ? '/admin' : '/login'
+  const { user, profile, loading: authLoading, isAdmin, signOut } = useAuth()
+  const navigate = useNavigate()
+  const homeLink = isAdmin ? '/admin' : '/home'
+
+  async function handleSignOut() {
+    await signOut()
+    navigate('/login', { replace: true })
+  }
   const { saveScore, pendingCount, syncing } = useOfflineQueue()
 
   const [event,         setEvent]         = useState(null)
@@ -248,6 +254,7 @@ export default function Scorecard() {
         canEdit={canEdit}
         onEdit={() => setShowScorecard(false)}
         homeLink={homeLink}
+        onSignOut={user ? handleSignOut : null}
       />
     )
   }
@@ -280,6 +287,11 @@ export default function Scorecard() {
             )}
             <Link to={`/leaderboard/${event.id}`} className="text-fairway-200 text-xs hover:text-white">Board</Link>
             <Link to={homeLink} className="text-fairway-200 text-xs hover:text-white">⛳</Link>
+            {user && (
+              <button onClick={handleSignOut} className="text-fairway-200 text-xs hover:text-white border border-fairway-500 rounded px-2 py-1">
+                Sign out
+              </button>
+            )}
           </div>
         </div>
 
@@ -499,7 +511,7 @@ function PlayerScoreCard({ ep, hole, par, si, score, allHoleScores, courseStroke
 }
 
 // ─── Traditional Scorecard View ────────────────────────────────────
-function TraditionalScorecard({ event, course, groupPlayers, scores, isComplete, canEdit, onEdit, homeLink }) {
+function TraditionalScorecard({ event, course, groupPlayers, scores, isComplete, canEdit, onEdit, homeLink, onSignOut }) {
   const pars  = course.par_per_hole  // array[18]
   const front = pars.slice(0, 9)
   const back  = pars.slice(9, 18)
@@ -561,6 +573,11 @@ function TraditionalScorecard({ event, course, groupPlayers, scores, isComplete,
           <div className="flex items-center gap-3">
             <Link to={`/leaderboard/${event.id}`} className="text-fairway-200 text-xs hover:text-white">Board</Link>
             <Link to={homeLink} className="text-fairway-200 text-xs hover:text-white">⛳</Link>
+            {onSignOut && (
+              <button onClick={onSignOut} className="text-fairway-200 text-xs hover:text-white border border-fairway-500 rounded px-2 py-1">
+                Sign out
+              </button>
+            )}
           </div>
         </div>
         <div className="px-4 pb-3 flex gap-2">
