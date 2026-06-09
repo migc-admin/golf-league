@@ -14,9 +14,10 @@ export default function Players() {
   const [profiles, setProfiles] = useState([])
   const [search,   setSearch]   = useState('')
   const [loading,  setLoading]  = useState(true)
-  const [modal,    setModal]    = useState(false)
-  const [editing,  setEditing]  = useState(null)
-  const [activeTab, setActiveTab] = useState('Roster')
+  const [modal,       setModal]       = useState(false)
+  const [editing,     setEditing]     = useState(null)
+  const [loginModal,  setLoginModal]  = useState(false)
+  const [activeTab,   setActiveTab]   = useState('Roster')
 
   async function load() {
     const [{ data: p }, { data: pr }] = await Promise.all([
@@ -127,11 +128,18 @@ export default function Players() {
       {/* ── User Accounts Tab ── */}
       {activeTab === 'User Accounts' && (
         <div className="space-y-4">
-          <p className="text-sm text-gray-600">
-            Manage login roles. <strong>Admin</strong> — full access.{' '}
-            <strong>Scorekeeper</strong> — score entry only.{' '}
-            <strong>None</strong> — can log in but no access.
-          </p>
+          <div className="flex items-start justify-between gap-4">
+            <p className="text-sm text-gray-600">
+              Manage login accounts and roles. <strong>Admin</strong> — full access.{' '}
+              <strong>Scorekeeper</strong> — score entry only.{' '}
+              <strong>None</strong> — can log in but no access.
+            </p>
+            <Button size="sm" onClick={() => setLoginModal(true)} className="shrink-0">+ Create Login</Button>
+          </div>
+
+          <div className="bg-yellow-50 border border-yellow-200 rounded-lg px-4 py-3 text-xs text-yellow-800">
+            <strong>Note:</strong> Adding a player to the roster does not create a login. Use <strong>Create Login</strong> to set up an email + password for a user so they can sign in.
+          </div>
 
           {loading ? (
             <div className="space-y-2 animate-pulse">
@@ -181,7 +189,107 @@ export default function Players() {
         editing={editing}
         onSaved={() => { setModal(false); load() }}
       />
+      <CreateLoginModal
+        open={loginModal}
+        onClose={() => setLoginModal(false)}
+        players={players}
+        onSaved={() => { setLoginModal(false); load() }}
+      />
     </div>
+  )
+}
+
+function CreateLoginModal({ open, onClose, players, onSaved }) {
+  const [email,    setEmail]    = useState('')
+  const [password, setPassword] = useState('')
+  const [role,     setRole]     = useState('scorekeeper')
+  const [fullName, setFullName] = useState('')
+  const [saving,   setSaving]   = useState(false)
+
+  useEffect(() => {
+    if (!open) { setEmail(''); setPassword(''); setRole('scorekeeper'); setFullName('') }
+  }, [open])
+
+  // Auto-fill name from matching player email
+  useEffect(() => {
+    const match = players.find(p => p.email?.toLowerCase() === email.toLowerCase())
+    if (match) setFullName(`${match.first_name} ${match.last_name}`)
+  }, [email, players])
+
+  async function handleSave(e) {
+    e.preventDefault()
+    if (!email || !password) return
+    setSaving(true)
+
+    // Create auth account
+    const { data, error } = await supabase.auth.signUp({
+      email:    email.trim(),
+      password: password,
+      options:  { data: { full_name: fullName.trim() } },
+    })
+
+    if (error) {
+      toast.error(error.message)
+      setSaving(false)
+      return
+    }
+
+    // If a profile was created (email confirm off), set role immediately
+    if (data?.user?.id) {
+      await supabase.from('profiles').upsert({
+        id:        data.user.id,
+        full_name: fullName.trim() || email.trim(),
+        role,
+      }, { onConflict: 'id' })
+    }
+
+    setSaving(false)
+    toast.success(`Login created for ${email}. ${data?.user?.identities?.length === 0 ? 'Account already exists.' : 'They can now sign in.'}`)
+    onSaved()
+  }
+
+  return (
+    <Modal open={open} onClose={onClose} title="Create Login">
+      <form onSubmit={handleSave} className="space-y-4">
+        <div className="bg-blue-50 border border-blue-200 rounded-lg px-4 py-3 text-xs text-blue-800">
+          Creates a Supabase login so the user can sign in to the app. Share the email and temporary password with them — they can change it later.
+        </div>
+        <Input
+          label="Email"
+          type="email"
+          value={email}
+          onChange={e => setEmail(e.target.value)}
+          placeholder="player@example.com"
+          required
+        />
+        <Input
+          label="Full Name"
+          value={fullName}
+          onChange={e => setFullName(e.target.value)}
+          placeholder="First Last"
+        />
+        <Input
+          label="Temporary Password"
+          type="text"
+          value={password}
+          onChange={e => setPassword(e.target.value)}
+          placeholder="Min 6 characters"
+          required
+        />
+        <div>
+          <label className="label">Role</label>
+          <select value={role} onChange={e => setRole(e.target.value)} className="input bg-white">
+            <option value="scorekeeper">Scorekeeper</option>
+            <option value="admin">Admin</option>
+            <option value="none">None (view only)</option>
+          </select>
+        </div>
+        <div className="flex justify-end gap-3 pt-2">
+          <Button type="button" variant="secondary" onClick={onClose}>Cancel</Button>
+          <Button type="submit" loading={saving}>Create Login</Button>
+        </div>
+      </form>
+    </Modal>
   )
 }
 
