@@ -146,7 +146,7 @@ export function computePayouts(event, playerCount, leaderboards, sideGames, skin
     if (!dollarVal || dollarVal <= 0) continue
 
     const multiplier = keyMultiplier(key)
-    const count = multiplier === 'flight_a' ? fcA : multiplier === 'flight_b' ? fcB : 1
+    const count = multiplier === 'flight_a' ? fcA : multiplier === 'flight_b' ? fcB : playerCount
     const amount = Math.round(dollarVal * count * 100) / 100
 
     // Skins handled separately

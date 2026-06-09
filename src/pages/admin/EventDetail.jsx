@@ -715,10 +715,12 @@ function TabPayoutConfig({ event, eventPlayers, course, onUpdated }) {
     else { toast.success('Payout config saved'); onUpdated() }
   }
 
+  const totalPlayers = eventPlayers.length
+
   function getMultiplier(key) {
     if (key === 'skins_a' || key.includes('_a_') || key === 'long_drive_a') return flightA
     if (key === 'skins_b' || key.includes('_b_') || key === 'long_drive_b') return flightB
-    return 1 // flat dollar (ctp, low_putts, etc.)
+    return totalPlayers // flat categories multiply by all players
   }
 
   const totalAllocated = Object.entries(config).reduce((sum, [k, v]) => sum + ((v || 0) * getMultiplier(k)), 0)
@@ -776,7 +778,7 @@ function TabPayoutConfig({ event, eventPlayers, course, onUpdated }) {
         <div className="px-4 py-2.5 bg-gray-50 border-b border-gray-100">
           <h3 className="text-xs font-semibold text-gray-600">Overall / Flat Amount</h3>
         </div>
-        <PayoutTable rows={rows.filter(r => r.isFlat)} onChange={setVal} flightLabel="" />
+        <PayoutTable rows={rows.filter(r => r.isFlat)} onChange={setVal} flightLabel="All" />
       </Card>
     </div>
   )
