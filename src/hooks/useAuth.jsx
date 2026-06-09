@@ -9,12 +9,16 @@ export function AuthProvider({ children }) {
   const [loading, setLoading] = useState(true)
 
   async function fetchProfile(userId) {
-    const { data } = await supabase
-      .from('profiles')
-      .select('*')
-      .eq('id', userId)
-      .single()
-    setProfile(data ?? null)
+    try {
+      const timeout = new Promise((_, reject) =>
+        setTimeout(() => reject(new Error('timeout')), 5000)
+      )
+      const query = supabase.from('profiles').select('*').eq('id', userId).single()
+      const { data } = await Promise.race([query, timeout])
+      setProfile(data ?? null)
+    } catch {
+      setProfile(null)
+    }
   }
 
   useEffect(() => {
