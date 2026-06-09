@@ -107,7 +107,7 @@ export default function EventDetail() {
       </div>
 
       {/* Tab content */}
-      {activeTab === 'Overview'        && <TabOverview event={event} eventPlayers={eventPlayers} allScores={allScores} onUpdated={load} leagues={leagues} />}
+      {activeTab === 'Overview'        && <TabOverview event={event} eventPlayers={eventPlayers} allScores={allScores} course={course} onUpdated={load} leagues={leagues} />}
       {activeTab === 'Players & Flights' && <TabFlights event={event} eventPlayers={eventPlayers} course={course} allPlayers={allPlayers} onUpdated={load} />}
       {activeTab === 'Groups'          && <TabGroups  event={event} eventPlayers={eventPlayers} onUpdated={load} />}
       {activeTab === 'Payout Config'   && <TabPayoutConfig event={event} eventPlayers={eventPlayers} course={course} onUpdated={load} />}
@@ -117,8 +117,59 @@ export default function EventDetail() {
   )
 }
 
+// ─── Export Scores ────────────────────────────────────────────────
+function exportScoresCSV(event, eventPlayers, allScores, course) {
+  const headers = [
+    'last_name', 'first_name', 'flight', 'group',
+    'course_handicap',
+    ...Array.from({ length: 18 }, (_, i) => `hole_${i + 1}_gross`),
+    ...Array.from({ length: 18 }, (_, i) => `hole_${i + 1}_putts`),
+    'total_gross', 'front_gross', 'back_gross',
+    'total_putts',
+  ]
+
+  const scoreMap = {}
+  for (const s of allScores) {
+    if (!scoreMap[s.player_id]) scoreMap[s.player_id] = {}
+    scoreMap[s.player_id][s.hole_number] = s
+  }
+
+  const rows = eventPlayers.map(ep => {
+    const pScores = scoreMap[ep.player_id] ?? {}
+    const grossArr = Array.from({ length: 18 }, (_, i) => pScores[i + 1]?.gross_score ?? '')
+    const puttsArr = Array.from({ length: 18 }, (_, i) => pScores[i + 1]?.putts ?? '')
+    const totalGross = grossArr.reduce((a, v) => a + (parseInt(v) || 0), 0)
+    const frontGross = grossArr.slice(0, 9).reduce((a, v) => a + (parseInt(v) || 0), 0)
+    const backGross  = grossArr.slice(9).reduce((a, v) => a + (parseInt(v) || 0), 0)
+    const totalPutts = puttsArr.reduce((a, v) => a + (parseInt(v) || 0), 0)
+
+    return [
+      ep.player?.last_name ?? '',
+      ep.player?.first_name ?? '',
+      ep.flight ?? '',
+      ep.group_number ?? '',
+      ep.course_handicap ?? '',
+      ...grossArr,
+      ...puttsArr,
+      totalGross || '',
+      frontGross || '',
+      backGross || '',
+      totalPutts || '',
+    ]
+  })
+
+  const csv = [headers, ...rows].map(r => r.join(',')).join('\n')
+  const blob = new Blob([csv], { type: 'text/csv' })
+  const url  = URL.createObjectURL(blob)
+  const a    = document.createElement('a')
+  a.href = url
+  a.download = `event_${event.event_number}_scores.csv`
+  a.click()
+  URL.revokeObjectURL(url)
+}
+
 // ─── Tab: Overview ────────────────────────────────────────────────
-function TabOverview({ event, eventPlayers, allScores, onUpdated }) {
+function TabOverview({ event, eventPlayers, allScores, course, onUpdated }) {
   const [editModal,   setEditModal]   = useState(false)
   const [deleteModal, setDeleteModal] = useState(false)
 
@@ -136,6 +187,9 @@ function TabOverview({ event, eventPlayers, allScores, onUpdated }) {
           title="Event Details"
           action={
             <div className="flex gap-2">
+              <Button size="sm" variant="secondary" onClick={() => exportScoresCSV(event, eventPlayers, allScores, course)}>
+                ⬇ Export Scores
+              </Button>
               <Button size="sm" variant="secondary" onClick={() => setEditModal(true)}>Edit</Button>
               {event.status !== 'complete' && (
                 <Button size="sm" variant="danger" onClick={() => setDeleteModal(true)}>Delete</Button>
@@ -360,38 +414,63 @@ function AddPlayerModal({ open, onClose, eventId, available, course, onSaved }) 
       if (next[playerId]) {
         delete next[playerId]
       } else {
-        next[playerId] = { hi: '', flight: '' }
+        next[playerId] = { hi: '', flight: '', autoHC: true, ch: '' }
       }
       return next
     })
   }
 
   function setField(playerId, field, value) {
-    setBulk(prev => ({ ...prev, [playerId]: { ...prev[playerId], [field]: value } }))
+    setBulk(prev => {
+      const current = prev[playerId] ?? { hi: '', flight: '', autoHC: true, ch: '' }
+      const updated = { ...current, [field]: value }
+      // Recompute auto CH when HI changes
+      if (field === 'hi' && updated.autoHC && course) {
+        const hi = parseFloat(value)
+        if (!isNaN(hi)) {
+          updated.ch = Math.round((hi * course.slope / 113) + (course.rating - course.par))
+        } else {
+          updated.ch = ''
+        }
+      }
+      // When toggling autoHC on, recompute
+      if (field === 'autoHC' && value === true && course) {
+        const hi = parseFloat(current.hi)
+        if (!isNaN(hi)) {
+          updated.ch = Math.round((hi * course.slope / 113) + (course.rating - course.par))
+        }
+      }
+      return { ...prev, [playerId]: updated }
+    })
   }
 
   function selectAll() {
     const next = {}
-    available.forEach(p => { next[p.id] = bulk[p.id] ?? { hi: '', flight: '' } })
+    available.forEach(p => { next[p.id] = bulk[p.id] ?? { hi: '', flight: '', autoHC: true, ch: '' } })
     setBulk(next)
   }
 
   function clearAll() { setBulk({}) }
 
   const selected = Object.entries(bulk)
-  const allValid = selected.length > 0 && selected.every(([, v]) => v.hi !== '' && !isNaN(parseFloat(v.hi)))
+  const allValid = selected.length > 0 && selected.every(([, v]) =>
+    v.hi !== '' && !isNaN(parseFloat(v.hi)) &&
+    (v.autoHC || (v.ch !== '' && !isNaN(parseInt(v.ch, 10))))
+  )
 
   async function handleSave(e) {
     e.preventDefault()
     if (!allValid) return
     setSaving(true)
 
-    for (const [playerId, { hi, flight }] of selected) {
+    for (const [playerId, { hi, flight, autoHC, ch }] of selected) {
       const hiVal = parseFloat(hi)
       let course_handicap = null
-      if (course) {
+      if (autoHC && course) {
         const { slope, rating, par } = course
         course_handicap = Math.round((hiVal * slope / 113) + (rating - par))
+      } else if (!autoHC && ch !== '') {
+        course_handicap = parseInt(ch, 10)
       }
       await supabase.from('event_players').insert({
         event_id:                eventId,
@@ -446,18 +525,46 @@ function AddPlayerModal({ open, onClose, eventId, available, course, onSaved }) 
                         value={vals.hi}
                         onChange={e => setField(p.id, 'hi', e.target.value)}
                         placeholder="HI"
-                        className="input py-1 text-xs w-20 shrink-0"
+                        className="input py-1 text-xs w-16 shrink-0"
                         required
                       />
                       <select
                         value={vals.flight}
                         onChange={e => setField(p.id, 'flight', e.target.value)}
-                        className="input py-1 text-xs w-24 shrink-0 bg-white"
+                        className="input py-1 text-xs w-20 shrink-0 bg-white"
                       >
                         <option value="">Flight?</option>
                         <option value="A">Flight A</option>
                         <option value="B">Flight B</option>
                       </select>
+                      {/* Course handicap: auto or manual */}
+                      {vals.autoHC ? (
+                        <span
+                          className="text-xs text-gray-500 w-16 shrink-0 cursor-pointer hover:text-fairway-700"
+                          title="Click to enter manually"
+                          onClick={() => setField(p.id, 'autoHC', false)}
+                        >
+                          CH: {vals.ch !== '' ? vals.ch : '—'}
+                        </span>
+                      ) : (
+                        <input
+                          type="number" min="-5" max="54"
+                          value={vals.ch}
+                          onChange={e => setField(p.id, 'ch', e.target.value)}
+                          placeholder="CH"
+                          className="input py-1 text-xs w-16 shrink-0"
+                          title="Course handicap (manual)"
+                          required
+                        />
+                      )}
+                      <button
+                        type="button"
+                        onClick={() => setField(p.id, 'autoHC', !vals.autoHC)}
+                        className={`text-xs shrink-0 px-1.5 py-1 rounded font-medium ${vals.autoHC ? 'text-fairway-600 bg-fairway-50' : 'text-orange-600 bg-orange-50'}`}
+                        title={vals.autoHC ? 'Auto-calculating CH — click for manual' : 'Manual CH — click for auto'}
+                      >
+                        {vals.autoHC ? 'Auto' : 'Manual'}
+                      </button>
                     </>
                   )}
                 </div>

@@ -21,24 +21,35 @@ import toast from 'react-hot-toast'
 
 export default function Scorecard() {
   const { eventId } = useParams()
-  const { profile, isAdmin } = useAuth()
+  const { user, profile, loading: authLoading, isAdmin } = useAuth()
   const homeLink = isAdmin ? '/admin' : '/login'
   const { saveScore, pendingCount, syncing } = useOfflineQueue()
 
   const [event,         setEvent]         = useState(null)
   const [course,        setCourse]        = useState(null)
   const [groupPlayers,  setGroupPlayers]  = useState([])
-  const [scores,        setScores]        = useState({})   // { playerId: { holeNum: { gross, putts } } }
+  const [scores,        setScores]        = useState({})
   const [currentHole,   setCurrentHole]   = useState(1)
   const [loading,       setLoading]       = useState(true)
   const [error,         setError]         = useState(null)
   const [saving,        setSaving]        = useState(false)
-  const [dirtyHoles,    setDirtyHoles]    = useState(new Set())   // holes edited but not saved
-  const [showScorecard, setShowScorecard] = useState(false)       // toggle traditional view
-  const [isComplete,    setIsComplete]    = useState(false)       // event locked but still viewable/editable
+  const [dirtyHoles,    setDirtyHoles]    = useState(new Set())
+  const [showScorecard, setShowScorecard] = useState(false)
+  const [isComplete,    setIsComplete]    = useState(false)
+  const [canEdit,       setCanEdit]       = useState(false)  // true if user is scorekeeper or admin
 
   useEffect(() => {
+    // Wait for auth to resolve before loading
+    if (authLoading || profile === undefined) return
+
     async function load() {
+      // Must be logged in to access scorecard
+      if (!user) {
+        setError('Please sign in to access the scorecard.')
+        setLoading(false)
+        return
+      }
+
       let evId = eventId
 
       if (evId === 'me') {
@@ -71,17 +82,26 @@ export default function Scorecard() {
       setCourse(ev.course)
       setIsComplete(ev.status === 'complete')
 
+      // Find this user's group and scorekeeper status
       let groupNum = null
+      let userIsScorekeeper = false
+
       if (profile?.player_id) {
         const { data: myEp } = await supabase
           .from('event_players')
-          .select('group_number')
+          .select('group_number, is_scorekeeper')
           .eq('event_id', evId)
           .eq('player_id', profile.player_id)
           .single()
-        groupNum = myEp?.group_number ?? null
+        groupNum          = myEp?.group_number ?? null
+        userIsScorekeeper = myEp?.is_scorekeeper ?? false
       }
 
+      // Admins can always edit; others must be the assigned scorekeeper
+      const editAllowed = isAdmin || userIsScorekeeper
+      setCanEdit(editAllowed)
+
+      // Load group players (admin sees all if no group assigned)
       const query = supabase
         .from('event_players')
         .select('*, player:players(*)')
@@ -111,15 +131,15 @@ export default function Scorecard() {
         )
         setCurrentHole(Math.min(18, lastComplete + 1))
 
-        // Show traditional scorecard if round is complete
         const allDone = playerIds.every(pid => Object.keys(map[pid] ?? {}).length === 18)
         if (allDone || ev.status === 'complete') setShowScorecard(true)
       }
 
       setLoading(false)
     }
-    if (profile !== undefined) load()
-  }, [eventId, profile])
+
+    load()
+  }, [eventId, user, profile, authLoading, isAdmin])
 
   function getScore(playerId, hole) {
     return scores[playerId]?.[hole] ?? { gross: '', putts: '' }
@@ -200,8 +220,8 @@ export default function Scorecard() {
     <div className="min-h-screen bg-fairway-800 flex flex-col items-center justify-center p-6 text-center">
       <div className="text-5xl mb-4">⛳</div>
       <p className="text-white font-semibold text-lg">{error}</p>
-      <Link to={homeLink} className="mt-6 bg-white/10 hover:bg-white/20 text-white text-sm font-medium px-5 py-2.5 rounded-xl transition-colors">
-        ⛳ Home
+      <Link to="/login" className="mt-6 bg-white/10 hover:bg-white/20 text-white text-sm font-medium px-5 py-2.5 rounded-xl transition-colors">
+        Sign In
       </Link>
     </div>
   )
@@ -225,6 +245,7 @@ export default function Scorecard() {
         groupPlayers={groupPlayers}
         scores={scores}
         isComplete={isComplete}
+        canEdit={canEdit}
         onEdit={() => setShowScorecard(false)}
         homeLink={homeLink}
       />
@@ -265,6 +286,11 @@ export default function Scorecard() {
         {isComplete && (
           <div className="px-4 py-2 bg-yellow-600/80 text-yellow-100 text-xs text-center font-medium">
             Event is complete — editing scores will update official results
+          </div>
+        )}
+        {!canEdit && !isComplete && (
+          <div className="px-4 py-2 bg-gray-800/80 text-gray-200 text-xs text-center font-medium">
+            View only — you are not the assigned scorekeeper for this group
           </div>
         )}
 
@@ -354,7 +380,7 @@ export default function Scorecard() {
           </button>
           <button
             onClick={saveHole}
-            disabled={saving}
+            disabled={saving || !canEdit}
             className="flex-1 h-12 bg-fairway-700 text-white font-bold rounded-xl disabled:opacity-50 hover:bg-fairway-800 active:scale-95 transition-all shadow-lg shadow-fairway-700/30"
           >
             {saving ? (
@@ -473,7 +499,7 @@ function PlayerScoreCard({ ep, hole, par, si, score, allHoleScores, courseStroke
 }
 
 // ─── Traditional Scorecard View ────────────────────────────────────
-function TraditionalScorecard({ event, course, groupPlayers, scores, isComplete, onEdit, homeLink }) {
+function TraditionalScorecard({ event, course, groupPlayers, scores, isComplete, canEdit, onEdit, homeLink }) {
   const pars  = course.par_per_hole  // array[18]
   const front = pars.slice(0, 9)
   const back  = pars.slice(9, 18)
@@ -538,20 +564,12 @@ function TraditionalScorecard({ event, course, groupPlayers, scores, isComplete,
           </div>
         </div>
         <div className="px-4 pb-3 flex gap-2">
-          {!isComplete && (
+          {canEdit && (
             <button
               onClick={onEdit}
               className="text-xs bg-white/10 hover:bg-white/20 text-white px-3 py-1.5 rounded-lg transition-colors"
             >
-              ← Edit Scores
-            </button>
-          )}
-          {isComplete && (
-            <button
-              onClick={onEdit}
-              className="text-xs bg-white/10 hover:bg-white/20 text-white px-3 py-1.5 rounded-lg transition-colors"
-            >
-              ✏ Edit Scores
+              {isComplete ? '✏ Edit Scores' : '← Edit Scores'}
             </button>
           )}
         </div>
