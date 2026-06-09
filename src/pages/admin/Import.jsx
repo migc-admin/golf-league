@@ -154,10 +154,10 @@ function PreviewTable({ headers, rows, statusKey = '_status', messageKey = '_mes
 }
 
 // ─── Tab 1: Import Players ─────────────────────────────────────────
-const PLAYERS_TEMPLATE = `first_name,last_name,email,handicap_index
-Tony,Alvarez,tony@example.com,5.2
-Dave,Kowalski,dave@example.com,11.1
-Sarah,Okonkwo,sarah@example.com,18.7`
+const PLAYERS_TEMPLATE = `first_name,last_name,email,handicap_index,role
+Tony,Alvarez,tony@example.com,5.2,player
+Dave,Kowalski,dave@example.com,11.1,player
+Sarah,Okonkwo,sarah@example.com,18.7,admin`
 
 function ImportPlayers() {
   const [rows,      setRows]      = useState([])
@@ -198,17 +198,27 @@ function ImportPlayers() {
         }
       }
 
-      const payload = { first_name: first, last_name: last }
+      const role = row['role']?.trim().toLowerCase() || 'player'
+      const payload = { first_name: first, last_name: last, intended_role: role }
       if (email) payload.email = email
-      if (!isNaN(hi)) payload.handicap_index = hi  // stored in players for reference
+      if (!isNaN(hi)) payload.handicap_index = hi
 
       const { error } = await supabase.from('players').insert(payload)
       if (error) {
         updated[i] = { ...row, _status: 'error', _message: error.message }
-      } else {
-        updated[i] = { ...row, _status: 'imported', _message: null }
+        setRows([...updated])
+        continue
       }
 
+      // If role is admin/scorekeeper and email exists, update the matching profile
+      if (email && role !== 'player') {
+        const { data: prof } = await supabase.from('profiles').select('id').eq('email', email).maybeSingle()
+        if (prof) {
+          await supabase.from('profiles').update({ role }).eq('id', prof.id)
+        }
+      }
+
+      updated[i] = { ...row, _status: 'imported', _message: null }
       setRows([...updated])
     }
 
@@ -241,14 +251,15 @@ function ImportPlayers() {
         />
         <div className="bg-gray-900 rounded-lg px-4 py-3 text-xs text-gray-300 font-mono overflow-x-auto">
           <div className="text-gray-500 mb-1"># players_template.csv</div>
-          <div>first_name,last_name,email,handicap_index</div>
-          <div className="text-gray-500">Tony,Alvarez,tony@example.com,5.2</div>
-          <div className="text-gray-500">Dave,Kowalski,dave@example.com,11.1</div>
+          <div>first_name,last_name,email,handicap_index,role</div>
+          <div className="text-gray-500">Tony,Alvarez,tony@example.com,5.2,player</div>
+          <div className="text-gray-500">Dave,Kowalski,dave@example.com,11.1,admin</div>
         </div>
         <ul className="mt-3 text-xs text-gray-500 space-y-1 list-disc list-inside">
           <li><strong>first_name</strong> and <strong>last_name</strong> are required</li>
           <li><strong>email</strong> is optional but used to prevent duplicates</li>
           <li><strong>handicap_index</strong> is optional here — you set it per event when adding to a roster</li>
+          <li><strong>role</strong> — <code>player</code> (default), <code>admin</code>, or <code>scorekeeper</code>. If an account with that email exists, the role is applied immediately.</li>
           <li>Players already in the system (matching email) will be skipped</li>
         </ul>
       </Card>
@@ -285,25 +296,43 @@ function ImportPlayers() {
 }
 
 // ─── Tab 2: Import Course ──────────────────────────────────────────
-const COURSE_TEMPLATE = `course_name,slope,rating,hole,par,yardage,stroke_index
-Torrey Pines South,144,74.6,1,4,452,3
-Torrey Pines South,144,74.6,2,4,388,9
-Torrey Pines South,144,74.6,3,3,196,15
-Torrey Pines South,144,74.6,4,4,490,7
-Torrey Pines South,144,74.6,5,4,486,1
-Torrey Pines South,144,74.6,6,3,148,17
-Torrey Pines South,144,74.6,7,4,442,11
-Torrey Pines South,144,74.6,8,5,566,5
-Torrey Pines South,144,74.6,9,5,515,13
-Torrey Pines South,144,74.6,10,4,415,6
-Torrey Pines South,144,74.6,11,4,395,14
-Torrey Pines South,144,74.6,12,3,178,18
-Torrey Pines South,144,74.6,13,5,558,2
-Torrey Pines South,144,74.6,14,4,371,10
-Torrey Pines South,144,74.6,15,3,173,16
-Torrey Pines South,144,74.6,16,4,370,12
-Torrey Pines South,144,74.6,17,5,510,4
-Torrey Pines South,144,74.6,18,4,450,8`
+const COURSE_TEMPLATE = `course_name,tee,slope,rating,hole,par,yardage,stroke_index
+Torrey Pines South,Back,144,74.6,1,4,452,3
+Torrey Pines South,Back,144,74.6,2,4,388,9
+Torrey Pines South,Back,144,74.6,3,3,196,15
+Torrey Pines South,Back,144,74.6,4,4,490,7
+Torrey Pines South,Back,144,74.6,5,4,486,1
+Torrey Pines South,Back,144,74.6,6,3,148,17
+Torrey Pines South,Back,144,74.6,7,4,442,11
+Torrey Pines South,Back,144,74.6,8,5,566,5
+Torrey Pines South,Back,144,74.6,9,5,515,13
+Torrey Pines South,Back,144,74.6,10,4,415,6
+Torrey Pines South,Back,144,74.6,11,4,395,14
+Torrey Pines South,Back,144,74.6,12,3,178,18
+Torrey Pines South,Back,144,74.6,13,5,558,2
+Torrey Pines South,Back,144,74.6,14,4,371,10
+Torrey Pines South,Back,144,74.6,15,3,173,16
+Torrey Pines South,Back,144,74.6,16,4,370,12
+Torrey Pines South,Back,144,74.6,17,5,510,4
+Torrey Pines South,Back,144,74.6,18,4,450,8
+Torrey Pines South,Middle,130,72.1,1,4,420,3
+Torrey Pines South,Middle,130,72.1,2,4,365,9
+Torrey Pines South,Middle,130,72.1,3,3,175,15
+Torrey Pines South,Middle,130,72.1,4,4,460,7
+Torrey Pines South,Middle,130,72.1,5,4,455,1
+Torrey Pines South,Middle,130,72.1,6,3,130,17
+Torrey Pines South,Middle,130,72.1,7,4,415,11
+Torrey Pines South,Middle,130,72.1,8,5,540,5
+Torrey Pines South,Middle,130,72.1,9,5,490,13
+Torrey Pines South,Middle,130,72.1,10,4,390,6
+Torrey Pines South,Middle,130,72.1,11,4,370,14
+Torrey Pines South,Middle,130,72.1,12,3,160,18
+Torrey Pines South,Middle,130,72.1,13,5,530,2
+Torrey Pines South,Middle,130,72.1,14,4,350,10
+Torrey Pines South,Middle,130,72.1,15,3,155,16
+Torrey Pines South,Middle,130,72.1,16,4,345,12
+Torrey Pines South,Middle,130,72.1,17,5,485,4
+Torrey Pines South,Middle,130,72.1,18,4,425,8`
 
 function ImportCourse() {
   const [rows,      setRows]      = useState([])
@@ -319,8 +348,7 @@ function ImportCourse() {
     setHeaders(headers)
     setRows(rows)
 
-    // Assemble preview
-    if (rows.length === 18) {
+    if (rows.length > 0 && rows.length % 18 === 0) {
       try {
         const assembled = assembleCourse(rows)
         setPreview(assembled)
@@ -331,33 +359,63 @@ function ImportCourse() {
   }
 
   function assembleCourse(rows) {
-    if (rows.length !== 18) throw new Error('CSV must have exactly 18 hole rows')
-    const sorted = [...rows].sort((a, b) => parseInt(a.hole) - parseInt(b.hole))
+    if (rows.length === 0 || rows.length % 18 !== 0) {
+      throw new Error(`Row count must be a multiple of 18 (got ${rows.length}). One tee = 18 rows.`)
+    }
 
-    const name   = sorted[0].course_name?.trim()
-    const slope  = parseInt(sorted[0].slope)
-    const rating = parseFloat(sorted[0].rating)
-    if (!name)        throw new Error('Missing course_name')
-    if (isNaN(slope)) throw new Error('Missing or invalid slope')
-    if (isNaN(rating)) throw new Error('Missing or invalid rating')
+    const name = rows[0].course_name?.trim()
+    if (!name) throw new Error('Missing course_name')
 
-    const par_per_hole  = sorted.map(r => parseInt(r.par))
-    const yardage       = sorted.map(r => parseInt(r.yardage))
-    const stroke_index  = sorted.map(r => parseInt(r.stroke_index))
-    const hole_type     = par_per_hole.map(p => p === 3 ? 'par3' : p === 5 ? 'par5' : 'par4')
-    const par           = par_per_hole.reduce((a, b) => a + b, 0)
+    // Group rows by tee name (or use a default 'Back' if no tee column)
+    const teeGroups = {}
+    const teeOrder  = []
+    for (const row of rows) {
+      const teeName = row['tee']?.trim() || 'Back'
+      if (!teeGroups[teeName]) { teeGroups[teeName] = []; teeOrder.push(teeName) }
+      teeGroups[teeName].push(row)
+    }
 
-    if (par_per_hole.some(isNaN))   throw new Error('Invalid par value in one or more holes')
-    if (yardage.some(isNaN))        throw new Error('Invalid yardage in one or more holes')
-    if (stroke_index.some(isNaN))   throw new Error('Invalid stroke_index in one or more holes')
+    // Use first tee group for par/stroke_index (same for all tees)
+    const firstTee = teeOrder[0]
+    const base = [...teeGroups[firstTee]].sort((a, b) => parseInt(a.hole) - parseInt(b.hole))
 
-    // Validate stroke_index is 1-18 with no duplicates
+    if (base.length !== 18) throw new Error(`Each tee must have exactly 18 rows (${firstTee} has ${base.length})`)
+
+    const par_per_hole = base.map(r => parseInt(r.par))
+    const stroke_index = base.map(r => parseInt(r.stroke_index))
+    const hole_type    = par_per_hole.map(p => p === 3 ? 'par3' : p === 5 ? 'par5' : 'par4')
+    const par          = par_per_hole.reduce((a, b) => a + b, 0)
+
+    if (par_per_hole.some(isNaN)) throw new Error('Invalid par value in one or more holes')
+    if (stroke_index.some(isNaN)) throw new Error('Invalid stroke_index in one or more holes')
+
     const siSet = new Set(stroke_index)
     if (siSet.size !== 18 || Math.min(...stroke_index) !== 1 || Math.max(...stroke_index) !== 18) {
       throw new Error('stroke_index must be unique values 1–18')
     }
 
-    return { name, slope, rating, par, par_per_hole, yardage, stroke_index, hole_type }
+    // Build tees array
+    const tees = teeOrder.map(teeName => {
+      const group  = [...teeGroups[teeName]].sort((a, b) => parseInt(a.hole) - parseInt(b.hole))
+      const slope  = parseInt(group[0].slope)
+      const rating = parseFloat(group[0].rating)
+      if (isNaN(slope))  throw new Error(`Missing or invalid slope for tee "${teeName}"`)
+      if (isNaN(rating)) throw new Error(`Missing or invalid rating for tee "${teeName}"`)
+      const yardage = group.map(r => parseInt(r.yardage))
+      if (yardage.some(isNaN)) throw new Error(`Invalid yardage for tee "${teeName}"`)
+      return { name: teeName, color: '', slope, rating, yardage }
+    })
+
+    // Primary tee (index 0) used for backward-compat fields
+    const primary = tees[0]
+
+    return {
+      name, par, par_per_hole, stroke_index, hole_type,
+      slope:   primary.slope,
+      rating:  primary.rating,
+      yardage: primary.yardage,
+      tees,
+    }
   }
 
   async function runImport() {
@@ -391,7 +449,7 @@ function ImportCourse() {
       <Card>
         <CardHeader
           title="Step 1 — Download the template"
-          subtitle="One row per hole (18 rows required). course_name, slope, and rating repeat on every row."
+          subtitle="One row per hole per tee. For multiple tees, repeat all 18 holes for each tee set."
           action={
             <Button
               size="sm" variant="secondary"
@@ -402,18 +460,20 @@ function ImportCourse() {
           }
         />
         <div className="bg-gray-900 rounded-lg px-4 py-3 text-xs text-gray-300 font-mono overflow-x-auto">
-          <div className="text-gray-500 mb-1"># course_template.csv</div>
-          <div>course_name,slope,rating,hole,par,yardage,stroke_index</div>
-          <div className="text-gray-500">Torrey Pines South,144,74.6,1,4,452,3</div>
-          <div className="text-gray-500">Torrey Pines South,144,74.6,2,4,388,9</div>
-          <div className="text-gray-500">... (18 rows total)</div>
+          <div className="text-gray-500 mb-1"># course_template.csv — 2 tees × 18 holes = 36 rows</div>
+          <div>course_name,tee,slope,rating,hole,par,yardage,stroke_index</div>
+          <div className="text-gray-500">Torrey Pines South,Back,144,74.6,1,4,452,3</div>
+          <div className="text-gray-500">... (18 Back rows, then 18 Middle rows)</div>
+          <div className="text-gray-500">Torrey Pines South,Middle,130,72.1,1,4,420,3</div>
+          <div className="text-gray-500">...</div>
         </div>
         <ul className="mt-3 text-xs text-gray-500 space-y-1 list-disc list-inside">
-          <li><strong>slope</strong> — from the scorecard (e.g. 128)</li>
-          <li><strong>rating</strong> — course rating e.g. 71.4</li>
+          <li><strong>tee</strong> — tee name, e.g. Back, Middle, Forward. Repeat all 18 rows per tee.</li>
+          <li><strong>slope</strong> and <strong>rating</strong> are per-tee (repeat the same value for all 18 rows of that tee)</li>
           <li><strong>hole</strong> — 1 through 18</li>
-          <li><strong>par</strong> — 3, 4, or 5</li>
+          <li><strong>par</strong> and <strong>stroke_index</strong> are course-level (same across all tees)</li>
           <li><strong>stroke_index</strong> — USGA handicap allocation, unique values 1–18 (1 = hardest hole)</li>
+          <li>Single tee: just 18 rows. Three tees: 54 rows total.</li>
         </ul>
       </Card>
 
@@ -421,9 +481,9 @@ function ImportCourse() {
       <Card>
         <CardHeader title="Step 2 — Upload your CSV" />
         <FileDropZone onFile={handleFile} />
-        {rows.length > 0 && rows.length !== 18 && (
+        {rows.length > 0 && rows.length % 18 !== 0 && (
           <p className="mt-3 text-sm text-red-600 font-medium">
-            ✕ Found {rows.length} rows — need exactly 18 (one per hole).
+            ✕ Found {rows.length} rows — must be a multiple of 18 (18 per tee).
           </p>
         )}
       </Card>
@@ -439,21 +499,21 @@ function ImportCourse() {
               </Button>
             }
           />
-          <div className="grid grid-cols-3 gap-4 text-sm mb-4">
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-sm mb-4">
             <div className="bg-gray-50 rounded-lg p-3">
-              <div className="text-xs text-gray-400 mb-1">Slope / Rating</div>
-              <div className="font-bold text-gray-900">{preview.slope} / {preview.rating}</div>
+              <div className="text-xs text-gray-400 mb-1">Tees</div>
+              <div className="font-bold text-gray-900">{preview.tees.length}</div>
             </div>
             <div className="bg-gray-50 rounded-lg p-3">
               <div className="text-xs text-gray-400 mb-1">Total Par</div>
               <div className="font-bold text-gray-900">{preview.par}</div>
             </div>
-            <div className="bg-gray-50 rounded-lg p-3">
-              <div className="text-xs text-gray-400 mb-1">Par 3 / 4 / 5</div>
-              <div className="font-bold text-gray-900">
-                {preview.par_per_hole.filter(p => p === 3).length} /&nbsp;
-                {preview.par_per_hole.filter(p => p === 4).length} /&nbsp;
-                {preview.par_per_hole.filter(p => p === 5).length}
+            <div className="bg-gray-50 rounded-lg p-3 col-span-2">
+              <div className="text-xs text-gray-400 mb-1">Tee Sets</div>
+              <div className="font-bold text-gray-900 text-xs space-y-0.5">
+                {preview.tees.map(t => (
+                  <div key={t.name}>{t.name}: Slope {t.slope} / Rating {t.rating}</div>
+                ))}
               </div>
             </div>
           </div>
@@ -477,8 +537,8 @@ function ImportCourse() {
                   ))}
                 </tr>
                 <tr className="border-b border-gray-100">
-                  <td className="px-2 py-2 text-left text-gray-500 font-medium">Yards</td>
-                  {preview.yardage.map((y, i) => (
+                  <td className="px-2 py-2 text-left text-gray-500 font-medium">{preview.tees[0]?.name} Yds</td>
+                  {preview.tees[0]?.yardage.map((y, i) => (
                     <td key={i} className="px-2 py-2 text-gray-600">{y}</td>
                   ))}
                 </tr>
@@ -504,11 +564,11 @@ function ImportCourse() {
 }
 
 // ─── Tab 3: Import Event Roster ────────────────────────────────────
-const ROSTER_TEMPLATE = `first_name,last_name,handicap_index,flight,tournament_wins
-Tony,Alvarez,5.2,A,0
-Dave,Kowalski,11.1,A,1
-Bob,Nguyen,15.3,B,0
-Sarah,Okonkwo,18.7,B,0`
+const ROSTER_TEMPLATE = `first_name,last_name,handicap_index,flight
+Tony,Alvarez,5.2,A
+Dave,Kowalski,11.1,A
+Bob,Nguyen,15.3,B
+Sarah,Okonkwo,18.7,B`
 
 function ImportRoster() {
   const [events,    setEvents]    = useState([])
@@ -547,11 +607,10 @@ function ImportRoster() {
       .single()
 
     for (let i = 0; i < updated.length; i++) {
-      const row   = updated[i]
+      const row    = updated[i]
       const first  = row['first_name']?.trim()
       const last   = row['last_name']?.trim()
       const hi     = parseFloat(row['handicap_index'])
-      const wins   = parseInt(row['tournament_wins'] ?? '0', 10) || 0
       const flight = row['flight']?.trim().toUpperCase() || null
 
       if (!first || !last) {
@@ -621,7 +680,6 @@ function ImportRoster() {
         handicap_index:          hi,
         adjusted_handicap_index: hi,
         course_handicap,
-        tournament_wins_prior:   wins,
         ...(flight ? { flight } : {}),
       })
 
@@ -662,17 +720,15 @@ function ImportRoster() {
         />
         <div className="bg-gray-900 rounded-lg px-4 py-3 text-xs text-gray-300 font-mono overflow-x-auto">
           <div className="text-gray-500 mb-1"># roster_template.csv</div>
-          <div>first_name,last_name,handicap_index,tournament_wins</div>
-          <div className="text-gray-500">Tony,Alvarez,5.2,0</div>
-          <div className="text-gray-500">Dave,Kowalski,11.1,1</div>
+          <div>first_name,last_name,handicap_index,flight</div>
+          <div className="text-gray-500">Tony,Alvarez,5.2,A</div>
+          <div className="text-gray-500">Dave,Kowalski,11.1,A</div>
         </div>
         <ul className="mt-3 text-xs text-gray-500 space-y-1 list-disc list-inside">
-          <li><strong>handicap_index</strong> — current USGA handicap index (e.g. 14.2)</li>
-          <li><strong>flight</strong> — A or B. If you include this, flights are set on import and you skip the auto-assignment step</li>
-          <li><strong>tournament_wins</strong> — wins <em>this season</em> for handicap reduction (0, 1, or 2+)</li>
-          <li>If a player matches by first + last name they are reused, not duplicated — no double entries</li>
+          <li><strong>handicap_index</strong> — current USGA handicap index for this event (e.g. 14.2)</li>
+          <li><strong>flight</strong> — A or B. If included, flights are set on import.</li>
+          <li>If a player matches by first + last name they are reused, not duplicated</li>
           <li>Course handicap is computed automatically from the event's course</li>
-          <li>If you leave <strong>flight</strong> blank, run <strong>Flight Assignment</strong> in the event after import</li>
         </ul>
       </Card>
 

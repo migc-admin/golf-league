@@ -176,16 +176,25 @@ function LeagueModal({ open, onClose, editing, onSaved }) {
   )
 }
 
+const SIDE_GAME_OPTIONS = [
+  { key: 'skins_a',    label: 'Skins — Flight A' },
+  { key: 'skins_b',    label: 'Skins — Flight B' },
+  { key: 'long_drive', label: 'Long Drive (A & B)' },
+  { key: 'low_putts',  label: 'Low Putts' },
+  { key: 'ctp',        label: 'Closest to Pin (par 3s)' },
+]
+
 function EventModal({ open, onClose, league, onSaved }) {
-  const [courses,   setCourses]   = useState([])
-  const [courseId,  setCourseId]  = useState('')
-  const [eventDate, setEventDate] = useState('')
-  const [eventNum,  setEventNum]  = useState(1)
-  const [entryFee,  setEntryFee]  = useState('20')
-  const [format,    setFormat]    = useState('net_stroke')
-  const [startTime, setStartTime] = useState('')
-  const [interval,  setInterval]  = useState(10)
-  const [saving,    setSaving]    = useState(false)
+  const [courses,    setCourses]    = useState([])
+  const [courseId,   setCourseId]   = useState('')
+  const [eventDate,  setEventDate]  = useState('')
+  const [eventNum,   setEventNum]   = useState(1)
+  const [entryFee,   setEntryFee]   = useState('20')
+  const [format,     setFormat]     = useState('net_stroke')
+  const [sideGames,  setSideGames]  = useState(new Set())
+  const [startTime,  setStartTime]  = useState('')
+  const [interval,   setInterval]   = useState(10)
+  const [saving,     setSaving]     = useState(false)
 
   useEffect(() => {
     if (!open) return
@@ -198,9 +207,18 @@ function EventModal({ open, onClose, league, onSaved }) {
     setCourseId('')
     setEntryFee('20')
     setFormat('net_stroke')
+    setSideGames(new Set())
     setStartTime('')
     setInterval(10)
   }, [open, league])
+
+  function toggleSideGame(key) {
+    setSideGames(prev => {
+      const next = new Set(prev)
+      next.has(key) ? next.delete(key) : next.add(key)
+      return next
+    })
+  }
 
   async function handleSave(e) {
     e.preventDefault()
@@ -213,6 +231,7 @@ function EventModal({ open, onClose, league, onSaved }) {
       event_number:           parseInt(eventNum, 10),
       entry_fee:              parseFloat(entryFee),
       format,
+      side_game_options:      [...sideGames],
       start_time:             startTime || null,
       tee_time_interval_mins: parseInt(interval, 10),
       status:                 'upcoming',
@@ -222,8 +241,21 @@ function EventModal({ open, onClose, league, onSaved }) {
     else { toast.success('Event created'); onSaved() }
   }
 
+  const FORMAT_OPTIONS = [
+    { group: 'Net Stroke Play', options: [
+      { value: 'net_stroke',       label: '18-Hole Overall Net' },
+      { value: 'net_stroke_front9', label: 'Front Nine Net' },
+      { value: 'net_stroke_back9',  label: 'Back Nine Net' },
+    ]},
+    { group: 'Other Formats', options: [
+      { value: 'stableford',   label: 'Stableford' },
+      { value: 'match_points', label: 'Match Play Points' },
+      { value: 'ryder_cup',    label: 'Ryder Cup' },
+    ]},
+  ]
+
   return (
-    <Modal open={open} onClose={onClose} title={`New Event — ${league?.name ?? ''}`}>
+    <Modal open={open} onClose={onClose} title={`New Event — ${league?.name ?? ''}`} maxWidth="max-w-lg">
       <form onSubmit={handleSave} className="space-y-4">
         <div className="grid grid-cols-2 gap-4">
           <Input label="Event #" type="number" min="1" value={eventNum} onChange={e => setEventNum(e.target.value)} required />
@@ -236,21 +268,50 @@ function EventModal({ open, onClose, league, onSaved }) {
             {courses.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
           </select>
         </div>
+
+        {/* Primary Format */}
         <div>
-          <label className="label">Format</label>
-          <select value={format} onChange={e => setFormat(e.target.value)} className="input bg-white">
-            <optgroup label="Net Stroke Play (Default)">
-              <option value="net_stroke">18-Hole Overall Net</option>
-              <option value="net_stroke_front9">Front Nine Net</option>
-              <option value="net_stroke_back9">Back Nine Net</option>
-            </optgroup>
-            <optgroup label="Other Formats">
-              <option value="stableford">Stableford</option>
-              <option value="match_points">Match Play Points</option>
-              <option value="ryder_cup">Ryder Cup</option>
-            </optgroup>
-          </select>
+          <label className="label">Primary Format</label>
+          <div className="space-y-1.5">
+            {FORMAT_OPTIONS.map(group => (
+              <div key={group.group}>
+                <div className="text-xs text-gray-400 font-medium uppercase tracking-wide mb-1">{group.group}</div>
+                {group.options.map(opt => (
+                  <label key={opt.value} className="flex items-center gap-2.5 py-1 cursor-pointer">
+                    <input
+                      type="radio"
+                      name="format"
+                      value={opt.value}
+                      checked={format === opt.value}
+                      onChange={() => setFormat(opt.value)}
+                      className="accent-fairway-600"
+                    />
+                    <span className="text-sm text-gray-800">{opt.label}</span>
+                  </label>
+                ))}
+              </div>
+            ))}
+          </div>
         </div>
+
+        {/* Side Games */}
+        <div>
+          <label className="label">Side Games / Competitions</label>
+          <div className="space-y-1.5 bg-gray-50 rounded-xl px-4 py-3">
+            {SIDE_GAME_OPTIONS.map(opt => (
+              <label key={opt.key} className="flex items-center gap-2.5 py-0.5 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={sideGames.has(opt.key)}
+                  onChange={() => toggleSideGame(opt.key)}
+                  className="accent-fairway-600 w-4 h-4"
+                />
+                <span className="text-sm text-gray-800">{opt.label}</span>
+              </label>
+            ))}
+          </div>
+        </div>
+
         <div className="grid grid-cols-2 gap-3">
           <Input label="Start Time" type="time" value={startTime} onChange={e => setStartTime(e.target.value)} />
           <Input label="Tee Interval (min)" type="number" min="1" max="60" value={interval} onChange={e => setInterval(e.target.value)} />

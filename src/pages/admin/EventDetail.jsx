@@ -346,75 +346,131 @@ function TabFlights({ event, eventPlayers, course, allPlayers, onUpdated }) {
 }
 
 function AddPlayerModal({ open, onClose, eventId, available, course, onSaved }) {
-  const [playerId,  setPlayerId]  = useState('')
-  const [handicap,  setHandicap]  = useState('')
-  const [wins,      setWins]      = useState(0)
-  const [flight,    setFlight]    = useState('')
-  const [saving,    setSaving]    = useState(false)
+  // bulk: { [playerId]: { hi, flight, checked } }
+  const [bulk,    setBulk]    = useState({})
+  const [saving,  setSaving]  = useState(false)
 
   useEffect(() => {
-    if (!open) { setPlayerId(''); setHandicap(''); setWins(0); setFlight('') }
+    if (!open) { setBulk({}) }
   }, [open])
+
+  function toggle(playerId) {
+    setBulk(prev => {
+      const next = { ...prev }
+      if (next[playerId]) {
+        delete next[playerId]
+      } else {
+        next[playerId] = { hi: '', flight: '' }
+      }
+      return next
+    })
+  }
+
+  function setField(playerId, field, value) {
+    setBulk(prev => ({ ...prev, [playerId]: { ...prev[playerId], [field]: value } }))
+  }
+
+  function selectAll() {
+    const next = {}
+    available.forEach(p => { next[p.id] = bulk[p.id] ?? { hi: '', flight: '' } })
+    setBulk(next)
+  }
+
+  function clearAll() { setBulk({}) }
+
+  const selected = Object.entries(bulk)
+  const allValid = selected.length > 0 && selected.every(([, v]) => v.hi !== '' && !isNaN(parseFloat(v.hi)))
 
   async function handleSave(e) {
     e.preventDefault()
-    if (!playerId || handicap === '') return
+    if (!allValid) return
     setSaving(true)
 
-    const hi = parseFloat(handicap)
-    const payload = {
-      event_id:              eventId,
-      player_id:             playerId,
-      handicap_index:        hi,
-      tournament_wins_prior: parseInt(wins, 10),
-      flight:                flight || null,
+    for (const [playerId, { hi, flight }] of selected) {
+      const hiVal = parseFloat(hi)
+      let course_handicap = null
+      if (course) {
+        const { slope, rating, par } = course
+        course_handicap = Math.round((hiVal * slope / 113) + (rating - par))
+      }
+      await supabase.from('event_players').insert({
+        event_id:                eventId,
+        player_id:               playerId,
+        handicap_index:          hiVal,
+        adjusted_handicap_index: hiVal,
+        course_handicap,
+        flight:                  flight || null,
+      })
     }
 
-    const { error } = await supabase.from('event_players').insert(payload)
     setSaving(false)
-    if (error) toast.error(error.message)
-    else { toast.success('Player added'); onSaved(); onClose() }
+    toast.success(`${selected.length} player${selected.length !== 1 ? 's' : ''} added`)
+    onSaved()
+    onClose()
   }
 
   return (
-    <Modal open={open} onClose={onClose} title="Add Player to Event">
+    <Modal open={open} onClose={onClose} title="Add Players to Event" maxWidth="max-w-2xl">
       <form onSubmit={handleSave} className="space-y-4">
-        <div>
-          <label className="label">Player</label>
-          <select value={playerId} onChange={e => setPlayerId(e.target.value)} className="input bg-white" required>
-            <option value="">Select player…</option>
-            {available.map(p => (
-              <option key={p.id} value={p.id}>{p.last_name}, {p.first_name}</option>
-            ))}
-          </select>
+        <div className="flex items-center justify-between">
+          <p className="text-sm text-gray-500">{available.length} players available · {selected.length} selected</p>
+          <div className="flex gap-2">
+            <button type="button" onClick={selectAll} className="text-xs text-fairway-700 hover:underline font-medium">Select All</button>
+            <span className="text-gray-300">|</span>
+            <button type="button" onClick={clearAll}  className="text-xs text-gray-500 hover:underline">Clear</button>
+          </div>
         </div>
-        <Input
-          label="Handicap Index"
-          type="number" step="0.1" min="-10" max="54"
-          value={handicap}
-          onChange={e => setHandicap(e.target.value)}
-          placeholder="e.g. 14.2"
-          required
-        />
-        <div>
-          <label className="label">Flight</label>
-          <select value={flight} onChange={e => setFlight(e.target.value)} className="input bg-white">
-            <option value="">— Unassigned —</option>
-            <option value="A">Flight A</option>
-            <option value="B">Flight B</option>
-          </select>
-        </div>
-        <div>
-          <label className="label">Tournament Wins (This Season)</label>
-          <select value={wins} onChange={e => setWins(e.target.value)} className="input bg-white">
-            <option value={0}>0 — No reduction</option>
-            <option value={1}>1 — 10% reduction</option>
-            <option value={2}>2+ — 20% reduction + 1 stroke</option>
-          </select>
-        </div>
+
+        {available.length === 0 ? (
+          <p className="text-sm text-gray-400 py-4 text-center">All players from the roster are already on this event.</p>
+        ) : (
+          <div className="max-h-96 overflow-y-auto border border-gray-200 rounded-xl divide-y divide-gray-100">
+            {available.map(p => {
+              const checked = !!bulk[p.id]
+              const vals    = bulk[p.id] ?? { hi: '', flight: '' }
+              return (
+                <div key={p.id} className={`flex items-center gap-3 px-4 py-2.5 transition-colors ${checked ? 'bg-fairway-50' : 'hover:bg-gray-50'}`}>
+                  <input
+                    type="checkbox"
+                    checked={checked}
+                    onChange={() => toggle(p.id)}
+                    className="accent-fairway-600 w-4 h-4 shrink-0"
+                  />
+                  <span className="text-sm font-medium text-gray-800 flex-1 min-w-0 truncate">
+                    {p.last_name}, {p.first_name}
+                  </span>
+                  {checked && (
+                    <>
+                      <input
+                        type="number" step="0.1" min="-10" max="54"
+                        value={vals.hi}
+                        onChange={e => setField(p.id, 'hi', e.target.value)}
+                        placeholder="HI"
+                        className="input py-1 text-xs w-20 shrink-0"
+                        required
+                      />
+                      <select
+                        value={vals.flight}
+                        onChange={e => setField(p.id, 'flight', e.target.value)}
+                        className="input py-1 text-xs w-24 shrink-0 bg-white"
+                      >
+                        <option value="">Flight?</option>
+                        <option value="A">Flight A</option>
+                        <option value="B">Flight B</option>
+                      </select>
+                    </>
+                  )}
+                </div>
+              )
+            })}
+          </div>
+        )}
+
         <div className="flex justify-end gap-3 pt-2">
           <Button type="button" variant="secondary" onClick={onClose}>Cancel</Button>
-          <Button type="submit" loading={saving}>Add to Event</Button>
+          <Button type="submit" loading={saving} disabled={!allValid}>
+            Add {selected.length > 0 ? selected.length : ''} Player{selected.length !== 1 ? 's' : ''}
+          </Button>
         </div>
       </form>
     </Modal>
