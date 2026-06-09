@@ -192,17 +192,18 @@ function RoleBadge({ role }) {
 }
 
 function PlayerModal({ open, onClose, editing, onSaved }) {
-  const [form,   setForm]   = useState({ first_name: '', last_name: '', email: '', ghin_number: '' })
+  const [form,   setForm]   = useState({ first_name: '', last_name: '', email: '', ghin_number: '', intended_role: 'player' })
   const [saving, setSaving] = useState(false)
 
   useEffect(() => {
     if (editing) setForm({
-      first_name:  editing.first_name,
-      last_name:   editing.last_name,
-      email:       editing.email ?? '',
-      ghin_number: editing.ghin_number ?? '',
+      first_name:    editing.first_name,
+      last_name:     editing.last_name,
+      email:         editing.email ?? '',
+      ghin_number:   editing.ghin_number ?? '',
+      intended_role: editing.intended_role ?? 'player',
     })
-    else setForm({ first_name: '', last_name: '', email: '', ghin_number: '' })
+    else setForm({ first_name: '', last_name: '', email: '', ghin_number: '', intended_role: 'player' })
   }, [editing, open])
 
   function setField(k, v) { setForm(f => ({ ...f, [k]: v })) }
@@ -211,14 +212,29 @@ function PlayerModal({ open, onClose, editing, onSaved }) {
     e.preventDefault()
     setSaving(true)
     const payload = {
-      first_name:  form.first_name.trim(),
-      last_name:   form.last_name.trim(),
-      email:       form.email.trim() || null,
-      ghin_number: form.ghin_number.trim() || null,
+      first_name:    form.first_name.trim(),
+      last_name:     form.last_name.trim(),
+      email:         form.email.trim() || null,
+      ghin_number:   form.ghin_number.trim() || null,
+      intended_role: form.intended_role,
     }
     const { error } = editing
       ? await supabase.from('players').update(payload).eq('id', editing.id)
       : await supabase.from('players').insert(payload)
+
+    // If an email is provided and role is not 'player', update the matching profile immediately
+    if (!error && payload.email && payload.intended_role !== 'player') {
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('id')
+        .eq('email', payload.email)
+        .maybeSingle()
+      if (profile) {
+        const roleMap = { admin: 'admin', scorekeeper: 'scorekeeper' }
+        await supabase.from('profiles').update({ role: roleMap[payload.intended_role] ?? 'none' }).eq('id', profile.id)
+      }
+    }
+
     setSaving(false)
     if (error) toast.error(error.message)
     else { toast.success(editing ? 'Player updated' : 'Player added'); onSaved() }
@@ -233,6 +249,17 @@ function PlayerModal({ open, onClose, editing, onSaved }) {
         </div>
         <Input label="Email (optional)"       type="email" value={form.email}       onChange={e => setField('email',       e.target.value)} placeholder="player@example.com" />
         <Input label="GHIN Number (optional)"             value={form.ghin_number} onChange={e => setField('ghin_number', e.target.value)} placeholder="1234567" />
+        <div>
+          <label className="label">Role</label>
+          <select value={form.intended_role} onChange={e => setField('intended_role', e.target.value)} className="input bg-white">
+            <option value="player">Player</option>
+            <option value="admin">Admin</option>
+            <option value="scorekeeper">Scorekeeper</option>
+          </select>
+          <p className="text-xs text-gray-400 mt-1">
+            Admin and Scorekeeper roles are applied immediately if a matching email account exists.
+          </p>
+        </div>
         <div className="flex justify-end gap-3 pt-2">
           <Button type="button" variant="secondary" onClick={onClose}>Cancel</Button>
           <Button type="submit" loading={saving}>{editing ? 'Save' : 'Add Player'}</Button>
