@@ -184,13 +184,26 @@ const SIDE_GAME_OPTIONS = [
   { key: 'ctp',        label: 'Closest to Pin (par 3s)' },
 ]
 
+const FORMAT_OPTIONS = [
+  { group: 'Net Stroke Play', options: [
+    { value: 'net_stroke',        label: '18-Hole Overall Net' },
+    { value: 'net_stroke_front9', label: 'Front Nine Net' },
+    { value: 'net_stroke_back9',  label: 'Back Nine Net' },
+  ]},
+  { group: 'Other Formats', options: [
+    { value: 'stableford',   label: 'Stableford' },
+    { value: 'match_points', label: 'Match Play Points' },
+    { value: 'ryder_cup',    label: 'Ryder Cup' },
+  ]},
+]
+
 function EventModal({ open, onClose, league, onSaved }) {
   const [courses,    setCourses]    = useState([])
   const [courseId,   setCourseId]   = useState('')
   const [eventDate,  setEventDate]  = useState('')
   const [eventNum,   setEventNum]   = useState(1)
   const [entryFee,   setEntryFee]   = useState('20')
-  const [format,     setFormat]     = useState('net_stroke')
+  const [formats,    setFormats]    = useState(new Set(['net_stroke']))
   const [sideGames,  setSideGames]  = useState(new Set())
   const [startTime,  setStartTime]  = useState('')
   const [interval,   setInterval]   = useState(10)
@@ -206,11 +219,19 @@ function EventModal({ open, onClose, league, onSaved }) {
     setEventDate('')
     setCourseId('')
     setEntryFee('20')
-    setFormat('net_stroke')
+    setFormats(new Set(['net_stroke']))
     setSideGames(new Set())
     setStartTime('')
     setInterval(10)
   }, [open, league])
+
+  function toggleFormat(key) {
+    setFormats(prev => {
+      const next = new Set(prev)
+      next.has(key) ? next.delete(key) : next.add(key)
+      return next
+    })
+  }
 
   function toggleSideGame(key) {
     setSideGames(prev => {
@@ -222,15 +243,17 @@ function EventModal({ open, onClose, league, onSaved }) {
 
   async function handleSave(e) {
     e.preventDefault()
-    if (!courseId || !eventDate) return
+    if (!courseId || !eventDate || formats.size === 0) return
     setSaving(true)
+    const formatsArr = [...formats]
     const { error } = await supabase.from('events').insert({
       league_id:              league.id,
       course_id:              courseId,
       event_date:             eventDate,
       event_number:           parseInt(eventNum, 10),
       entry_fee:              parseFloat(entryFee),
-      format,
+      format:                 formatsArr[0],   // primary format for backward compat
+      formats:                formatsArr,
       side_game_options:      [...sideGames],
       start_time:             startTime || null,
       tee_time_interval_mins: parseInt(interval, 10),
@@ -240,19 +263,6 @@ function EventModal({ open, onClose, league, onSaved }) {
     if (error) toast.error(error.message)
     else { toast.success('Event created'); onSaved() }
   }
-
-  const FORMAT_OPTIONS = [
-    { group: 'Net Stroke Play', options: [
-      { value: 'net_stroke',       label: '18-Hole Overall Net' },
-      { value: 'net_stroke_front9', label: 'Front Nine Net' },
-      { value: 'net_stroke_back9',  label: 'Back Nine Net' },
-    ]},
-    { group: 'Other Formats', options: [
-      { value: 'stableford',   label: 'Stableford' },
-      { value: 'match_points', label: 'Match Play Points' },
-      { value: 'ryder_cup',    label: 'Ryder Cup' },
-    ]},
-  ]
 
   return (
     <Modal open={open} onClose={onClose} title={`New Event — ${league?.name ?? ''}`} maxWidth="max-w-lg">
@@ -269,29 +279,32 @@ function EventModal({ open, onClose, league, onSaved }) {
           </select>
         </div>
 
-        {/* Primary Format */}
+        {/* Formats — multi-select checkboxes */}
         <div>
-          <label className="label">Primary Format</label>
-          <div className="space-y-1.5">
+          <label className="label">Scoring Formats</label>
+          <div className="bg-gray-50 rounded-xl px-4 py-3 space-y-3">
             {FORMAT_OPTIONS.map(group => (
               <div key={group.group}>
-                <div className="text-xs text-gray-400 font-medium uppercase tracking-wide mb-1">{group.group}</div>
-                {group.options.map(opt => (
-                  <label key={opt.value} className="flex items-center gap-2.5 py-1 cursor-pointer">
-                    <input
-                      type="radio"
-                      name="format"
-                      value={opt.value}
-                      checked={format === opt.value}
-                      onChange={() => setFormat(opt.value)}
-                      className="accent-fairway-600"
-                    />
-                    <span className="text-sm text-gray-800">{opt.label}</span>
-                  </label>
-                ))}
+                <div className="text-xs text-gray-400 font-medium uppercase tracking-wide mb-1.5">{group.group}</div>
+                <div className="space-y-1.5">
+                  {group.options.map(opt => (
+                    <label key={opt.value} className="flex items-center gap-2.5 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={formats.has(opt.value)}
+                        onChange={() => toggleFormat(opt.value)}
+                        className="accent-fairway-600 w-4 h-4"
+                      />
+                      <span className="text-sm text-gray-800">{opt.label}</span>
+                    </label>
+                  ))}
+                </div>
               </div>
             ))}
           </div>
+          {formats.size === 0 && (
+            <p className="text-xs text-red-500 mt-1">Select at least one format.</p>
+          )}
         </div>
 
         {/* Side Games */}
