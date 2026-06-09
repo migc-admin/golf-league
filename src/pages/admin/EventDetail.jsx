@@ -697,11 +697,7 @@ function TabPayoutConfig({ event, eventPlayers, course, onUpdated }) {
 
   useEffect(() => {
     const base = { ...DEFAULT_PAYOUT_CONFIG }
-    // CTP keys are per-flight: ctp_5_a, ctp_5_b
-    par3Holes.forEach(h => {
-      base[`ctp_${h.hole}_a`] = 0
-      base[`ctp_${h.hole}_b`] = 0
-    })
+    par3Holes.forEach(h => { base[`ctp_${h.hole}`] = 0 })
     const merged = { ...base, ...(event.payout_config ?? {}) }
     setConfig(merged)
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -719,9 +715,12 @@ function TabPayoutConfig({ event, eventPlayers, course, onUpdated }) {
     else { toast.success('Payout config saved'); onUpdated() }
   }
 
+  const totalPlayers = eventPlayers.length
+
   function getMultiplier(key) {
-    const isB = key.endsWith('_b') || key.includes('_b_') || key === 'skins_b'
-    return isB ? flightB : flightA
+    if (key === 'low_putts' || key.startsWith('ctp_')) return totalPlayers  // full field
+    if (key === 'skins_b' || key.includes('_b_') || key === 'long_drive_b') return flightB
+    return flightA
   }
 
   const totalAllocated = Object.entries(config).reduce((sum, [k, v]) => sum + ((v || 0) * getMultiplier(k)), 0)
@@ -729,23 +728,22 @@ function TabPayoutConfig({ event, eventPlayers, course, onUpdated }) {
   const overBudget     = totalAllocated > totalPot
 
   const rows = Object.entries(config).map(([key, val]) => {
-    const isFlightB = key.endsWith('_b') || key.includes('_b_') || key === 'skins_b'
+    const isField   = key === 'low_putts' || key.startsWith('ctp_')
+    const isFlightB = !isField && (key === 'skins_b' || key.includes('_b_') || key === 'long_drive_b')
+    const isFlightA = !isField && !isFlightB
     const mult  = getMultiplier(key)
     const total = (val || 0) * mult
     const label = key.startsWith('ctp_')
-      ? (() => { const parts = key.split('_'); return ctpLabel(parseInt(parts[1], 10), parts[2]?.toUpperCase()) })()
+      ? ctpLabel(parseInt(key.replace('ctp_', ''), 10))
       : (CATEGORY_LABELS[key] ?? key)
-    return { key, val, label, isFlightB, mult, total }
+    return { key, val, label, isField, isFlightA, isFlightB, mult, total }
   })
-
-  const rowsA = rows.filter(r => !r.isFlightB)
-  const rowsB = rows.filter(r =>  r.isFlightB)
 
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between flex-wrap gap-2">
         <div className="text-sm text-gray-600 space-y-0.5">
-          <p>Flight A: <strong>{flightA} players</strong> · Flight B: <strong>{flightB} players</strong> · Total Pot: <strong>${totalPot.toFixed(2)}</strong></p>
+          <p>Flight A: <strong>{flightA} players</strong> · Flight B: <strong>{flightB} players</strong> · Total: <strong>{totalPlayers} players</strong> · Pot: <strong>${totalPot.toFixed(2)}</strong></p>
           <p className={overBudget ? 'text-red-600 font-medium' : 'text-fairway-700 font-medium'}>
             Total Allocated: ${totalAllocated.toFixed(2)}{overBudget ? ' — exceeds pot!' : ` of $${totalPot.toFixed(2)}`}
           </p>
@@ -754,36 +752,44 @@ function TabPayoutConfig({ event, eventPlayers, course, onUpdated }) {
       </div>
 
       <p className="text-xs text-gray-500">
-        All values are <strong>$ per player</strong> in that flight — total = amount × players in flight.
+        All values are <strong>$ per player</strong>. Flight categories × their flight count. Low Putts &amp; Greenies × full field.
       </p>
 
-      {/* Flight A categories */}
+      {/* Flight A */}
       <Card className="overflow-hidden p-0">
         <div className="px-4 py-2.5 bg-blue-50 border-b border-blue-100">
           <h3 className="text-xs font-semibold text-blue-700">Flight A ({flightA} players)</h3>
         </div>
-        <PayoutTable rows={rowsA} onChange={setVal} flightLabel="A" />
+        <PayoutTable rows={rows.filter(r => r.isFlightA)} onChange={setVal} colLabel={`$ per player (Flt A)`} />
       </Card>
 
-      {/* Flight B categories */}
+      {/* Flight B */}
       <Card className="overflow-hidden p-0">
         <div className="px-4 py-2.5 bg-purple-50 border-b border-purple-100">
           <h3 className="text-xs font-semibold text-purple-700">Flight B ({flightB} players)</h3>
         </div>
-        <PayoutTable rows={rowsB} onChange={setVal} flightLabel="B" />
+        <PayoutTable rows={rows.filter(r => r.isFlightB)} onChange={setVal} colLabel={`$ per player (Flt B)`} />
+      </Card>
+
+      {/* Full field — Low Putts & Greenies */}
+      <Card className="overflow-hidden p-0">
+        <div className="px-4 py-2.5 bg-green-50 border-b border-green-100">
+          <h3 className="text-xs font-semibold text-green-700">Full Field — Low Putts &amp; Greenies ({totalPlayers} players)</h3>
+        </div>
+        <PayoutTable rows={rows.filter(r => r.isField)} onChange={setVal} colLabel={`$ per player (All)`} />
       </Card>
     </div>
   )
 }
 
-function PayoutTable({ rows, onChange, flightLabel }) {
+function PayoutTable({ rows, onChange, colLabel }) {
   if (rows.length === 0) return <p className="px-4 py-3 text-xs text-gray-400">None</p>
   return (
     <table className="w-full text-sm">
       <thead>
         <tr className="text-left text-xs font-semibold text-gray-400 border-b border-gray-100">
           <th className="px-4 py-2">Category</th>
-          <th className="px-3 py-2 w-32">$ per player (Flt {flightLabel})</th>
+          <th className="px-3 py-2 w-36">{colLabel}</th>
           <th className="px-3 py-2 w-24">× Players</th>
           <th className="px-3 py-2 w-24 text-right">Total</th>
         </tr>
