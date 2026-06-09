@@ -1,48 +1,78 @@
-import { createContext, useContext, useEffect, useState } from 'react'
+import { createContext, useContext, useEffect, useRef, useState } from 'react'
 import { supabase } from '../lib/supabase'
 
 const AuthContext = createContext(null)
 
+const PROFILE_TIMEOUT_MS = 7000  // if profile fetch hangs, unblock after 7s
+
 export function AuthProvider({ children }) {
   const [user,           setUser]           = useState(null)
   const [profile,        setProfile]        = useState(null)
-  const [loading,        setLoading]        = useState(true)   // true while getSession + fetchProfile runs
-  const [profileLoading, setProfileLoading] = useState(false)  // true while fetchProfile alone runs
+  const [loading,        setLoading]        = useState(true)
+  const [profileLoading, setProfileLoading] = useState(false)
+
+  // Track which userId we last successfully started a fetch for, to avoid
+  // redundant concurrent fetches (e.g. getSession + SIGNED_IN both firing).
+  const fetchingForRef = useRef(null)
 
   async function fetchProfile(userId) {
+    // Deduplicate: if already fetching for this user, skip
+    if (fetchingForRef.current === userId) return
+    fetchingForRef.current = userId
     setProfileLoading(true)
     try {
-      const { data } = await supabase.from('profiles').select('*').eq('id', userId).single()
+      // Race the DB query against a timeout so a hung query never stalls the UI
+      const dbQuery = supabase.from('profiles').select('*').eq('id', userId).single()
+      const timeout = new Promise(resolve => setTimeout(() => resolve({ data: null }), PROFILE_TIMEOUT_MS))
+      const { data } = await Promise.race([dbQuery, timeout])
       setProfile(data ?? null)
     } catch {
       setProfile(null)
     } finally {
+      fetchingForRef.current = null
       setProfileLoading(false)
     }
   }
 
   useEffect(() => {
-    // Use onAuthStateChange as single source of truth.
-    // INITIAL_SESSION fires on page load (replaces getSession), SIGNED_IN on login,
-    // SIGNED_OUT on logout. TOKEN_REFRESHED is ignored to avoid re-fetching profile.
+    let mounted = true
+
+    // getSession() catches the existing session synchronously on reload.
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (!mounted) return
+      const u = session?.user ?? null
+      setUser(u)
+      if (u) {
+        fetchProfile(u.id).finally(() => { if (mounted) setLoading(false) })
+      } else {
+        setLoading(false)
+      }
+    })
+
+    // onAuthStateChange handles login, logout, and token refreshes.
+    // INITIAL_SESSION is skipped (getSession handles initial load).
+    // TOKEN_REFRESHED is now handled to cover expired-token-on-reload case.
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      async (event, session) => {
-        if (event === 'INITIAL_SESSION' || event === 'SIGNED_IN') {
+      (event, session) => {
+        if (!mounted) return
+        if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
           const u = session?.user ?? null
           setUser(u)
-          if (u) await fetchProfile(u.id)
-          else   setProfile(null)
-          setLoading(false)
+          if (u) fetchProfile(u.id)
         } else if (event === 'SIGNED_OUT') {
+          fetchingForRef.current = null
           setUser(null)
           setProfile(null)
           setLoading(false)
         }
-        // TOKEN_REFRESHED and other events: no-op
+        // INITIAL_SESSION handled by getSession() above; USER_UPDATED etc: no-op
       }
     )
 
-    return () => subscription.unsubscribe()
+    return () => {
+      mounted = false
+      subscription.unsubscribe()
+    }
   }, [])
 
   async function signIn(email, password) {
@@ -54,7 +84,7 @@ export function AuthProvider({ children }) {
   function signOut() {
     setUser(null)
     setProfile(null)
-    supabase.auth.signOut() // fire and forget — don't block UI on network call
+    supabase.auth.signOut()
   }
 
   const isAdmin       = profile?.role === 'admin'
