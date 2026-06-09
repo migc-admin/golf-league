@@ -485,8 +485,18 @@ function TabGroups({ event, eventPlayers, onUpdated }) {
 
   async function setGroup(epId, group) {
     const { error } = await supabase.from('event_players').update({ group_number: group || null }).eq('id', epId)
-    if (error) toast.error(error.message)
-    else onUpdated()
+    if (error) { toast.error(error.message); return }
+
+    // If assigning to a group, auto-set as scorekeeper if none exists in that group yet
+    if (group) {
+      const groupMembers = eventPlayers.filter(ep => ep.group_number === parseInt(group, 10))
+      const hasScorekeeper = groupMembers.some(ep => ep.is_scorekeeper)
+      if (!hasScorekeeper) {
+        await supabase.from('event_players').update({ is_scorekeeper: true }).eq('id', epId)
+      }
+    }
+
+    onUpdated()
   }
 
   async function toggleScorekeeper(ep) {
@@ -903,26 +913,40 @@ function TabPayoutSummary({ event, eventPlayers, allScores, sideGames, course })
 function EventStatusControl({ event, onUpdated }) {
   const [saving, setSaving] = useState(false)
 
-  async function advance() {
-    const next = event.status === 'upcoming' ? 'active' : 'complete'
-    const msg  = event.status === 'upcoming'
-      ? 'Activate this event? Scorekeepers will be able to enter scores.'
-      : 'Close this event? Final results will be locked.'
+  async function setStatus(next, msg) {
     if (!confirm(msg)) return
     setSaving(true)
     const { error } = await supabase.from('events').update({ status: next }).eq('id', event.id)
     setSaving(false)
     if (error) toast.error(error.message)
-    else { toast.success(`Event ${next}`); onUpdated() }
+    else { toast.success(`Event set to ${next}`); onUpdated() }
   }
 
-  if (event.status === 'complete') return null
+  if (event.status === 'upcoming') {
+    return (
+      <Button onClick={() => setStatus('active', 'Activate this event? Scorekeepers will be able to enter scores.')} loading={saving} variant="primary">
+        ▶ Activate Event
+      </Button>
+    )
+  }
 
-  return (
-    <Button onClick={advance} loading={saving} variant={event.status === 'upcoming' ? 'primary' : 'danger'}>
-      {event.status === 'upcoming' ? '▶ Activate Event' : '⏹ Close Event'}
-    </Button>
-  )
+  if (event.status === 'active') {
+    return (
+      <Button onClick={() => setStatus('complete', 'Close this event? Results will be locked.')} loading={saving} variant="danger">
+        ⏹ Close Event
+      </Button>
+    )
+  }
+
+  if (event.status === 'complete') {
+    return (
+      <Button onClick={() => setStatus('active', 'Re-open this event? Status will return to Active and scores can be edited.')} loading={saving} variant="secondary">
+        ↩ Re-open Event
+      </Button>
+    )
+  }
+
+  return null
 }
 
 // ─── Edit Event Modal ──────────────────────────────────────────────
