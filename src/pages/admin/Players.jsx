@@ -1,24 +1,30 @@
 import { useEffect, useState } from 'react'
 import { supabase } from '../../lib/supabase'
 import toast from 'react-hot-toast'
-import Card from '../../components/ui/Card'
+import Card, { CardHeader } from '../../components/ui/Card'
 import Button from '../../components/ui/Button'
 import Modal from '../../components/ui/Modal'
 import Input from '../../components/ui/Input'
+import Badge from '../../components/ui/Badge'
+
+const TABS = ['Roster', 'User Accounts']
 
 export default function Players() {
-  const [players, setPlayers] = useState([])
-  const [search,  setSearch]  = useState('')
-  const [loading, setLoading] = useState(true)
-  const [modal,   setModal]   = useState(false)
-  const [editing, setEditing] = useState(null)
+  const [players,  setPlayers]  = useState([])
+  const [profiles, setProfiles] = useState([])
+  const [search,   setSearch]   = useState('')
+  const [loading,  setLoading]  = useState(true)
+  const [modal,    setModal]    = useState(false)
+  const [editing,  setEditing]  = useState(null)
+  const [activeTab, setActiveTab] = useState('Roster')
 
   async function load() {
-    const { data } = await supabase
-      .from('players')
-      .select('*')
-      .order('last_name')
-    setPlayers(data ?? [])
+    const [{ data: p }, { data: pr }] = await Promise.all([
+      supabase.from('players').select('*').order('last_name'),
+      supabase.from('profiles').select('*').order('full_name'),
+    ])
+    setPlayers(p ?? [])
+    setProfiles(pr ?? [])
     setLoading(false)
   }
 
@@ -36,63 +42,137 @@ export default function Players() {
     else { toast.success('Player removed'); load() }
   }
 
+  async function handleRoleChange(profileId, newRole) {
+    const { error } = await supabase.from('profiles').update({ role: newRole }).eq('id', profileId)
+    if (error) toast.error(error.message)
+    else { toast.success(`Role updated to ${newRole}`); load() }
+  }
+
   return (
     <div className="space-y-5">
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Players</h1>
-          <p className="text-sm text-gray-500 mt-0.5">Global player roster</p>
+          <p className="text-sm text-gray-500 mt-0.5">Roster &amp; user account management</p>
         </div>
-        <Button onClick={() => { setEditing(null); setModal(true) }}>+ Add Player</Button>
+        {activeTab === 'Roster' && (
+          <Button onClick={() => { setEditing(null); setModal(true) }}>+ Add Player</Button>
+        )}
       </div>
 
-      {/* Search */}
-      <input
-        type="search"
-        value={search}
-        onChange={e => setSearch(e.target.value)}
-        placeholder="Search players…"
-        className="input w-full sm:w-72"
-      />
+      {/* Tabs */}
+      <div className="border-b border-gray-200">
+        <nav className="-mb-px flex gap-1">
+          {TABS.map(tab => (
+            <button
+              key={tab}
+              onClick={() => setActiveTab(tab)}
+              className={`px-4 py-2.5 text-sm font-medium transition-colors ${
+                activeTab === tab ? 'tab-active' : 'tab-inactive'
+              }`}
+            >
+              {tab}
+            </button>
+          ))}
+        </nav>
+      </div>
 
-      {loading ? (
-        <div className="space-y-2 animate-pulse">
-          {[0,1,2,3,4].map(i => <div key={i} className="h-14 bg-gray-200 rounded-xl" />)}
-        </div>
-      ) : filtered.length === 0 ? (
-        <Card className="text-center py-10">
-          <p className="text-gray-500">{search ? 'No players match your search.' : 'No players yet.'}</p>
-          {!search && <Button className="mt-3" onClick={() => { setEditing(null); setModal(true) }}>Add First Player</Button>}
-        </Card>
-      ) : (
-        <Card className="overflow-hidden p-0">
-          <div className="divide-y divide-gray-100">
-            {filtered.map(p => (
-              <div key={p.id} className="flex items-center justify-between px-5 py-3.5">
-                <div>
-                  <div className="font-medium text-gray-900">
-                    {p.last_name}, {p.first_name}
+      {/* ── Roster Tab ── */}
+      {activeTab === 'Roster' && (
+        <>
+          <input
+            type="search"
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+            placeholder="Search players…"
+            className="input w-full sm:w-72"
+          />
+
+          {loading ? (
+            <div className="space-y-2 animate-pulse">
+              {[0,1,2,3,4].map(i => <div key={i} className="h-14 bg-gray-200 rounded-xl" />)}
+            </div>
+          ) : filtered.length === 0 ? (
+            <Card className="text-center py-10">
+              <p className="text-gray-500">{search ? 'No players match your search.' : 'No players yet.'}</p>
+              {!search && <Button className="mt-3" onClick={() => { setEditing(null); setModal(true) }}>Add First Player</Button>}
+            </Card>
+          ) : (
+            <Card className="overflow-hidden p-0">
+              <div className="divide-y divide-gray-100">
+                {filtered.map(p => (
+                  <div key={p.id} className="flex items-center justify-between px-5 py-3.5">
+                    <div>
+                      <div className="font-medium text-gray-900">{p.last_name}, {p.first_name}</div>
+                      <div className="text-xs text-gray-500 flex items-center gap-3 mt-0.5">
+                        {p.email && <span>{p.email}</span>}
+                        {p.ghin_number && <span>GHIN: {p.ghin_number}</span>}
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Button variant="secondary" size="sm" onClick={() => { setEditing(p); setModal(true) }}>Edit</Button>
+                      <Button variant="danger" size="sm" onClick={() => handleDelete(p.id)}>Remove</Button>
+                    </div>
                   </div>
-                  <div className="text-xs text-gray-500 flex items-center gap-3 mt-0.5">
-                    {p.email && <span>{p.email}</span>}
-                    {p.ghin_number && <span>GHIN: {p.ghin_number}</span>}
-                  </div>
-                </div>
-                <div className="flex items-center gap-2">
-                  <Button variant="secondary" size="sm" onClick={() => { setEditing(p); setModal(true) }}>
-                    Edit
-                  </Button>
-                  <Button variant="danger" size="sm" onClick={() => handleDelete(p.id)}>
-                    Remove
-                  </Button>
-                </div>
+                ))}
               </div>
-            ))}
-          </div>
-          <div className="px-5 py-2 bg-gray-50 text-xs text-gray-400 border-t border-gray-100">
-            {filtered.length} player{filtered.length !== 1 ? 's' : ''}
-          </div>
-        </Card>
+              <div className="px-5 py-2 bg-gray-50 text-xs text-gray-400 border-t border-gray-100">
+                {filtered.length} player{filtered.length !== 1 ? 's' : ''}
+              </div>
+            </Card>
+          )}
+        </>
+      )}
+
+      {/* ── User Accounts Tab ── */}
+      {activeTab === 'User Accounts' && (
+        <div className="space-y-4">
+          <p className="text-sm text-gray-600">
+            Manage login roles. <strong>Admin</strong> — full access.{' '}
+            <strong>Scorekeeper</strong> — score entry only.{' '}
+            <strong>None</strong> — can log in but no access.
+          </p>
+
+          {loading ? (
+            <div className="space-y-2 animate-pulse">
+              {[0,1,2].map(i => <div key={i} className="h-14 bg-gray-200 rounded-xl" />)}
+            </div>
+          ) : profiles.length === 0 ? (
+            <Card className="text-center py-10">
+              <p className="text-gray-500">No user accounts found.</p>
+            </Card>
+          ) : (
+            <Card className="overflow-hidden p-0">
+              <div className="divide-y divide-gray-100">
+                {profiles.map(pr => (
+                  <div key={pr.id} className="flex items-center justify-between px-5 py-3.5">
+                    <div>
+                      <div className="font-medium text-gray-900 flex items-center gap-2">
+                        {pr.full_name || pr.id.slice(0, 8) + '…'}
+                        <RoleBadge role={pr.role} />
+                      </div>
+                      <div className="text-xs text-gray-400 mt-0.5">ID: {pr.id.slice(0, 12)}…</div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <select
+                        value={pr.role ?? 'none'}
+                        onChange={e => handleRoleChange(pr.id, e.target.value)}
+                        className="input py-1 text-xs w-36 bg-white"
+                      >
+                        <option value="admin">Admin</option>
+                        <option value="scorekeeper">Scorekeeper</option>
+                        <option value="none">None</option>
+                      </select>
+                    </div>
+                  </div>
+                ))}
+              </div>
+              <div className="px-5 py-2 bg-gray-50 text-xs text-gray-400 border-t border-gray-100">
+                {profiles.length} user{profiles.length !== 1 ? 's' : ''}
+              </div>
+            </Card>
+          )}
+        </div>
       )}
 
       <PlayerModal
@@ -105,10 +185,14 @@ export default function Players() {
   )
 }
 
+function RoleBadge({ role }) {
+  if (role === 'admin')       return <Badge variant="green">Admin</Badge>
+  if (role === 'scorekeeper') return <Badge variant="blue">Scorekeeper</Badge>
+  return <Badge variant="gray">No Role</Badge>
+}
+
 function PlayerModal({ open, onClose, editing, onSaved }) {
-  const [form, setForm] = useState({
-    first_name: '', last_name: '', email: '', ghin_number: '',
-  })
+  const [form,   setForm]   = useState({ first_name: '', last_name: '', email: '', ghin_number: '' })
   const [saving, setSaving] = useState(false)
 
   useEffect(() => {

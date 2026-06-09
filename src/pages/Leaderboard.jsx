@@ -10,9 +10,10 @@ import { supabase } from '../lib/supabase'
 import { computeLeaderboards, computeStableford } from '../lib/engines/scoring'
 import { computeAllSkins } from '../lib/engines/skins'
 import { computeMatchPoints } from '../lib/engines/matchPoints'
+import { computePayouts, CATEGORY_LABELS, ctpLabel } from '../lib/engines/payouts'
 import { FlightBadge, StatusBadge } from '../components/ui/Badge'
 
-const TABS = ['18-Hole', 'Front 9', 'Back 9', 'Stableford', 'Match Points', 'Low Putts', 'Skins']
+const TABS = ['18-Hole', 'Front 9', 'Back 9', 'Stableford', 'Match Points', 'Low Putts', 'Skins', 'Payouts']
 
 const FORMAT_LABELS = {
   net_stroke:   'Net Stroke Play',
@@ -27,6 +28,7 @@ export default function Leaderboard() {
   const [event,        setEvent]        = useState(null)
   const [eventPlayers, setEventPlayers] = useState([])
   const [allScores,    setAllScores]    = useState([])
+  const [sideGames,    setSideGames]    = useState([])
   const [course,       setCourse]       = useState(null)
   const [loading,      setLoading]      = useState(true)
   const [activeTab,    setActiveTab]    = useState('18-Hole')
@@ -50,16 +52,20 @@ export default function Leaderboard() {
         .single()
       if (!ev) { setLoading(false); return }
 
-      const { data: eps } = await supabase
-        .from('event_players')
-        .select('*, player:players(*)')
-        .eq('event_id', eventId)
+      const [{ data: eps }, { data: sg }] = await Promise.all([
+        supabase.from('event_players').select('*, player:players(*)').eq('event_id', eventId),
+        supabase.from('side_games').select('*, winner:players(first_name,last_name)').eq('event_id', eventId),
+      ])
 
       setEvent(ev)
       setCourse(ev.course)
       setEventPlayers(eps ?? [])
+      setSideGames(sg ?? [])
       await loadScores(eventId)
       setLoading(false)
+
+      // Auto-switch to Payouts tab if event is complete
+      if (ev.status === 'complete') setActiveTab('Payouts')
 
       // Subscribe to realtime score changes
       subRef.current = supabase
@@ -149,7 +155,7 @@ export default function Leaderboard() {
       </div>
 
       {/* Flight toggle */}
-      {activeTab !== 'Low Putts' && activeTab !== 'Skins' && activeTab !== 'Match Points' && (
+      {activeTab !== 'Low Putts' && activeTab !== 'Skins' && activeTab !== 'Match Points' && activeTab !== 'Payouts' && (
         <div className="max-w-2xl mx-auto px-4 pt-4 flex gap-2">
           {['A', 'B'].map(f => (
             <button
@@ -212,6 +218,16 @@ export default function Leaderboard() {
         )}
         {activeTab === 'Skins' && skinsResults && (
           <SkinsBoard skinsResults={skinsResults} playerMap={playerMap} />
+        )}
+        {activeTab === 'Payouts' && (
+          <PayoutsBoard
+            event={event}
+            eventPlayers={eventPlayers}
+            leaderboards={leaderboards}
+            sideGames={sideGames}
+            skinsResults={skinsResults}
+            playerMap={playerMap}
+          />
         )}
       </div>
     </div>
@@ -573,6 +589,102 @@ function MatchPointsBoard({ matchData }) {
               <span className="font-bold text-gray-800">{p.points} pts</span>
             </div>
           ))}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// ─── Payouts Board ────────────────────────────────────────────────
+function PayoutsBoard({ event, eventPlayers, leaderboards, sideGames, skinsResults, playerMap }) {
+  if (!event?.payout_config || eventPlayers.length === 0) {
+    return (
+      <div className="text-center py-12 text-gray-400">
+        <div className="text-4xl mb-3">💰</div>
+        <p>No payout configuration set for this event.</p>
+      </div>
+    )
+  }
+
+  const flightCounts = {
+    A: eventPlayers.filter(ep => ep.flight === 'A').length,
+    B: eventPlayers.filter(ep => ep.flight === 'B').length,
+  }
+
+  const { totalPot, byCategory, byPlayer, totalAllocated } = computePayouts(
+    event, eventPlayers.length, leaderboards, sideGames ?? [], skinsResults, flightCounts
+  )
+
+  return (
+    <div className="space-y-4">
+      {/* Summary banner */}
+      <div className="bg-fairway-700 rounded-xl p-4 text-white flex items-center justify-between">
+        <div>
+          <div className="text-xs text-fairway-300 font-medium">Total Pot</div>
+          <div className="text-3xl font-black">${totalPot.toFixed(2)}</div>
+          <div className="text-xs text-fairway-300 mt-0.5">{eventPlayers.length} players × ${event.entry_fee}</div>
+        </div>
+        <div className="text-right">
+          <div className="text-xs text-fairway-300 font-medium">Allocated</div>
+          <div className="text-2xl font-bold">${totalAllocated.toFixed(2)}</div>
+        </div>
+      </div>
+
+      {/* By player */}
+      {byPlayer.length > 0 && (
+        <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+          <div className="px-4 py-3 border-b bg-gray-50">
+            <h3 className="font-semibold text-sm text-gray-800">💵 Payouts by Player</h3>
+          </div>
+          <div className="divide-y divide-gray-100">
+            {byPlayer.map(({ playerId, total, items }) => {
+              const p = playerMap[playerId]
+              return (
+                <div key={playerId} className="px-4 py-3">
+                  <div className="flex items-center justify-between">
+                    <span className="font-semibold text-gray-900">
+                      {p ? `${p.last_name}, ${p.first_name}` : '—'}
+                    </span>
+                    <span className="font-black text-fairway-700 text-lg">${total.toFixed(2)}</span>
+                  </div>
+                  <div className="mt-1 space-y-0.5">
+                    {items.map((item, i) => (
+                      <div key={i} className="flex justify-between text-xs text-gray-500">
+                        <span>{item.category}</span>
+                        <span>${item.amount.toFixed(2)}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* By category */}
+      <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+        <div className="px-4 py-3 border-b bg-gray-50">
+          <h3 className="font-semibold text-sm text-gray-800">By Category</h3>
+        </div>
+        <div className="divide-y divide-gray-100">
+          {byCategory.map(cat => {
+            const p = cat.playerId ? playerMap[cat.playerId] : null
+            return (
+              <div key={cat.key} className="flex items-center justify-between px-4 py-2.5">
+                <div>
+                  <div className="text-sm text-gray-700">{cat.label}</div>
+                  <div className="text-xs text-gray-400">
+                    {p ? `${p.last_name}, ${p.first_name}` : '— Unresolved'}
+                  </div>
+                </div>
+                <span className="font-bold text-gray-900">${cat.amount.toFixed(2)}</span>
+              </div>
+            )
+          })}
+          {byCategory.length === 0 && (
+            <p className="px-4 py-4 text-sm text-gray-400">No payouts resolved yet.</p>
+          )}
         </div>
       </div>
     </div>

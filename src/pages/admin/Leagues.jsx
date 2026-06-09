@@ -177,17 +177,19 @@ function LeagueModal({ open, onClose, editing, onSaved }) {
 }
 
 function EventModal({ open, onClose, league, onSaved }) {
-  const [courses,    setCourses]    = useState([])
-  const [courseId,   setCourseId]   = useState('')
-  const [eventDate,  setEventDate]  = useState('')
-  const [eventNum,   setEventNum]   = useState(1)
-  const [entryFee,   setEntryFee]   = useState('20')
-  const [saving,     setSaving]     = useState(false)
+  const [courses,   setCourses]   = useState([])
+  const [courseId,  setCourseId]  = useState('')
+  const [eventDate, setEventDate] = useState('')
+  const [eventNum,  setEventNum]  = useState(1)
+  const [entryFee,  setEntryFee]  = useState('20')
+  const [format,    setFormat]    = useState('net_stroke')
+  const [startTime, setStartTime] = useState('')
+  const [interval,  setInterval]  = useState(10)
+  const [saving,    setSaving]    = useState(false)
 
   useEffect(() => {
     if (!open) return
     supabase.from('courses').select('id, name').order('name').then(({ data }) => setCourses(data ?? []))
-    // Auto-suggest next event number
     if (league) {
       supabase.from('events').select('event_number').eq('league_id', league.id).order('event_number', { ascending: false }).limit(1)
         .then(({ data }) => setEventNum(data?.[0]?.event_number ? data[0].event_number + 1 : 1))
@@ -195,6 +197,9 @@ function EventModal({ open, onClose, league, onSaved }) {
     setEventDate('')
     setCourseId('')
     setEntryFee('20')
+    setFormat('net_stroke')
+    setStartTime('')
+    setInterval(10)
   }, [open, league])
 
   async function handleSave(e) {
@@ -202,12 +207,15 @@ function EventModal({ open, onClose, league, onSaved }) {
     if (!courseId || !eventDate) return
     setSaving(true)
     const { error } = await supabase.from('events').insert({
-      league_id:    league.id,
-      course_id:    courseId,
-      event_date:   eventDate,
-      event_number: parseInt(eventNum, 10),
-      entry_fee:    parseFloat(entryFee),
-      status:       'upcoming',
+      league_id:              league.id,
+      course_id:              courseId,
+      event_date:             eventDate,
+      event_number:           parseInt(eventNum, 10),
+      entry_fee:              parseFloat(entryFee),
+      format,
+      start_time:             startTime || null,
+      tee_time_interval_mins: parseInt(interval, 10),
+      status:                 'upcoming',
     })
     setSaving(false)
     if (error) toast.error(error.message)
@@ -227,6 +235,25 @@ function EventModal({ open, onClose, league, onSaved }) {
             <option value="">Select course…</option>
             {courses.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
           </select>
+        </div>
+        <div>
+          <label className="label">Format</label>
+          <select value={format} onChange={e => setFormat(e.target.value)} className="input bg-white">
+            <optgroup label="Net Stroke Play (Default)">
+              <option value="net_stroke">18-Hole Overall Net</option>
+              <option value="net_stroke_front9">Front Nine Net</option>
+              <option value="net_stroke_back9">Back Nine Net</option>
+            </optgroup>
+            <optgroup label="Other Formats">
+              <option value="stableford">Stableford</option>
+              <option value="match_points">Match Play Points</option>
+              <option value="ryder_cup">Ryder Cup</option>
+            </optgroup>
+          </select>
+        </div>
+        <div className="grid grid-cols-2 gap-3">
+          <Input label="Start Time" type="time" value={startTime} onChange={e => setStartTime(e.target.value)} />
+          <Input label="Tee Interval (min)" type="number" min="1" max="60" value={interval} onChange={e => setInterval(e.target.value)} />
         </div>
         <Input label="Entry Fee ($)" type="number" step="0.01" min="0" value={entryFee} onChange={e => setEntryFee(e.target.value)} required />
         <div className="flex justify-end gap-3 pt-2">

@@ -1,165 +1,159 @@
 /**
  * Payout Calculation Engine
  *
- * payout_config (stored as JSON on events):
- * {
- *   "18_net_a_1st": 0.15,
- *   "18_net_a_2nd": 0.08,
- *   "18_net_a_3rd": 0.04,
- *   "18_net_b_1st": 0.15,
- *   "18_net_b_2nd": 0.08,
- *   "18_net_b_3rd": 0.04,
- *   "f9_a_1st":     0.05,
- *   "f9_a_2nd":     0.025,
- *   "f9_b_1st":     0.05,
- *   "f9_b_2nd":     0.025,
- *   "b9_a_1st":     0.05,
- *   "b9_a_2nd":     0.025,
- *   "b9_b_1st":     0.05,
- *   "b9_b_2nd":     0.025,
- *   "low_putts":    0.03,
- *   "long_drive":   0.02,
- *   "ctp_4":        0.02,    // CTP hole 4
- *   "ctp_7":        0.02,    // CTP hole 7 (any par-3 hole)
- *   "skins_a":      0.10,    // total pool → Flight A skins
- *   "skins_b":      0.10     // total pool → Flight B skins
- * }
+ * payout_config (stored as JSON on events) — values are DOLLAR AMOUNTS:
+ * - For flight-specific keys (_a_ / _b_): value = $ per player in that flight
+ *   → payout total = value × flightPlayerCount
+ * - For flat keys (ctp_*, long_drive_a, long_drive_b, long_drive, low_putts): value = flat $ total
+ * - For skins keys: value = $ per player in that flight → total pool divided by skin winners
  *
- * Percentages should sum to ≤ 1.0. Admin is responsible for the split.
- * Skins categories are distributed by the skins engine, not as fixed places.
+ * Example:
+ * {
+ *   "18_net_a_1st": 3,   // $3 × flightA players
+ *   "18_net_b_1st": 3,   // $3 × flightB players
+ *   "ctp_5": 15,         // flat $15 for CTP hole 5
+ *   "long_drive_a": 10,  // flat $10 Flight A long drive
+ *   "long_drive_b": 10,  // flat $10 Flight B long drive
+ *   "skins_a": 2,        // $2 × flightA players → skins pool
+ * }
  */
 
 import { computeSkinsPayout } from './skins.js'
 
-// Human-readable category labels
 export const CATEGORY_LABELS = {
-  '18_net_a_1st': '18-Hole Net — Flight A, 1st',
-  '18_net_a_2nd': '18-Hole Net — Flight A, 2nd',
-  '18_net_a_3rd': '18-Hole Net — Flight A, 3rd',
-  '18_net_b_1st': '18-Hole Net — Flight B, 1st',
-  '18_net_b_2nd': '18-Hole Net — Flight B, 2nd',
-  '18_net_b_3rd': '18-Hole Net — Flight B, 3rd',
-  'f9_a_1st':     'Front 9 Net — Flight A, 1st',
-  'f9_a_2nd':     'Front 9 Net — Flight A, 2nd',
-  'f9_b_1st':     'Front 9 Net — Flight B, 1st',
-  'f9_b_2nd':     'Front 9 Net — Flight B, 2nd',
-  'b9_a_1st':     'Back 9 Net — Flight A, 1st',
-  'b9_a_2nd':     'Back 9 Net — Flight A, 2nd',
-  'b9_b_1st':     'Back 9 Net — Flight B, 1st',
-  'b9_b_2nd':     'Back 9 Net — Flight B, 2nd',
-  'low_putts':    'Low Putts (Overall)',
-  'long_drive':   'Long Drive',
-  'skins_a':      'Skins — Flight A',
-  'skins_b':      'Skins — Flight B',
+  '18_net_a_1st':  '18-Hole Net — Flight A, 1st',
+  '18_net_a_2nd':  '18-Hole Net — Flight A, 2nd',
+  '18_net_a_3rd':  '18-Hole Net — Flight A, 3rd',
+  '18_net_b_1st':  '18-Hole Net — Flight B, 1st',
+  '18_net_b_2nd':  '18-Hole Net — Flight B, 2nd',
+  '18_net_b_3rd':  '18-Hole Net — Flight B, 3rd',
+  'f9_a_1st':      'Front 9 Net — Flight A, 1st',
+  'f9_a_2nd':      'Front 9 Net — Flight A, 2nd',
+  'f9_b_1st':      'Front 9 Net — Flight B, 1st',
+  'f9_b_2nd':      'Front 9 Net — Flight B, 2nd',
+  'b9_a_1st':      'Back 9 Net — Flight A, 1st',
+  'b9_a_2nd':      'Back 9 Net — Flight A, 2nd',
+  'b9_b_1st':      'Back 9 Net — Flight B, 1st',
+  'b9_b_2nd':      'Back 9 Net — Flight B, 2nd',
+  'low_putts':     'Low Putts (Overall)',
+  'long_drive_a':  'Long Drive — Flight A',
+  'long_drive_b':  'Long Drive — Flight B',
+  'long_drive':    'Long Drive (Overall)',
+  'skins_a':       'Skins — Flight A',
+  'skins_b':       'Skins — Flight B',
 }
 
 export function ctpLabel(holeNumber) {
   return `Closest to Pin — Hole ${holeNumber}`
 }
 
-/** Default payout config percentages (admin can adjust) */
+/** Default per-player dollar amounts (admin adjusts as needed) */
 export const DEFAULT_PAYOUT_CONFIG = {
-  '18_net_a_1st': 0.12,
-  '18_net_a_2nd': 0.06,
-  '18_net_a_3rd': 0.03,
-  '18_net_b_1st': 0.12,
-  '18_net_b_2nd': 0.06,
-  '18_net_b_3rd': 0.03,
-  'f9_a_1st':     0.05,
-  'f9_a_2nd':     0.02,
-  'f9_b_1st':     0.05,
-  'f9_b_2nd':     0.02,
-  'b9_a_1st':     0.05,
-  'b9_a_2nd':     0.02,
-  'b9_b_1st':     0.05,
-  'b9_b_2nd':     0.02,
-  'low_putts':    0.03,
-  'long_drive':   0.03,
-  'skins_a':      0.12,
-  'skins_b':      0.12,
+  '18_net_a_1st': 3,
+  '18_net_a_2nd': 2,
+  '18_net_a_3rd': 1,
+  '18_net_b_1st': 3,
+  '18_net_b_2nd': 2,
+  '18_net_b_3rd': 1,
+  'f9_a_1st':     2,
+  'f9_a_2nd':     1,
+  'f9_b_1st':     2,
+  'f9_b_2nd':     1,
+  'b9_a_1st':     2,
+  'b9_a_2nd':     1,
+  'b9_b_1st':     2,
+  'b9_b_2nd':     1,
+  'long_drive_a': 0,
+  'long_drive_b': 0,
+  'low_putts':    0,
+  'skins_a':      2,
+  'skins_b':      2,
 }
 
 /**
- * Map a payout config key to a leaderboard result.
- *
- * @param {string} key
- * @param {Object} leaderboards  — from scoring.computeLeaderboards
- * @param {Array}  sideGames     — from side_games table
- * @returns {string|null}  player_id or null if not resolved
+ * Determine how a config key's value should be multiplied.
+ * Returns 'flight_a', 'flight_b', or 'flat'.
  */
+function keyMultiplier(key) {
+  if (key === 'skins_a' || key.includes('_a_') || key === 'long_drive_a') return 'flight_a'
+  if (key === 'skins_b' || key.includes('_b_') || key === 'long_drive_b') return 'flight_b'
+  return 'flat'
+}
+
 function resolveWinner(key, leaderboards, sideGames) {
   const rankMap = { '1st': 1, '2nd': 2, '3rd': 3 }
 
   if (key.startsWith('18_net_a_') || key.startsWith('18_net_b_')) {
     const flight = key.includes('_a_') ? 'A' : 'B'
     const rank   = rankMap[key.split('_').pop()]
-    const entry  = leaderboards.full[flight]?.find(p => p.rank === rank)
-    return entry?.player_id ?? null
+    return leaderboards.full[flight]?.find(p => p.rank === rank)?.player_id ?? null
   }
-
   if (key.startsWith('f9_')) {
     const flight = key.includes('_a_') ? 'A' : 'B'
     const rank   = rankMap[key.split('_').pop()]
-    const entry  = leaderboards.front9[flight]?.find(p => p.rank === rank)
-    return entry?.player_id ?? null
+    return leaderboards.front9[flight]?.find(p => p.rank === rank)?.player_id ?? null
   }
-
   if (key.startsWith('b9_')) {
     const flight = key.includes('_a_') ? 'A' : 'B'
     const rank   = rankMap[key.split('_').pop()]
-    const entry  = leaderboards.back9[flight]?.find(p => p.rank === rank)
-    return entry?.player_id ?? null
+    return leaderboards.back9[flight]?.find(p => p.rank === rank)?.player_id ?? null
   }
-
   if (key === 'low_putts') {
-    // Check side_games table first; fall back to leaderboard
     const manual = sideGames.find(g => g.game_type === 'low_putts')
     if (manual?.winner_player_id) return manual.winner_player_id
     return leaderboards.putts?.[0]?.player_id ?? null
   }
-
+  if (key === 'long_drive_a') {
+    const g = sideGames.find(g => g.game_type === 'long_drive' && g.flight === 'A')
+    return g?.winner_player_id ?? null
+  }
+  if (key === 'long_drive_b') {
+    const g = sideGames.find(g => g.game_type === 'long_drive' && g.flight === 'B')
+    return g?.winner_player_id ?? null
+  }
   if (key === 'long_drive') {
     const g = sideGames.find(g => g.game_type === 'long_drive')
     return g?.winner_player_id ?? null
   }
-
   if (key.startsWith('ctp_')) {
     const holeNum = parseInt(key.replace('ctp_', ''), 10)
     const g = sideGames.find(g => g.game_type === 'ctp' && g.hole_number === holeNum)
     return g?.winner_player_id ?? null
   }
-
   return null
 }
 
 /**
  * Compute full payout summary for an event.
  *
- * @param {Object} event         — { entry_fee, payout_config }
- * @param {number} playerCount
- * @param {Object} leaderboards  — from scoring.computeLeaderboards
+ * @param {Object} event          — { entry_fee, payout_config }
+ * @param {number} playerCount    — total players
+ * @param {Object} leaderboards   — from scoring.computeLeaderboards
  * @param {Array}  sideGames
- * @param {Object} skinsResults  — { A: skinsResult, B: skinsResult }
- * @returns {Object}  { totalPot, byCategory, byPlayer, allocationPct }
+ * @param {Object} skinsResults   — { A: skinsResult, B: skinsResult }
+ * @param {Object} flightCounts   — { A: number, B: number }  (optional, defaults to split)
  */
-export function computePayouts(event, playerCount, leaderboards, sideGames, skinsResults) {
-  const config    = event.payout_config ?? {}
-  const totalPot  = event.entry_fee * playerCount
+export function computePayouts(event, playerCount, leaderboards, sideGames, skinsResults, flightCounts) {
+  const config  = event.payout_config ?? {}
+  const totalPot = event.entry_fee * playerCount
+  const fcA = flightCounts?.A ?? Math.ceil(playerCount / 2)
+  const fcB = flightCounts?.B ?? Math.floor(playerCount / 2)
+
   const byCategory = []
-  const byPlayer   = {}  // playerId → { total, items[] }
+  const byPlayer   = {}
 
-  const allocationPct = Object.values(config).reduce((a, b) => a + b, 0)
+  for (const [key, dollarVal] of Object.entries(config)) {
+    if (!dollarVal || dollarVal <= 0) continue
 
-  for (const [key, pct] of Object.entries(config)) {
-    const amount = Math.round(totalPot * pct * 100) / 100
-    if (amount <= 0) continue
+    const multiplier = keyMultiplier(key)
+    const count = multiplier === 'flight_a' ? fcA : multiplier === 'flight_b' ? fcB : 1
+    const amount = Math.round(dollarVal * count * 100) / 100
 
-    // Skins are handled separately
+    // Skins handled separately
     if (key === 'skins_a' || key === 'skins_b') {
       const flight      = key === 'skins_a' ? 'A' : 'B'
       const skinsResult = skinsResults?.[flight]
       if (!skinsResult) continue
-
       const skinPayouts = computeSkinsPayout(skinsResult, amount)
       for (const sp of skinPayouts) {
         const label = `${CATEGORY_LABELS[key]} (${sp.skinsWon} skin${sp.skinsWon !== 1 ? 's' : ''})`
@@ -171,13 +165,9 @@ export function computePayouts(event, playerCount, leaderboards, sideGames, skin
       continue
     }
 
-    const label    = key.startsWith('ctp_')
-      ? ctpLabel(parseInt(key.replace('ctp_', ''), 10))
-      : (CATEGORY_LABELS[key] ?? key)
+    const label    = key.startsWith('ctp_') ? ctpLabel(parseInt(key.replace('ctp_', ''), 10)) : (CATEGORY_LABELS[key] ?? key)
     const playerId = resolveWinner(key, leaderboards, sideGames)
-
     byCategory.push({ key, label, amount, playerId, isSkin: false })
-
     if (playerId) {
       if (!byPlayer[playerId]) byPlayer[playerId] = { total: 0, items: [] }
       byPlayer[playerId].total += amount
@@ -185,10 +175,11 @@ export function computePayouts(event, playerCount, leaderboards, sideGames, skin
     }
   }
 
-  // Sort byPlayer descending
   const byPlayerSorted = Object.entries(byPlayer)
     .sort(([, a], [, b]) => b.total - a.total)
     .map(([playerId, data]) => ({ playerId, ...data }))
 
-  return { totalPot, byCategory, byPlayer: byPlayerSorted, allocationPct }
+  const totalAllocated = byCategory.reduce((s, c) => s + c.amount, 0)
+
+  return { totalPot, byCategory, byPlayer: byPlayerSorted, totalAllocated }
 }
