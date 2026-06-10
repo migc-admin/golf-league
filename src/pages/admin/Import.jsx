@@ -227,7 +227,6 @@ function ImportPlayers() {
       if (!playerId) {
         const payload = { first_name: first, last_name: last, intended_role: role }
         if (email) payload.email = email
-        if (!isNaN(hi)) payload.handicap_index = hi
 
         const { data: newP, error } = await supabase.from('players').insert(payload).select('id').single()
         if (error) {
