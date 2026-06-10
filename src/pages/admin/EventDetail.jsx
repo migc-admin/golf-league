@@ -269,6 +269,12 @@ function TabFlights({ event, eventPlayers, course, allPlayers, onUpdated }) {
     else onUpdated()
   }
 
+  async function overrideTee(epId, tee) {
+    const { error } = await supabase.from('event_players').update({ tee: tee || null }).eq('id', epId)
+    if (error) toast.error(error.message)
+    else onUpdated()
+  }
+
   async function removePlayer(epId) {
     if (!confirm('Remove player from this event?')) return
     const { error } = await supabase.from('event_players').delete().eq('id', epId)
@@ -363,6 +369,23 @@ function TabFlights({ event, eventPlayers, course, allPlayers, onUpdated }) {
                     </div>
                   </div>
                   <div className="flex items-center gap-2">
+                    {courseTees.length > 0 && (
+                      <select
+                        value={ep.tee ?? ''}
+                        onChange={e => overrideTee(ep.id, e.target.value)}
+                        className="input py-1 text-xs w-28"
+                        title="Tee override (defaults to flight tee)"
+                      >
+                        <option value="">
+                          {event[`tee_flight_${(ep.flight ?? 'a').toLowerCase()}`]
+                            ? `${event[`tee_flight_${(ep.flight ?? 'a').toLowerCase()}`]} (default)`
+                            : '— Tee —'}
+                        </option>
+                        {courseTees.map(t => (
+                          <option key={t.name} value={t.name}>{t.name}</option>
+                        ))}
+                      </select>
+                    )}
                     <select
                       value={ep.flight ?? ''}
                       onChange={e => overrideFlight(ep.id, e.target.value)}
