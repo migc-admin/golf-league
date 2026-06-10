@@ -117,8 +117,10 @@ export function useOfflineQueue() {
         if (!error) return { ok: true, queued: false }
         // DB/auth error — surface it, do NOT queue
         return { ok: false, queued: false, error: error.message }
-      } catch {
-        // True network failure — fall through to queue
+      } catch (err) {
+        // Log the real error so we can diagnose
+        console.error('[saveScore] caught exception:', err)
+        return { ok: false, queued: false, error: err?.message ?? String(err) }
       }
     }
 
