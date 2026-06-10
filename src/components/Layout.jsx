@@ -28,7 +28,7 @@ export default function Layout({ children }) {
           <Link to="/admin" className="flex items-center gap-2.5 tracking-tight">
             <span className="text-2xl leading-none">⛳</span>
             <span className="hidden sm:inline font-bold text-white" style={{ fontFamily: "'Playfair Display', serif", fontSize: '1.15rem', letterSpacing: '0.02em' }}>
-              MIGC Golf League
+              Mulligan's Island Golf Club
             </span>
           </Link>
 
