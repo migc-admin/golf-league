@@ -43,8 +43,8 @@ const FORMAT_LABELS = {
 export default function Leaderboard() {
   const { eventId } = useParams()
   const navigate = useNavigate()
-  const { isAdmin } = useAuth()
-  const homeLink = isAdmin ? '/admin' : '/login'
+  const { user, isAdmin } = useAuth()
+  const homeLink = isAdmin ? '/admin' : user ? '/home' : null
   const [event,        setEvent]        = useState(null)
   const [eventPlayers, setEventPlayers] = useState([])
   const [allScores,    setAllScores]    = useState([])
@@ -129,9 +129,11 @@ export default function Leaderboard() {
         >
           ← Back
         </button>
-        <Link to={homeLink} className="text-fairway-300 hover:text-white text-sm transition-colors">
-          ⛳ Dashboard
-        </Link>
+        {homeLink && (
+          <Link to={homeLink} className="text-fairway-300 hover:text-white text-sm transition-colors">
+            ⛳ Dashboard
+          </Link>
+        )}
       </div>
 
       {/* Header */}

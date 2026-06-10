@@ -43,15 +43,9 @@ export default function App() {
         {/* Public schedule — no auth required, shareable with players */}
         <Route path="/schedule/:eventId" element={<Schedule />} />
 
-        {/* Leaderboard & Standings (any authenticated user) */}
-        <Route
-          path="/leaderboard/:eventId"
-          element={<ProtectedRoute><Leaderboard /></ProtectedRoute>}
-        />
-        <Route
-          path="/standings/:leagueId"
-          element={<ProtectedRoute><Standings /></ProtectedRoute>}
-        />
+        {/* Leaderboard & Standings — public, shareable links */}
+        <Route path="/leaderboard/:eventId" element={<Leaderboard />} />
+        <Route path="/standings/:leagueId"  element={<Standings />} />
 
         <Route path="/" element={<Navigate to="/home" replace />} />
         <Route path="*" element={<Navigate to="/home" replace />} />
