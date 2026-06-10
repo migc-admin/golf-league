@@ -36,7 +36,7 @@ export default function Login() {
       <div className="w-full max-w-sm">
         {/* Logo */}
         <div className="text-center mb-8">
-          <div className="text-6xl mb-3">⛳</div>
+          <img src="/logo.png" alt="Mulligan's Island Golf Club" className="w-28 h-28 rounded-full object-cover mx-auto mb-2 shadow-xl" />
           <h1 className="text-white mb-1" style={{ fontFamily: "'Playfair Display', serif", fontSize: '2rem', fontWeight: 700 }}>Mulligan's Island Golf Club</h1>
           <div className="mx-auto mb-2" style={{ width: 60, height: 2, background: '#D4AF37' }} />
           <p className="text-sm mt-1" style={{ color: 'rgba(255,255,255,0.55)' }}>Sign in to continue</p>
