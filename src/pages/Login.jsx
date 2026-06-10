@@ -32,13 +32,14 @@ export default function Login() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-fairway-800 to-fairway-950 flex flex-col items-center justify-center p-4">
+    <div className="min-h-screen flex flex-col items-center justify-center p-4" style={{ background: 'linear-gradient(150deg,#0b2318 0%,#1B4332 45%,#1f5c3e 100%)' }}>
       <div className="w-full max-w-sm">
         {/* Logo */}
         <div className="text-center mb-8">
           <div className="text-6xl mb-3">⛳</div>
-          <h1 className="text-3xl font-bold text-white tracking-tight">Golf League</h1>
-          <p className="text-fairway-300 mt-1 text-sm">Sign in to continue</p>
+          <h1 className="text-white mb-1" style={{ fontFamily: "'Playfair Display', serif", fontSize: '2rem', fontWeight: 700 }}>MIGC Golf League</h1>
+          <div className="mx-auto mb-2" style={{ width: 60, height: 2, background: '#D4AF37' }} />
+          <p className="text-sm mt-1" style={{ color: 'rgba(255,255,255,0.55)' }}>Sign in to continue</p>
         </div>
 
         {/* Card */}
@@ -88,7 +89,7 @@ export default function Login() {
           </form>
         </div>
 
-        <p className="text-center text-fairway-400 text-xs mt-6">
+        <p className="text-center text-xs mt-6" style={{ color: 'rgba(255,255,255,0.35)' }}>
           Contact your league admin for access.
         </p>
       </div>
