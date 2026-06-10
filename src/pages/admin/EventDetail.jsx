@@ -62,7 +62,7 @@ export default function EventDetail() {
         <span>/</span>
         <Link to="/admin/leagues" className="hover:text-gray-700">Leagues</Link>
         <span>/</span>
-        <span className="text-gray-800 font-medium">Event #{event.event_number}</span>
+        <span className="text-gray-800 font-medium">{event.name ?? `Event #${event.event_number}`}</span>
       </nav>
 
       {/* Header */}
@@ -70,7 +70,7 @@ export default function EventDetail() {
         <div>
           <div className="flex items-center gap-3">
             <h1 className="text-2xl font-bold text-gray-900">
-              {event.league?.name} — Event #{event.event_number}
+              {event.league?.name} — {event.name ? event.name : `Event #${event.event_number}`}
             </h1>
             <StatusBadge status={event.status} />
           </div>
@@ -708,20 +708,36 @@ function GroupRow({ ep, maxGroup, onSetGroup, onToggleSK }) {
 
 // ─── Tab: Payout Config ───────────────────────────────────────────
 function TabPayoutConfig({ event, eventPlayers, course, onUpdated }) {
-  const [config, setConfig] = useState({})
-  const [saving, setSaving] = useState(false)
+  const [config,      setConfig]      = useState({})
+  const [saving,      setSaving]      = useState(false)
+  const [ctpHoles,    setCtpHoles]    = useState([])   // array of hole numbers
+  const [ctpInput,    setCtpInput]    = useState('')
+  const [payoutBasis, setPayoutBasis] = useState(event.payout_basis ?? 'per_player')
+  const [fixedTotal,  setFixedTotal]  = useState(event.payout_fixed_total ?? '')
 
   const flightA = eventPlayers.filter(e => e.flight === 'A').length
   const flightB = eventPlayers.filter(e => e.flight === 'B').length
+  const totalPlayers = eventPlayers.length
 
-  const par3Holes = course
-    ? course.par_per_hole.map((p, i) => ({ hole: i+1, par: p })).filter(h => h.par === 3)
-    : []
-
+  // Initialise config and CTP holes from event
   useEffect(() => {
-    const base = { ...DEFAULT_PAYOUT_CONFIG }
-    par3Holes.forEach(h => { base[`ctp_${h.hole}`] = 0 })
-    const merged = { ...base, ...(event.payout_config ?? {}) }
+    const existingConfig = event.payout_config ?? {}
+    // Derive CTP holes from existing ctp_ keys
+    const existingCtpHoles = Object.keys(existingConfig)
+      .filter(k => k.startsWith('ctp_'))
+      .map(k => parseInt(k.replace('ctp_', ''), 10))
+      .sort((a, b) => a - b)
+    setCtpHoles(existingCtpHoles)
+
+    const base   = { ...DEFAULT_PAYOUT_CONFIG }
+    existingCtpHoles.forEach(h => { if (!(base[`ctp_${h}`])) base[`ctp_${h}`] = 0 })
+    const merged = { ...base, ...existingConfig }
+    // Remove any ctp_ keys not in existingCtpHoles (cleanup)
+    Object.keys(merged).forEach(k => {
+      if (k.startsWith('ctp_') && !existingCtpHoles.includes(parseInt(k.replace('ctp_', ''), 10))) {
+        delete merged[k]
+      }
+    })
     setConfig(merged)
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [event.id])
@@ -730,24 +746,45 @@ function TabPayoutConfig({ event, eventPlayers, course, onUpdated }) {
     setConfig(c => ({ ...c, [key]: parseFloat(val) || 0 }))
   }
 
+  function addCtpHole() {
+    const h = parseInt(ctpInput, 10)
+    if (isNaN(h) || h < 1 || h > 18) { toast.error('Hole must be 1–18'); return }
+    if (ctpHoles.includes(h)) { toast.error(`Hole ${h} already added`); return }
+    const sorted = [...ctpHoles, h].sort((a, b) => a - b)
+    setCtpHoles(sorted)
+    setConfig(c => ({ ...c, [`ctp_${h}`]: 0 }))
+    setCtpInput('')
+  }
+
+  function removeCtpHole(h) {
+    setCtpHoles(prev => prev.filter(x => x !== h))
+    setConfig(c => { const next = { ...c }; delete next[`ctp_${h}`]; return next })
+  }
+
   async function handleSave() {
     setSaving(true)
-    const { error } = await supabase.from('events').update({ payout_config: config }).eq('id', event.id)
+    const updates = {
+      payout_config:       config,
+      payout_basis:        payoutBasis,
+      payout_fixed_total:  payoutBasis === 'fixed' ? parseFloat(fixedTotal) || 0 : null,
+    }
+    const { error } = await supabase.from('events').update(updates).eq('id', event.id)
     setSaving(false)
     if (error) toast.error(error.message)
     else { toast.success('Payout config saved'); onUpdated() }
   }
 
-  const totalPlayers = eventPlayers.length
-
   function getMultiplier(key) {
-    if (key === 'low_putts' || key.startsWith('ctp_')) return totalPlayers  // full field
+    if (key === 'low_putts' || key.startsWith('ctp_')) return totalPlayers
     if (key === 'skins_b' || key.includes('_b_') || key === 'long_drive_b') return flightB
     return flightA
   }
 
+  const totalPot = payoutBasis === 'fixed'
+    ? (parseFloat(fixedTotal) || 0)
+    : event.entry_fee * totalPlayers
+
   const totalAllocated = Object.entries(config).reduce((sum, [k, v]) => sum + ((v || 0) * getMultiplier(k)), 0)
-  const totalPot       = event.entry_fee * eventPlayers.length
   const overBudget     = totalAllocated > totalPot
 
   const rows = Object.entries(config).map(([key, val]) => {
@@ -764,18 +801,87 @@ function TabPayoutConfig({ event, eventPlayers, course, onUpdated }) {
 
   return (
     <div className="space-y-4">
+      {/* Summary + save */}
       <div className="flex items-center justify-between flex-wrap gap-2">
         <div className="text-sm text-gray-600 space-y-0.5">
-          <p>Flight A: <strong>{flightA} players</strong> · Flight B: <strong>{flightB} players</strong> · Total: <strong>{totalPlayers} players</strong> · Pot: <strong>${totalPot.toFixed(2)}</strong></p>
+          <p>Flight A: <strong>{flightA}</strong> · Flight B: <strong>{flightB}</strong> · Total: <strong>{totalPlayers} players</strong> · Pot: <strong>${totalPot.toFixed(2)}</strong></p>
           <p className={overBudget ? 'text-red-600 font-medium' : 'text-fairway-700 font-medium'}>
-            Total Allocated: ${totalAllocated.toFixed(2)}{overBudget ? ' — exceeds pot!' : ` of $${totalPot.toFixed(2)}`}
+            Allocated: ${totalAllocated.toFixed(2)}{overBudget ? ' — exceeds pot!' : ` of $${totalPot.toFixed(2)}`}
           </p>
         </div>
         <Button onClick={handleSave} loading={saving}>Save Config</Button>
       </div>
 
+      {/* Payout basis */}
+      <Card>
+        <CardHeader title="Payout Pot" subtitle="How the total prize pool is calculated" />
+        <div className="flex gap-6 mt-1">
+          <label className="flex items-center gap-2 cursor-pointer">
+            <input type="radio" checked={payoutBasis === 'per_player'} onChange={() => setPayoutBasis('per_player')} className="accent-fairway-600" />
+            <span className="text-sm text-gray-700">Attendance — entry fee × players (<strong>${(event.entry_fee * totalPlayers).toFixed(2)}</strong>)</span>
+          </label>
+          <label className="flex items-center gap-2 cursor-pointer">
+            <input type="radio" checked={payoutBasis === 'fixed'} onChange={() => setPayoutBasis('fixed')} className="accent-fairway-600" />
+            <span className="text-sm text-gray-700">Fixed total</span>
+          </label>
+        </div>
+        {payoutBasis === 'fixed' && (
+          <div className="flex items-center gap-2 mt-3">
+            <span className="text-sm text-gray-500">Total pot: $</span>
+            <input
+              type="number" min="0" step="1"
+              value={fixedTotal}
+              onChange={e => setFixedTotal(e.target.value)}
+              className="input py-1 text-sm w-32"
+              placeholder="e.g. 500"
+            />
+          </div>
+        )}
+      </Card>
+
+      {/* CTP hole assignment */}
+      <Card>
+        <CardHeader title="Closest to Pin Holes" subtitle="Add the specific hole numbers for CTP contests at this course" />
+        <div className="flex flex-wrap gap-2 mb-3">
+          {ctpHoles.map(h => (
+            <span key={h} className="inline-flex items-center gap-1 bg-green-100 text-green-800 text-xs font-semibold px-2.5 py-1 rounded-full">
+              Hole {h}
+              <button onClick={() => removeCtpHole(h)} className="text-green-600 hover:text-green-900 ml-0.5">×</button>
+            </span>
+          ))}
+          {ctpHoles.length === 0 && <p className="text-xs text-gray-400">No CTP holes set. Add holes below.</p>}
+        </div>
+        <div className="flex items-center gap-2">
+          <input
+            type="number" min="1" max="18"
+            value={ctpInput}
+            onChange={e => setCtpInput(e.target.value)}
+            onKeyDown={e => e.key === 'Enter' && (e.preventDefault(), addCtpHole())}
+            placeholder="Hole #"
+            className="input py-1 text-sm w-24"
+          />
+          <Button size="sm" variant="secondary" onClick={addCtpHole}>+ Add Hole</Button>
+          {course?.par_per_hole && (
+            <button
+              className="text-xs text-fairway-600 hover:underline ml-2"
+              onClick={() => {
+                const par3s = course.par_per_hole
+                  .map((p, i) => ({ hole: i+1, par: p }))
+                  .filter(h => h.par === 3 && !ctpHoles.includes(h.hole))
+                par3s.forEach(h => {
+                  setCtpHoles(prev => [...prev, h.hole].sort((a,b) => a-b))
+                  setConfig(c => ({ ...c, [`ctp_${h.hole}`]: c[`ctp_${h.hole}`] ?? 0 }))
+                })
+              }}
+            >
+              Auto-add par-3s
+            </button>
+          )}
+        </div>
+      </Card>
+
       <p className="text-xs text-gray-500">
-        All values are <strong>$ per player</strong>. Flight categories × their flight count. Low Putts &amp; Greenies × full field.
+        All values are <strong>$ per player</strong>. Flight categories × their flight count. Low Putts, Greenies &amp; CTP × full field.
       </p>
 
       {/* Flight A */}
@@ -783,7 +889,7 @@ function TabPayoutConfig({ event, eventPlayers, course, onUpdated }) {
         <div className="px-4 py-2.5 bg-blue-50 border-b border-blue-100">
           <h3 className="text-xs font-semibold text-blue-700">Flight A ({flightA} players)</h3>
         </div>
-        <PayoutTable rows={rows.filter(r => r.isFlightA)} onChange={setVal} colLabel={`$ per player (Flt A)`} />
+        <PayoutTable rows={rows.filter(r => r.isFlightA)} onChange={setVal} colLabel="$ per player (Flt A)" />
       </Card>
 
       {/* Flight B */}
@@ -791,15 +897,15 @@ function TabPayoutConfig({ event, eventPlayers, course, onUpdated }) {
         <div className="px-4 py-2.5 bg-purple-50 border-b border-purple-100">
           <h3 className="text-xs font-semibold text-purple-700">Flight B ({flightB} players)</h3>
         </div>
-        <PayoutTable rows={rows.filter(r => r.isFlightB)} onChange={setVal} colLabel={`$ per player (Flt B)`} />
+        <PayoutTable rows={rows.filter(r => r.isFlightB)} onChange={setVal} colLabel="$ per player (Flt B)" />
       </Card>
 
-      {/* Full field — Low Putts & Greenies */}
+      {/* Full field */}
       <Card className="overflow-hidden p-0">
         <div className="px-4 py-2.5 bg-green-50 border-b border-green-100">
-          <h3 className="text-xs font-semibold text-green-700">Full Field — Low Putts &amp; Greenies ({totalPlayers} players)</h3>
+          <h3 className="text-xs font-semibold text-green-700">Full Field — Low Putts, Greenies &amp; CTP ({totalPlayers} players)</h3>
         </div>
-        <PayoutTable rows={rows.filter(r => r.isField)} onChange={setVal} colLabel={`$ per player (All)`} />
+        <PayoutTable rows={rows.filter(r => r.isField)} onChange={setVal} colLabel="$ per player (All)" />
       </Card>
     </div>
   )

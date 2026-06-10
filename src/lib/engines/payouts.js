@@ -129,8 +129,10 @@ function resolveWinner(key, leaderboards, sideGames) {
  * @param {Object} flightCounts   — { A: number, B: number }  (optional, defaults to split)
  */
 export function computePayouts(event, playerCount, leaderboards, sideGames, skinsResults, flightCounts) {
-  const config  = event.payout_config ?? {}
-  const totalPot = event.entry_fee * playerCount
+  const config   = event.payout_config ?? {}
+  const totalPot = (event.payout_basis === 'fixed' && event.payout_fixed_total)
+    ? event.payout_fixed_total
+    : event.entry_fee * playerCount
   const fcA = flightCounts?.A ?? Math.ceil(playerCount / 2)
   const fcB = flightCounts?.B ?? Math.floor(playerCount / 2)
 
