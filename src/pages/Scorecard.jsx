@@ -88,17 +88,25 @@ export default function Scorecard() {
       setCourse(ev.course)
       setIsComplete(ev.status === 'complete')
 
+      // Find this user's player record (by profile.player_id or email fallback)
+      let myPlayerId = profile?.player_id ?? null
+      if (!myPlayerId && user?.email) {
+        const { data: pByEmail } = await supabase
+          .from('players').select('id').eq('email', user.email).maybeSingle()
+        myPlayerId = pByEmail?.id ?? null
+      }
+
       // Find this user's group and scorekeeper status
       let groupNum = null
       let userIsScorekeeper = false
 
-      if (profile?.player_id) {
+      if (myPlayerId) {
         const { data: myEp } = await supabase
           .from('event_players')
           .select('group_number, is_scorekeeper')
           .eq('event_id', evId)
-          .eq('player_id', profile.player_id)
-          .single()
+          .eq('player_id', myPlayerId)
+          .maybeSingle()
         groupNum          = myEp?.group_number ?? null
         userIsScorekeeper = myEp?.is_scorekeeper ?? false
       }
@@ -107,12 +115,13 @@ export default function Scorecard() {
       const editAllowed = isAdmin || userIsScorekeeper
       setCanEdit(editAllowed)
 
-      // Load group players (admin sees all if no group assigned)
+      // Load group players — scorekeepers/players only see their group; admins see all
       const query = supabase
         .from('event_players')
         .select('*, player:players(*)')
         .eq('event_id', evId)
-      if (groupNum) query.eq('group_number', groupNum)
+      if (!isAdmin && groupNum) query.eq('group_number', groupNum)
+      else if (!isAdmin && !groupNum && myPlayerId) query.eq('player_id', myPlayerId)
 
       const { data: eps } = await query.order('flight').order('adjusted_handicap_index')
       setGroupPlayers(eps ?? [])
@@ -234,10 +243,11 @@ export default function Scorecard() {
 
   if (!event || !course) return null
 
-  const hole = currentHole
-  const par  = course.par_per_hole[hole - 1]
-  const si   = course.stroke_index[hole - 1]
-  const yd   = course.yardage?.[hole - 1] ?? '—'
+  const hole       = currentHole
+  const par        = course.par_per_hole[hole - 1]
+  const si         = course.stroke_index[hole - 1]
+  const yd         = course.yardage?.[hole - 1] ?? '—'
+  const trackPutts = !event.side_game_options?.length || event.side_game_options.includes('track_putts')
   const holesEntered = groupPlayers.length > 0
     ? Math.max(0, ...groupPlayers.map(ep => Object.keys(scores[ep.player_id] ?? {}).length))
     : 0
@@ -370,6 +380,7 @@ export default function Scorecard() {
             score={getScore(ep.player_id, hole)}
             allHoleScores={scores[ep.player_id] ?? {}}
             courseStrokeIndexes={course.stroke_index}
+            trackPutts={trackPutts}
             onChange={(field, val) => updateScore(ep.player_id, hole, field, val)}
           />
         ))}
@@ -421,7 +432,7 @@ export default function Scorecard() {
 }
 
 // ─── Player Score Card ─────────────────────────────────────────────
-function PlayerScoreCard({ ep, hole, par, si, score, allHoleScores, courseStrokeIndexes, onChange }) {
+function PlayerScoreCard({ ep, hole, par, si, score, allHoleScores, courseStrokeIndexes, trackPutts, onChange }) {
   const ch      = ep.course_handicap ?? 0
   const strokes = getStrokesOnHole(ch, si)
   const rawGross = score.gross === '' ? 1 : parseInt(score.gross, 10)
@@ -477,6 +488,11 @@ function PlayerScoreCard({ ep, hole, par, si, score, allHoleScores, courseStroke
               {ep.flight}
             </span>
           )}
+          {strokes > 0 && (
+            <span className="inline-flex items-center gap-0.5 bg-fairway-100 text-fairway-800 text-xs font-bold px-1.5 py-0.5 rounded-full" title={`Receives ${strokes} stroke${strokes > 1 ? 's' : ''} on this hole`}>
+              {'●'.repeat(strokes)} stroke{strokes > 1 ? 's' : ''}
+            </span>
+          )}
         </div>
         <div className="flex items-center gap-3 text-xs text-gray-500">
           <span>CH: {ch}</span>
@@ -501,10 +517,12 @@ function PlayerScoreCard({ ep, hole, par, si, score, allHoleScores, courseStroke
             </>
           )}
         </div>
-        <div className="flex flex-col items-center gap-1">
-          <span className="text-xs text-gray-400 font-medium uppercase tracking-wide">Putts</span>
-          {stepper('putts', 0, 10)}
-        </div>
+        {trackPutts && (
+          <div className="flex flex-col items-center gap-1">
+            <span className="text-xs text-gray-400 font-medium uppercase tracking-wide">Putts</span>
+            {stepper('putts', 0, 10)}
+          </div>
+        )}
       </div>
     </div>
   )
