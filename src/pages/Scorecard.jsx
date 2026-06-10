@@ -115,13 +115,22 @@ export default function Scorecard() {
       const editAllowed = isAdmin || userIsScorekeeper
       setCanEdit(editAllowed)
 
-      // Load group players — scorekeepers/players only see their group; admins see all
+      const eventComplete = ev.status === 'complete'
+
+      // Group scoping:
+      // - If assigned to a group AND event is not complete → only see that group (even admins)
+      // - If admin AND event is complete (or no group) → see all players
+      // - If not admin and no group → only see own player row
       const query = supabase
         .from('event_players')
         .select('*, player:players(*)')
         .eq('event_id', evId)
-      if (!isAdmin && groupNum) query.eq('group_number', groupNum)
-      else if (!isAdmin && !groupNum && myPlayerId) query.eq('player_id', myPlayerId)
+
+      if (groupNum && !eventComplete) {
+        query.eq('group_number', groupNum)
+      } else if (!isAdmin && !groupNum && myPlayerId) {
+        query.eq('player_id', myPlayerId)
+      }
 
       const { data: eps } = await query.order('flight').order('adjusted_handicap_index')
       setGroupPlayers(eps ?? [])

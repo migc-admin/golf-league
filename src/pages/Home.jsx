@@ -84,9 +84,9 @@ export default function Home() {
     <div className="min-h-screen bg-gradient-to-br from-fairway-800 to-fairway-950 flex flex-col">
       {/* Header */}
       <header className="flex items-center justify-between px-5 py-4 max-w-2xl mx-auto w-full">
-        <div className="flex items-center gap-2 text-white font-bold text-lg">
-          <span className="text-2xl">⛳</span>
-          <span>Golf League</span>
+        <div className="flex items-center gap-2.5">
+          <img src="/logo.png" alt="Mulligan's Island Golf Club" className="w-9 h-9 rounded-full object-cover" />
+          <span className="text-white font-bold" style={{ fontFamily: "'Playfair Display', serif", fontSize: '1.05rem' }}>Mulligan's Island Golf Club</span>
         </div>
         <button
           onClick={handleSignOut}
