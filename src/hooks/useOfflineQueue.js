@@ -115,12 +115,14 @@ export function useOfflineQueue() {
           .from('scores')
           .upsert(payload, { onConflict: 'event_id,player_id,hole_number' })
         if (!error) return { ok: true, queued: false }
+        // DB/auth error — surface it, do NOT queue
+        return { ok: false, queued: false, error: error.message }
       } catch {
-        // Fall through to queue
+        // True network failure — fall through to queue
       }
     }
 
-    // Queue locally
+    // Queue locally (only on real network failures)
     const item  = { ...payload, _qid: crypto.randomUUID(), _ts: Date.now() }
     const q     = deduped(readQueue(), item)
     writeQueue(q)
