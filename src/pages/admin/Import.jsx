@@ -154,16 +154,28 @@ function PreviewTable({ headers, rows, statusKey = '_status', messageKey = '_mes
 }
 
 // ─── Tab 1: Import Players ─────────────────────────────────────────
-const PLAYERS_TEMPLATE = `first_name,last_name,email,handicap_index,role
-Tony,Alvarez,tony@example.com,5.2,player
-Dave,Kowalski,dave@example.com,11.1,player
-Sarah,Okonkwo,sarah@example.com,18.7,admin`
+const PLAYERS_TEMPLATE = `first_name,last_name,email,handicap_index,flight,role
+Tony,Alvarez,tony@example.com,5.2,A,player
+Dave,Kowalski,dave@example.com,11.1,A,player
+Bob,Nguyen,bob@example.com,15.3,B,player
+Sarah,Okonkwo,sarah@example.com,18.7,B,admin`
 
 function ImportPlayers() {
   const [rows,      setRows]      = useState([])
   const [headers,   setHeaders]   = useState([])
   const [importing, setImporting] = useState(false)
   const [done,      setDone]      = useState(false)
+  const [events,    setEvents]    = useState([])
+  const [eventId,   setEventId]   = useState('')
+
+  useEffect(() => {
+    supabase
+      .from('events')
+      .select('id, event_number, event_date, status, league:leagues(name), course:courses(name, slope, rating, par)')
+      .neq('status', 'complete')
+      .order('event_date', { ascending: false })
+      .then(({ data }) => setEvents(data ?? []))
+  }, [])
 
   function handleFile(text) {
     setDone(false)
@@ -176,45 +188,81 @@ function ImportPlayers() {
     setImporting(true)
     const updated = [...rows]
 
+    // Load event course for course handicap calc if event selected
+    let eventCourse = null
+    if (eventId) {
+      const ev = events.find(e => e.id === eventId)
+      eventCourse = ev?.course ?? null
+    }
+
     for (let i = 0; i < updated.length; i++) {
-      const row = updated[i]
-      const first = row['first_name']?.trim()
-      const last  = row['last_name']?.trim()
-      const email = row['email']?.trim() || null
-      const hi    = parseFloat(row['handicap_index'])
+      const row    = updated[i]
+      const first  = row['first_name']?.trim()
+      const last   = row['last_name']?.trim()
+      const email  = row['email']?.trim() || null
+      const hi     = parseFloat(row['handicap_index'])
+      const flight = row['flight']?.trim().toUpperCase() || null
+      const role   = row['role']?.trim().toLowerCase() || 'player'
 
       if (!first || !last) {
         updated[i] = { ...row, _status: 'error', _message: 'Missing name' }
         continue
       }
+      if (flight && flight !== 'A' && flight !== 'B') {
+        updated[i] = { ...row, _status: 'error', _message: 'Flight must be A or B' }
+        continue
+      }
 
       // Check for duplicate email
+      let playerId = null
       if (email) {
         const { data: existing } = await supabase
           .from('players').select('id').eq('email', email).single()
         if (existing) {
-          updated[i] = { ...row, _status: 'skipped', _message: 'Email already exists' }
-          continue
+          playerId = existing.id
+          // Don't skip — still enroll in event below if selected
         }
       }
 
-      const role = row['role']?.trim().toLowerCase() || 'player'
-      const payload = { first_name: first, last_name: last, intended_role: role }
-      if (email) payload.email = email
-      if (!isNaN(hi)) payload.handicap_index = hi
+      if (!playerId) {
+        const payload = { first_name: first, last_name: last, intended_role: role }
+        if (email) payload.email = email
+        if (!isNaN(hi)) payload.handicap_index = hi
 
-      const { error } = await supabase.from('players').insert(payload)
-      if (error) {
-        updated[i] = { ...row, _status: 'error', _message: error.message }
-        setRows([...updated])
-        continue
+        const { data: newP, error } = await supabase.from('players').insert(payload).select('id').single()
+        if (error) {
+          updated[i] = { ...row, _status: 'error', _message: error.message }
+          setRows([...updated])
+          continue
+        }
+        playerId = newP.id
+
+        // Apply role to matching profile
+        if (email && role !== 'player') {
+          const { data: prof } = await supabase.from('profiles').select('id').eq('email', email).maybeSingle()
+          if (prof) await supabase.from('profiles').update({ role }).eq('id', prof.id)
+        }
       }
 
-      // If role is admin/scorekeeper and email exists, update the matching profile
-      if (email && role !== 'player') {
-        const { data: prof } = await supabase.from('profiles').select('id').eq('email', email).maybeSingle()
-        if (prof) {
-          await supabase.from('profiles').update({ role }).eq('id', prof.id)
+      // Enroll in event if selected
+      if (eventId && playerId) {
+        const { data: alreadyOn } = await supabase
+          .from('event_players').select('id').eq('event_id', eventId).eq('player_id', playerId).single()
+
+        if (!alreadyOn) {
+          let course_handicap = null
+          if (eventCourse && !isNaN(hi)) {
+            const { slope, rating, par } = eventCourse
+            course_handicap = Math.round((hi * slope / 113) + (rating - par))
+          }
+          await supabase.from('event_players').insert({
+            event_id:                eventId,
+            player_id:               playerId,
+            handicap_index:          isNaN(hi) ? null : hi,
+            adjusted_handicap_index: isNaN(hi) ? null : hi,
+            course_handicap,
+            ...(flight ? { flight } : {}),
+          })
         }
       }
 
@@ -251,22 +299,44 @@ function ImportPlayers() {
         />
         <div className="bg-gray-900 rounded-lg px-4 py-3 text-xs text-gray-300 font-mono overflow-x-auto">
           <div className="text-gray-500 mb-1"># players_template.csv</div>
-          <div>first_name,last_name,email,handicap_index,role</div>
-          <div className="text-gray-500">Tony,Alvarez,tony@example.com,5.2,player</div>
-          <div className="text-gray-500">Dave,Kowalski,dave@example.com,11.1,admin</div>
+          <div>first_name,last_name,email,handicap_index,flight,role</div>
+          <div className="text-gray-500">Tony,Alvarez,tony@example.com,5.2,A,player</div>
+          <div className="text-gray-500">Dave,Kowalski,dave@example.com,11.1,A,admin</div>
+          <div className="text-gray-500">Bob,Nguyen,bob@example.com,15.3,B,player</div>
         </div>
         <ul className="mt-3 text-xs text-gray-500 space-y-1 list-disc list-inside">
           <li><strong>first_name</strong> and <strong>last_name</strong> are required</li>
           <li><strong>email</strong> is optional but used to prevent duplicates</li>
-          <li><strong>handicap_index</strong> is optional here — you set it per event when adding to a roster</li>
-          <li><strong>role</strong> — <code>player</code> (default), <code>admin</code>, or <code>scorekeeper</code>. If an account with that email exists, the role is applied immediately.</li>
-          <li>Players already in the system (matching email) will be skipped</li>
+          <li><strong>handicap_index</strong> — used for course handicap if also enrolling in an event</li>
+          <li><strong>flight</strong> — A or B. Only applied when enrolling in an event (optional).</li>
+          <li><strong>role</strong> — <code>player</code> (default), <code>admin</code>, or <code>scorekeeper</code></li>
+          <li>Players already in the system (matching email) are still enrolled in the selected event</li>
         </ul>
+      </Card>
+
+      {/* Optional: enroll in event */}
+      <Card>
+        <CardHeader
+          title="Step 2 — Enroll in an event (optional)"
+          subtitle="If selected, players will also be added to this event with flight and course handicap."
+        />
+        <select
+          value={eventId}
+          onChange={e => setEventId(e.target.value)}
+          className="input bg-white"
+        >
+          <option value="">Skip — add to roster only</option>
+          {events.map(ev => (
+            <option key={ev.id} value={ev.id}>
+              {ev.league?.name} — Event #{ev.event_number} · {ev.course?.name} · {formatDate(ev.event_date)}
+            </option>
+          ))}
+        </select>
       </Card>
 
       {/* Upload */}
       <Card>
-        <CardHeader title="Step 2 — Upload your CSV" />
+        <CardHeader title="Step 3 — Upload your CSV" />
         <FileDropZone onFile={handleFile} />
       </Card>
 
@@ -274,7 +344,7 @@ function ImportPlayers() {
       {rows.length > 0 && (
         <Card>
           <CardHeader
-            title={`Step 3 — Review & Import (${rows.length} rows)`}
+            title={`Step 4 — Review & Import (${rows.length} rows)`}
             action={
               !done && pendingCount > 0 && (
                 <Button onClick={runImport} loading={importing}>
@@ -286,7 +356,8 @@ function ImportPlayers() {
           <PreviewTable headers={[...headers, '_status']} rows={rows} />
           {done && importedCount > 0 && (
             <p className="mt-3 text-sm text-fairway-700 font-medium">
-              ✓ {importedCount} player{importedCount !== 1 ? 's' : ''} added to your roster. You can now add them to events from the Players page.
+              ✓ {importedCount} player{importedCount !== 1 ? 's' : ''} added to your roster
+              {eventId ? ' and enrolled in the selected event' : ''}.
             </p>
           )}
         </Card>
