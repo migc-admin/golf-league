@@ -21,29 +21,32 @@ export default function Layout({ children }) {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 flex flex-col">
-      {/* Top nav */}
-      <header className="bg-fairway-700 text-white shadow-lg sticky top-0 z-40">
+    <div className="min-h-screen flex flex-col" style={{ background: '#EEF1EC' }}>
+      {/* Top nav — MIGC gradient + gold border */}
+      <header className="sticky top-0 z-40 shadow-lg" style={{ background: 'linear-gradient(150deg,#0b2318 0%,#1B4332 45%,#1f5c3e 100%)', borderBottom: '3px solid #D4AF37' }}>
         <div className="max-w-7xl mx-auto px-4 flex items-center justify-between h-14">
-          <Link to="/admin" className="flex items-center gap-2 font-bold text-lg tracking-tight">
+          <Link to="/admin" className="flex items-center gap-2.5 tracking-tight">
             <span className="text-2xl leading-none">⛳</span>
-            <span className="hidden sm:inline">Golf League</span>
+            <span className="hidden sm:inline font-bold text-white" style={{ fontFamily: "'Playfair Display', serif", fontSize: '1.15rem', letterSpacing: '0.02em' }}>
+              MIGC Golf League
+            </span>
           </Link>
 
           {/* Desktop nav */}
-          <nav className="hidden md:flex items-center gap-1">
+          <nav className="hidden md:flex items-center gap-0.5">
             {navItems.map(({ to, label, icon: Icon, end }) => (
               <NavLink
                 key={to}
                 to={to}
                 end={end}
                 className={({ isActive }) =>
-                  `flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
+                  `flex items-center gap-1.5 px-3 py-2 text-xs font-semibold uppercase tracking-wider transition-colors ${
                     isActive
-                      ? 'bg-white/20 text-white'
-                      : 'text-fairway-100 hover:bg-white/10'
+                      ? 'text-gold-400 border-b-2 border-gold-400'
+                      : 'text-white/70 hover:text-white hover:bg-white/10 rounded'
                   }`
                 }
+                style={({ isActive }) => isActive ? { color: '#D4AF37', borderBottomColor: '#D4AF37' } : {}}
               >
                 <Icon className="w-4 h-4" />
                 {label}
@@ -52,22 +55,23 @@ export default function Layout({ children }) {
           </nav>
 
           <div className="flex items-center gap-2">
-            <span className="text-xs text-fairway-200 hidden sm:block">
+            <span className="text-xs hidden sm:block" style={{ color: 'rgba(255,255,255,0.5)' }}>
               {profile?.full_name}
             </span>
             <button
               onClick={handleSignOut}
-              className="text-fairway-200 hover:text-white transition-colors text-sm px-3 py-1.5 rounded-lg hover:bg-white/10"
+              className="text-xs font-semibold uppercase tracking-wider px-3 py-1.5 transition-colors hover:bg-white/10 rounded"
+              style={{ color: '#D4AF37', letterSpacing: '0.08em' }}
             >
               Sign out
             </button>
 
             {/* Mobile hamburger */}
             <button
-              className="md:hidden p-2 rounded-lg hover:bg-white/10"
+              className="md:hidden p-2 rounded hover:bg-white/10"
               onClick={() => setMenuOpen(v => !v)}
             >
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 {menuOpen
                   ? <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
                   : <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
@@ -79,7 +83,7 @@ export default function Layout({ children }) {
 
         {/* Mobile menu */}
         {menuOpen && (
-          <nav className="md:hidden border-t border-fairway-600 px-4 py-2 flex flex-col gap-1">
+          <nav className="md:hidden px-4 py-2 flex flex-col gap-1" style={{ borderTop: '1px solid rgba(255,255,255,0.1)' }}>
             {navItems.map(({ to, label, icon: Icon, end }) => (
               <NavLink
                 key={to}
@@ -87,10 +91,11 @@ export default function Layout({ children }) {
                 end={end}
                 onClick={() => setMenuOpen(false)}
                 className={({ isActive }) =>
-                  `flex items-center gap-2 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${
-                    isActive ? 'bg-white/20 text-white' : 'text-fairway-100 hover:bg-white/10'
+                  `flex items-center gap-2 px-3 py-2.5 text-sm font-semibold uppercase tracking-wider transition-colors rounded ${
+                    isActive ? 'bg-white/20' : 'hover:bg-white/10'
                   }`
                 }
+                style={({ isActive }) => ({ color: isActive ? '#D4AF37' : 'rgba(255,255,255,0.75)' })}
               >
                 <Icon className="w-4 h-4" />
                 {label}
