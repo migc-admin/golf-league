@@ -221,12 +221,23 @@ function CreateLoginModal({ open, onClose, players, onSaved }) {
     if (!email || !password) return
     setSaving(true)
 
+    // Save admin session before signUp replaces it
+    const { data: { session: adminSession } } = await supabase.auth.getSession()
+
     // Create auth account
     const { data, error } = await supabase.auth.signUp({
       email:    email.trim(),
       password: password,
       options:  { data: { full_name: fullName.trim() } },
     })
+
+    // Restore admin session immediately so we don't get logged out
+    if (adminSession) {
+      await supabase.auth.setSession({
+        access_token:  adminSession.access_token,
+        refresh_token: adminSession.refresh_token,
+      })
+    }
 
     if (error) {
       toast.error(error.message)
