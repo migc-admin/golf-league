@@ -14,7 +14,24 @@ import { computeMatchPoints } from '../lib/engines/matchPoints'
 import { computePayouts, CATEGORY_LABELS, ctpLabel } from '../lib/engines/payouts'
 import { FlightBadge, StatusBadge } from '../components/ui/Badge'
 
-const TABS = ['18-Hole', 'Front 9', 'Back 9', 'Stableford', 'Match Points', 'Low Putts', 'Skins', 'Payouts']
+const ALL_TABS = ['18-Hole', 'Front 9', 'Back 9', 'Stableford', 'Match Points', 'Low Putts', 'Skins', 'Payouts']
+
+function visibleTabs(event) {
+  if (!event) return ALL_TABS
+  const formats  = event.formats ?? (event.format ? [event.format] : ['net_stroke'])
+  const sideOpts = event.side_game_options ?? []
+  return ALL_TABS.filter(tab => {
+    if (tab === 'Payouts')       return true
+    if (tab === '18-Hole')       return formats.includes('net_stroke')
+    if (tab === 'Front 9')       return formats.includes('net_stroke_front9')
+    if (tab === 'Back 9')        return formats.includes('net_stroke_back9')
+    if (tab === 'Stableford')    return formats.includes('stableford')
+    if (tab === 'Match Points')  return formats.includes('match_points') || formats.includes('ryder_cup')
+    if (tab === 'Low Putts')     return sideOpts.includes('low_putts')
+    if (tab === 'Skins')         return sideOpts.some(s => s.startsWith('skins_'))
+    return false
+  })
+}
 
 const FORMAT_LABELS = {
   net_stroke:   'Net Stroke Play',
@@ -37,9 +54,8 @@ export default function Leaderboard() {
   const [activeTab,    setActiveTab]    = useState('18-Hole')
   const [activeFlight, setActiveFlight] = useState('A')
 
-  // Derived from event.format
-  const format = event?.format ?? 'net_stroke'
   const subRef = useRef(null)
+  const tabs   = event ? visibleTabs(event) : ALL_TABS
 
   async function loadScores(evId) {
     const { data } = await supabase.from('scores').select('*').eq('event_id', evId)
@@ -67,8 +83,9 @@ export default function Leaderboard() {
       await loadScores(eventId)
       setLoading(false)
 
-      // Auto-switch to Payouts tab if event is complete
-      if (ev.status === 'complete') setActiveTab('Payouts')
+      // Auto-switch to Payouts tab if event is complete, else first visible tab
+      const tvs = visibleTabs(ev)
+      setActiveTab(ev.status === 'complete' ? 'Payouts' : (tvs[0] ?? 'Payouts'))
 
       // Subscribe to realtime score changes
       subRef.current = supabase
@@ -140,7 +157,7 @@ export default function Leaderboard() {
         {/* Tabs */}
         <div className="max-w-2xl mx-auto">
           <div className="flex overflow-x-auto border-t border-fairway-600">
-            {TABS.map(tab => (
+            {tabs.map(tab => (
               <button
                 key={tab}
                 onClick={() => setActiveTab(tab)}
@@ -158,7 +175,7 @@ export default function Leaderboard() {
       </div>
 
       {/* Flight toggle */}
-      {activeTab !== 'Low Putts' && activeTab !== 'Skins' && activeTab !== 'Match Points' && activeTab !== 'Payouts' && (
+      {!['Low Putts', 'Skins', 'Match Points', 'Payouts'].includes(activeTab) && (
         <div className="max-w-2xl mx-auto px-4 pt-4 flex gap-2">
           {['A', 'B'].map(f => (
             <button

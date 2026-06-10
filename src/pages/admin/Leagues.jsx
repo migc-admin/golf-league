@@ -182,6 +182,7 @@ const SIDE_GAME_OPTIONS = [
   { key: 'long_drive', label: 'Long Drive (A & B)' },
   { key: 'low_putts',  label: 'Low Putts' },
   { key: 'ctp',        label: 'Closest to Pin (par 3s)' },
+  { key: 'track_putts', label: 'Track Putts on Scorecard' },
 ]
 
 const FORMAT_OPTIONS = [
