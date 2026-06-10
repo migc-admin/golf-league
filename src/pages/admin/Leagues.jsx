@@ -198,16 +198,19 @@ const FORMAT_OPTIONS = [
 ]
 
 function EventModal({ open, onClose, league, onSaved }) {
-  const [courses,    setCourses]    = useState([])
-  const [courseId,   setCourseId]   = useState('')
-  const [eventDate,  setEventDate]  = useState('')
-  const [eventNum,   setEventNum]   = useState(1)
-  const [entryFee,   setEntryFee]   = useState('20')
-  const [formats,    setFormats]    = useState(new Set(['net_stroke']))
-  const [sideGames,  setSideGames]  = useState(new Set())
-  const [startTime,  setStartTime]  = useState('')
-  const [interval,   setInterval]   = useState(10)
-  const [saving,     setSaving]     = useState(false)
+  const [courses,      setCourses]      = useState([])
+  const [courseId,     setCourseId]     = useState('')
+  const [eventDate,    setEventDate]    = useState('')
+  const [eventNum,     setEventNum]     = useState(1)
+  const [eventName,    setEventName]    = useState('')
+  const [entryFee,     setEntryFee]     = useState('20')
+  const [payoutBasis,  setPayoutBasis]  = useState('per_player')
+  const [payoutFixed,  setPayoutFixed]  = useState('')
+  const [formats,      setFormats]      = useState(new Set(['net_stroke']))
+  const [sideGames,    setSideGames]    = useState(new Set())
+  const [startTime,    setStartTime]    = useState('')
+  const [interval,     setInterval]     = useState(10)
+  const [saving,       setSaving]       = useState(false)
 
   useEffect(() => {
     if (!open) return
@@ -218,7 +221,10 @@ function EventModal({ open, onClose, league, onSaved }) {
     }
     setEventDate('')
     setCourseId('')
+    setEventName('')
     setEntryFee('20')
+    setPayoutBasis('per_player')
+    setPayoutFixed('')
     setFormats(new Set(['net_stroke']))
     setSideGames(new Set())
     setStartTime('')
@@ -251,8 +257,11 @@ function EventModal({ open, onClose, league, onSaved }) {
       course_id:              courseId,
       event_date:             eventDate,
       event_number:           parseInt(eventNum, 10),
+      name:                   eventName.trim() || null,
       entry_fee:              parseFloat(entryFee),
-      format:                 formatsArr[0],   // primary format for backward compat
+      payout_basis:           payoutBasis,
+      payout_fixed_total:     payoutBasis === 'fixed' ? parseFloat(payoutFixed) || 0 : null,
+      format:                 formatsArr[0],
       formats:                formatsArr,
       side_game_options:      [...sideGames],
       start_time:             startTime || null,
@@ -271,6 +280,7 @@ function EventModal({ open, onClose, league, onSaved }) {
           <Input label="Event #" type="number" min="1" value={eventNum} onChange={e => setEventNum(e.target.value)} required />
           <Input label="Date" type="date" value={eventDate} onChange={e => setEventDate(e.target.value)} required />
         </div>
+        <Input label="Event Name (optional)" value={eventName} onChange={e => setEventName(e.target.value)} placeholder="e.g. Spring Opener, Member-Guest…" />
         <div>
           <label className="label">Course</label>
           <select value={courseId} onChange={e => setCourseId(e.target.value)} className="input bg-white" required>
@@ -330,6 +340,22 @@ function EventModal({ open, onClose, league, onSaved }) {
           <Input label="Tee Interval (min)" type="number" min="1" max="60" value={interval} onChange={e => setInterval(e.target.value)} />
         </div>
         <Input label="Entry Fee ($)" type="number" step="0.01" min="0" value={entryFee} onChange={e => setEntryFee(e.target.value)} required />
+        <div>
+          <label className="label">Payout Pot Based On</label>
+          <div className="flex gap-4 mt-1">
+            <label className="flex items-center gap-2 cursor-pointer">
+              <input type="radio" name="payoutBasis" value="per_player" checked={payoutBasis === 'per_player'} onChange={() => setPayoutBasis('per_player')} className="accent-fairway-600" />
+              <span className="text-sm text-gray-700">Attendance (entry fee × players)</span>
+            </label>
+            <label className="flex items-center gap-2 cursor-pointer">
+              <input type="radio" name="payoutBasis" value="fixed" checked={payoutBasis === 'fixed'} onChange={() => setPayoutBasis('fixed')} className="accent-fairway-600" />
+              <span className="text-sm text-gray-700">Fixed total</span>
+            </label>
+          </div>
+          {payoutBasis === 'fixed' && (
+            <Input className="mt-2" label="Fixed Pot Total ($)" type="number" step="0.01" min="0" value={payoutFixed} onChange={e => setPayoutFixed(e.target.value)} placeholder="e.g. 500" />
+          )}
+        </div>
         <div className="flex justify-end gap-3 pt-2">
           <Button type="button" variant="secondary" onClick={onClose}>Cancel</Button>
           <Button type="submit" loading={saving}>Create Event</Button>
