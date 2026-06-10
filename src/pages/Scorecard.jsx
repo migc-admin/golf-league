@@ -202,7 +202,10 @@ export default function Scorecard() {
         putts,
       })
 
-      if (result?.queued) {
+      if (result?.error) {
+        toast.error(`Save failed: ${result.error}`)
+        allValid = false
+      } else if (result?.queued) {
         toast('Saved offline — will sync when connected', { icon: '📶', duration: 2000 })
       }
     }
