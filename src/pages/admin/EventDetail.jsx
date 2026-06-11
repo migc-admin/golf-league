@@ -336,9 +336,38 @@ function TabFlights({ event, eventPlayers, course, allPlayers, onUpdated }) {
       </div>
 
       {unassigned.length > 0 && (
-        <div className="bg-yellow-50 border border-yellow-200 rounded-lg px-4 py-3 text-sm text-yellow-800">
-          {unassigned.length} player{unassigned.length !== 1 ? 's' : ''} not yet assigned to a flight. Use the dropdown to assign flights manually.
-        </div>
+        <Card className="overflow-hidden p-0 border-yellow-300">
+          <div className="px-5 py-3 border-b border-yellow-200 flex items-center gap-2 bg-yellow-50">
+            <span className="text-sm font-semibold text-yellow-800">⚠ Unassigned — {unassigned.length} player{unassigned.length !== 1 ? 's' : ''} need a flight</span>
+          </div>
+          <div className="divide-y divide-gray-100">
+            {unassigned.map(ep => (
+              <div key={ep.id} className="flex items-center justify-between px-5 py-3">
+                <div>
+                  <div className="font-medium text-sm text-gray-900">
+                    {ep.player?.last_name}, {ep.player?.first_name}
+                  </div>
+                  <div className="text-xs text-gray-500 flex items-center gap-3 mt-0.5">
+                    <span>HI: {ep.handicap_index}</span>
+                    {ep.course_handicap != null && <span>CH: {ep.course_handicap}</span>}
+                  </div>
+                </div>
+                <div className="flex items-center gap-2">
+                  <select
+                    value=""
+                    onChange={e => overrideFlight(ep.id, e.target.value)}
+                    className="input py-1 text-xs w-28 border-yellow-400 bg-yellow-50"
+                  >
+                    <option value="">Assign flight…</option>
+                    <option value="A">Flight A</option>
+                    <option value="B">Flight B</option>
+                  </select>
+                  <button onClick={() => removePlayer(ep.id)} className="text-red-400 hover:text-red-600 text-xs">✕</button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </Card>
       )}
 
       {['A', 'B'].map(flight => {
