@@ -11,6 +11,7 @@ import Courses        from './pages/admin/Courses'
 import Players        from './pages/admin/Players'
 import EventDetail    from './pages/admin/EventDetail'
 import Scorecard      from './pages/Scorecard'
+import ScorecardJoin  from './pages/ScorecardJoin'
 import Leaderboard    from './pages/Leaderboard'
 import Standings      from './pages/Standings'
 import Schedule       from './pages/Schedule'
@@ -32,6 +33,9 @@ export default function App() {
           <Route path="events/:id"    element={<EventDetail />} />
           <Route path="import"        element={<Import />} />
         </Route>
+
+        {/* Join via access code — no auth required */}
+        <Route path="/join/:eventId" element={<ScorecardJoin />} />
 
         {/* Scorecard — public for specific eventId (shareable link), auth required for /me */}
         <Route path="/scorecard/:eventId" element={<Scorecard />} />

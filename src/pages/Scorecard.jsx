@@ -4,14 +4,15 @@
  * Flow:
  *  1. If eventId === 'me' → find the active event this user is scorekeeper for
  *  2. Load the event, course, and their group's players
- *  3. Hole-by-hole entry with +/- steppers (defaults to 1)
+ *  3. Hole-by-hole entry via tap-to-enter keypad inputs
  *  4. Net score shown live per player
  *  5. Saves optimistically; queues offline if no connection
- *  6. Traditional scorecard table view after round complete
+ *  6. Traditional scorecard table view (available mid-round via Progress button)
  *  7. Score editing allowed even on completed events
+ *  8. Guest access via sessionStorage (set by /join/:eventId)
  */
 
-import { useEffect, useState, useCallback } from 'react'
+import { useEffect, useState, useCallback, useRef } from 'react'
 import { useParams, Link, useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../hooks/useAuth'
@@ -49,14 +50,24 @@ export default function Scorecard() {
     if (authLoading || profile === undefined) return
 
     async function load() {
-      // Must be logged in to access scorecard
-      if (!user) {
-        setError('Please sign in to access the scorecard.')
-        setLoading(false)
-        return
-      }
-
       let evId = eventId
+      let guestGroupNum = null
+
+      // Guest access: check sessionStorage for a valid guest session
+      if (!user) {
+        const rawGuest = sessionStorage.getItem('guestSession')
+        const guest = rawGuest ? JSON.parse(rawGuest) : null
+        if (guest?.eventId === evId && guest?.groupNum && guest?.accessCode) {
+          // Will verify access code after loading event
+          guestGroupNum = guest.groupNum
+          // Store code to verify against DB
+          evId = guest.eventId
+        } else {
+          setError('Please sign in or use a join link to access the scorecard.')
+          setLoading(false)
+          return
+        }
+      }
 
       if (evId === 'me') {
         const { data: ep } = await supabase
@@ -84,6 +95,18 @@ export default function Scorecard() {
 
       if (!ev) { setError('Event not found.'); setLoading(false); return }
 
+      // Verify guest access code
+      if (guestGroupNum) {
+        const rawGuest = sessionStorage.getItem('guestSession')
+        const guest = rawGuest ? JSON.parse(rawGuest) : null
+        if (!ev.access_code || ev.access_code !== guest?.accessCode) {
+          sessionStorage.removeItem('guestSession')
+          setError('Access code is invalid or has been changed. Please use the join link again.')
+          setLoading(false)
+          return
+        }
+      }
+
       setEvent(ev)
       setCourse(ev.course)
       setIsComplete(ev.status === 'complete')
@@ -97,10 +120,10 @@ export default function Scorecard() {
       }
 
       // Find this user's group and scorekeeper status
-      let groupNum = null
-      let userIsScorekeeper = false
+      let groupNum = guestGroupNum  // guests already have their group from sessionStorage
+      let userIsScorekeeper = guestGroupNum != null  // guests are assumed scorekeepers
 
-      if (myPlayerId) {
+      if (!guestGroupNum && myPlayerId) {
         const { data: myEp } = await supabase
           .from('event_players')
           .select('group_number, is_scorekeeper')
@@ -111,7 +134,7 @@ export default function Scorecard() {
         userIsScorekeeper = myEp?.is_scorekeeper ?? false
       }
 
-      // Admins can always edit; others must be the assigned scorekeeper
+      // Admins can always edit; others must be the assigned scorekeeper or guest
       const editAllowed = isAdmin || userIsScorekeeper
       setCanEdit(editAllowed)
 
@@ -299,16 +322,22 @@ export default function Scorecard() {
                 <span className="text-xs text-yellow-200">{pendingCount} pending</span>
               </div>
             )}
-            {holesEntered === 18 && (
+            {holesEntered > 0 && (
               <button
                 onClick={() => setShowScorecard(true)}
                 className="text-fairway-200 text-xs hover:text-white border border-fairway-500 rounded px-2 py-1"
               >
-                Scorecard
+                {holesEntered === 18 ? 'Scorecard' : `Progress (${holesEntered})`}
               </button>
             )}
-            <Link to={`/leaderboard/${event.id}`} className="text-fairway-200 text-xs hover:text-white">Board</Link>
-            <Link to={homeLink} className="text-fairway-200 text-xs hover:text-white">⛳</Link>
+            <Link
+              to={`/leaderboard/${event.id}`}
+              state={{ from: 'scorecard', scorecardEventId: event.id }}
+              className="text-fairway-200 text-xs hover:text-white border border-fairway-500 rounded px-2 py-1"
+            >
+              Board
+            </Link>
+            {homeLink && <Link to={homeLink} className="text-fairway-200 text-xs hover:text-white">⛳</Link>}
             {user && (
               <button onClick={handleSignOut} className="text-fairway-200 text-xs hover:text-white border border-fairway-500 rounded px-2 py-1">
                 Sign out
@@ -445,97 +474,119 @@ export default function Scorecard() {
 
 // ─── Player Score Card ─────────────────────────────────────────────
 function PlayerScoreCard({ ep, hole, par, si, score, allHoleScores, courseStrokeIndexes, trackPutts, onChange }) {
+  const grossRef = useRef(null)
+  const puttsRef = useRef(null)
+
   const ch      = ep.course_handicap ?? 0
   const strokes = getStrokesOnHole(ch, si)
-  const rawGross = score.gross === '' ? 1 : parseInt(score.gross, 10)
-  const gross   = !isNaN(rawGross) && rawGross > 0 ? rawGross : null
-  const net     = gross != null ? gross - strokes : null
-  const netVsPar = net != null ? net - par : null
-  const netColor = netVsPar == null ? '' : netVsPar < 0 ? 'text-red-600' : netVsPar === 0 ? 'text-gray-700' : 'text-blue-600'
 
-  function stepper(field, min, max) {
-    const currentVal = field === 'gross'
-      ? (score.gross === '' ? 1 : (parseInt(score.gross, 10) || 1))
-      : (score.putts === '' ? 0 : (parseInt(score.putts, 10) || 0))
-    return (
-      <div className="flex items-center gap-0">
-        <button
-          type="button"
-          onClick={() => onChange(field, Math.max(min, currentVal - 1))}
-          className="w-10 h-10 rounded-l-lg bg-gray-100 text-gray-700 font-bold text-lg active:bg-gray-200 transition-colors flex items-center justify-center"
-        >
-          −
-        </button>
-        <input
-          type="number"
-          value={field === 'gross'
-            ? (score.gross === '' ? 1 : score.gross)
-            : (score.putts === '' ? 0 : score.putts)}
-          onChange={e => onChange(field, e.target.value)}
-          className="w-12 h-10 text-center font-bold text-base border-y border-gray-200 focus:outline-none focus:bg-fairway-50"
-          min={min}
-          max={max}
-          inputMode="numeric"
-        />
-        <button
-          type="button"
-          onClick={() => onChange(field, Math.min(max, currentVal + 1))}
-          className="w-10 h-10 rounded-r-lg bg-gray-100 text-gray-700 font-bold text-lg active:bg-gray-200 transition-colors flex items-center justify-center"
-        >
-          +
-        </button>
-      </div>
-    )
+  // Running total across all saved holes
+  let totalGross = 0, totalNetVsPar = 0, holesPlayed = 0
+  for (let h = 1; h <= 18; h++) {
+    const sc = allHoleScores[h]
+    if (sc && sc.gross !== '' && sc.gross != null) {
+      const g = parseInt(sc.gross, 10)
+      const hSI = courseStrokeIndexes[h - 1]
+      const hStrokes = getStrokesOnHole(ch, hSI)
+      totalGross += g
+      // par for this hole isn't passed in here, but we can approximate via netVsPar
+      // We'll just track gross for the summary display
+      holesPlayed++
+    }
   }
+
+  // Net for current hole
+  const grossVal = score.gross !== '' && score.gross != null ? parseInt(score.gross, 10) : null
+  const net = grossVal != null && !isNaN(grossVal) ? grossVal - strokes : null
+  const netVsPar = net != null ? net - par : null
+  const netColor = netVsPar == null ? 'text-gray-300'
+    : netVsPar <= -2 ? 'text-yellow-600 font-black'
+    : netVsPar === -1 ? 'text-red-600'
+    : netVsPar === 0  ? 'text-gray-700'
+    : netVsPar === 1  ? 'text-blue-600'
+    : 'text-blue-800'
+
+  const grossDisplay = score.gross !== '' && score.gross != null ? String(score.gross) : ''
+  const puttsDisplay = score.putts !== '' && score.putts != null ? String(score.putts) : ''
+
+  // Running score summary text
+  const runningLabel = holesPlayed > 0
+    ? `${holesPlayed} hole${holesPlayed !== 1 ? 's' : ''} · Gross ${totalGross}`
+    : 'No holes entered'
 
   return (
     <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
-      <div className="flex items-center justify-between px-4 py-2.5 bg-gray-50 border-b border-gray-100">
-        <div className="flex items-center gap-2">
-          <span className="font-semibold text-gray-900 text-sm">
-            {ep.player?.first_name} {ep.player?.last_name}
-          </span>
-          {ep.flight && (
-            <span className={`text-xs font-bold px-1.5 py-0.5 rounded ${ep.flight === 'A' ? 'bg-blue-100 text-blue-700' : 'bg-purple-100 text-purple-700'}`}>
-              {ep.flight}
+      {/* Player header row */}
+      <div className="flex items-center justify-between px-4 py-3">
+        <div className="flex-1 min-w-0 pr-4">
+          <div className="flex items-center gap-2 flex-wrap">
+            <span className="font-bold text-gray-900">
+              {ep.player?.first_name} {ep.player?.last_name}
             </span>
-          )}
-          {strokes > 0 && (
-            <span className="inline-flex items-center gap-0.5 bg-fairway-100 text-fairway-800 text-xs font-bold px-1.5 py-0.5 rounded-full" title={`Receives ${strokes} stroke${strokes > 1 ? 's' : ''} on this hole`}>
-              {'●'.repeat(strokes)} stroke{strokes > 1 ? 's' : ''}
-            </span>
-          )}
-        </div>
-        <div className="flex items-center gap-3 text-xs text-gray-500">
-          <span>CH: {ch}</span>
-          <span className={`font-bold text-sm ${netColor}`}>
-            {net != null ? (netVsPar === 0 ? 'E' : `${netVsPar > 0 ? '+' : ''}${netVsPar}`) : '—'}
-          </span>
-        </div>
-      </div>
-      <div className="px-4 py-3 flex items-center gap-6">
-        <div className="flex flex-col items-center gap-1">
-          <span className="text-xs text-gray-400 font-medium uppercase tracking-wide">Gross</span>
-          {stepper('gross', 1, 15)}
-          {strokes > 0 && (
-            <span className="text-xs text-fairway-600 font-medium">−{strokes} stroke{strokes !== 1 ? 's' : ''}</span>
-          )}
-        </div>
-        <div className="flex-1 flex flex-col items-center">
-          {net != null && (
-            <>
-              <span className="text-xs text-gray-400 font-medium uppercase tracking-wide">Net</span>
-              <span className={`text-3xl font-black ${netColor}`}>{net}</span>
-            </>
-          )}
-        </div>
-        {trackPutts && (
-          <div className="flex flex-col items-center gap-1">
-            <span className="text-xs text-gray-400 font-medium uppercase tracking-wide">Putts</span>
-            {stepper('putts', 0, 10)}
+            {ep.flight && (
+              <span className={`text-xs font-bold px-1.5 py-0.5 rounded ${ep.flight === 'A' ? 'bg-blue-100 text-blue-700' : 'bg-purple-100 text-purple-700'}`}>
+                {ep.flight}
+              </span>
+            )}
+            {strokes > 0 && (
+              <span className="inline-flex items-center bg-fairway-100 text-fairway-800 text-xs font-bold px-1.5 py-0.5 rounded-full" title={`Receives ${strokes} stroke${strokes > 1 ? 's' : ''}`}>
+                {'●'.repeat(Math.min(strokes, 3))} {strokes} stroke{strokes > 1 ? 's' : ''}
+              </span>
+            )}
           </div>
-        )}
+          <div className="text-xs text-gray-400 mt-0.5">{runningLabel}</div>
+        </div>
+
+        {/* Score input — large tap target */}
+        <div className="flex items-center gap-3">
+          {net != null && (
+            <div className="text-right">
+              <div className="text-xs text-gray-400 leading-none mb-0.5">Net</div>
+              <div className={`text-xl font-black leading-none ${netColor}`}>
+                {netVsPar === 0 ? 'E' : `${netVsPar > 0 ? '+' : ''}${netVsPar}`}
+              </div>
+            </div>
+          )}
+          <div className="flex flex-col items-center gap-0.5">
+            <span className="text-xs text-gray-400 font-medium uppercase tracking-wide">Score</span>
+            <input
+              ref={grossRef}
+              type="number"
+              inputMode="numeric"
+              pattern="[0-9]*"
+              value={grossDisplay}
+              onChange={e => onChange('gross', e.target.value === '' ? '' : parseInt(e.target.value, 10) || '')}
+              onFocus={e => e.target.select()}
+              placeholder="—"
+              min={1}
+              max={20}
+              className="w-16 h-16 text-center text-3xl font-black border-2 border-fairway-700 rounded-xl focus:border-fairway-500 focus:ring-2 focus:ring-fairway-200 outline-none bg-white"
+              style={{ WebkitAppearance: 'none', MozAppearance: 'textfield' }}
+            />
+          </div>
+        </div>
       </div>
+
+      {/* Putts row */}
+      {trackPutts && (
+        <div className="flex items-center justify-between px-4 py-2 bg-gray-50 border-t border-gray-100">
+          <span className="text-xs text-gray-500 font-medium">Putts on this hole</span>
+          <input
+            ref={puttsRef}
+            type="number"
+            inputMode="numeric"
+            pattern="[0-9]*"
+            value={puttsDisplay}
+            onChange={e => onChange('putts', e.target.value === '' ? '' : parseInt(e.target.value, 10) || '')}
+            onFocus={e => e.target.select()}
+            placeholder="0"
+            min={0}
+            max={10}
+            className="w-14 h-11 text-center text-xl font-bold border-2 border-gray-300 rounded-lg focus:border-fairway-500 focus:ring-2 focus:ring-fairway-200 outline-none bg-white"
+            style={{ WebkitAppearance: 'none', MozAppearance: 'textfield' }}
+          />
+        </div>
+      )}
     </div>
   )
 }
@@ -601,8 +652,14 @@ function TraditionalScorecard({ event, course, groupPlayers, scores, isComplete,
             <div className="text-xs text-fairway-200">{event.league?.name} · Event #{event.event_number}</div>
           </div>
           <div className="flex items-center gap-3">
-            <Link to={`/leaderboard/${event.id}`} className="text-fairway-200 text-xs hover:text-white">Board</Link>
-            <Link to={homeLink} className="text-fairway-200 text-xs hover:text-white">⛳</Link>
+            <Link
+              to={`/leaderboard/${event.id}`}
+              state={{ from: 'scorecard', scorecardEventId: event.id }}
+              className="text-fairway-200 text-xs hover:text-white border border-fairway-500 rounded px-2 py-1"
+            >
+              Board
+            </Link>
+            {homeLink && <Link to={homeLink} className="text-fairway-200 text-xs hover:text-white">⛳</Link>}
             {onSignOut && (
               <button onClick={onSignOut} className="text-fairway-200 text-xs hover:text-white border border-fairway-500 rounded px-2 py-1">
                 Sign out
@@ -611,14 +668,12 @@ function TraditionalScorecard({ event, course, groupPlayers, scores, isComplete,
           </div>
         </div>
         <div className="px-4 pb-3 flex gap-2">
-          {canEdit && (
-            <button
-              onClick={onEdit}
-              className="text-xs bg-white/10 hover:bg-white/20 text-white px-3 py-1.5 rounded-lg transition-colors"
-            >
-              {isComplete ? '✏ Edit Scores' : '← Edit Scores'}
-            </button>
-          )}
+          <button
+            onClick={onEdit}
+            className="text-xs bg-white/10 hover:bg-white/20 text-white px-3 py-1.5 rounded-lg transition-colors"
+          >
+            ← {isComplete ? 'Edit Scores' : 'Back to Entry'}
+          </button>
         </div>
       </div>
 

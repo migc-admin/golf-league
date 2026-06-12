@@ -172,6 +172,7 @@ function exportScoresCSV(event, eventPlayers, allScores, course) {
 function TabOverview({ event, eventPlayers, allScores, course, onUpdated }) {
   const [editModal,   setEditModal]   = useState(false)
   const [deleteModal, setDeleteModal] = useState(false)
+  const [scoreEditor, setScoreEditor] = useState(false)
 
   const holesEntered = new Set(allScores.map(s => `${s.player_id}-${s.hole_number}`)).size
   const flightA = eventPlayers.filter(e => e.flight === 'A').length
@@ -188,8 +189,9 @@ function TabOverview({ event, eventPlayers, allScores, course, onUpdated }) {
           action={
             <div className="flex gap-2">
               <Button size="sm" variant="secondary" onClick={() => exportScoresCSV(event, eventPlayers, allScores, course)}>
-                ⬇ Export Scores
+                ⬇ Export
               </Button>
+              <Button size="sm" variant="secondary" onClick={() => setScoreEditor(true)}>✎ Scores</Button>
               <Button size="sm" variant="secondary" onClick={() => setEditModal(true)}>Edit</Button>
               {event.status !== 'complete' && (
                 <Button size="sm" variant="danger" onClick={() => setDeleteModal(true)}>Delete</Button>
@@ -221,37 +223,265 @@ function TabOverview({ event, eventPlayers, allScores, course, onUpdated }) {
           </dl>
         </Card>
 
-        {/* Scorecard link — shown when active */}
+        {/* Scorecard link + Access Code — shown when active */}
         {event.status === 'active' && (
           <Card>
-            <CardHeader title="Scorecard Link" subtitle="Share with scorekeepers to enter scores" />
-            <div className="flex items-center gap-2 mt-1">
-              <input
-                readOnly
-                value={scorecardUrl}
-                className="input text-xs flex-1 bg-gray-50"
-                onFocus={e => e.target.select()}
-              />
-              <Button
-                size="sm"
-                variant="secondary"
-                onClick={() => {
-                  navigator.clipboard.writeText(scorecardUrl)
-                  toast.success('Link copied!')
-                }}
-              >
-                Copy
-              </Button>
+            <CardHeader title="Scoring Access" subtitle="Share with players to enter scores" />
+            <div className="space-y-4">
+              {/* Authenticated scorecard link */}
+              <div>
+                <p className="text-xs font-semibold text-gray-600 mb-1.5">Scorecard Link (requires login)</p>
+                <div className="flex items-center gap-2">
+                  <input
+                    readOnly
+                    value={scorecardUrl}
+                    className="input text-xs flex-1 bg-gray-50"
+                    onFocus={e => e.target.select()}
+                  />
+                  <Button
+                    size="sm"
+                    variant="secondary"
+                    onClick={() => { navigator.clipboard.writeText(scorecardUrl); toast.success('Link copied!') }}
+                  >
+                    Copy
+                  </Button>
+                </div>
+              </div>
+
+              {/* Access code join link */}
+              <AccessCodeSection event={event} onUpdated={onUpdated} />
             </div>
-            <p className="text-xs text-gray-400 mt-2">
-              Scorekeepers must have an account and be assigned to a group to enter scores.
-            </p>
           </Card>
         )}
       </div>
 
       <EditEventModal open={editModal} onClose={() => setEditModal(false)} event={event} onSaved={onUpdated} />
       <DeleteEventModal open={deleteModal} onClose={() => setDeleteModal(false)} event={event} />
+      {scoreEditor && (
+        <AdminScoreEditor
+          event={event}
+          eventPlayers={eventPlayers}
+          allScores={allScores}
+          course={course}
+          onClose={() => setScoreEditor(false)}
+          onSaved={onUpdated}
+        />
+      )}
+    </div>
+  )
+}
+
+// ─── Admin Score Editor ────────────────────────────────────────────
+function AdminScoreEditor({ event, eventPlayers, allScores, course, onClose, onSaved }) {
+  const [selectedId, setSelectedId] = useState(eventPlayers[0]?.player_id ?? null)
+  const [scores,     setScores]     = useState(() => {
+    const map = {}
+    for (const s of allScores) {
+      if (!map[s.player_id]) map[s.player_id] = {}
+      map[s.player_id][s.hole_number] = { gross: s.gross_score ?? '', putts: s.putts ?? '' }
+    }
+    return map
+  })
+  const [saving, setSaving] = useState(false)
+
+  const groups = {}
+  for (const ep of eventPlayers) {
+    const g = ep.group_number ?? 'Unassigned'
+    if (!groups[g]) groups[g] = []
+    groups[g].push(ep)
+  }
+
+  const selectedEp = eventPlayers.find(ep => ep.player_id === selectedId)
+  const ch = selectedEp?.course_handicap ?? 0
+
+  function getVal(hole, field) {
+    return scores[selectedId]?.[hole]?.[field] ?? ''
+  }
+
+  function setVal(hole, field, value) {
+    setScores(prev => ({
+      ...prev,
+      [selectedId]: {
+        ...(prev[selectedId] ?? {}),
+        [hole]: { ...(prev[selectedId]?.[hole] ?? {}), [field]: value },
+      },
+    }))
+  }
+
+  async function savePlayer() {
+    if (!selectedId) return
+    setSaving(true)
+    const playerScores = scores[selectedId] ?? {}
+    for (const [hStr, sc] of Object.entries(playerScores)) {
+      const hole  = parseInt(hStr, 10)
+      const gross = parseInt(sc.gross, 10)
+      if (!gross || gross < 1) continue
+      await supabase.from('scores').upsert({
+        event_id:    event.id,
+        player_id:   selectedId,
+        hole_number: hole,
+        gross_score: gross,
+        putts:       sc.putts !== '' ? parseInt(sc.putts, 10) : null,
+      }, { onConflict: 'event_id,player_id,hole_number' })
+    }
+    setSaving(false)
+    toast.success('Scores saved')
+    onSaved()
+  }
+
+  const holes = course ? Array.from({ length: 18 }, (_, i) => i + 1) : []
+
+  return (
+    <div className="fixed inset-0 z-50 flex" style={{ background: 'rgba(0,0,0,0.6)' }}>
+      <div className="flex w-full max-w-5xl mx-auto my-4 bg-white rounded-xl overflow-hidden shadow-2xl">
+
+        {/* Sidebar — player list */}
+        <div className="w-56 shrink-0 border-r border-gray-200 flex flex-col" style={{ background: '#f8f9fa' }}>
+          <div className="px-4 py-3 border-b border-gray-200" style={{ background: '#1B4332' }}>
+            <p className="text-xs font-bold uppercase tracking-wider text-white/70">Players</p>
+          </div>
+          <div className="flex-1 overflow-y-auto">
+            {Object.entries(groups).sort(([a],[b]) => a < b ? -1 : 1).map(([grp, players]) => (
+              <div key={grp}>
+                <div className="px-3 py-1.5 text-xs font-semibold uppercase tracking-wider" style={{ color: '#6c757d', background: '#f0f0ee' }}>
+                  Group {grp}
+                </div>
+                {players.map(ep => {
+                  const entered = Object.keys(scores[ep.player_id] ?? {}).length
+                  const isSelected = ep.player_id === selectedId
+                  return (
+                    <button
+                      key={ep.player_id}
+                      onClick={() => setSelectedId(ep.player_id)}
+                      className="w-full text-left px-3 py-2.5 border-b border-gray-100 transition-colors"
+                      style={{ background: isSelected ? '#1B4332' : 'transparent', color: isSelected ? '#fff' : '#212529' }}
+                    >
+                      <div className="text-xs font-semibold truncate">{ep.player?.last_name}, {ep.player?.first_name}</div>
+                      <div className="text-xs mt-0.5" style={{ color: isSelected ? 'rgba(255,255,255,0.6)' : '#6c757d' }}>
+                        {entered}/18 holes · CH {ep.course_handicap ?? '—'}
+                      </div>
+                    </button>
+                  )
+                })}
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Main — score grid */}
+        <div className="flex-1 flex flex-col overflow-hidden">
+          {/* Header */}
+          <div className="flex items-center justify-between px-5 py-3 border-b border-gray-200" style={{ background: '#1B4332', borderBottom: '2px solid #D4AF37' }}>
+            <div>
+              <p style={{ fontFamily: "'Playfair Display',serif", color: '#D4AF37', fontWeight: 700, fontSize: '1rem' }}>
+                Admin Score Entry
+              </p>
+              {selectedEp && (
+                <p className="text-xs mt-0.5" style={{ color: 'rgba(255,255,255,0.6)' }}>
+                  {selectedEp.player?.first_name} {selectedEp.player?.last_name} · CH {ch} · Flight {selectedEp.flight ?? '—'}
+                </p>
+              )}
+            </div>
+            <div className="flex items-center gap-2">
+              <Button size="sm" onClick={savePlayer} loading={saving}>Save</Button>
+              <button onClick={onClose} className="text-white/60 hover:text-white text-lg leading-none px-2">✕</button>
+            </div>
+          </div>
+
+          {/* Score grid */}
+          <div className="flex-1 overflow-y-auto p-4">
+            {!course ? (
+              <p className="text-sm text-gray-400 text-center py-8">No course data available.</p>
+            ) : (
+              [['Front 9', holes.slice(0,9)], ['Back 9', holes.slice(9)]].map(([label, holeGroup]) => (
+                <div key={label} className="mb-5">
+                  <p className="text-xs font-bold uppercase tracking-wider mb-2" style={{ color: '#1B4332' }}>{label}</p>
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-xs border-collapse">
+                      <thead>
+                        <tr style={{ background: '#2D6A4F', color: '#fff' }}>
+                          <td className="px-2 py-1.5 font-semibold w-16">Hole</td>
+                          {holeGroup.map(h => <td key={h} className="px-2 py-1.5 text-center font-semibold w-12">{h}</td>)}
+                          <td className="px-2 py-1.5 text-center font-semibold w-14">Total</td>
+                        </tr>
+                        <tr style={{ background: '#f0f0ee', color: '#6c757d' }}>
+                          <td className="px-2 py-1">Par</td>
+                          {holeGroup.map(h => <td key={h} className="px-2 py-1 text-center">{course.par_per_hole[h-1]}</td>)}
+                          <td className="px-2 py-1 text-center font-semibold" style={{ color: '#1B4332' }}>
+                            {holeGroup.reduce((s,h) => s + course.par_per_hole[h-1], 0)}
+                          </td>
+                        </tr>
+                        <tr style={{ background: '#f0f0ee', color: '#6c757d' }}>
+                          <td className="px-2 py-1">S.I.</td>
+                          {holeGroup.map(h => <td key={h} className="px-2 py-1 text-center">{course.stroke_index[h-1]}</td>)}
+                          <td className="px-2 py-1" />
+                        </tr>
+                      </thead>
+                      <tbody>
+                        <tr className="border-t border-gray-200">
+                          <td className="px-2 py-1 font-semibold" style={{ color: '#1B4332' }}>Gross</td>
+                          {holeGroup.map(h => {
+                            const val = getVal(h, 'gross')
+                            const par = course.par_per_hole[h-1]
+                            const diff = val !== '' ? parseInt(val,10) - par : null
+                            const bg = diff == null ? '' : diff < 0 ? '#fee2e2' : diff === 0 ? '#f0fdf4' : diff === 1 ? '#fff' : '#fef9c3'
+                            return (
+                              <td key={h} className="px-1 py-1 text-center" style={{ background: bg }}>
+                                <input
+                                  type="number"
+                                  min="1" max="15"
+                                  value={val}
+                                  onChange={e => setVal(h, 'gross', e.target.value)}
+                                  className="w-10 text-center font-bold text-sm border border-gray-200 rounded focus:outline-none focus:border-fairway-500"
+                                  style={{ background: 'transparent' }}
+                                  inputMode="numeric"
+                                />
+                              </td>
+                            )
+                          })}
+                          <td className="px-2 py-1 text-center font-bold" style={{ color: '#1B4332' }}>
+                            {holeGroup.reduce((s,h) => {
+                              const v = parseInt(getVal(h,'gross'),10)
+                              return isNaN(v) ? s : s + v
+                            }, 0) || '—'}
+                          </td>
+                        </tr>
+                        <tr className="border-t border-gray-100">
+                          <td className="px-2 py-1 font-semibold" style={{ color: '#6c757d' }}>Putts</td>
+                          {holeGroup.map(h => (
+                            <td key={h} className="px-1 py-1 text-center">
+                              <input
+                                type="number"
+                                min="0" max="10"
+                                value={getVal(h, 'putts')}
+                                onChange={e => setVal(h, 'putts', e.target.value)}
+                                className="w-10 text-center text-xs border border-gray-200 rounded focus:outline-none focus:border-fairway-500"
+                                inputMode="numeric"
+                              />
+                            </td>
+                          ))}
+                          <td className="px-2 py-1 text-center text-xs" style={{ color: '#6c757d' }}>
+                            {holeGroup.reduce((s,h) => {
+                              const v = parseInt(getVal(h,'putts'),10)
+                              return isNaN(v) ? s : s + v
+                            }, 0) || '—'}
+                          </td>
+                        </tr>
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+
+          {/* Footer */}
+          <div className="border-t border-gray-200 px-5 py-3 flex items-center justify-between bg-gray-50">
+            <p className="text-xs text-gray-400">Scores are saved per player. Switch players using the sidebar.</p>
+            <Button onClick={savePlayer} loading={saving}>Save Scores</Button>
+          </div>
+        </div>
+      </div>
     </div>
   )
 }
@@ -1329,6 +1559,69 @@ function Row({ label, value }) {
     <div className="flex justify-between">
       <dt className="text-gray-500">{label}</dt>
       <dd className="font-medium text-gray-900">{value}</dd>
+    </div>
+  )
+}
+
+// ─── Access Code Section ───────────────────────────────────────────
+function AccessCodeSection({ event, onUpdated }) {
+  const [code,    setCode]    = useState(event.access_code ?? '')
+  const [saving,  setSaving]  = useState(false)
+  const joinUrl = `${window.location.origin}/join/${event.id}`
+
+  function generateCode() {
+    const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'
+    let result = ''
+    for (let i = 0; i < 6; i++) result += chars[Math.floor(Math.random() * chars.length)]
+    setCode(result)
+  }
+
+  async function saveCode() {
+    setSaving(true)
+    const { error } = await supabase.from('events').update({ access_code: code.trim() || null }).eq('id', event.id)
+    setSaving(false)
+    if (error) { toast.error('Failed to save code'); return }
+    toast.success('Access code saved')
+    onUpdated()
+  }
+
+  return (
+    <div>
+      <p className="text-xs font-semibold text-gray-600 mb-1.5">Join Link (no login needed)</p>
+      <div className="flex items-center gap-2 mb-2">
+        <input
+          type="text"
+          value={code}
+          onChange={e => setCode(e.target.value.toUpperCase())}
+          placeholder="Set access code…"
+          maxLength={10}
+          className="input text-sm flex-1 uppercase tracking-widest font-bold"
+        />
+        <Button size="sm" variant="secondary" onClick={generateCode}>Generate</Button>
+        <Button size="sm" variant="primary" onClick={saveCode} disabled={saving}>Save</Button>
+      </div>
+      {event.access_code && (
+        <>
+          <div className="flex items-center gap-2">
+            <input
+              readOnly
+              value={joinUrl}
+              className="input text-xs flex-1 bg-gray-50"
+              onFocus={e => e.target.select()}
+            />
+            <Button
+              size="sm"
+              variant="secondary"
+              onClick={() => { navigator.clipboard.writeText(joinUrl); toast.success('Join link copied!') }}
+            >
+              Copy
+            </Button>
+          </div>
+          <p className="text-xs text-gray-400 mt-1.5">
+            Share the join link + code <strong className="text-gray-600">{event.access_code}</strong> — no account needed.
+          </p>
+        </>
+      )}
     </div>
   )
 }
