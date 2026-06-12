@@ -5,7 +5,7 @@
  */
 
 import { useEffect, useState, useRef } from 'react'
-import { useParams, Link, useNavigate } from 'react-router-dom'
+import { useParams, Link, useNavigate, useLocation } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../hooks/useAuth'
 import { computeLeaderboards, computeStableford } from '../lib/engines/scoring'
@@ -43,8 +43,11 @@ const FORMAT_LABELS = {
 export default function Leaderboard() {
   const { eventId } = useParams()
   const navigate = useNavigate()
+  const location = useLocation()
   const { user, isAdmin } = useAuth()
   const homeLink = isAdmin ? '/admin' : user ? '/home' : null
+  const fromScorecard = location.state?.from === 'scorecard'
+  const scorecardEventId = location.state?.scorecardEventId ?? eventId
   const [event,        setEvent]        = useState(null)
   const [eventPlayers, setEventPlayers] = useState([])
   const [allScores,    setAllScores]    = useState([])
@@ -127,7 +130,7 @@ export default function Leaderboard() {
           onClick={() => navigate(-1)}
           className="flex items-center gap-1.5 text-fairway-300 hover:text-white text-sm transition-colors"
         >
-          ← Back
+          ← {fromScorecard ? 'Back to Scoring' : 'Back'}
         </button>
         {homeLink && (
           <Link to={homeLink} className="text-fairway-300 hover:text-white text-sm transition-colors">
