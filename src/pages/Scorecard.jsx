@@ -43,7 +43,11 @@ export default function Scorecard() {
   const [dirtyHoles,    setDirtyHoles]    = useState(new Set())
   const [showScorecard, setShowScorecard] = useState(false)
   const [isComplete,    setIsComplete]    = useState(false)
-  const [canEdit,       setCanEdit]       = useState(false)  // true if user is scorekeeper or admin
+  const [canEdit,       setCanEdit]       = useState(false)
+  // Guest code entry state (shown when not logged in and no valid session)
+  const [needsCode,     setNeedsCode]     = useState(false)
+  const [codeEventId,   setCodeEventId]   = useState(null)
+  const [loadTrigger,   setLoadTrigger]   = useState(0)
 
   useEffect(() => {
     // Wait for auth to resolve before loading
@@ -57,13 +61,12 @@ export default function Scorecard() {
       if (!user) {
         const rawGuest = sessionStorage.getItem('guestSession')
         const guest = rawGuest ? JSON.parse(rawGuest) : null
-        if (guest?.eventId === evId && guest?.groupNum && guest?.accessCode) {
-          // Will verify access code after loading event
+        if (guest?.eventId === evId && guest?.groupNum != null) {
           guestGroupNum = guest.groupNum
-          // Store code to verify against DB
-          evId = guest.eventId
         } else {
-          setError('Please sign in or use a join link to access the scorecard.')
+          // No valid session — show inline code entry
+          setCodeEventId(evId)
+          setNeedsCode(true)
           setLoading(false)
           return
         }
@@ -95,13 +98,16 @@ export default function Scorecard() {
 
       if (!ev) { setError('Event not found.'); setLoading(false); return }
 
-      // Verify guest access code
-      if (guestGroupNum) {
+      // Verify guest group code
+      if (guestGroupNum != null) {
         const rawGuest = sessionStorage.getItem('guestSession')
         const guest = rawGuest ? JSON.parse(rawGuest) : null
-        if (!ev.access_code || ev.access_code !== guest?.accessCode) {
+        const groupCodes = ev.group_codes ?? {}
+        const expectedCode = groupCodes[String(guestGroupNum)]
+        if (!expectedCode || expectedCode !== guest?.accessCode) {
           sessionStorage.removeItem('guestSession')
-          setError('Access code is invalid or has been changed. Please use the join link again.')
+          setCodeEventId(evId)
+          setNeedsCode(true)
           setLoading(false)
           return
         }
@@ -186,7 +192,7 @@ export default function Scorecard() {
     }
 
     load()
-  }, [eventId, user, profile, authLoading, isAdmin])
+  }, [eventId, user, profile, authLoading, isAdmin, loadTrigger])
 
   function getScore(playerId, hole) {
     return scores[playerId]?.[hole] ?? { gross: '', putts: '' }
@@ -265,6 +271,20 @@ export default function Scorecard() {
   }
 
   if (loading) return <ScorecardSkeleton />
+
+  if (needsCode) {
+    return (
+      <GuestCodeEntry
+        eventId={codeEventId}
+        onSuccess={(groupNum, code) => {
+          sessionStorage.setItem('guestSession', JSON.stringify({ eventId: codeEventId, groupNum, accessCode: code }))
+          setNeedsCode(false)
+          setLoading(true)
+          setLoadTrigger(t => t + 1)
+        }}
+      />
+    )
+  }
 
   if (error) return (
     <div className="min-h-screen bg-fairway-800 flex flex-col items-center justify-center p-6 text-center">
@@ -774,6 +794,155 @@ function TraditionalScorecard({ event, course, groupPlayers, scores, isComplete,
           <span className="flex items-center gap-1"><span className="bg-blue-100 text-blue-900 px-1.5 py-0.5 rounded font-bold">Double+</span></span>
           <span className="text-gray-400 ml-2">Colors based on net score vs par</span>
         </div>
+      </div>
+    </div>
+  )
+}
+
+// ─── Guest Code Entry ──────────────────────────────────────────────
+function GuestCodeEntry({ eventId, onSuccess }) {
+  const [eventInfo,    setEventInfo]    = useState(null)
+  const [groupPlayers, setGroupPlayers] = useState(null)  // null = not yet loaded
+  const [matchedGroup, setMatchedGroup] = useState(null)
+  const [matchedCode,  setMatchedCode]  = useState('')
+  const [code,         setCode]         = useState('')
+  const [error,        setError]        = useState('')
+  const [checking,     setChecking]     = useState(false)
+  const [selectedName, setSelectedName] = useState(null)
+
+  useEffect(() => {
+    supabase.from('events')
+      .select('id, name, event_number, group_codes, course:courses(name), league:leagues(name)')
+      .eq('id', eventId)
+      .single()
+      .then(({ data }) => setEventInfo(data))
+  }, [eventId])
+
+  async function handleCodeSubmit(e) {
+    e.preventDefault()
+    if (!code.trim()) return
+    setChecking(true)
+    setError('')
+
+    const trimmed = code.trim().toUpperCase()
+    const groupCodes = eventInfo?.group_codes ?? {}
+    const match = Object.entries(groupCodes).find(([, c]) => c?.toUpperCase() === trimmed)
+
+    if (!match) {
+      setError('Code not recognized. Check with your group leader and try again.')
+      setChecking(false)
+      return
+    }
+
+    const groupNum = parseInt(match[0], 10)
+
+    // Load players in this group
+    const { data: eps } = await supabase
+      .from('event_players')
+      .select('player_id, player:players(first_name, last_name)')
+      .eq('event_id', eventId)
+      .eq('group_number', groupNum)
+      .order('player(last_name)')
+
+    setGroupPlayers(eps ?? [])
+    setMatchedGroup(groupNum)
+    setMatchedCode(trimmed)
+    setChecking(false)
+  }
+
+  function handleConfirm() {
+    onSuccess(matchedGroup, matchedCode)
+  }
+
+  const eventLabel = eventInfo?.name ?? (eventInfo ? `Event #${eventInfo.event_number}` : '…')
+
+  return (
+    <div className="min-h-screen flex flex-col items-center justify-center p-4" style={{ background: 'linear-gradient(150deg,#0b2318 0%,#1B4332 45%,#1f5c3e 100%)' }}>
+      <div className="w-full max-w-xs">
+        <div className="text-center mb-8">
+          <img src="/logo.png" alt="Mulligan's Island Golf Club" className="w-20 h-20 rounded-full object-cover mx-auto mb-3 shadow-xl" />
+          <h1 className="text-white font-bold text-xl" style={{ fontFamily: "'Playfair Display', serif" }}>{eventLabel}</h1>
+          {eventInfo && <p className="text-white/50 text-sm mt-0.5">{eventInfo.course?.name}</p>}
+          <div className="mx-auto mt-2" style={{ width: 40, height: 2, background: '#D4AF37' }} />
+        </div>
+
+        <div className="bg-white rounded-2xl shadow-2xl p-6">
+          {groupPlayers === null ? (
+            /* Step 1 — enter code */
+            <>
+              <h2 className="text-lg font-bold text-gray-900 mb-1 text-center">Enter Group Code</h2>
+              <p className="text-sm text-gray-500 mb-5 text-center">Your group leader has a code to access scoring.</p>
+              <form onSubmit={handleCodeSubmit} className="space-y-4">
+                <input
+                  type="text"
+                  value={code}
+                  onChange={e => setCode(e.target.value.toUpperCase())}
+                  placeholder="· · · · ·"
+                  maxLength={8}
+                  autoFocus
+                  autoCapitalize="characters"
+                  autoCorrect="off"
+                  spellCheck={false}
+                  className="w-full text-center text-3xl font-black tracking-[0.4em] border-2 border-gray-200 rounded-xl px-4 py-4 focus:border-fairway-600 focus:outline-none uppercase"
+                />
+                {error && <p className="text-sm text-red-600 text-center">{error}</p>}
+                <button
+                  type="submit"
+                  disabled={checking || !code.trim()}
+                  className="w-full py-3.5 rounded-xl font-bold text-white text-base transition-colors disabled:opacity-50"
+                  style={{ background: '#1B4332' }}
+                >
+                  {checking ? 'Checking…' : 'Continue'}
+                </button>
+              </form>
+            </>
+          ) : (
+            /* Step 2 — confirm who you are */
+            <>
+              <h2 className="text-lg font-bold text-gray-900 mb-1 text-center">Who are you?</h2>
+              <p className="text-sm text-gray-500 mb-4 text-center">Group {matchedGroup} · Tap your name</p>
+              <div className="space-y-2 mb-4">
+                {groupPlayers.map(ep => {
+                  const name = `${ep.player?.first_name ?? ''} ${ep.player?.last_name ?? ''}`.trim()
+                  return (
+                    <button
+                      key={ep.player_id}
+                      onClick={() => setSelectedName(name)}
+                      className={`w-full text-left px-4 py-3 rounded-xl border-2 font-semibold transition-all ${
+                        selectedName === name
+                          ? 'border-fairway-700 bg-fairway-50 text-fairway-900'
+                          : 'border-gray-200 text-gray-800 hover:border-gray-300'
+                      }`}
+                    >
+                      {name}
+                    </button>
+                  )
+                })}
+                {groupPlayers.length === 0 && (
+                  <p className="text-sm text-gray-400 text-center py-3">No players in this group yet.</p>
+                )}
+              </div>
+              <button
+                onClick={handleConfirm}
+                disabled={!selectedName && groupPlayers.length > 0}
+                className="w-full py-3.5 rounded-xl font-bold text-white text-base transition-colors disabled:opacity-50"
+                style={{ background: '#1B4332' }}
+              >
+                Enter Scoring →
+              </button>
+              <button
+                onClick={() => { setGroupPlayers(null); setMatchedGroup(null); setCode('') }}
+                className="w-full mt-2 py-2 text-sm text-gray-500 hover:text-gray-700 transition-colors"
+              >
+                ← Wrong code?
+              </button>
+            </>
+          )}
+        </div>
+
+        <p className="text-center text-xs mt-5 text-white/40">
+          Have an account? <a href="/login" className="underline text-white/60">Sign in</a>
+        </p>
       </div>
     </div>
   )
