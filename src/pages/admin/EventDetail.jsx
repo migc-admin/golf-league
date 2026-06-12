@@ -227,30 +227,7 @@ function TabOverview({ event, eventPlayers, allScores, course, onUpdated }) {
         {event.status === 'active' && (
           <Card>
             <CardHeader title="Scoring Access" subtitle="Share with players to enter scores" />
-            <div className="space-y-4">
-              {/* Authenticated scorecard link */}
-              <div>
-                <p className="text-xs font-semibold text-gray-600 mb-1.5">Scorecard Link (requires login)</p>
-                <div className="flex items-center gap-2">
-                  <input
-                    readOnly
-                    value={scorecardUrl}
-                    className="input text-xs flex-1 bg-gray-50"
-                    onFocus={e => e.target.select()}
-                  />
-                  <Button
-                    size="sm"
-                    variant="secondary"
-                    onClick={() => { navigator.clipboard.writeText(scorecardUrl); toast.success('Link copied!') }}
-                  >
-                    Copy
-                  </Button>
-                </div>
-              </div>
-
-              {/* Access code join link */}
-              <AccessCodeSection event={event} onUpdated={onUpdated} />
-            </div>
+            <AccessCodeSection event={event} eventPlayers={eventPlayers} onUpdated={onUpdated} />
           </Card>
         )}
       </div>
@@ -1564,64 +1541,99 @@ function Row({ label, value }) {
 }
 
 // ─── Access Code Section ───────────────────────────────────────────
-function AccessCodeSection({ event, onUpdated }) {
-  const [code,    setCode]    = useState(event.access_code ?? '')
-  const [saving,  setSaving]  = useState(false)
-  const joinUrl = `${window.location.origin}/join/${event.id}`
+// ─── Per-Group Code Section ────────────────────────────────────────
+function AccessCodeSection({ event, eventPlayers, onUpdated }) {
+  // group_codes stored as { "1": "ABC123", "2": "XYZ789" }
+  const [groupCodes, setGroupCodes] = useState(event.group_codes ?? {})
+  const [saving,     setSaving]     = useState(false)
+  const scorecardUrl = `${window.location.origin}/scorecard/${event.id}`
 
-  function generateCode() {
+  // Unique sorted group numbers from event players
+  const groupNums = [...new Set(
+    eventPlayers.map(ep => ep.group_number).filter(g => g != null)
+  )].sort((a, b) => a - b)
+
+  function makeCode() {
     const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'
-    let result = ''
-    for (let i = 0; i < 6; i++) result += chars[Math.floor(Math.random() * chars.length)]
-    setCode(result)
+    let r = ''
+    for (let i = 0; i < 5; i++) r += chars[Math.floor(Math.random() * chars.length)]
+    return r
   }
 
-  async function saveCode() {
+  function setCode(groupNum, val) {
+    setGroupCodes(prev => ({ ...prev, [groupNum]: val.toUpperCase() }))
+  }
+
+  function generateAll() {
+    const next = {}
+    for (const g of groupNums) next[g] = makeCode()
+    setGroupCodes(next)
+  }
+
+  async function saveAll() {
     setSaving(true)
-    const { error } = await supabase.from('events').update({ access_code: code.trim() || null }).eq('id', event.id)
+    const { error } = await supabase.from('events')
+      .update({ group_codes: groupCodes })
+      .eq('id', event.id)
     setSaving(false)
-    if (error) { toast.error('Failed to save code'); return }
-    toast.success('Access code saved')
+    if (error) { toast.error('Failed to save codes'); return }
+    toast.success('Group codes saved')
     onUpdated()
+  }
+
+  if (groupNums.length === 0) {
+    return (
+      <div>
+        <p className="text-xs font-semibold text-gray-600 mb-1">Group Codes (no login needed)</p>
+        <p className="text-xs text-gray-400">Assign players to groups first, then set codes here.</p>
+      </div>
+    )
   }
 
   return (
     <div>
-      <p className="text-xs font-semibold text-gray-600 mb-1.5">Join Link (no login needed)</p>
-      <div className="flex items-center gap-2 mb-2">
-        <input
-          type="text"
-          value={code}
-          onChange={e => setCode(e.target.value.toUpperCase())}
-          placeholder="Set access code…"
-          maxLength={10}
-          className="input text-sm flex-1 uppercase tracking-widest font-bold"
-        />
-        <Button size="sm" variant="secondary" onClick={generateCode}>Generate</Button>
-        <Button size="sm" variant="primary" onClick={saveCode} disabled={saving}>Save</Button>
+      <div className="flex items-center justify-between mb-2">
+        <p className="text-xs font-semibold text-gray-600">Group Codes (no login needed)</p>
+        <div className="flex gap-2">
+          <Button size="sm" variant="secondary" onClick={generateAll}>Generate All</Button>
+          <Button size="sm" variant="primary" onClick={saveAll} disabled={saving}>Save</Button>
+        </div>
       </div>
-      {event.access_code && (
-        <>
-          <div className="flex items-center gap-2">
-            <input
-              readOnly
-              value={joinUrl}
-              className="input text-xs flex-1 bg-gray-50"
-              onFocus={e => e.target.select()}
-            />
-            <Button
-              size="sm"
-              variant="secondary"
-              onClick={() => { navigator.clipboard.writeText(joinUrl); toast.success('Join link copied!') }}
-            >
-              Copy
-            </Button>
-          </div>
-          <p className="text-xs text-gray-400 mt-1.5">
-            Share the join link + code <strong className="text-gray-600">{event.access_code}</strong> — no account needed.
-          </p>
-        </>
-      )}
+
+      <div className="space-y-2 mb-3">
+        {groupNums.map(g => {
+          const code = groupCodes[g] ?? ''
+          const players = eventPlayers
+            .filter(ep => ep.group_number === g)
+            .map(ep => `${ep.player?.first_name ?? ''} ${ep.player?.last_name ?? ''}`.trim())
+            .join(', ')
+          return (
+            <div key={g} className="flex items-center gap-2">
+              <div className="shrink-0 text-xs font-bold text-gray-500 w-16">Group {g}</div>
+              <input
+                type="text"
+                value={code}
+                onChange={e => setCode(g, e.target.value)}
+                placeholder="—"
+                maxLength={8}
+                className="input text-sm w-28 uppercase tracking-widest font-bold text-center"
+              />
+              <div className="text-xs text-gray-400 truncate flex-1" title={players}>{players}</div>
+              <Button size="sm" variant="secondary" onClick={() => setCode(g, makeCode())}>↺</Button>
+            </div>
+          )
+        })}
+      </div>
+
+      <p className="text-xs text-gray-500 mb-1.5">
+        Share the scorecard link + each group's code. Players enter their code to access scoring — no account needed.
+      </p>
+      <div className="flex items-center gap-2">
+        <input readOnly value={scorecardUrl} className="input text-xs flex-1 bg-gray-50" onFocus={e => e.target.select()} />
+        <Button size="sm" variant="secondary" onClick={() => { navigator.clipboard.writeText(scorecardUrl); toast.success('Link copied!') }}>
+          Copy
+        </Button>
+      </div>
     </div>
   )
 }
