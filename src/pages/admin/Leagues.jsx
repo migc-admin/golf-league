@@ -177,13 +177,15 @@ function LeagueModal({ open, onClose, editing, onSaved }) {
 }
 
 const SIDE_GAME_OPTIONS = [
-  { key: 'skins_a',       label: 'Skins — Flight A' },
-  { key: 'skins_b',       label: 'Skins — Flight B' },
-  { key: 'long_drive_a',  label: 'Long Drive — Flight A' },
-  { key: 'long_drive_b',  label: 'Long Drive — Flight B' },
-  { key: 'low_putts',     label: 'Low Putts' },
-  { key: 'ctp',           label: 'Closest to Pin (par 3s)' },
-  { key: 'track_putts',   label: 'Track Putts on Scorecard' },
+  { key: 'skins',         label: 'Skins',                flightsOff: true,  flightsOn: false },
+  { key: 'skins_a',       label: 'Skins — Flight A',     flightsOff: false, flightsOn: true  },
+  { key: 'skins_b',       label: 'Skins — Flight B',     flightsOff: false, flightsOn: true  },
+  { key: 'long_drive',    label: 'Long Drive',           flightsOff: true,  flightsOn: false },
+  { key: 'long_drive_a',  label: 'Long Drive — Flight A',flightsOff: false, flightsOn: true  },
+  { key: 'long_drive_b',  label: 'Long Drive — Flight B',flightsOff: false, flightsOn: true  },
+  { key: 'low_putts',     label: 'Low Putts',            flightsOff: true,  flightsOn: true  },
+  { key: 'ctp',           label: 'Closest to Pin (par 3s)', flightsOff: true, flightsOn: true },
+  { key: 'track_putts',   label: 'Track Putts on Scorecard', flightsOff: true, flightsOn: true },
 ]
 
 const FORMAT_OPTIONS = [
@@ -342,11 +344,7 @@ function EventModal({ open, onClose, league, onSaved }) {
           <label className="label">Side Games / Competitions</label>
           <div className="space-y-1.5 bg-gray-50 rounded-xl px-4 py-3">
             {SIDE_GAME_OPTIONS
-              .filter(opt => {
-                // Hide flight-specific options when flights are disabled
-                const flightSpecific = opt.key.endsWith('_a') || opt.key.endsWith('_b')
-                return useFlights || !flightSpecific
-              })
+              .filter(opt => useFlights ? opt.flightsOn : opt.flightsOff)
               .map(opt => (
                 <label key={opt.key} className="flex items-center gap-2.5 py-0.5 cursor-pointer">
                   <input
