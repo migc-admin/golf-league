@@ -177,12 +177,13 @@ function LeagueModal({ open, onClose, editing, onSaved }) {
 }
 
 const SIDE_GAME_OPTIONS = [
-  { key: 'skins_a',    label: 'Skins — Flight A' },
-  { key: 'skins_b',    label: 'Skins — Flight B' },
-  { key: 'long_drive', label: 'Long Drive (A & B)' },
-  { key: 'low_putts',  label: 'Low Putts' },
-  { key: 'ctp',        label: 'Closest to Pin (par 3s)' },
-  { key: 'track_putts', label: 'Track Putts on Scorecard' },
+  { key: 'skins_a',       label: 'Skins — Flight A' },
+  { key: 'skins_b',       label: 'Skins — Flight B' },
+  { key: 'long_drive_a',  label: 'Long Drive — Flight A' },
+  { key: 'long_drive_b',  label: 'Long Drive — Flight B' },
+  { key: 'low_putts',     label: 'Low Putts' },
+  { key: 'ctp',           label: 'Closest to Pin (par 3s)' },
+  { key: 'track_putts',   label: 'Track Putts on Scorecard' },
 ]
 
 const FORMAT_OPTIONS = [
@@ -209,6 +210,7 @@ function EventModal({ open, onClose, league, onSaved }) {
   const [payoutFixed,  setPayoutFixed]  = useState('')
   const [formats,      setFormats]      = useState(new Set(['net_stroke']))
   const [sideGames,    setSideGames]    = useState(new Set())
+  const [useFlights,   setUseFlights]   = useState(false)
   const [startTime,    setStartTime]    = useState('')
   const [interval,     setInterval]     = useState(10)
   const [saving,       setSaving]       = useState(false)
@@ -228,6 +230,7 @@ function EventModal({ open, onClose, league, onSaved }) {
     setPayoutFixed('')
     setFormats(new Set(['net_stroke']))
     setSideGames(new Set())
+    setUseFlights(false)
     setStartTime('')
     setInterval(10)
   }, [open, league])
@@ -264,6 +267,7 @@ function EventModal({ open, onClose, league, onSaved }) {
       payout_fixed_total:     payoutBasis === 'fixed' ? parseFloat(payoutFixed) || 0 : null,
       format:                 formatsArr[0],
       formats:                formatsArr,
+      use_flights:            useFlights,
       side_game_options:      [...sideGames],
       start_time:             startTime || null,
       tee_time_interval_mins: parseInt(interval, 10),
@@ -288,6 +292,21 @@ function EventModal({ open, onClose, league, onSaved }) {
             <option value="">Select course…</option>
             {courses.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
           </select>
+        </div>
+
+        {/* Flights toggle */}
+        <div className="bg-gray-50 rounded-xl px-4 py-3 flex items-center justify-between">
+          <div>
+            <div className="text-sm font-medium text-gray-800">Use Flights (A &amp; B)?</div>
+            <div className="text-xs text-gray-400 mt-0.5">Enable if splitting players into two competitive flights</div>
+          </div>
+          <button
+            type="button"
+            onClick={() => setUseFlights(v => !v)}
+            className={`relative inline-flex h-6 w-11 shrink-0 rounded-full border-2 border-transparent transition-colors focus:outline-none ${useFlights ? 'bg-fairway-600' : 'bg-gray-300'}`}
+          >
+            <span className={`inline-block h-5 w-5 rounded-full bg-white shadow transition-transform ${useFlights ? 'translate-x-5' : 'translate-x-0'}`} />
+          </button>
         </div>
 
         {/* Formats — multi-select checkboxes */}
@@ -322,17 +341,24 @@ function EventModal({ open, onClose, league, onSaved }) {
         <div>
           <label className="label">Side Games / Competitions</label>
           <div className="space-y-1.5 bg-gray-50 rounded-xl px-4 py-3">
-            {SIDE_GAME_OPTIONS.map(opt => (
-              <label key={opt.key} className="flex items-center gap-2.5 py-0.5 cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={sideGames.has(opt.key)}
-                  onChange={() => toggleSideGame(opt.key)}
-                  className="accent-fairway-600 w-4 h-4"
-                />
-                <span className="text-sm text-gray-800">{opt.label}</span>
-              </label>
-            ))}
+            {SIDE_GAME_OPTIONS
+              .filter(opt => {
+                // Hide flight-specific options when flights are disabled
+                const flightSpecific = opt.key.endsWith('_a') || opt.key.endsWith('_b')
+                return useFlights || !flightSpecific
+              })
+              .map(opt => (
+                <label key={opt.key} className="flex items-center gap-2.5 py-0.5 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={sideGames.has(opt.key)}
+                    onChange={() => toggleSideGame(opt.key)}
+                    className="accent-fairway-600 w-4 h-4"
+                  />
+                  <span className="text-sm text-gray-800">{opt.label}</span>
+                </label>
+              ))
+            }
           </div>
         </div>
 
