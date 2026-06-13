@@ -611,67 +611,59 @@ function PlayerScoreCard({ ep, hole, par, si, score, allHoleScores, courseStroke
   )
 }
 
-// ─── Traditional Scorecard View ────────────────────────────────────
+// ─── Traditional Scorecard View (vertical: holes=rows, players=cols) ──
 function TraditionalScorecard({ event, course, groupPlayers, scores, isComplete, canEdit, onEdit, homeLink, onSignOut }) {
-  const pars  = course.par_per_hole  // array[18]
-  const front = pars.slice(0, 9)
-  const back  = pars.slice(9, 18)
-  const frontPar = front.reduce((a, b) => a + b, 0)
-  const backPar  = back.reduce((a, b) => a + b, 0)
-  const totalPar = frontPar + backPar
+  const pars  = course.par_per_hole
+  const sis   = course.stroke_index
 
-  function playerRow(ep) {
+  // Build per-player totals
+  const playerData = groupPlayers.map(ep => {
     const ch = ep.course_handicap ?? 0
-    const name = `${ep.player?.first_name ?? ''} ${ep.player?.last_name ?? ''}`
+    const name = ep.player?.first_name ?? ''
     let frontGross = 0, backGross = 0, frontNet = 0, backNet = 0
 
     const cells = Array.from({ length: 18 }, (_, i) => {
       const h = i + 1
       const sc = scores[ep.player_id]?.[h]
       const g = sc ? parseInt(sc.gross, 10) : null
-      const si = course.stroke_index[i]
-      const strokes = getStrokesOnHole(ch, si)
+      const strokes = getStrokesOnHole(ch, sis[i])
       const net = g != null ? g - strokes : null
       const p = pars[i]
-
       if (g != null) {
         if (i < 9) { frontGross += g; frontNet += (net ?? g) }
         else        { backGross  += g; backNet  += (net ?? g) }
       }
-
       const netVsPar = net != null ? net - p : null
-      let cellClass = 'text-center text-xs font-bold px-1 py-1.5 '
-      if (netVsPar != null) {
-        if (netVsPar <= -2) cellClass += 'bg-yellow-100 text-yellow-800'          // eagle+
-        else if (netVsPar === -1) cellClass += 'bg-red-100 text-red-700'           // birdie
-        else if (netVsPar === 0)  cellClass += 'text-gray-700'                     // par
-        else if (netVsPar === 1)  cellClass += 'bg-blue-50 text-blue-700'          // bogey
-        else                      cellClass += 'bg-blue-100 text-blue-900'         // double+
-      } else {
-        cellClass += 'text-gray-300'
-      }
-
-      return { g, net, cellClass }
+      return { g, net, netVsPar }
     })
 
-    const totalGross = frontGross + backGross
-    const totalNet   = frontNet + backNet
+    return { ep, name, ch, cells, frontGross, backGross, frontNet, backNet,
+      totalGross: frontGross + backGross, totalNet: frontNet + backNet }
+  })
 
-    return { name, ep, cells, frontGross, backGross, totalGross, frontNet, backNet, totalNet }
+  // Color for a cell by netVsPar
+  function cellBg(netVsPar) {
+    if (netVsPar == null) return 'bg-transparent text-gray-300'
+    if (netVsPar <= -2)   return 'bg-yellow-400 text-yellow-900 font-black'  // eagle+
+    if (netVsPar === -1)  return 'bg-green-200 text-green-900 font-bold'     // birdie
+    if (netVsPar === 0)   return 'bg-white text-gray-700 border border-gray-200'  // par
+    if (netVsPar === 1)   return 'bg-red-200 text-red-900 font-bold'         // bogey
+    return 'bg-red-700 text-white font-bold'                                 // double+
   }
 
-  const rows = groupPlayers.map(playerRow)
+  const frontPar = pars.slice(0, 9).reduce((a, b) => a + b, 0)
+  const backPar  = pars.slice(9).reduce((a, b) => a + b, 0)
 
   return (
-    <div className="min-h-screen bg-gray-50 flex flex-col">
+    <div className="min-h-screen flex flex-col" style={{ background: '#f5f3ef' }}>
       {/* Header */}
       <div className="bg-fairway-700 text-white sticky top-0 z-20 shadow-lg">
         <div className="px-4 py-3 flex items-center justify-between">
           <div>
             <div className="font-bold text-base">{event.course?.name ?? course.name}</div>
-            <div className="text-xs text-fairway-200">{event.league?.name} · Event #{event.event_number}</div>
+            <div className="text-xs text-fairway-200">{event.league?.name} · {event.name ?? `Event #${event.event_number}`}</div>
           </div>
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2">
             <Link
               to={`/leaderboard/${event.id}`}
               state={{ from: 'scorecard', scorecardEventId: event.id }}
@@ -687,7 +679,7 @@ function TraditionalScorecard({ event, course, groupPlayers, scores, isComplete,
             )}
           </div>
         </div>
-        <div className="px-4 pb-3 flex gap-2">
+        <div className="px-4 pb-3">
           <button
             onClick={onEdit}
             className="text-xs bg-white/10 hover:bg-white/20 text-white px-3 py-1.5 rounded-lg transition-colors"
@@ -697,103 +689,126 @@ function TraditionalScorecard({ event, course, groupPlayers, scores, isComplete,
         </div>
       </div>
 
-      {/* Scorecard table — horizontal scroll */}
-      <div className="overflow-x-auto p-4">
-        <table className="w-full text-xs border-collapse min-w-[700px]">
-          {/* Front nine */}
-          <thead>
-            <tr className="bg-fairway-700 text-white">
-              <th className="text-left px-3 py-2 font-semibold w-28">Player</th>
-              {[1,2,3,4,5,6,7,8,9].map(h => (
-                <th key={h} className="text-center px-1 py-2 w-8">{h}</th>
-              ))}
-              <th className="text-center px-2 py-2 font-bold bg-fairway-800 w-10">OUT</th>
-              {[10,11,12,13,14,15,16,17,18].map(h => (
-                <th key={h} className="text-center px-1 py-2 w-8">{h}</th>
-              ))}
-              <th className="text-center px-2 py-2 font-bold bg-fairway-800 w-10">IN</th>
-              <th className="text-center px-2 py-2 font-bold bg-fairway-900 w-10">TOT</th>
-            </tr>
-            {/* Par row */}
-            <tr className="bg-gray-100 text-gray-600 font-semibold">
-              <td className="px-3 py-1.5 text-xs">Par</td>
-              {pars.slice(0, 9).map((p, i) => (
-                <td key={i} className="text-center px-1 py-1.5">{p}</td>
-              ))}
-              <td className="text-center px-2 py-1.5 bg-gray-200 font-bold">{frontPar}</td>
-              {pars.slice(9, 18).map((p, i) => (
-                <td key={i} className="text-center px-1 py-1.5">{p}</td>
-              ))}
-              <td className="text-center px-2 py-1.5 bg-gray-200 font-bold">{backPar}</td>
-              <td className="text-center px-2 py-1.5 bg-gray-300 font-bold">{totalPar}</td>
-            </tr>
-          </thead>
-          <tbody>
-            {rows.map(({ name, ep, cells, frontGross, backGross, totalGross, frontNet, backNet, totalNet }) => (
-              <>
-                {/* Gross row */}
-                <tr key={`${ep.player_id}-gross`} className="border-t border-gray-200 bg-white hover:bg-gray-50">
-                  <td className="px-3 py-1.5 font-semibold text-gray-900 whitespace-nowrap">
-                    {name}
-                    {ep.flight && (
-                      <span className={`ml-1 text-xs font-bold ${ep.flight === 'A' ? 'text-blue-600' : 'text-purple-600'}`}>
-                        ({ep.flight})
-                      </span>
-                    )}
-                  </td>
-                  {cells.slice(0, 9).map((c, i) => (
-                    <td key={i} className={c.cellClass}>{c.g ?? '—'}</td>
-                  ))}
-                  <td className="text-center px-2 py-1.5 bg-gray-100 font-bold text-gray-800">
+      {/* Vertical scorecard */}
+      <div className="p-3 pb-10">
+        <div className="bg-white rounded-2xl shadow overflow-hidden">
+          <table className="w-full text-sm border-collapse">
+            <thead>
+              {/* Player name header row */}
+              <tr className="bg-fairway-800 text-white">
+                <th className="text-left px-3 py-2.5 text-xs font-semibold w-16 text-fairway-300">HOLE</th>
+                <th className="text-center px-2 py-2.5 text-xs font-semibold w-10 text-fairway-300">PAR</th>
+                {playerData.map(({ ep, name, ch }) => (
+                  <th key={ep.player_id} className="text-center px-2 py-2.5">
+                    <div className="font-bold text-white text-sm">{name}</div>
+                    <div className="text-fairway-300 text-xs">({ch})</div>
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {/* Front nine */}
+              {Array.from({ length: 9 }, (_, i) => {
+                const h = i + 1
+                const p = pars[i]
+                return (
+                  <tr key={h} className={i % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
+                    <td className="px-3 py-2 text-xs font-bold text-gray-500">{h}</td>
+                    <td className="text-center px-2 py-2 text-xs text-gray-400 font-medium">{p}</td>
+                    {playerData.map(({ ep, cells }) => {
+                      const c = cells[i]
+                      return (
+                        <td key={ep.player_id} className="text-center px-1 py-1.5">
+                          {c.g != null ? (
+                            <span className={`inline-flex items-center justify-center w-9 h-9 rounded-lg text-sm font-bold ${cellBg(c.netVsPar)}`}>
+                              {c.g}
+                            </span>
+                          ) : (
+                            <span className="text-gray-200 text-sm">—</span>
+                          )}
+                        </td>
+                      )
+                    })}
+                  </tr>
+                )
+              })}
+              {/* Front nine total */}
+              <tr className="bg-fairway-700 text-white">
+                <td className="px-3 py-2 text-xs font-bold">OUT</td>
+                <td className="text-center px-2 py-2 text-xs font-bold">{frontPar}</td>
+                {playerData.map(({ ep, frontGross }) => (
+                  <td key={ep.player_id} className="text-center px-2 py-2 font-black text-sm">
                     {frontGross || '—'}
                   </td>
-                  {cells.slice(9, 18).map((c, i) => (
-                    <td key={i} className={c.cellClass}>{c.g ?? '—'}</td>
-                  ))}
-                  <td className="text-center px-2 py-1.5 bg-gray-100 font-bold text-gray-800">
+                ))}
+              </tr>
+
+              {/* Back nine divider label */}
+              <tr>
+                <td colSpan={2 + playerData.length} className="text-center py-2 text-xs font-bold tracking-widest text-gray-400 border-t-2 border-dashed border-gray-200 bg-gray-50">
+                  — BACK NINE —
+                </td>
+              </tr>
+
+              {/* Back nine */}
+              {Array.from({ length: 9 }, (_, i) => {
+                const h = i + 10
+                const p = pars[i + 9]
+                return (
+                  <tr key={h} className={i % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
+                    <td className="px-3 py-2 text-xs font-bold text-gray-500">{h}</td>
+                    <td className="text-center px-2 py-2 text-xs text-gray-400 font-medium">{p}</td>
+                    {playerData.map(({ ep, cells }) => {
+                      const c = cells[i + 9]
+                      return (
+                        <td key={ep.player_id} className="text-center px-1 py-1.5">
+                          {c.g != null ? (
+                            <span className={`inline-flex items-center justify-center w-9 h-9 rounded-lg text-sm font-bold ${cellBg(c.netVsPar)}`}>
+                              {c.g}
+                            </span>
+                          ) : (
+                            <span className="text-gray-200 text-sm">—</span>
+                          )}
+                        </td>
+                      )
+                    })}
+                  </tr>
+                )
+              })}
+              {/* Back nine total */}
+              <tr className="bg-fairway-700 text-white">
+                <td className="px-3 py-2 text-xs font-bold">IN</td>
+                <td className="text-center px-2 py-2 text-xs font-bold">{backPar}</td>
+                {playerData.map(({ ep, backGross }) => (
+                  <td key={ep.player_id} className="text-center px-2 py-2 font-black text-sm">
                     {backGross || '—'}
                   </td>
-                  <td className="text-center px-2 py-1.5 bg-gray-200 font-bold text-gray-900">
-                    {totalGross || '—'}
+                ))}
+              </tr>
+              {/* Grand total */}
+              <tr className="bg-fairway-900 text-white">
+                <td className="px-3 py-2.5 text-sm font-black">TOTAL</td>
+                <td className="text-center px-2 py-2.5 text-sm font-bold">{frontPar + backPar}</td>
+                {playerData.map(({ ep, totalGross, totalNet, ch }) => (
+                  <td key={ep.player_id} className="text-center px-2 py-2.5">
+                    <div className="font-black text-base leading-none">{totalGross || '—'}</div>
+                    {totalNet > 0 && <div className="text-fairway-300 text-xs mt-0.5">Net {totalNet}</div>}
                   </td>
-                </tr>
-                {/* Net row */}
-                <tr key={`${ep.player_id}-net`} className="bg-fairway-50">
-                  <td className="px-3 py-1 text-gray-400 text-xs italic">Net (CH:{ep.course_handicap ?? 0})</td>
-                  {cells.slice(0, 9).map((c, i) => (
-                    <td key={i} className="text-center px-1 py-1 text-xs text-fairway-700 font-medium">
-                      {c.net ?? '—'}
-                    </td>
-                  ))}
-                  <td className="text-center px-2 py-1 bg-fairway-100 font-bold text-fairway-800 text-xs">
-                    {frontNet || '—'}
-                  </td>
-                  {cells.slice(9, 18).map((c, i) => (
-                    <td key={i} className="text-center px-1 py-1 text-xs text-fairway-700 font-medium">
-                      {c.net ?? '—'}
-                    </td>
-                  ))}
-                  <td className="text-center px-2 py-1 bg-fairway-100 font-bold text-fairway-800 text-xs">
-                    {backNet || '—'}
-                  </td>
-                  <td className="text-center px-2 py-1 bg-fairway-200 font-bold text-fairway-900 text-xs">
-                    {totalNet || '—'}
-                  </td>
-                </tr>
-              </>
-            ))}
-          </tbody>
-        </table>
+                ))}
+              </tr>
+            </tbody>
+          </table>
+        </div>
 
         {/* Legend */}
-        <div className="mt-4 flex flex-wrap gap-3 text-xs text-gray-500">
-          <span className="flex items-center gap-1"><span className="bg-yellow-100 text-yellow-800 px-1.5 py-0.5 rounded font-bold">Eagle+</span></span>
-          <span className="flex items-center gap-1"><span className="bg-red-100 text-red-700 px-1.5 py-0.5 rounded font-bold">Birdie</span></span>
-          <span className="flex items-center gap-1"><span className="text-gray-700 px-1.5 py-0.5 rounded font-bold border border-gray-200">Par</span></span>
-          <span className="flex items-center gap-1"><span className="bg-blue-50 text-blue-700 px-1.5 py-0.5 rounded font-bold">Bogey</span></span>
-          <span className="flex items-center gap-1"><span className="bg-blue-100 text-blue-900 px-1.5 py-0.5 rounded font-bold">Double+</span></span>
-          <span className="text-gray-400 ml-2">Colors based on net score vs par</span>
+        <div className="mt-3 flex flex-wrap gap-2 text-xs justify-center">
+          <span className="flex items-center gap-1"><span className="inline-flex items-center justify-center w-6 h-6 rounded bg-yellow-400 text-yellow-900 font-black text-xs">E</span> Eagle+</span>
+          <span className="flex items-center gap-1"><span className="inline-flex items-center justify-center w-6 h-6 rounded bg-green-200 text-green-900 font-bold text-xs">B</span> Birdie</span>
+          <span className="flex items-center gap-1"><span className="inline-flex items-center justify-center w-6 h-6 rounded border border-gray-300 text-gray-700 font-bold text-xs">P</span> Par</span>
+          <span className="flex items-center gap-1"><span className="inline-flex items-center justify-center w-6 h-6 rounded bg-red-200 text-red-900 font-bold text-xs">+1</span> Bogey</span>
+          <span className="flex items-center gap-1"><span className="inline-flex items-center justify-center w-6 h-6 rounded bg-red-700 text-white font-bold text-xs">+2</span> Double+</span>
         </div>
+        <p className="text-center text-xs text-gray-400 mt-1">Colors based on net score vs par</p>
       </div>
     </div>
   )
