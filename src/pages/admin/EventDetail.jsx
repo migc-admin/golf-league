@@ -689,13 +689,14 @@ function TabFlights({ event, eventPlayers, course, allPlayers, onUpdated }) {
         eventId={event.id}
         available={available}
         course={course}
+        useFlights={useFlights}
         onSaved={onUpdated}
       />
     </div>
   )
 }
 
-function AddPlayerModal({ open, onClose, eventId, available, course, onSaved }) {
+function AddPlayerModal({ open, onClose, eventId, available, course, useFlights, onSaved }) {
   // bulk: { [playerId]: { hi, flight, checked } }
   const [bulk,    setBulk]    = useState({})
   const [saving,  setSaving]  = useState(false)
@@ -824,15 +825,17 @@ function AddPlayerModal({ open, onClose, eventId, available, course, onSaved }) 
                         className="input py-1 text-xs w-16 shrink-0"
                         required
                       />
-                      <select
-                        value={vals.flight}
-                        onChange={e => setField(p.id, 'flight', e.target.value)}
-                        className="input py-1 text-xs w-20 shrink-0 bg-white"
-                      >
-                        <option value="">Flight?</option>
-                        <option value="A">Flight A</option>
-                        <option value="B">Flight B</option>
-                      </select>
+                      {useFlights && (
+                        <select
+                          value={vals.flight}
+                          onChange={e => setField(p.id, 'flight', e.target.value)}
+                          className="input py-1 text-xs w-20 shrink-0 bg-white"
+                        >
+                          <option value="">Flight?</option>
+                          <option value="A">Flight A</option>
+                          <option value="B">Flight B</option>
+                        </select>
+                      )}
                       {/* Course handicap: auto or manual */}
                       {vals.autoHC ? (
                         <span
