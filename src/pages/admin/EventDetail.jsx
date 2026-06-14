@@ -633,10 +633,23 @@ function TabFlights({ event, eventPlayers, course, allPlayers, onUpdated }) {
 
   const courseTees = course?.tees ?? []
 
-  async function saveTeeAssignment(field, value) {
+  async function saveTeeAssignment(field, value, flight) {
     const { error } = await supabase.from('events').update({ [field]: value || null }).eq('id', event.id)
-    if (error) toast.error(error.message)
-    else onUpdated()
+    if (error) { toast.error(error.message); return }
+
+    // Bulk-apply tee to all players in the flight (or all players when no flights)
+    const playerIds = flight
+      ? eventPlayers.filter(ep => ep.flight === flight).map(ep => ep.id)
+      : eventPlayers.map(ep => ep.id)
+
+    if (playerIds.length > 0) {
+      await supabase
+        .from('event_players')
+        .update({ tee: value || null })
+        .in('id', playerIds)
+    }
+
+    onUpdated()
   }
 
   const useFlights = event.use_flights ?? false
@@ -719,10 +732,10 @@ function TabFlights({ event, eventPlayers, course, allPlayers, onUpdated }) {
               return (
                 <div key={flight}>
                   <label className="label">Flight {flight} Tee</label>
-                  <select value={current} onChange={e => saveTeeAssignment(field, e.target.value)} className="input bg-white">
+                  <select value={current} onChange={e => saveTeeAssignment(field, e.target.value, flight)} className="input bg-white">
                     <option value="">— Not assigned —</option>
                     {courseTees.map(t => (
-                      <option key={t.name} value={t.name}>{t.name} ({t.color}) — Slope {t.slope} / Rating {t.rating}</option>
+                      <option key={t.name} value={t.name}>{t.name}{t.color ? ` (${t.color})` : ''} — Slope {t.slope} / Rating {t.rating}</option>
                     ))}
                   </select>
                 </div>
@@ -732,12 +745,12 @@ function TabFlights({ event, eventPlayers, course, allPlayers, onUpdated }) {
                 <label className="label">Tee</label>
                 <select
                   value={event.tee_flight_a ?? ''}
-                  onChange={e => saveTeeAssignment('tee_flight_a', e.target.value)}
+                  onChange={e => saveTeeAssignment('tee_flight_a', e.target.value, null)}
                   className="input bg-white"
                 >
                   <option value="">— Not assigned —</option>
                   {courseTees.map(t => (
-                    <option key={t.name} value={t.name}>{t.name} ({t.color}) — Slope {t.slope} / Rating {t.rating}</option>
+                    <option key={t.name} value={t.name}>{t.name}{t.color ? ` (${t.color})` : ''} — Slope {t.slope} / Rating {t.rating}</option>
                   ))}
                 </select>
               </div>
