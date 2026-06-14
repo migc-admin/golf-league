@@ -634,11 +634,11 @@ function ImportCourse() {
 }
 
 // ─── Tab 3: Import Event Roster ────────────────────────────────────
-const ROSTER_TEMPLATE = `first_name,last_name,handicap_index,flight
-Tony,Alvarez,5.2,A
-Dave,Kowalski,11.1,A
-Bob,Nguyen,15.3,B
-Sarah,Okonkwo,18.7,B`
+const ROSTER_TEMPLATE = `first_name,last_name,handicap_index,flight,course_handicap
+Tony,Alvarez,5.2,A,6
+Dave,Kowalski,11.1,A,13
+Bob,Nguyen,15.3,B,18
+Sarah,Okonkwo,18.7,B,22`
 
 function ImportRoster() {
   const [events,    setEvents]    = useState([])
@@ -651,7 +651,7 @@ function ImportRoster() {
   useEffect(() => {
     supabase
       .from('events')
-      .select('id, event_number, event_date, status, league:leagues(name), course:courses(name)')
+      .select('id, event_number, event_date, status, league:leagues(name), course:courses(name, slope, rating, par)')
       .neq('status', 'complete')
       .order('event_date', { ascending: false })
       .then(({ data }) => setEvents(data ?? []))
@@ -669,26 +669,25 @@ function ImportRoster() {
     setImporting(true)
     const updated = [...rows]
 
-    // Load event course for course handicap calc
-    const { data: ev } = await supabase
-      .from('events')
-      .select('course:courses(slope, rating, par)')
-      .eq('id', eventId)
-      .single()
+    // Load event + course for auto course handicap calc fallback
+    const ev = events.find(e => e.id === eventId)
+    const eventCourse = ev?.course ?? null
 
     for (let i = 0; i < updated.length; i++) {
       const row    = updated[i]
       const first  = row['first_name']?.trim()
       const last   = row['last_name']?.trim()
-      const hi     = parseFloat(row['handicap_index'])
+      const hi     = row['handicap_index']?.trim() !== '' ? parseFloat(row['handicap_index']) : null
       const flight = row['flight']?.trim().toUpperCase() || null
+      const chRaw  = row['course_handicap']?.trim()
+      const chManual = chRaw !== '' && chRaw != null ? parseInt(chRaw, 10) : null
 
       if (!first || !last) {
         updated[i] = { ...row, _status: 'error', _message: 'Missing name' }
         continue
       }
-      if (isNaN(hi)) {
-        updated[i] = { ...row, _status: 'error', _message: 'Invalid handicap' }
+      if (hi === null && chManual === null) {
+        updated[i] = { ...row, _status: 'error', _message: 'Need handicap_index or course_handicap' }
         continue
       }
       if (flight && flight !== 'A' && flight !== 'B') {
@@ -696,7 +695,7 @@ function ImportRoster() {
         continue
       }
 
-      // Find or create player
+      // Match player by name — avoid duplicates
       let playerId = null
       const { data: match } = await supabase
         .from('players')
@@ -704,12 +703,12 @@ function ImportRoster() {
         .ilike('first_name', first)
         .ilike('last_name', last)
         .limit(1)
-        .single()
+        .maybeSingle()
 
       if (match) {
         playerId = match.id
       } else {
-        // Create the player
+        // New player — add to roster
         const { data: newP, error: pErr } = await supabase
           .from('players')
           .insert({ first_name: first, last_name: last })
@@ -723,32 +722,32 @@ function ImportRoster() {
         playerId = newP.id
       }
 
-      // Check if already on event
-      const { data: existing } = await supabase
+      // Skip if already on this event
+      const { data: alreadyOn } = await supabase
         .from('event_players')
         .select('id')
         .eq('event_id', eventId)
         .eq('player_id', playerId)
-        .single()
+        .maybeSingle()
 
-      if (existing) {
+      if (alreadyOn) {
         updated[i] = { ...row, _status: 'skipped', _message: 'Already on roster' }
         setRows([...updated])
         continue
       }
 
-      // Compute course handicap
-      let course_handicap = null
-      if (ev?.course) {
-        const { slope, rating, par } = ev.course
+      // Course handicap: use CSV value if provided, otherwise auto-calc from course
+      let course_handicap = chManual
+      if (course_handicap === null && hi !== null && eventCourse) {
+        const { slope, rating, par } = eventCourse
         course_handicap = Math.round((hi * slope / 113) + (rating - par))
       }
 
       const { error } = await supabase.from('event_players').insert({
         event_id:                eventId,
         player_id:               playerId,
-        handicap_index:          hi,
-        adjusted_handicap_index: hi,
+        handicap_index:          hi ?? null,
+        adjusted_handicap_index: hi ?? null,
         course_handicap,
         ...(flight ? { flight } : {}),
       })
@@ -790,15 +789,18 @@ function ImportRoster() {
         />
         <div className="bg-gray-900 rounded-lg px-4 py-3 text-xs text-gray-300 font-mono overflow-x-auto">
           <div className="text-gray-500 mb-1"># roster_template.csv</div>
-          <div>first_name,last_name,handicap_index,flight</div>
-          <div className="text-gray-500">Tony,Alvarez,5.2,A</div>
-          <div className="text-gray-500">Dave,Kowalski,11.1,A</div>
+          <div>first_name,last_name,handicap_index,flight,course_handicap</div>
+          <div className="text-gray-500">Tony,Alvarez,5.2,A,6</div>
+          <div className="text-gray-500">Dave,Kowalski,11.1,A,13</div>
+          <div className="text-gray-500">Bob,Nguyen,15.3,B,18</div>
         </div>
         <ul className="mt-3 text-xs text-gray-500 space-y-1 list-disc list-inside">
-          <li><strong>handicap_index</strong> — current USGA handicap index for this event (e.g. 14.2)</li>
-          <li><strong>flight</strong> — A or B. If included, flights are set on import.</li>
-          <li>If a player matches by first + last name they are reused, not duplicated</li>
-          <li>Course handicap is computed automatically from the event's course</li>
+          <li><strong>first_name</strong> and <strong>last_name</strong> are required</li>
+          <li><strong>handicap_index</strong> — USGA index (e.g. 14.2). Used to auto-calculate course handicap if not provided.</li>
+          <li><strong>course_handicap</strong> — if provided, this value is used directly (overrides auto-calc). Use this for adjusted handicaps.</li>
+          <li><strong>flight</strong> — A or B (optional)</li>
+          <li>Players matched by first + last name are reused — no duplicates created</li>
+          <li>New players not found in the system are added to the roster automatically</li>
         </ul>
       </Card>
 
@@ -848,7 +850,7 @@ function ImportRoster() {
           <PreviewTable headers={[...headers, '_status']} rows={rows} />
           {done && (
             <p className="mt-3 text-sm text-fairway-700 font-medium">
-              ✓ Done. Go to the event and run <strong>Flight Assignment</strong> to sort players into flights.
+              ✓ Done. Review players in the event's Players &amp; Flights tab to verify handicaps and flights.
             </p>
           )}
         </Card>
