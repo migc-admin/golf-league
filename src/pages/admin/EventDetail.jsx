@@ -30,6 +30,7 @@ export default function EventDetail() {
   const [course,       setCourse]       = useState(null)
   const [leagues,      setLeagues]      = useState([])
   const [allPlayers,   setAllPlayers]   = useState([])
+  const [conflicts,    setConflicts]    = useState([])
   const [loading,      setLoading]      = useState(true)
   const [activeTab,    setActiveTab]    = useState('Overview')
 
@@ -40,16 +41,19 @@ export default function EventDetail() {
       { data: sc },
       { data: sg },
       { data: allP },
+      { data: cf },
     ] = await Promise.all([
       supabase.from('events').select('*, league:leagues(*), course:courses(*)').eq('id', id).single(),
       supabase.from('event_players').select('*, player:players(*)').eq('event_id', id).order('flight').order('adjusted_handicap_index'),
       supabase.from('scores').select('*').eq('event_id', id),
       supabase.from('side_games').select('*, winner:players(first_name,last_name)').eq('event_id', id),
       supabase.from('players').select('*').order('last_name'),
+      supabase.from('score_audit_log').select('*, player:players(first_name,last_name)').eq('event_id', id).eq('is_conflict', true).order('hole_number'),
     ])
 
     setEvent(ev)
     setEventPlayers(eps ?? [])
+    setConflicts(cf ?? [])
     setAllScores(sc ?? [])
     setSideGames(sg ?? [])
     setCourse(ev?.course ?? null)
@@ -115,7 +119,7 @@ export default function EventDetail() {
       </div>
 
       {/* Tab content */}
-      {activeTab === 'Overview'        && <TabOverview event={event} eventPlayers={eventPlayers} allScores={allScores} course={course} onUpdated={load} leagues={leagues} />}
+      {activeTab === 'Overview'        && <TabOverview event={event} eventPlayers={eventPlayers} allScores={allScores} course={course} conflicts={conflicts} onUpdated={load} leagues={leagues} />}
       {activeTab === 'Players & Flights' && <TabFlights event={event} eventPlayers={eventPlayers} course={course} allPlayers={allPlayers} onUpdated={load} />}
       {activeTab === 'Groups'          && <TabGroups  event={event} eventPlayers={eventPlayers} onUpdated={load} />}
       {activeTab === 'Payout Config'   && <TabPayoutConfig event={event} eventPlayers={eventPlayers} course={course} onUpdated={load} />}
@@ -177,7 +181,7 @@ function exportScoresCSV(event, eventPlayers, allScores, course) {
 }
 
 // ─── Tab: Overview ────────────────────────────────────────────────
-function TabOverview({ event, eventPlayers, allScores, course, onUpdated }) {
+function TabOverview({ event, eventPlayers, allScores, course, conflicts, onUpdated }) {
   const [editModal,   setEditModal]   = useState(false)
   const [deleteModal, setDeleteModal] = useState(false)
   const [scoreEditor, setScoreEditor] = useState(false)
@@ -239,6 +243,33 @@ function TabOverview({ event, eventPlayers, allScores, course, onUpdated }) {
           </Card>
         )}
       </div>
+
+      {/* Score conflicts */}
+      {conflicts.length > 0 && (
+        <Card className="border-red-300 bg-red-50">
+          <CardHeader
+            title={`⚠ Score Conflicts (${conflicts.length})`}
+            subtitle="Multiple scorers entered different values for the same hole"
+          />
+          <div className="space-y-2 mt-1">
+            {conflicts.map((c, i) => (
+              <div key={i} className="flex items-start justify-between text-sm bg-white border border-red-200 rounded-lg px-3 py-2">
+                <div>
+                  <span className="font-semibold text-gray-900">
+                    {c.player?.first_name} {c.player?.last_name}
+                  </span>
+                  <span className="text-gray-500 ml-2">· Hole {c.hole_number}</span>
+                </div>
+                <div className="text-right text-xs text-gray-600">
+                  <div><span className="text-gray-400">Was</span> <strong>{c.previous_score}</strong> by <em>{c.previous_entered_by}</em></div>
+                  <div><span className="text-red-500">Changed to</span> <strong>{c.new_score}</strong> by <em>{c.entered_by}</em></div>
+                </div>
+              </div>
+            ))}
+          </div>
+          <p className="text-xs text-red-500 mt-2">Use ✎ Scores to review and correct the final values.</p>
+        </Card>
+      )}
 
       <EditEventModal open={editModal} onClose={() => setEditModal(false)} event={event} onSaved={onUpdated} />
       <DeleteEventModal open={deleteModal} onClose={() => setDeleteModal(false)} event={event} />
