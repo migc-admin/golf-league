@@ -995,13 +995,26 @@ function TabPayoutConfig({ event, eventPlayers, course, onUpdated }) {
   // Active keys driven by event's formats + side_game_options + use_flights
   const eventActiveKeys = activePayoutKeys(event)
 
-  // Initialise config from active keys only + existing saved values
+  const hasCtp = (event.side_game_options ?? []).includes('ctp')
+
+  // Rebuild config whenever event setup changes (formats, sides, use_flights)
+  const eventConfigKey = [
+    event.id,
+    (event.formats ?? []).join(','),
+    (event.side_game_options ?? []).join(','),
+    String(event.use_flights),
+  ].join('|')
+
   useEffect(() => {
     const existingConfig = event.payout_config ?? {}
-    const existingCtpHoles = Object.keys(existingConfig)
-      .filter(k => k.startsWith('ctp_'))
-      .map(k => parseInt(k.replace('ctp_', ''), 10))
-      .sort((a, b) => a - b)
+
+    // CTP holes only loaded when CTP is selected
+    const existingCtpHoles = hasCtp
+      ? Object.keys(existingConfig)
+          .filter(k => k.startsWith('ctp_'))
+          .map(k => parseInt(k.replace('ctp_', ''), 10))
+          .sort((a, b) => a - b)
+      : []
     setCtpHoles(existingCtpHoles)
 
     // Build config from active keys only — no extra keys shown
@@ -1010,13 +1023,12 @@ function TabPayoutConfig({ event, eventPlayers, course, onUpdated }) {
     for (const k of keys) {
       next[k] = existingConfig[k] ?? DEFAULT_PAYOUT_CONFIG[k] ?? 0
     }
-    // Add CTP holes
     for (const h of existingCtpHoles) {
       next[`ctp_${h}`] = existingConfig[`ctp_${h}`] ?? 0
     }
     setConfig(next)
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [event.id])
+  }, [eventConfigKey])
 
   function setVal(key, val) {
     setConfig(c => ({ ...c, [key]: parseFloat(val) || 0 }))
@@ -1124,8 +1136,8 @@ function TabPayoutConfig({ event, eventPlayers, course, onUpdated }) {
         )}
       </Card>
 
-      {/* CTP hole assignment */}
-      <Card>
+      {/* CTP hole assignment — only when CTP is selected */}
+      {hasCtp && <Card>
         <CardHeader title="Closest to Pin Holes" subtitle="Add the specific hole numbers for CTP contests at this course" />
         <div className="flex flex-wrap gap-2 mb-3">
           {ctpHoles.map(h => (
@@ -1163,7 +1175,7 @@ function TabPayoutConfig({ event, eventPlayers, course, onUpdated }) {
             </button>
           )}
         </div>
-      </Card>
+      </Card>}
 
       <p className="text-xs text-gray-500">
         All values are <strong>$ per player</strong> × player count shown in each section.
@@ -1497,34 +1509,84 @@ function EventStatusControl({ event, onUpdated }) {
 }
 
 // ─── Edit Event Modal ──────────────────────────────────────────────
+const EDIT_FORMAT_OPTIONS = [
+  { group: 'Net Stroke Play', options: [
+    { value: 'net_stroke',        label: '18-Hole Overall Net' },
+    { value: 'net_stroke_front9', label: 'Front Nine Net' },
+    { value: 'net_stroke_back9',  label: 'Back Nine Net' },
+  ]},
+  { group: 'Other Formats', options: [
+    { value: 'stableford',   label: 'Stableford' },
+    { value: 'match_points', label: 'Match Play Points' },
+    { value: 'ryder_cup',    label: 'Ryder Cup' },
+  ]},
+]
+
+const EDIT_SIDE_GAME_OPTIONS = [
+  { key: 'skins',         label: 'Skins',                  flightsOff: true,  flightsOn: false },
+  { key: 'skins_a',       label: 'Skins — Flight A',       flightsOff: false, flightsOn: true  },
+  { key: 'skins_b',       label: 'Skins — Flight B',       flightsOff: false, flightsOn: true  },
+  { key: 'long_drive',    label: 'Long Drive',             flightsOff: true,  flightsOn: false },
+  { key: 'long_drive_a',  label: 'Long Drive — Flight A',  flightsOff: false, flightsOn: true  },
+  { key: 'long_drive_b',  label: 'Long Drive — Flight B',  flightsOff: false, flightsOn: true  },
+  { key: 'low_putts',     label: 'Low Putts',              flightsOff: true,  flightsOn: true  },
+  { key: 'ctp',           label: 'Closest to Pin (par 3s)',flightsOff: true,  flightsOn: true  },
+  { key: 'track_putts',   label: 'Track Putts on Scorecard',flightsOff: true, flightsOn: true  },
+]
+
 function EditEventModal({ open, onClose, event, onSaved }) {
-  const [eventDate, setEventDate] = useState('')
-  const [entryFee,  setEntryFee]  = useState('')
-  const [format,    setFormat]    = useState('net_stroke')
-  const [startTime, setStartTime] = useState('')
-  const [interval,  setInterval]  = useState(10)
-  const [saving,    setSaving]    = useState(false)
+  const [eventDate,   setEventDate]   = useState('')
+  const [eventName,   setEventName]   = useState('')
+  const [entryFee,    setEntryFee]    = useState('')
+  const [startTime,   setStartTime]   = useState('')
+  const [interval,    setInterval]    = useState(10)
+  const [formats,     setFormats]     = useState(new Set(['net_stroke']))
+  const [sideGames,   setSideGames]   = useState(new Set())
+  const [useFlights,  setUseFlights]  = useState(false)
+  const [payoutBasis, setPayoutBasis] = useState('per_player')
+  const [payoutFixed, setPayoutFixed] = useState('')
+  const [saving,      setSaving]      = useState(false)
 
   useEffect(() => {
     if (event && open) {
       setEventDate(event.event_date ?? '')
-      setEntryFee(event.entry_fee)
-      setFormat(event.format ?? 'net_stroke')
+      setEventName(event.name ?? '')
+      setEntryFee(event.entry_fee ?? '')
       setStartTime(event.start_time ? event.start_time.slice(0, 5) : '')
       setInterval(event.tee_time_interval_mins ?? 10)
+      setFormats(new Set(event.formats?.length ? event.formats : [event.format ?? 'net_stroke']))
+      setSideGames(new Set(event.side_game_options ?? []))
+      setUseFlights(event.use_flights ?? false)
+      setPayoutBasis(event.payout_basis ?? 'per_player')
+      setPayoutFixed(event.payout_fixed_total ?? '')
     }
   }, [event, open])
 
+  function toggleFormat(key) {
+    setFormats(prev => { const n = new Set(prev); n.has(key) ? n.delete(key) : n.add(key); return n })
+  }
+  function toggleSideGame(key) {
+    setSideGames(prev => { const n = new Set(prev); n.has(key) ? n.delete(key) : n.add(key); return n })
+  }
+
   async function handleSave(e) {
     e.preventDefault()
+    if (formats.size === 0) return
     setSaving(true)
+    const formatsArr = [...formats]
     const { error } = await supabase.from('events')
       .update({
         event_date:             eventDate,
+        name:                   eventName.trim() || null,
         entry_fee:              parseFloat(entryFee),
-        format,
         start_time:             startTime || null,
         tee_time_interval_mins: parseInt(interval, 10),
+        format:                 formatsArr[0],
+        formats:                formatsArr,
+        side_game_options:      [...sideGames],
+        use_flights:            useFlights,
+        payout_basis:           payoutBasis,
+        payout_fixed_total:     payoutBasis === 'fixed' ? parseFloat(payoutFixed) || 0 : null,
       })
       .eq('id', event.id)
     setSaving(false)
@@ -1533,42 +1595,92 @@ function EditEventModal({ open, onClose, event, onSaved }) {
   }
 
   return (
-    <Modal open={open} onClose={onClose} title="Edit Event">
+    <Modal open={open} onClose={onClose} title="Edit Event" maxWidth="max-w-lg">
       <form onSubmit={handleSave} className="space-y-4">
-        <Input
-          label="Event Date"
-          type="date"
-          value={eventDate}
-          onChange={e => setEventDate(e.target.value)}
-          required
-        />
+        <div className="grid grid-cols-2 gap-4">
+          <Input label="Date" type="date" value={eventDate} onChange={e => setEventDate(e.target.value)} required />
+          <Input label="Start Time" type="time" value={startTime} onChange={e => setStartTime(e.target.value)} />
+        </div>
+        <Input label="Event Name (optional)" value={eventName} onChange={e => setEventName(e.target.value)} placeholder="e.g. Spring Opener…" />
+
+        {/* Use Flights toggle */}
+        <div className="bg-gray-50 rounded-xl px-4 py-3 flex items-center justify-between">
+          <div>
+            <div className="text-sm font-medium text-gray-800">Use Flights (A &amp; B)?</div>
+            <div className="text-xs text-gray-400 mt-0.5">Enable if splitting players into two competitive flights</div>
+          </div>
+          <button
+            type="button"
+            onClick={() => setUseFlights(v => !v)}
+            className={`relative inline-flex h-6 w-11 shrink-0 rounded-full border-2 border-transparent transition-colors focus:outline-none ${useFlights ? 'bg-fairway-600' : 'bg-gray-300'}`}
+          >
+            <span className={`inline-block h-5 w-5 rounded-full bg-white shadow transition-transform ${useFlights ? 'translate-x-5' : 'translate-x-0'}`} />
+          </button>
+        </div>
+
+        {/* Scoring Formats */}
         <div>
-          <label className="label">Format</label>
-          <select value={format} onChange={e => setFormat(e.target.value)} className="input bg-white">
-            <option value="net_stroke">Net Stroke Play</option>
-            <option value="stableford">Stableford</option>
-            <option value="match_points">Match Play Points</option>
-            <option value="ryder_cup">Ryder Cup</option>
-          </select>
+          <label className="label">Scoring Formats</label>
+          <div className="bg-gray-50 rounded-xl px-4 py-3 space-y-3">
+            {EDIT_FORMAT_OPTIONS.map(group => (
+              <div key={group.group}>
+                <div className="text-xs text-gray-400 font-medium uppercase tracking-wide mb-1.5">{group.group}</div>
+                <div className="space-y-1.5">
+                  {group.options.map(opt => (
+                    <label key={opt.value} className="flex items-center gap-2.5 cursor-pointer">
+                      <input type="checkbox" checked={formats.has(opt.value)} onChange={() => toggleFormat(opt.value)} className="accent-fairway-600 w-4 h-4" />
+                      <span className="text-sm text-gray-800">{opt.label}</span>
+                    </label>
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
+          {formats.size === 0 && <p className="text-xs text-red-500 mt-1">Select at least one format.</p>}
         </div>
+
+        {/* Side Games */}
+        <div>
+          <label className="label">Side Games / Competitions</label>
+          <div className="space-y-1.5 bg-gray-50 rounded-xl px-4 py-3">
+            {EDIT_SIDE_GAME_OPTIONS
+              .filter(opt => useFlights ? opt.flightsOn : opt.flightsOff)
+              .map(opt => (
+                <label key={opt.key} className="flex items-center gap-2.5 py-0.5 cursor-pointer">
+                  <input type="checkbox" checked={sideGames.has(opt.key)} onChange={() => toggleSideGame(opt.key)} className="accent-fairway-600 w-4 h-4" />
+                  <span className="text-sm text-gray-800">{opt.label}</span>
+                </label>
+              ))
+            }
+          </div>
+        </div>
+
         <div className="grid grid-cols-2 gap-3">
-          <Input
-            label="Start Time"
-            type="time"
-            value={startTime}
-            onChange={e => setStartTime(e.target.value)}
-          />
-          <Input
-            label="Tee Interval (min)"
-            type="number" min="1" max="60"
-            value={interval}
-            onChange={e => setInterval(e.target.value)}
-          />
+          <Input label="Entry Fee ($)" type="number" step="0.01" min="0" value={entryFee} onChange={e => setEntryFee(e.target.value)} required />
+          <Input label="Tee Interval (min)" type="number" min="1" max="60" value={interval} onChange={e => setInterval(e.target.value)} />
         </div>
-        <Input label="Entry Fee ($)" type="number" step="0.01" min="0" value={entryFee} onChange={e => setEntryFee(e.target.value)} required />
+
+        {/* Payout Basis */}
+        <div>
+          <label className="label">Payout Pot Based On</label>
+          <div className="flex gap-4 mt-1">
+            <label className="flex items-center gap-2 cursor-pointer">
+              <input type="radio" name="editPayoutBasis" value="per_player" checked={payoutBasis === 'per_player'} onChange={() => setPayoutBasis('per_player')} className="accent-fairway-600" />
+              <span className="text-sm text-gray-700">Attendance (entry fee × players)</span>
+            </label>
+            <label className="flex items-center gap-2 cursor-pointer">
+              <input type="radio" name="editPayoutBasis" value="fixed" checked={payoutBasis === 'fixed'} onChange={() => setPayoutBasis('fixed')} className="accent-fairway-600" />
+              <span className="text-sm text-gray-700">Fixed total</span>
+            </label>
+          </div>
+          {payoutBasis === 'fixed' && (
+            <Input className="mt-2" label="Fixed Pot Total ($)" type="number" step="0.01" min="0" value={payoutFixed} onChange={e => setPayoutFixed(e.target.value)} placeholder="e.g. 500" />
+          )}
+        </div>
+
         <div className="flex justify-end gap-3 pt-2">
           <Button type="button" variant="secondary" onClick={onClose}>Cancel</Button>
-          <Button type="submit" loading={saving}>Save</Button>
+          <Button type="submit" loading={saving} disabled={formats.size === 0}>Save Changes</Button>
         </div>
       </form>
     </Modal>
