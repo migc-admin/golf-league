@@ -224,8 +224,8 @@ function TabOverview({ event, eventPlayers, allScores, course, onUpdated }) {
           <CardHeader title="Players" />
           <dl className="space-y-2 text-sm">
             <Row label="Total Players"  value={eventPlayers.length} />
-            <Row label="Flight A"       value={flightA} />
-            <Row label="Flight B"       value={flightB} />
+            {(event.use_flights ?? false) && <Row label="Flight A" value={flightA} />}
+            {(event.use_flights ?? false) && <Row label="Flight B" value={flightB} />}
             <Row label="Scores Entered" value={`${holesEntered} hole entries`} />
             <Row label="Total Pot"      value={`$${(event.entry_fee * eventPlayers.length).toFixed(2)}`} />
           </dl>
@@ -509,34 +509,97 @@ function TabFlights({ event, eventPlayers, course, allPlayers, onUpdated }) {
     else onUpdated()
   }
 
+  const useFlights = event.use_flights ?? false
+
+  // Shared player row renderer
+  function PlayerRow({ ep }) {
+    return (
+      <div key={ep.id} className="flex items-center justify-between px-5 py-3">
+        <div>
+          <div className="font-medium text-sm text-gray-900">
+            {ep.player?.last_name}, {ep.player?.first_name}
+          </div>
+          <div className="text-xs text-gray-500 flex items-center gap-3 mt-0.5">
+            <span>HI: {ep.handicap_index}</span>
+            {ep.adjusted_handicap_index != null && ep.adjusted_handicap_index !== ep.handicap_index && (
+              <span className="text-orange-600">Adj: {ep.adjusted_handicap_index}</span>
+            )}
+            {ep.course_handicap != null && <span>CH: {ep.course_handicap}</span>}
+            {ep.tournament_wins_prior > 0 && (
+              <span className="text-fairway-700 font-medium">{ep.tournament_wins_prior} win{ep.tournament_wins_prior !== 1 ? 's' : ''}</span>
+            )}
+          </div>
+        </div>
+        <div className="flex items-center gap-2">
+          {courseTees.length > 0 && (
+            <select
+              value={ep.tee ?? ''}
+              onChange={e => overrideTee(ep.id, e.target.value)}
+              className="input py-1 text-xs w-28"
+              title="Tee override"
+            >
+              <option value="">— Tee —</option>
+              {courseTees.map(t => (
+                <option key={t.name} value={t.name}>{t.name}</option>
+              ))}
+            </select>
+          )}
+          {useFlights && (
+            <select
+              value={ep.flight ?? ''}
+              onChange={e => overrideFlight(ep.id, e.target.value)}
+              className="input py-1 text-xs w-24"
+            >
+              <option value="">—</option>
+              <option value="A">Flight A</option>
+              <option value="B">Flight B</option>
+            </select>
+          )}
+          <button onClick={() => removePlayer(ep.id)} className="text-red-400 hover:text-red-600 text-xs">✕</button>
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div className="space-y-4">
-      {/* Tee Assignment per Flight */}
+      {/* Tee Assignment — per flight when flights on, single tee when off */}
       {courseTees.length > 0 && (
         <Card>
-          <CardHeader title="Tee Assignment" subtitle="Which tees each flight plays from" />
-          <div className="grid sm:grid-cols-2 gap-4 mt-1">
-            {['A', 'B'].map(flight => {
+          <CardHeader
+            title="Tee Assignment"
+            subtitle={useFlights ? 'Which tees each flight plays from' : 'Which tees players play from'}
+          />
+          <div className={`grid gap-4 mt-1 ${useFlights ? 'sm:grid-cols-2' : 'max-w-xs'}`}>
+            {useFlights ? ['A', 'B'].map(flight => {
               const field = `tee_flight_${flight.toLowerCase()}`
               const current = event[field] ?? ''
               return (
                 <div key={flight}>
                   <label className="label">Flight {flight} Tee</label>
-                  <select
-                    value={current}
-                    onChange={e => saveTeeAssignment(field, e.target.value)}
-                    className="input bg-white"
-                  >
+                  <select value={current} onChange={e => saveTeeAssignment(field, e.target.value)} className="input bg-white">
                     <option value="">— Not assigned —</option>
                     {courseTees.map(t => (
-                      <option key={t.name} value={t.name}>
-                        {t.name} ({t.color}) — Slope {t.slope} / Rating {t.rating}
-                      </option>
+                      <option key={t.name} value={t.name}>{t.name} ({t.color}) — Slope {t.slope} / Rating {t.rating}</option>
                     ))}
                   </select>
                 </div>
               )
-            })}
+            }) : (
+              <div>
+                <label className="label">Tee</label>
+                <select
+                  value={event.tee_flight_a ?? ''}
+                  onChange={e => saveTeeAssignment('tee_flight_a', e.target.value)}
+                  className="input bg-white"
+                >
+                  <option value="">— Not assigned —</option>
+                  {courseTees.map(t => (
+                    <option key={t.name} value={t.name}>{t.name} ({t.color}) — Slope {t.slope} / Rating {t.rating}</option>
+                  ))}
+                </select>
+              </div>
+            )}
           </div>
         </Card>
       )}
@@ -545,12 +608,16 @@ function TabFlights({ event, eventPlayers, course, allPlayers, onUpdated }) {
         <Button onClick={() => setAddModal(true)} variant="secondary">+ Add Player to Event</Button>
         {eventPlayers.length > 0 && (
           <span className="text-sm text-gray-500">
-            {eventPlayers.length} players · Flight A: {flightA.length} · Flight B: {flightB.length}
+            {useFlights
+              ? `${eventPlayers.length} players · Flight A: ${flightA.length} · Flight B: ${flightB.length}`
+              : `${eventPlayers.length} player${eventPlayers.length !== 1 ? 's' : ''}`
+            }
           </span>
         )}
       </div>
 
-      {unassigned.length > 0 && (
+      {/* Unassigned warning — only relevant when flights are on */}
+      {useFlights && unassigned.length > 0 && (
         <Card className="overflow-hidden p-0 border-yellow-300">
           <div className="px-5 py-3 border-b border-yellow-200 flex items-center gap-2 bg-yellow-50">
             <span className="text-sm font-semibold text-yellow-800">⚠ Unassigned — {unassigned.length} player{unassigned.length !== 1 ? 's' : ''} need a flight</span>
@@ -559,20 +626,14 @@ function TabFlights({ event, eventPlayers, course, allPlayers, onUpdated }) {
             {unassigned.map(ep => (
               <div key={ep.id} className="flex items-center justify-between px-5 py-3">
                 <div>
-                  <div className="font-medium text-sm text-gray-900">
-                    {ep.player?.last_name}, {ep.player?.first_name}
-                  </div>
+                  <div className="font-medium text-sm text-gray-900">{ep.player?.last_name}, {ep.player?.first_name}</div>
                   <div className="text-xs text-gray-500 flex items-center gap-3 mt-0.5">
                     <span>HI: {ep.handicap_index}</span>
                     {ep.course_handicap != null && <span>CH: {ep.course_handicap}</span>}
                   </div>
                 </div>
                 <div className="flex items-center gap-2">
-                  <select
-                    value=""
-                    onChange={e => overrideFlight(ep.id, e.target.value)}
-                    className="input py-1 text-xs w-28 border-yellow-400 bg-yellow-50"
-                  >
+                  <select value="" onChange={e => overrideFlight(ep.id, e.target.value)} className="input py-1 text-xs w-28 border-yellow-400 bg-yellow-50">
                     <option value="">Assign flight…</option>
                     <option value="A">Flight A</option>
                     <option value="B">Flight B</option>
@@ -585,68 +646,36 @@ function TabFlights({ event, eventPlayers, course, allPlayers, onUpdated }) {
         </Card>
       )}
 
-      {['A', 'B'].map(flight => {
-        const list = flight === 'A' ? flightA : flightB
-        if (list.length === 0 && eventPlayers.length > 0) return null
-        return (
-          <Card key={flight} className="overflow-hidden p-0">
-            <div className="px-5 py-3 border-b border-gray-100 flex items-center gap-2 bg-gray-50">
-              <FlightBadge flight={flight} />
-              <span className="text-sm font-semibold text-gray-700">{list.length} players</span>
+      {/* Flight-based roster — only when flights on */}
+      {useFlights ? (
+        ['A', 'B'].map(flight => {
+          const list = flight === 'A' ? flightA : flightB
+          if (list.length === 0 && eventPlayers.length > 0) return null
+          return (
+            <Card key={flight} className="overflow-hidden p-0">
+              <div className="px-5 py-3 border-b border-gray-100 flex items-center gap-2 bg-gray-50">
+                <FlightBadge flight={flight} />
+                <span className="text-sm font-semibold text-gray-700">{list.length} players</span>
+              </div>
+              <div className="divide-y divide-gray-100">
+                {list.map(ep => <PlayerRow key={ep.id} ep={ep} />)}
+              </div>
+            </Card>
+          )
+        })
+      ) : (
+        /* No flights — single flat roster */
+        eventPlayers.length > 0 && (
+          <Card className="overflow-hidden p-0">
+            <div className="px-5 py-3 border-b border-gray-100 bg-gray-50">
+              <span className="text-sm font-semibold text-gray-700">Players ({eventPlayers.length})</span>
             </div>
             <div className="divide-y divide-gray-100">
-              {list.map(ep => (
-                <div key={ep.id} className="flex items-center justify-between px-5 py-3">
-                  <div>
-                    <div className="font-medium text-sm text-gray-900">
-                      {ep.player?.last_name}, {ep.player?.first_name}
-                    </div>
-                    <div className="text-xs text-gray-500 flex items-center gap-3 mt-0.5">
-                      <span>HI: {ep.handicap_index}</span>
-                      {ep.adjusted_handicap_index != null && ep.adjusted_handicap_index !== ep.handicap_index && (
-                        <span className="text-orange-600">Adj: {ep.adjusted_handicap_index}</span>
-                      )}
-                      {ep.course_handicap != null && <span>CH: {ep.course_handicap}</span>}
-                      {ep.tournament_wins_prior > 0 && (
-                        <span className="text-fairway-700 font-medium">{ep.tournament_wins_prior} win{ep.tournament_wins_prior !== 1 ? 's' : ''}</span>
-                      )}
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    {courseTees.length > 0 && (
-                      <select
-                        value={ep.tee ?? ''}
-                        onChange={e => overrideTee(ep.id, e.target.value)}
-                        className="input py-1 text-xs w-28"
-                        title="Tee override (defaults to flight tee)"
-                      >
-                        <option value="">
-                          {event[`tee_flight_${(ep.flight ?? 'a').toLowerCase()}`]
-                            ? `${event[`tee_flight_${(ep.flight ?? 'a').toLowerCase()}`]} (default)`
-                            : '— Tee —'}
-                        </option>
-                        {courseTees.map(t => (
-                          <option key={t.name} value={t.name}>{t.name}</option>
-                        ))}
-                      </select>
-                    )}
-                    <select
-                      value={ep.flight ?? ''}
-                      onChange={e => overrideFlight(ep.id, e.target.value)}
-                      className="input py-1 text-xs w-24"
-                    >
-                      <option value="">—</option>
-                      <option value="A">Flight A</option>
-                      <option value="B">Flight B</option>
-                    </select>
-                    <button onClick={() => removePlayer(ep.id)} className="text-red-400 hover:text-red-600 text-xs">✕</button>
-                  </div>
-                </div>
-              ))}
+              {eventPlayers.map(ep => <PlayerRow key={ep.id} ep={ep} />)}
             </div>
           </Card>
         )
-      })}
+      )}
 
       {eventPlayers.length === 0 && (
         <Card className="text-center py-10">
