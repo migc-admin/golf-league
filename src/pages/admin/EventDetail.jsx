@@ -502,9 +502,108 @@ function AdminScoreEditor({ event, eventPlayers, allScores, course, onClose, onS
   )
 }
 
+// ─── Edit Handicap Modal ─────────────────────────────────────────────
+function EditHandicapModal({ ep, course, onClose, onSaved }) {
+  const [hi, setHi] = useState(ep.handicap_index ?? '')
+  const [ch, setCh] = useState(ep.course_handicap ?? '')
+  const [autoCalc, setAutoCalc] = useState(false)
+  const [saving, setSaving] = useState(false)
+
+  // Auto-calculate CH from HI whenever HI changes and autoCalc is on
+  const calcCh = useCallback((hiVal) => {
+    if (!course) return ''
+    const { slope, rating, par } = course
+    if (!slope || !rating || !par) return ''
+    return Math.round((parseFloat(hiVal) * slope / 113) + (rating - par))
+  }, [course])
+
+  function handleHiChange(val) {
+    setHi(val)
+    if (autoCalc && val !== '' && !isNaN(parseFloat(val))) {
+      setCh(calcCh(val))
+    }
+  }
+
+  function toggleAuto(checked) {
+    setAutoCalc(checked)
+    if (checked && hi !== '' && !isNaN(parseFloat(hi))) {
+      setCh(calcCh(hi))
+    }
+  }
+
+  async function handleSave() {
+    setSaving(true)
+    const hiVal = parseFloat(hi)
+    if (isNaN(hiVal)) { toast.error('Invalid handicap index'); setSaving(false); return }
+    const chVal = ch !== '' ? parseInt(ch, 10) : null
+    const { error } = await supabase
+      .from('event_players')
+      .update({ handicap_index: hiVal, adjusted_handicap_index: hiVal, course_handicap: chVal })
+      .eq('id', ep.id)
+    setSaving(false)
+    if (error) { toast.error(error.message); return }
+    toast.success('Handicap updated')
+    onSaved()
+  }
+
+  return (
+    <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+      <div className="bg-white rounded-2xl shadow-xl w-full max-w-sm p-6 space-y-4">
+        <h2 className="text-lg font-bold text-gray-900">Edit Handicap</h2>
+        <p className="text-sm text-gray-600">{ep.player?.first_name} {ep.player?.last_name}</p>
+
+        <div>
+          <label className="label">Handicap Index</label>
+          <input
+            type="number"
+            step="0.1"
+            value={hi}
+            onChange={e => handleHiChange(e.target.value)}
+            className="input"
+            placeholder="e.g. 14.2"
+          />
+        </div>
+
+        <div>
+          <div className="flex items-center justify-between mb-1">
+            <label className="label mb-0">Course Handicap</label>
+            {course && (
+              <label className="flex items-center gap-1.5 text-xs text-gray-500 cursor-pointer">
+                <input type="checkbox" checked={autoCalc} onChange={e => toggleAuto(e.target.checked)} />
+                Auto-calculate
+              </label>
+            )}
+          </div>
+          <input
+            type="number"
+            value={ch}
+            onChange={e => setCh(e.target.value)}
+            className="input"
+            placeholder="e.g. 16"
+            readOnly={autoCalc}
+          />
+          {autoCalc && course && (
+            <p className="text-xs text-gray-400 mt-1">
+              Calculated: ({hi} × {course.slope} / 113) + ({course.rating} − {course.par})
+            </p>
+          )}
+        </div>
+
+        <div className="flex gap-3 pt-2">
+          <Button onClick={onClose} variant="secondary" className="flex-1">Cancel</Button>
+          <Button onClick={handleSave} disabled={saving} className="flex-1">
+            {saving ? 'Saving…' : 'Save'}
+          </Button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 // ─── Tab: Players & Flights ────────────────────────────────────────
 function TabFlights({ event, eventPlayers, course, allPlayers, onUpdated }) {
   const [addModal, setAddModal] = useState(false)
+  const [editingEp, setEditingEp] = useState(null) // ep being edited
 
   const rostered = new Set(eventPlayers.map(ep => ep.player_id))
   const available = allPlayers.filter(p => !rostered.has(p.id))
@@ -542,16 +641,16 @@ function TabFlights({ event, eventPlayers, course, allPlayers, onUpdated }) {
 
   const useFlights = event.use_flights ?? false
 
-  // Shared player row renderer
-  function PlayerRow({ ep }) {
+  // Shared player row renderer — called as renderPlayerRow(ep), NOT as <PlayerRow>
+  function renderPlayerRow(ep) {
     return (
       <div key={ep.id} className="flex items-center justify-between px-5 py-3">
         <div>
           <div className="font-medium text-sm text-gray-900">
             {ep.player?.last_name}, {ep.player?.first_name}
           </div>
-          <div className="text-xs text-gray-500 flex items-center gap-3 mt-0.5">
-            <span>HI: {ep.handicap_index}</span>
+          <div className="text-xs text-gray-500 flex items-center gap-2 mt-1 flex-wrap">
+            <span>HI: {ep.handicap_index ?? '—'}</span>
             {ep.adjusted_handicap_index != null && ep.adjusted_handicap_index !== ep.handicap_index && (
               <span className="text-orange-600">Adj: {ep.adjusted_handicap_index}</span>
             )}
@@ -559,6 +658,10 @@ function TabFlights({ event, eventPlayers, course, allPlayers, onUpdated }) {
             {ep.tournament_wins_prior > 0 && (
               <span className="text-fairway-700 font-medium">{ep.tournament_wins_prior} win{ep.tournament_wins_prior !== 1 ? 's' : ''}</span>
             )}
+            <button
+              onClick={() => setEditingEp(ep)}
+              style={{ background: '#e5e7eb', color: '#374151', border: 'none', borderRadius: 4, padding: '1px 8px', fontSize: 11, cursor: 'pointer', fontWeight: 600 }}
+            >Edit</button>
           </div>
         </div>
         <div className="flex items-center gap-2">
@@ -594,6 +697,14 @@ function TabFlights({ event, eventPlayers, course, allPlayers, onUpdated }) {
 
   return (
     <div className="space-y-4">
+      {editingEp && (
+        <EditHandicapModal
+          ep={editingEp}
+          course={course}
+          onClose={() => setEditingEp(null)}
+          onSaved={() => { setEditingEp(null); onUpdated() }}
+        />
+      )}
       {/* Tee Assignment — per flight when flights on, single tee when off */}
       {courseTees.length > 0 && (
         <Card>
@@ -669,6 +780,7 @@ function TabFlights({ event, eventPlayers, course, allPlayers, onUpdated }) {
                     <option value="A">Flight A</option>
                     <option value="B">Flight B</option>
                   </select>
+                  <button onClick={() => setEditingEp(ep)} className="text-xs px-2 py-1 rounded bg-gray-100 hover:bg-fairway-100 text-gray-600 hover:text-fairway-800 font-medium">Edit HI</button>
                   <button onClick={() => removePlayer(ep.id)} className="text-red-400 hover:text-red-600 text-xs">✕</button>
                 </div>
               </div>
@@ -689,7 +801,7 @@ function TabFlights({ event, eventPlayers, course, allPlayers, onUpdated }) {
                 <span className="text-sm font-semibold text-gray-700">{list.length} players</span>
               </div>
               <div className="divide-y divide-gray-100">
-                {list.map(ep => <PlayerRow key={ep.id} ep={ep} />)}
+                {list.map(ep => renderPlayerRow(ep))}
               </div>
             </Card>
           )
@@ -702,7 +814,7 @@ function TabFlights({ event, eventPlayers, course, allPlayers, onUpdated }) {
               <span className="text-sm font-semibold text-gray-700">Players ({eventPlayers.length})</span>
             </div>
             <div className="divide-y divide-gray-100">
-              {eventPlayers.map(ep => <PlayerRow key={ep.id} ep={ep} />)}
+              {eventPlayers.map(ep => renderPlayerRow(ep))}
             </div>
           </Card>
         )
