@@ -44,6 +44,8 @@ export default function Scorecard() {
   const [showScorecard, setShowScorecard] = useState(false)
   const [isComplete,    setIsComplete]    = useState(false)
   const [canEdit,       setCanEdit]       = useState(false)
+  const [enteredBy,     setEnteredBy]     = useState(null)   // name/email of scorer
+  const [conflicts,     setConflicts]     = useState([])     // conflicting holes detected
   // Guest code entry state (shown when not logged in and no valid session)
   const [needsCode,     setNeedsCode]     = useState(false)
   const [codeEventId,   setCodeEventId]   = useState(null)
@@ -141,8 +143,16 @@ export default function Scorecard() {
       }
 
       // Admins can always edit; others must be the assigned scorekeeper or guest
-      const editAllowed = isAdmin || userIsScorekeeper
+      const editAllowed = isAdmin || userIsScorekeeper || guestGroupNum != null
       setCanEdit(editAllowed)
+
+      // Resolve scorer identity for audit log
+      const rawGuest = sessionStorage.getItem('guestSession')
+      const guestSession = rawGuest ? JSON.parse(rawGuest) : null
+      const scorerName = guestSession?.selectedName
+        ?? user?.email
+        ?? (isAdmin ? 'Admin' : null)
+      setEnteredBy(scorerName)
 
       const eventComplete = ev.status === 'complete'
 
@@ -186,6 +196,16 @@ export default function Scorecard() {
 
         const allDone = playerIds.every(pid => Object.keys(map[pid] ?? {}).length === 18)
         if (allDone || ev.status === 'complete') setShowScorecard(true)
+
+        // Load conflicts for this group
+        const { data: conflictRows } = await supabase
+          .from('score_audit_log')
+          .select('*')
+          .eq('event_id', evId)
+          .eq('is_conflict', true)
+          .in('player_id', playerIds)
+          .order('hole_number')
+        setConflicts(conflictRows ?? [])
       }
 
       setLoading(false)
@@ -238,6 +258,7 @@ export default function Scorecard() {
         hole_number: currentHole,
         gross_score: gross,
         putts,
+        entered_by:  enteredBy,
       })
 
       if (result?.error) {
@@ -276,8 +297,8 @@ export default function Scorecard() {
     return (
       <GuestCodeEntry
         eventId={codeEventId}
-        onSuccess={(groupNum, code) => {
-          sessionStorage.setItem('guestSession', JSON.stringify({ eventId: codeEventId, groupNum, accessCode: code }))
+        onSuccess={(groupNum, code, name) => {
+          sessionStorage.setItem('guestSession', JSON.stringify({ eventId: codeEventId, groupNum, accessCode: code, selectedName: name }))
           setNeedsCode(false)
           setLoading(true)
           setLoadTrigger(t => t + 1)
@@ -446,6 +467,21 @@ export default function Scorecard() {
           />
         ))}
       </div>
+
+      {/* Conflicts banner */}
+      {conflicts.length > 0 && (
+        <div className="mx-4 mt-3 bg-red-50 border border-red-200 rounded-xl px-4 py-3">
+          <p className="text-sm font-bold text-red-700 mb-1">⚠ Conflicting scores detected</p>
+          <div className="space-y-0.5">
+            {conflicts.map((c, i) => (
+              <p key={i} className="text-xs text-red-600">
+                Hole {c.hole_number} · {c.player_name ?? 'Player'}: {c.previous_score} → {c.new_score} (entered by {c.entered_by})
+              </p>
+            ))}
+          </div>
+          <p className="text-xs text-red-400 mt-1.5">Contact your admin to resolve.</p>
+        </div>
+      )}
 
       {/* Bottom action bar */}
       <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 p-4 safe-bottom">
@@ -866,7 +902,7 @@ function GuestCodeEntry({ eventId, onSuccess }) {
   }
 
   function handleConfirm() {
-    onSuccess(matchedGroup, matchedCode)
+    onSuccess(matchedGroup, matchedCode, selectedName)
   }
 
   const eventLabel = eventInfo?.name ?? (eventInfo ? `Event #${eventInfo.event_number}` : '…')
