@@ -11,7 +11,15 @@ import Modal from '../../components/ui/Modal'
 import Input, { Select } from '../../components/ui/Input'
 import Badge, { FlightBadge, StatusBadge } from '../../components/ui/Badge'
 
-const TABS = ['Overview', 'Players & Flights', 'Groups', 'Payout Config', 'Side Games', 'Payout Summary']
+const ALL_ADMIN_TABS = ['Overview', 'Players & Flights', 'Groups', 'Payout Config', 'Side Games', 'Payout Summary']
+
+function visibleAdminTabs(event) {
+  const sides = event?.side_game_options ?? []
+  const hasLongDrive = sides.some(s => s.startsWith('long_drive'))
+  const hasCtp       = sides.includes('ctp')
+  const showSideGames = hasLongDrive || hasCtp
+  return ALL_ADMIN_TABS.filter(t => t !== 'Side Games' || showSideGames)
+}
 
 export default function EventDetail() {
   const { id } = useParams()
@@ -92,7 +100,7 @@ export default function EventDetail() {
       {/* Tabs */}
       <div className="border-b border-gray-200">
         <nav className="-mb-px flex gap-1 overflow-x-auto">
-          {TABS.map(tab => (
+          {visibleAdminTabs(event).map(tab => (
             <button
               key={tab}
               onClick={() => setActiveTab(tab)}
@@ -1246,35 +1254,55 @@ function TabSideGames({ event, eventPlayers, course, sideGames, onUpdated }) {
     )?.winner_player_id ?? ''
   }
 
+  const sides      = event.side_game_options ?? []
+  const useFlights = event.use_flights ?? false
+  const hasLdA     = sides.includes('long_drive_a')
+  const hasLdB     = sides.includes('long_drive_b')
+  const hasLd      = sides.includes('long_drive')
+  const hasCtp     = sides.includes('ctp')
+
   return (
     <div className="space-y-4">
-      <p className="text-sm text-gray-600">Enter manual side game winners. Low putts can be auto-calculated from scores.</p>
+      <p className="text-sm text-gray-600">Enter manual side game winners.</p>
 
-      {/* Long Drive — separate A/B */}
-      <Card>
-        <CardHeader title="Long Drive" />
-        <div className="space-y-3">
-          <div className="flex items-center gap-4">
-            <span className="text-xs font-semibold text-blue-600 w-16">Flight A</span>
-            <SideGameSelect
-              players={flightA.length ? flightA : eventPlayers}
-              value={getWinner('long_drive', null, 'A')}
-              onChange={v => setWinner('long_drive', null, v, 'A')}
-            />
+      {/* Long Drive */}
+      {(hasLd || hasLdA || hasLdB) && (
+        <Card>
+          <CardHeader title="Long Drive" />
+          <div className="space-y-3">
+            {hasLd && (
+              <SideGameSelect
+                players={eventPlayers}
+                value={getWinner('long_drive', null, 'overall')}
+                onChange={v => setWinner('long_drive', null, v, 'overall')}
+              />
+            )}
+            {hasLdA && (
+              <div className="flex items-center gap-4">
+                <span className="text-xs font-semibold text-blue-600 w-16">Flight A</span>
+                <SideGameSelect
+                  players={flightA.length ? flightA : eventPlayers}
+                  value={getWinner('long_drive', null, 'A')}
+                  onChange={v => setWinner('long_drive', null, v, 'A')}
+                />
+              </div>
+            )}
+            {hasLdB && (
+              <div className="flex items-center gap-4">
+                <span className="text-xs font-semibold text-purple-600 w-16">Flight B</span>
+                <SideGameSelect
+                  players={flightB.length ? flightB : eventPlayers}
+                  value={getWinner('long_drive', null, 'B')}
+                  onChange={v => setWinner('long_drive', null, v, 'B')}
+                />
+              </div>
+            )}
           </div>
-          <div className="flex items-center gap-4">
-            <span className="text-xs font-semibold text-purple-600 w-16">Flight B</span>
-            <SideGameSelect
-              players={flightB.length ? flightB : eventPlayers}
-              value={getWinner('long_drive', null, 'B')}
-              onChange={v => setWinner('long_drive', null, v, 'B')}
-            />
-          </div>
-        </div>
-      </Card>
+        </Card>
+      )}
 
       {/* CTP per par-3 */}
-      {par3Holes.length > 0 && (
+      {hasCtp && par3Holes.length > 0 && (
         <Card>
           <CardHeader title="Closest to Pin" subtitle="One winner per par-3 hole" />
           <div className="space-y-3">
