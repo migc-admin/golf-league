@@ -355,7 +355,7 @@ export default function Scorecard() {
               state={{ from: 'scorecard', scorecardEventId: event.id }}
               className="text-fairway-200 text-xs hover:text-white border border-fairway-500 rounded px-2 py-1"
             >
-              Board
+              Leaderboard
             </Link>
             {homeLink && <Link to={homeLink} className="text-fairway-200 text-xs hover:text-white">⛳</Link>}
             {user && (
@@ -669,7 +669,7 @@ function TraditionalScorecard({ event, course, groupPlayers, scores, isComplete,
               state={{ from: 'scorecard', scorecardEventId: event.id }}
               className="text-fairway-200 text-xs hover:text-white border border-fairway-500 rounded px-2 py-1"
             >
-              Board
+              Leaderboard
             </Link>
             {homeLink && <Link to={homeLink} className="text-fairway-200 text-xs hover:text-white">⛳</Link>}
             {onSignOut && (
