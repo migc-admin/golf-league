@@ -239,7 +239,7 @@ function GroupCard({ groupNum, members, teeTime, format, groupCode }) {
           </div>
           {groupCode && (
             <div className="bg-white/20 rounded-lg px-2.5 py-1 text-center">
-              <div className="text-fairway-200 text-xs leading-none mb-0.5">Code</div>
+              <div className="text-fairway-200 text-xs leading-none mb-0.5">Scoring Access Code</div>
               <div className="text-white font-bold text-sm tracking-widest">{groupCode}</div>
             </div>
           )}
