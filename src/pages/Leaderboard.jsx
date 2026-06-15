@@ -272,32 +272,62 @@ function NetLeaderboard({ complete, inProgress, flight, maxPlaces, label }) {
     )
   }
 
+  // Include all players whose rank falls within maxPlaces (handles ties at cut line)
+  const topFinishers = complete?.filter(p => p.rank <= maxPlaces) ?? []
+  const restFinishers = complete?.filter(p => p.rank > maxPlaces) ?? []
+
+  function rankLabel(p) {
+    // Check if anyone else shares this rank
+    const tied = complete.filter(x => x.rank === p.rank).length > 1
+    return tied ? `T${p.rank}` : `${p.rank}`
+  }
+
+  function scoreDisplay(p) {
+    const vs = p.netVsPar ?? p.f9VsPar ?? p.b9VsPar
+    return vs === 0 ? 'E' : `${vs > 0 ? '+' : ''}${vs}`
+  }
+
+  function scoreColor(p) {
+    const vs = p.netVsPar ?? p.f9VsPar ?? p.b9VsPar
+    return vs < 0 ? 'text-red-600' : vs === 0 ? 'text-gray-700' : 'text-blue-600'
+  }
+
   return (
     <div className="space-y-2">
-      {/* Finishers */}
-      {complete?.slice(0, maxPlaces).map((p, i) => (
-        <div key={p.player_id} className={`bg-white rounded-xl border overflow-hidden ${i === 0 ? 'border-yellow-300 shadow-md shadow-yellow-100' : 'border-gray-200'}`}>
-          <div className="flex items-center px-4 py-3.5">
-            <div className="w-10 text-xl">{medals[i] ?? `${i+1}.`}</div>
-            <div className="flex-1">
-              <div className="font-semibold text-gray-900">
-                {p.player?.last_name}, {p.player?.first_name}
+      {/* Top finishers — all players within maxPlaces including ties */}
+      {topFinishers.map(p => {
+        const rl = rankLabel(p)
+        const isTied = rl.startsWith('T')
+        const isFirst = p.rank === 1
+        return (
+          <div key={p.player_id} className={`bg-white rounded-xl border overflow-hidden ${isFirst && !isTied ? 'border-yellow-300 shadow-md shadow-yellow-100' : isTied && p.rank === 1 ? 'border-yellow-300 shadow-md shadow-yellow-100' : 'border-gray-200'}`}>
+            <div className="flex items-center px-4 py-3.5">
+              <div className="w-10 text-xl">
+                {isTied
+                  ? <span className="text-sm font-bold text-gray-500">{rl}</span>
+                  : (medals[p.rank - 1] ?? `${p.rank}.`)
+                }
               </div>
-              <div className="text-xs text-gray-400 mt-0.5">
-                CH: {p.course_handicap} · Gross: {p.gross18 ?? p.grossF9 ?? p.grossB9}
+              <div className="flex-1">
+                <div className="font-semibold text-gray-900">
+                  {p.player?.last_name}, {p.player?.first_name}
+                </div>
+                <div className="text-xs text-gray-400 mt-0.5">
+                  CH: {p.course_handicap} · Gross: {p.gross18 ?? p.grossF9 ?? p.grossB9}
+                </div>
               </div>
-            </div>
-            <div className="text-right">
-              <div className={`text-2xl font-black ${p.netVsPar < 0 ? 'text-red-600' : p.netVsPar === 0 ? 'text-gray-700' : 'text-blue-600'}`}>
-                {p.netVsPar === 0 ? 'E' : `${p.netVsPar > 0 ? '+' : ''}${p.netVsPar}`}
-              </div>
-              <div className="text-xs text-gray-400">
-                Net {p.net18 ?? p.netF9 ?? p.netB9}
+              <div className="text-right">
+                <div className={`text-2xl font-black ${scoreColor(p)}`}>
+                  {scoreDisplay(p)}
+                </div>
+                <div className="text-xs text-gray-400">
+                  Net {p.net18 ?? p.netF9 ?? p.netB9}
+                </div>
               </div>
             </div>
           </div>
-        </div>
-      ))}
+        )
+      })}
 
       {/* In progress */}
       {inProgress?.length > 0 && (
@@ -311,8 +341,8 @@ function NetLeaderboard({ complete, inProgress, flight, maxPlaces, label }) {
                 </div>
                 <div className="text-xs text-gray-400">thru {p.holesCompleted}</div>
               </div>
-              <div className={`font-bold text-sm ${p.netVsPar < 0 ? 'text-red-600' : p.netVsPar > 0 ? 'text-blue-600' : 'text-gray-700'}`}>
-                {p.netVsPar === 0 ? 'E' : `${p.netVsPar > 0 ? '+' : ''}${p.netVsPar}`}
+              <div className={`font-bold text-sm ${scoreColor(p)}`}>
+                {scoreDisplay(p)}
               </div>
             </div>
           ))}
@@ -320,17 +350,17 @@ function NetLeaderboard({ complete, inProgress, flight, maxPlaces, label }) {
       )}
 
       {/* Rest of finishers */}
-      {complete?.slice(maxPlaces).length > 0 && (
+      {restFinishers.length > 0 && (
         <div>
           <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mt-4 mb-2">Full Results</p>
-          {complete.slice(maxPlaces).map(p => (
+          {restFinishers.map(p => (
             <div key={p.player_id} className="bg-white rounded-xl border border-gray-200 flex items-center px-4 py-2.5 mb-2">
-              <span className="w-8 text-sm text-gray-400 font-medium">{p.rank}.</span>
+              <span className="w-8 text-sm text-gray-400 font-medium">{rankLabel(p)}</span>
               <div className="flex-1 text-sm text-gray-800">
                 {p.player?.last_name}, {p.player?.first_name}
               </div>
-              <span className={`font-semibold text-sm ${p.netVsPar < 0 ? 'text-red-600' : p.netVsPar > 0 ? 'text-blue-600' : 'text-gray-700'}`}>
-                {p.netVsPar === 0 ? 'E' : `${p.netVsPar > 0 ? '+' : ''}${p.netVsPar}`}
+              <span className={`font-semibold text-sm ${scoreColor(p)}`}>
+                {scoreDisplay(p)}
               </span>
             </div>
           ))}
@@ -694,13 +724,17 @@ function PayoutsBoard({ event, eventPlayers, leaderboards, sideGames, skinsResul
         </div>
         <div className="divide-y divide-gray-100">
           {byCategory.map(cat => {
-            const p = cat.playerId ? playerMap[cat.playerId] : null
+            const winners = (cat.playerIds ?? (cat.playerId ? [cat.playerId] : []))
+              .map(pid => playerMap[pid])
+              .filter(Boolean)
             return (
               <div key={cat.key} className="flex items-center justify-between px-4 py-2.5">
                 <div>
                   <div className="text-sm text-gray-700">{cat.label}</div>
                   <div className="text-xs text-gray-400">
-                    {p ? `${p.last_name}, ${p.first_name}` : '— Unresolved'}
+                    {winners.length > 0
+                      ? winners.map(p => `${p.last_name}, ${p.first_name}`).join(' · ')
+                      : '— Unresolved'}
                   </div>
                 </div>
                 <span className="font-bold text-gray-900">${cat.amount.toFixed(2)}</span>
