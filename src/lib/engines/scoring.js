@@ -210,12 +210,18 @@ export function computeLeaderboards(eventPlayers, allScores, course) {
 
   const withRank = (arr, sortFn, tieKey) => {
     const sorted = [...arr].sort(sortFn)
-    return sorted.map((p, i) => {
-      if (i === 0) return { ...p, rank: 1 }
-      const prev = sorted[i - 1]
-      const tied = tieKey(prev) === tieKey(p) && prev.holesCompleted === p.holesCompleted
-      return { ...p, rank: tied ? prev.rank : i + 1 }
-    })
+    const ranked = []
+    for (let i = 0; i < sorted.length; i++) {
+      const p = sorted[i]
+      if (i === 0) {
+        ranked.push({ ...p, rank: 1 })
+      } else {
+        const prev = ranked[i - 1]
+        const tied = tieKey(prev) === tieKey(p) && prev.holesCompleted === p.holesCompleted
+        ranked.push({ ...p, rank: tied ? prev.rank : i + 1 })
+      }
+    }
+    return ranked
   }
 
   // Split by flight
