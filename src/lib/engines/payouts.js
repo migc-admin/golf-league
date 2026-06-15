@@ -127,43 +127,54 @@ function keyMultiplier(key) {
   return 'flight_a'
 }
 
-function resolveWinner(key, leaderboards, sideGames) {
+// Returns array of player_ids (multiple when tied)
+function resolveWinners(key, leaderboards, sideGames) {
   const rankMap = { '1st': 1, '2nd': 2, '3rd': 3 }
 
-  if (key.startsWith('18_net_a_') || key.startsWith('18_net_b_')) {
-    const flight = key.includes('_a_') ? 'A' : 'B'
-    const rank   = rankMap[key.split('_').pop()]
-    return leaderboards.full[flight]?.find(p => p.rank === rank)?.player_id ?? null
+  if (key.startsWith('18_net_a_') || key.startsWith('18_net_b_') || key.startsWith('18_net_1st') || key.startsWith('18_net_2nd') || key.startsWith('18_net_3rd')) {
+    const flight = key.includes('_a_') ? 'A' : key.includes('_b_') ? 'B' : null
+    const suffix = key.split('_').pop()
+    const rank   = rankMap[suffix]
+    const list   = flight ? leaderboards.full[flight] : (leaderboards.full?.A ?? []).concat(leaderboards.full?.B ?? [])
+    return list?.filter(p => p.rank === rank).map(p => p.player_id) ?? []
   }
   if (key.startsWith('f9_')) {
-    const flight = key.includes('_a_') ? 'A' : 'B'
+    const flight = key.includes('_a_') ? 'A' : key.includes('_b_') ? 'B' : null
     const rank   = rankMap[key.split('_').pop()]
-    return leaderboards.front9[flight]?.find(p => p.rank === rank)?.player_id ?? null
+    const list   = flight ? leaderboards.front9[flight] : (leaderboards.front9?.A ?? []).concat(leaderboards.front9?.B ?? [])
+    return list?.filter(p => p.rank === rank).map(p => p.player_id) ?? []
   }
   if (key.startsWith('b9_')) {
-    const flight = key.includes('_a_') ? 'A' : 'B'
+    const flight = key.includes('_a_') ? 'A' : key.includes('_b_') ? 'B' : null
     const rank   = rankMap[key.split('_').pop()]
-    return leaderboards.back9[flight]?.find(p => p.rank === rank)?.player_id ?? null
+    const list   = flight ? leaderboards.back9[flight] : (leaderboards.back9?.A ?? []).concat(leaderboards.back9?.B ?? [])
+    return list?.filter(p => p.rank === rank).map(p => p.player_id) ?? []
   }
   if (key === 'low_putts') {
     const manual = sideGames.find(g => g.game_type === 'low_putts')
-    if (manual?.winner_player_id) return manual.winner_player_id
-    return leaderboards.putts?.[0]?.player_id ?? null
+    if (manual?.winner_player_id) return [manual.winner_player_id]
+    const top = leaderboards.putts?.[0]
+    if (!top) return []
+    return leaderboards.putts.filter(p => p.rank === top.rank).map(p => p.player_id)
   }
   if (key === 'long_drive_a') {
     const g = sideGames.find(g => g.game_type === 'long_drive' && g.flight === 'A')
-    return g?.winner_player_id ?? null
+    return g?.winner_player_id ? [g.winner_player_id] : []
   }
   if (key === 'long_drive_b') {
     const g = sideGames.find(g => g.game_type === 'long_drive' && g.flight === 'B')
-    return g?.winner_player_id ?? null
+    return g?.winner_player_id ? [g.winner_player_id] : []
+  }
+  if (key === 'long_drive') {
+    const g = sideGames.find(g => g.game_type === 'long_drive' && !g.flight)
+    return g?.winner_player_id ? [g.winner_player_id] : []
   }
   if (key.startsWith('ctp_')) {
     const holeNum = parseInt(key.replace('ctp_', ''), 10)
     const g = sideGames.find(g => g.game_type === 'ctp' && g.hole_number === holeNum)
-    return g?.winner_player_id ?? null
+    return g?.winner_player_id ? [g.winner_player_id] : []
   }
-  return null
+  return []
 }
 
 /**
@@ -213,12 +224,17 @@ export function computePayouts(event, playerCount, leaderboards, sideGames, skin
     const label    = key.startsWith('ctp_')
       ? ctpLabel(parseInt(key.replace('ctp_', ''), 10))
       : (CATEGORY_LABELS[key] ?? key)
-    const playerId = resolveWinner(key, leaderboards, sideGames)
-    byCategory.push({ key, label, amount, playerId, isSkin: false })
-    if (playerId) {
-      if (!byPlayer[playerId]) byPlayer[playerId] = { total: 0, items: [] }
-      byPlayer[playerId].total += amount
-      byPlayer[playerId].items.push({ category: label, amount })
+    const winners  = resolveWinners(key, leaderboards, sideGames)
+    const isTied   = winners.length > 1
+    const split    = winners.length > 0 ? Math.round((amount / winners.length) * 100) / 100 : 0
+    const tieLabel = isTied ? `${label} (Tied — split ${winners.length} ways)` : label
+
+    byCategory.push({ key, label: tieLabel, amount, playerId: winners[0] ?? null, playerIds: winners, isSkin: false, isTied })
+
+    for (const pid of winners) {
+      if (!byPlayer[pid]) byPlayer[pid] = { total: 0, items: [] }
+      byPlayer[pid].total += split
+      byPlayer[pid].items.push({ category: tieLabel, amount: split })
     }
   }
 
