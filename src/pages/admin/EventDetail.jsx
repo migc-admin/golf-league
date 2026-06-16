@@ -867,7 +867,7 @@ function AddPlayerModal({ open, onClose, eventId, available, course, useFlights,
       if (next[playerId]) {
         delete next[playerId]
       } else {
-        next[playerId] = { hi: '', flight: '', autoHC: true, ch: '' }
+        next[playerId] = { hi: '', flight: '', autoHC: false, ch: '' }
       }
       return next
     })
@@ -899,7 +899,7 @@ function AddPlayerModal({ open, onClose, eventId, available, course, useFlights,
 
   function selectAll() {
     const next = {}
-    available.forEach(p => { next[p.id] = bulk[p.id] ?? { hi: '', flight: '', autoHC: true, ch: '' } })
+    available.forEach(p => { next[p.id] = bulk[p.id] ?? { hi: '', flight: '', autoHC: false, ch: '' } })
     setBulk(next)
   }
 
