@@ -12,6 +12,22 @@
  *  8. Guest access via sessionStorage (set by /join/:eventId)
  */
 
+// Guest session helpers — use localStorage with 12-hour TTL (Safari iOS clears sessionStorage on tab suspend)
+const GUEST_KEY = 'golf_guest_session'
+function readGuestSession() {
+  try {
+    const raw = localStorage.getItem(GUEST_KEY)
+    if (!raw) return null
+    const obj = JSON.parse(raw)
+    if (obj._expires && Date.now() > obj._expires) { localStorage.removeItem(GUEST_KEY); return null }
+    return obj
+  } catch { return null }
+}
+function writeGuestSession(data) {
+  localStorage.setItem(GUEST_KEY, JSON.stringify({ ...data, _expires: Date.now() + 12 * 60 * 60 * 1000 }))
+}
+function clearGuestSession() { localStorage.removeItem(GUEST_KEY) }
+
 import { useEffect, useState, useCallback, useRef } from 'react'
 import { useParams, Link, useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
@@ -61,8 +77,7 @@ export default function Scorecard() {
 
       // Guest access: check sessionStorage for a valid guest session
       if (!user) {
-        const rawGuest = sessionStorage.getItem('guestSession')
-        const guest = rawGuest ? JSON.parse(rawGuest) : null
+        const guest = readGuestSession()
         if (guest?.eventId === evId && guest?.groupNum != null) {
           guestGroupNum = guest.groupNum
         } else {
@@ -102,12 +117,11 @@ export default function Scorecard() {
 
       // Verify guest group code
       if (guestGroupNum != null) {
-        const rawGuest = sessionStorage.getItem('guestSession')
-        const guest = rawGuest ? JSON.parse(rawGuest) : null
+        const guest = readGuestSession()
         const groupCodes = ev.group_codes ?? {}
         const expectedCode = groupCodes[String(guestGroupNum)]
         if (!expectedCode || expectedCode !== guest?.accessCode) {
-          sessionStorage.removeItem('guestSession')
+          clearGuestSession()
           setCodeEventId(evId)
           setNeedsCode(true)
           setLoading(false)
@@ -147,8 +161,7 @@ export default function Scorecard() {
       setCanEdit(editAllowed)
 
       // Resolve scorer identity for audit log
-      const rawGuest = sessionStorage.getItem('guestSession')
-      const guestSession = rawGuest ? JSON.parse(rawGuest) : null
+      const guestSession = readGuestSession()
       const scorerName = guestSession?.selectedName
         ?? user?.email
         ?? (isAdmin ? 'Admin' : null)
@@ -269,14 +282,16 @@ export default function Scorecard() {
       }
     }
 
-    // Clear dirty state for this hole
-    setDirtyHoles(prev => { const n = new Set(prev); n.delete(currentHole); return n })
-
     setSaving(false)
+
+    // Only clear dirty state if all saves succeeded
+    if (allValid) {
+      setDirtyHoles(prev => { const n = new Set(prev); n.delete(currentHole); return n })
+    }
 
     if (allValid && currentHole < 18) {
       setCurrentHole(h => h + 1)
-    } else if (currentHole === 18) {
+    } else if (allValid && currentHole === 18) {
       toast.success('Round complete! All 18 holes saved.')
       setShowScorecard(true)
     }
@@ -298,7 +313,7 @@ export default function Scorecard() {
       <GuestCodeEntry
         eventId={codeEventId}
         onSuccess={(groupNum, code, name) => {
-          sessionStorage.setItem('guestSession', JSON.stringify({ eventId: codeEventId, groupNum, accessCode: code, selectedName: name }))
+          writeGuestSession({ eventId: codeEventId, groupNum, accessCode: code, selectedName: name })
           setNeedsCode(false)
           setLoading(true)
           setLoadTrigger(t => t + 1)
