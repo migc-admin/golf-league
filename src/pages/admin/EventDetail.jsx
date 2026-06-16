@@ -1414,9 +1414,18 @@ function PayoutTable({ rows, onChange, colLabel }) {
 
 // ─── Tab: Side Games ──────────────────────────────────────────────
 function TabSideGames({ event, eventPlayers, course, sideGames, onUpdated }) {
-  const par3Holes = course
-    ? course.par_per_hole.map((p, i) => ({ hole: i+1 })).filter((_, i) => course.par_per_hole[i] === 3)
-    : []
+  // Only show CTP holes that were explicitly configured in Payout Config
+  const ctpConfigHoles = Object.keys(event.payout_config ?? {})
+    .filter(k => k.startsWith('ctp_'))
+    .map(k => parseInt(k.replace('ctp_', ''), 10))
+    .sort((a, b) => a - b)
+
+  // Fallback to all par-3s if no CTP holes configured yet
+  const par3Holes = ctpConfigHoles.length > 0
+    ? ctpConfigHoles.map(h => ({ hole: h }))
+    : course
+      ? course.par_per_hole.map((p, i) => ({ hole: i+1 })).filter((_, i) => course.par_per_hole[i] === 3)
+      : []
 
   const flightA = eventPlayers.filter(ep => ep.flight === 'A')
   const flightB = eventPlayers.filter(ep => ep.flight === 'B')
