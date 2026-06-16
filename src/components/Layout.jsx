@@ -3,7 +3,7 @@ import { useState } from 'react'
 import { useAuth } from '../hooks/useAuth'
 
 const navItems = [
-  { to: '/admin',         label: 'Dashboard',  icon: HomeIcon,    end: true },
+  { to: '/admin',         label: 'Home',  icon: HomeIcon,    end: true },
   { to: '/admin/leagues', label: 'Leagues',    icon: TrophyIcon },
   { to: '/admin/courses', label: 'Courses',    icon: FlagIcon },
   { to: '/admin/players', label: 'Players',    icon: UsersIcon },

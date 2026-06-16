@@ -124,7 +124,7 @@ export default function Home() {
                 to="/admin"
                 className="flex items-center justify-between w-full px-4 py-3 rounded-xl bg-fairway-600 text-white font-medium text-sm hover:bg-fairway-700 transition-colors"
               >
-                <span>Go to Admin Dashboard</span>
+                <span>Go to Home</span>
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
                 </svg>

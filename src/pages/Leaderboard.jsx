@@ -134,7 +134,7 @@ export default function Leaderboard() {
         </button>
         {homeLink && (
           <Link to={homeLink} className="text-fairway-300 hover:text-white text-sm transition-colors">
-            ⛳ Dashboard
+            ⛳ Home
           </Link>
         )}
       </div>
