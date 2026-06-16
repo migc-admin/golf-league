@@ -86,7 +86,7 @@ export default function Standings() {
       {/* Header */}
       <div className="bg-fairway-700 text-white shadow-lg">
         <div className="max-w-4xl mx-auto px-4 py-4">
-          <Link to="/admin" className="text-fairway-300 text-xs hover:text-white">← Dashboard</Link>
+          <Link to="/admin" className="text-fairway-300 text-xs hover:text-white">← Home</Link>
           <h1 className="text-xl font-bold mt-1">Season Standings</h1>
           <p className="text-fairway-200 text-sm">
             {league?.name} · {league?.season_year} · {events.length} event{events.length !== 1 ? 's' : ''} complete

@@ -94,7 +94,7 @@ export default function Schedule() {
           ← Back
         </button>
         <Link to="/admin" className="text-fairway-300 hover:text-white text-sm transition-colors">
-          ⛳ Dashboard
+          ⛳ Home
         </Link>
       </div>
 

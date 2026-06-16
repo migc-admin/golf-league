@@ -70,7 +70,7 @@ export default function EventDetail() {
     <div className="space-y-5">
       {/* Breadcrumb */}
       <nav className="text-sm text-gray-500 flex items-center gap-1.5">
-        <Link to="/admin" className="hover:text-gray-700">Dashboard</Link>
+        <Link to="/admin" className="hover:text-gray-700">Home</Link>
         <span>/</span>
         <Link to="/admin/leagues" className="hover:text-gray-700">Leagues</Link>
         <span>/</span>
