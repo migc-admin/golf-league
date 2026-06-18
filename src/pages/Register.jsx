@@ -138,10 +138,24 @@ export default function Register() {
         {!loading && event && event.status !== 'complete' && !submitted && (
           <div className="bg-white rounded-2xl shadow-2xl p-6 space-y-4">
             <div>
-              <p className="text-xs text-gray-500 text-center mb-4">
-                Entry fee: <span className="font-bold text-gray-800">${Number(event.entry_fee).toFixed(2)}</span>
-                {event.venmo_handle && <> · Pay via Venmo after registering</>}
-              </p>
+              {(() => {
+                const bets = Number(event.entry_fee || 0)
+                const green = Number(event.green_fee || 0)
+                const total = bets + green
+                return (
+                  <div className="bg-gray-50 rounded-xl px-4 py-3 text-sm text-center mb-2 space-y-1">
+                    {green > 0 ? (
+                      <>
+                        <div className="flex justify-between text-gray-500"><span>Bets Entry</span><span>${bets.toFixed(2)}</span></div>
+                        <div className="flex justify-between text-gray-500"><span>Green Fee</span><span>${green.toFixed(2)}</span></div>
+                        <div className="flex justify-between font-bold text-gray-900 border-t border-gray-200 pt-1 mt-1"><span>Total to Play</span><span>${total.toFixed(2)}</span></div>
+                      </>
+                    ) : (
+                      <div className="flex justify-between font-semibold text-gray-800"><span>Entry Fee</span><span>${bets.toFixed(2)}</span></div>
+                    )}
+                  </div>
+                )
+              })()}
             </div>
 
             <form onSubmit={handleSubmit} className="space-y-4">
@@ -238,7 +252,7 @@ export default function Register() {
               <div className="space-y-3">
                 <VenmoButton
                   handle={event.venmo_handle ?? DEFAULT_VENMO}
-                  amount={Number(event.entry_fee).toFixed(2)}
+                  amount={(Number(event.entry_fee || 0) + Number(event.green_fee || 0)).toFixed(2)}
                   note={`${eventLabel} – ${firstName} ${lastName}`}
                 />
                 <p className="text-xs text-gray-400">

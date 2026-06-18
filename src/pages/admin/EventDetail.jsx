@@ -220,7 +220,9 @@ function TabOverview({ event, eventPlayers, allScores, course, conflicts, onUpda
           <Row label="Format"       value={FORMAT_LABELS[event.format] ?? event.format ?? 'Net Stroke Play'} />
           <Row label="Start Time"   value={event.start_time ? formatTime(event.start_time) : '—'} />
           <Row label="Tee Interval" value={`${event.tee_time_interval_mins ?? 10} min`} />
-          <Row label="Entry Fee"    value={`$${event.entry_fee}`} />
+          <Row label="Bets Entry Fee" value={`$${event.entry_fee}`} />
+          {event.green_fee > 0 && <Row label="Green Fee" value={`$${Number(event.green_fee).toFixed(2)}`} />}
+          {event.green_fee > 0 && <Row label="Total to Play" value={`$${(Number(event.entry_fee) + Number(event.green_fee)).toFixed(2)}`} />}
           <Row label="Status"       value={<StatusBadge status={event.status} />} />
         </dl>
       </Card>
@@ -1776,6 +1778,7 @@ function EditEventModal({ open, onClose, event, onSaved }) {
   const [eventDate,   setEventDate]   = useState('')
   const [eventName,   setEventName]   = useState('')
   const [entryFee,    setEntryFee]    = useState('')
+  const [greenFee,    setGreenFee]    = useState('')
   const [startTime,   setStartTime]   = useState('')
   const [interval,    setInterval]    = useState(10)
   const [formats,     setFormats]     = useState(new Set(['net_stroke']))
@@ -1790,6 +1793,7 @@ function EditEventModal({ open, onClose, event, onSaved }) {
       setEventDate(event.event_date ?? '')
       setEventName(event.name ?? '')
       setEntryFee(event.entry_fee ?? '')
+      setGreenFee(event.green_fee ?? '')
       setStartTime(event.start_time ? event.start_time.slice(0, 5) : '')
       setInterval(event.tee_time_interval_mins ?? 10)
       setFormats(new Set(event.formats?.length ? event.formats : [event.format ?? 'net_stroke']))
@@ -1817,6 +1821,7 @@ function EditEventModal({ open, onClose, event, onSaved }) {
         event_date:             eventDate,
         name:                   eventName.trim() || null,
         entry_fee:              parseFloat(entryFee),
+        green_fee:              greenFee !== '' ? parseFloat(greenFee) : null,
         start_time:             startTime || null,
         tee_time_interval_mins: parseInt(interval, 10),
         format:                 formatsArr[0],
@@ -1840,6 +1845,15 @@ function EditEventModal({ open, onClose, event, onSaved }) {
           <Input label="Start Time" type="time" value={startTime} onChange={e => setStartTime(e.target.value)} />
         </div>
         <Input label="Event Name (optional)" value={eventName} onChange={e => setEventName(e.target.value)} placeholder="e.g. Spring Opener…" />
+        <div className="grid grid-cols-2 gap-4">
+          <Input label="Bets Entry Fee ($)" type="number" step="0.01" min="0" value={entryFee} onChange={e => setEntryFee(e.target.value)} required />
+          <Input label="Green Fee ($)" type="number" step="0.01" min="0" value={greenFee} onChange={e => setGreenFee(e.target.value)} placeholder="0.00" />
+        </div>
+        {greenFee !== '' && entryFee !== '' && (
+          <p className="text-xs text-gray-500 -mt-2">
+            Total to play: <strong>${(parseFloat(entryFee || 0) + parseFloat(greenFee || 0)).toFixed(2)}</strong>
+          </p>
+        )}
 
         {/* Use Flights toggle */}
         <div className="bg-gray-50 rounded-xl px-4 py-3 flex items-center justify-between">
@@ -2091,6 +2105,14 @@ function TabRegistrations({ event, onUpdated }) {
     load()
   }
 
+  async function removeReg(id) {
+    if (!window.confirm('Remove this registration? This cannot be undone.')) return
+    const { error } = await supabase.from('registrations').delete().eq('id', id)
+    if (error) { toast.error(error.message); return }
+    toast.success('Registration removed')
+    load()
+  }
+
   async function addToRoster(reg) {
     // Upsert player by email or name, then add to event_players
     let playerId = null
@@ -2180,6 +2202,9 @@ function TabRegistrations({ event, onUpdated }) {
               Restore
             </Button>
           )}
+          <Button size="sm" variant="danger" onClick={() => removeReg(reg.id)}>
+            Remove
+          </Button>
         </div>
       </div>
     )
