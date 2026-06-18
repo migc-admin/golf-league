@@ -2,7 +2,6 @@ import { useEffect, useState, useCallback } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import { supabase } from '../../lib/supabase'
 import toast from 'react-hot-toast'
-import { useScorecardExport } from '../../hooks/useScorecardExport'
 import { computePayouts, DEFAULT_PAYOUT_CONFIG, CATEGORY_LABELS, ctpLabel, activePayoutKeys } from '../../lib/engines/payouts'
 import { computeLeaderboards } from '../../lib/engines/scoring'
 import { computeAllSkins } from '../../lib/engines/skins'
@@ -22,39 +21,6 @@ function visibleAdminTabs(event) {
   return ALL_ADMIN_TABS.filter(t => t !== 'Side Games' || showSideGames)
 }
 
-function ExportScorecardsButton({ eventId }) {
-  const { exportScorecards, loading, error } = useScorecardExport(eventId)
-  return (
-    <>
-      <Button onClick={exportScorecards} loading={loading} variant="secondary" size="sm">
-        Export Scorecards
-      </Button>
-      {error && <p className="text-xs text-red-500 mt-1">{error}</p>}
-    </>
-  )
-}
-
-function ScorecardExportRow({ event, eventPlayers }) {
-  const groupNums = [...new Set(eventPlayers.map(ep => ep.group_number).filter(Boolean))]
-  const savedCodes = event.group_codes ?? {}
-  const missingCodes = groupNums.filter(g => !savedCodes[String(g)])
-  const allCodesSet = groupNums.length > 0 && missingCodes.length === 0
-
-  return (
-    <div className="px-4 pb-4 pt-3 border-t border-gray-100 mt-2 flex items-center justify-between gap-4">
-      <div>
-        <p className="text-sm font-medium text-gray-700">Scorecard Export</p>
-        {allCodesSet
-          ? <p className="text-xs text-gray-500">QR codes will be printed on each scorecard</p>
-          : groupNums.length === 0
-            ? <p className="text-xs text-amber-600">Assign players to groups first</p>
-            : <p className="text-xs text-amber-600">Set &amp; save group codes above to include QR codes</p>
-        }
-      </div>
-      <ExportScorecardsButton eventId={event.id} />
-    </div>
-  )
-}
 
 export default function EventDetail() {
   const { id } = useParams()
@@ -270,14 +236,11 @@ function TabOverview({ event, eventPlayers, allScores, course, conflicts, onUpda
           </dl>
         </Card>
 
-        {/* Scoring Access + Scorecard Export — shown when upcoming or active */}
-        {(event.status === 'upcoming' || event.status === 'active') && (
+        {/* Scoring Access — shown when active */}
+        {event.status === 'active' && (
           <Card>
             <CardHeader title="Scoring Access" subtitle="Share with players to enter scores" />
-            {event.status === 'active' && (
-              <AccessCodeSection event={event} eventPlayers={eventPlayers} onUpdated={onUpdated} />
-            )}
-            <ScorecardExportRow event={event} eventPlayers={eventPlayers} />
+            <AccessCodeSection event={event} eventPlayers={eventPlayers} onUpdated={onUpdated} />
           </Card>
         )}
       </div>
