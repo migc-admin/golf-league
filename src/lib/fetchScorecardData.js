@@ -8,7 +8,7 @@ export async function fetchScorecardData(eventId) {
   // 1. Event + course in one query
   const { data: event, error: evErr } = await supabase
     .from('events')
-    .select('id, name, event_number, event_date, start_time, tee_time_interval_mins, long_drive_hole, ctp_holes, include_putts, use_flights, course:courses(par_per_hole, stroke_index, tees)')
+    .select('id, name, event_number, event_date, start_time, tee_time_interval_mins, long_drive_hole, ctp_holes, include_putts, use_flights, group_codes, course:courses(par_per_hole, stroke_index, tees)')
     .eq('id', eventId)
     .single()
   if (evErr) throw evErr
