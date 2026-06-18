@@ -209,13 +209,14 @@ def draw_card(img, draw, group, card_top, course, event_config):
         img.paste(qr_img, (qr_x, qr_top))
         qr_right = qr_x + QR_SIZE
 
-        # Group code text centered above the QR
+        # Group code text centered below the QR
         if group_code:
-            code_font  = fnt(NARROW, 76)   # ~22pt
-            code_label = f'CODE: {group_code}'
-            cw, _, cx0, cy0 = bbox(draw, code_label, code_font)
+            code_font  = fnt(NARROW, 59)   # ~17pt — fits under QR
+            code_label = f'Access Code: {group_code}'
+            cw, ch, cx0, cy0 = bbox(draw, code_label, code_font)
             code_cx = qr_x + QR_SIZE // 2
-            draw.text((code_cx - cw // 2 - cx0, card_top + 18 - cy0), code_label, font=code_font, fill=BLACK)
+            code_y  = qr_top + QR_SIZE + 10
+            draw.text((code_cx - cw // 2 - cx0, code_y - cy0), code_label, font=code_font, fill=BLACK)
 
     # Event + group info — centered in the portion to the right of the QR
     text_cx = qr_right + (PW - qr_right) // 2
