@@ -25,12 +25,12 @@ function visibleAdminTabs(event) {
 function ExportScorecardsButton({ eventId }) {
   const { exportScorecards, loading, error } = useScorecardExport(eventId)
   return (
-    <div className="flex flex-col items-end gap-1">
-      <Button onClick={exportScorecards} disabled={loading} variant="outline" size="sm">
-        {loading ? 'Generating…' : 'Export Scorecards'}
+    <>
+      <Button onClick={exportScorecards} loading={loading} variant="secondary" size="sm">
+        Export Scorecards
       </Button>
-      {error && <p className="text-xs text-red-500">{error}</p>}
-    </div>
+      {error && <p className="text-xs text-red-500 mt-1">{error}</p>}
+    </>
   )
 }
 
@@ -1063,18 +1063,57 @@ function AddPlayerModal({ open, onClose, eventId, available, course, useFlights,
 
 // ─── Tab: Groups ──────────────────────────────────────────────────
 function TabGroups({ event, eventPlayers, onUpdated }) {
-  const groups = groupBy(eventPlayers, 'group_number')
   const ungrouped = eventPlayers.filter(ep => !ep.group_number)
-  const maxGroup = Math.max(0, ...eventPlayers.map(ep => ep.group_number ?? 0))
+  const maxGroup  = Math.max(0, ...eventPlayers.map(ep => ep.group_number ?? 0))
+
+  // Local order state: { [epId]: orderIndex }
+  const [localOrder, setLocalOrder] = useState(() => {
+    const init = {}
+    const byGroup = {}
+    for (const ep of eventPlayers) {
+      if (!ep.group_number) continue
+      if (!byGroup[ep.group_number]) byGroup[ep.group_number] = []
+      byGroup[ep.group_number].push(ep)
+    }
+    for (const members of Object.values(byGroup)) {
+      members.sort((a, b) => (a.group_order ?? 0) - (b.group_order ?? 0))
+      members.forEach((ep, i) => { init[ep.id] = i })
+    }
+    return init
+  })
+
+  // Sorted members for a given group number
+  function groupMembers(g) {
+    return eventPlayers
+      .filter(ep => ep.group_number === parseInt(g, 10))
+      .sort((a, b) => (localOrder[a.id] ?? 0) - (localOrder[b.id] ?? 0))
+  }
+
+  async function movePlayer(epId, groupNum, direction) {
+    const members = groupMembers(groupNum)
+    const idx = members.findIndex(m => m.id === epId)
+    const swapIdx = idx + direction
+    if (swapIdx < 0 || swapIdx >= members.length) return
+
+    const a = members[idx]
+    const b = members[swapIdx]
+    const newOrder = { ...localOrder, [a.id]: swapIdx, [b.id]: idx }
+    setLocalOrder(newOrder)
+
+    // Persist — requires group_order column (run migration if not yet done)
+    await Promise.all([
+      supabase.from('event_players').update({ group_order: swapIdx }).eq('id', a.id),
+      supabase.from('event_players').update({ group_order: idx }).eq('id', b.id),
+    ])
+  }
 
   async function setGroup(epId, group) {
     const { error } = await supabase.from('event_players').update({ group_number: group || null }).eq('id', epId)
     if (error) { toast.error(error.message); return }
 
-    // If assigning to a group, auto-set as scorekeeper if none exists in that group yet
     if (group) {
-      const groupMembers = eventPlayers.filter(ep => ep.group_number === parseInt(group, 10))
-      const hasScorekeeper = groupMembers.some(ep => ep.is_scorekeeper)
+      const members = eventPlayers.filter(ep => ep.group_number === parseInt(group, 10))
+      const hasScorekeeper = members.some(ep => ep.is_scorekeeper)
       if (!hasScorekeeper) {
         await supabase.from('event_players').update({ is_scorekeeper: true }).eq('id', epId)
       }
@@ -1091,13 +1130,14 @@ function TabGroups({ event, eventPlayers, onUpdated }) {
     else onUpdated()
   }
 
+  const groupNums = [...new Set(eventPlayers.map(ep => ep.group_number).filter(Boolean))].sort((a,b) => a - b)
+
   return (
     <div className="space-y-4">
       <p className="text-sm text-gray-600">
-        Assign players to groups (2–4 per group). Mark one player per group as scorekeeper — they will enter scores for the group.
+        Assign players to groups (2–4 per group). Use the arrows to reorder players within a group. Mark one player per group as scorekeeper.
       </p>
 
-      {/* Ungrouped */}
       {ungrouped.length > 0 && (
         <Card>
           <CardHeader title="Ungrouped Players" subtitle="Assign these players to a group" />
@@ -1109,27 +1149,55 @@ function TabGroups({ event, eventPlayers, onUpdated }) {
         </Card>
       )}
 
-      {/* Groups */}
-      {Object.entries(groups).sort(([a],[b]) => parseInt(a)-parseInt(b)).map(([g, members]) => (
-        <Card key={g}>
-          <CardHeader title={`Group ${g}`} subtitle={`${members.length} player${members.length !== 1 ? 's' : ''}`} />
-          <div className="space-y-2">
-            {members.map(ep => (
-              <GroupRow key={ep.id} ep={ep} maxGroup={maxGroup} onSetGroup={setGroup} onToggleSK={toggleScorekeeper} />
-            ))}
-          </div>
-        </Card>
-      ))}
+      {groupNums.map(g => {
+        const members = groupMembers(g)
+        return (
+          <Card key={g}>
+            <CardHeader title={`Group ${g}`} subtitle={`${members.length} player${members.length !== 1 ? 's' : ''}`} />
+            <div className="divide-y divide-gray-100">
+              {members.map((ep, i) => (
+                <GroupRow
+                  key={ep.id}
+                  ep={ep}
+                  maxGroup={maxGroup}
+                  isFirst={i === 0}
+                  isLast={i === members.length - 1}
+                  onSetGroup={setGroup}
+                  onToggleSK={toggleScorekeeper}
+                  onMove={dir => movePlayer(ep.id, g, dir)}
+                />
+              ))}
+            </div>
+          </Card>
+        )
+      })}
     </div>
   )
 }
 
-function GroupRow({ ep, maxGroup, onSetGroup, onToggleSK }) {
+function GroupRow({ ep, maxGroup, isFirst, isLast, onSetGroup, onToggleSK, onMove }) {
   const groupOptions = Array.from({ length: Math.max(maxGroup + 1, 5) }, (_, i) => i + 1)
 
   return (
-    <div className="flex items-center justify-between py-1.5">
-      <div className="flex items-center gap-3">
+    <div className="flex items-center justify-between py-2 px-1">
+      <div className="flex items-center gap-2">
+        {/* Up/down only shown when inside a group */}
+        {onMove && (
+          <div className="flex flex-col gap-0.5">
+            <button
+              onClick={() => onMove(-1)}
+              disabled={isFirst}
+              className="text-gray-400 hover:text-gray-700 disabled:opacity-20 leading-none px-1"
+              title="Move up"
+            >▲</button>
+            <button
+              onClick={() => onMove(1)}
+              disabled={isLast}
+              className="text-gray-400 hover:text-gray-700 disabled:opacity-20 leading-none px-1"
+              title="Move down"
+            >▼</button>
+          </div>
+        )}
         <span className="text-sm font-medium text-gray-900">
           {ep.player?.last_name}, {ep.player?.first_name}
         </span>
