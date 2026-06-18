@@ -220,9 +220,8 @@ function TabOverview({ event, eventPlayers, allScores, course, conflicts, onUpda
           <Row label="Format"       value={FORMAT_LABELS[event.format] ?? event.format ?? 'Net Stroke Play'} />
           <Row label="Start Time"   value={event.start_time ? formatTime(event.start_time) : '—'} />
           <Row label="Tee Interval" value={`${event.tee_time_interval_mins ?? 10} min`} />
-          <Row label="Bets Entry Fee" value={`$${event.entry_fee}`} />
-          {event.green_fee > 0 && <Row label="Green Fee" value={`$${Number(event.green_fee).toFixed(2)}`} />}
-          {event.green_fee > 0 && <Row label="Total to Play" value={`$${(Number(event.entry_fee) + Number(event.green_fee)).toFixed(2)}`} />}
+          <Row label="Entry Fee" value={`$${event.entry_fee}`} />
+          {event.tournament_fee > 0 && <Row label="Tournament Entry Fee" value={`$${Number(event.tournament_fee).toFixed(2)}`} />}
           <Row label="Status"       value={<StatusBadge status={event.status} />} />
         </dl>
       </Card>
@@ -1777,8 +1776,8 @@ const EDIT_SIDE_GAME_OPTIONS = [
 function EditEventModal({ open, onClose, event, onSaved }) {
   const [eventDate,   setEventDate]   = useState('')
   const [eventName,   setEventName]   = useState('')
-  const [entryFee,    setEntryFee]    = useState('')
-  const [greenFee,    setGreenFee]    = useState('')
+  const [entryFee,        setEntryFee]        = useState('')
+  const [tournamentFee,   setTournamentFee]   = useState('')
   const [startTime,   setStartTime]   = useState('')
   const [interval,    setInterval]    = useState(10)
   const [formats,     setFormats]     = useState(new Set(['net_stroke']))
@@ -1793,7 +1792,7 @@ function EditEventModal({ open, onClose, event, onSaved }) {
       setEventDate(event.event_date ?? '')
       setEventName(event.name ?? '')
       setEntryFee(event.entry_fee ?? '')
-      setGreenFee(event.green_fee ?? '')
+      setTournamentFee(event.tournament_fee ?? '')
       setStartTime(event.start_time ? event.start_time.slice(0, 5) : '')
       setInterval(event.tee_time_interval_mins ?? 10)
       setFormats(new Set(event.formats?.length ? event.formats : [event.format ?? 'net_stroke']))
@@ -1821,7 +1820,7 @@ function EditEventModal({ open, onClose, event, onSaved }) {
         event_date:             eventDate,
         name:                   eventName.trim() || null,
         entry_fee:              parseFloat(entryFee),
-        green_fee:              greenFee !== '' ? parseFloat(greenFee) : null,
+        tournament_fee:         tournamentFee !== '' ? parseFloat(tournamentFee) : null,
         start_time:             startTime || null,
         tee_time_interval_mins: parseInt(interval, 10),
         format:                 formatsArr[0],
@@ -1846,14 +1845,10 @@ function EditEventModal({ open, onClose, event, onSaved }) {
         </div>
         <Input label="Event Name (optional)" value={eventName} onChange={e => setEventName(e.target.value)} placeholder="e.g. Spring Opener…" />
         <div className="grid grid-cols-2 gap-4">
-          <Input label="Bets Entry Fee ($)" type="number" step="0.01" min="0" value={entryFee} onChange={e => setEntryFee(e.target.value)} required />
-          <Input label="Green Fee ($)" type="number" step="0.01" min="0" value={greenFee} onChange={e => setGreenFee(e.target.value)} placeholder="0.00" />
+          <Input label="Entry Fee ($)" type="number" step="0.01" min="0" value={entryFee} onChange={e => setEntryFee(e.target.value)} required />
+          <Input label="Tournament Entry Fee ($)" type="number" step="0.01" min="0" value={tournamentFee} onChange={e => setTournamentFee(e.target.value)} placeholder="Charged at registration" />
         </div>
-        {greenFee !== '' && entryFee !== '' && (
-          <p className="text-xs text-gray-500 -mt-2">
-            Total to play: <strong>${(parseFloat(entryFee || 0) + parseFloat(greenFee || 0)).toFixed(2)}</strong>
-          </p>
-        )}
+        <p className="text-xs text-gray-400 -mt-2">Entry Fee drives payouts. Tournament Entry Fee is what players pay to register.</p>
 
         {/* Use Flights toggle */}
         <div className="bg-gray-50 rounded-xl px-4 py-3 flex items-center justify-between">

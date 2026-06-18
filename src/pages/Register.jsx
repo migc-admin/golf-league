@@ -54,7 +54,7 @@ export default function Register() {
   useEffect(() => {
     supabase
       .from('events')
-      .select('id, name, event_number, event_date, entry_fee, status, venmo_handle, course:courses(name), league:leagues(name), use_flights')
+      .select('id, name, event_number, event_date, entry_fee, tournament_fee, status, venmo_handle, course:courses(name), league:leagues(name), use_flights')
       .eq('id', eventId)
       .single()
       .then(({ data, error }) => {
@@ -138,14 +138,11 @@ export default function Register() {
         {!loading && event && event.status !== 'complete' && !submitted && (
           <div className="bg-white rounded-2xl shadow-2xl p-6 space-y-4">
             <div>
-              {(() => {
-                const total = Number(event.entry_fee || 0) + Number(event.green_fee || 0)
-                return (
-                  <div className="bg-gray-50 rounded-xl px-4 py-3 text-sm text-center mb-2">
-                    <div className="flex justify-between font-bold text-gray-900"><span>Event Fee</span><span>${total.toFixed(2)}</span></div>
-                  </div>
-                )
-              })()}
+              {event.tournament_fee > 0 && (
+                <div className="bg-gray-50 rounded-xl px-4 py-3 text-sm mb-2">
+                  <div className="flex justify-between font-bold text-gray-900"><span>Event Fee</span><span>${Number(event.tournament_fee).toFixed(2)}</span></div>
+                </div>
+              )}
             </div>
 
             <form onSubmit={handleSubmit} className="space-y-4">
@@ -242,7 +239,7 @@ export default function Register() {
               <div className="space-y-3">
                 <VenmoButton
                   handle={event.venmo_handle ?? DEFAULT_VENMO}
-                  amount={(Number(event.entry_fee || 0) + Number(event.green_fee || 0)).toFixed(2)}
+                  amount={Number(event.tournament_fee || event.entry_fee || 0).toFixed(2)}
                   note={`${eventLabel} – ${firstName} ${lastName}`}
                 />
                 <p className="text-xs text-gray-400">
