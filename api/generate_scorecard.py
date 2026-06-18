@@ -3,26 +3,23 @@ import json, base64, io, os
 from PIL import Image, ImageDraw, ImageFont
 import qrcode
 
-# ── PAGE DIMENSIONS ──────────────────────────────────────────────────────────
-DPI     = 250
-PW      = int(11  * DPI)    # 2750
-PH      = int(8.5 * DPI)    # 2125
-CARD_H  = PH // 2            # 1062
-# Reduced blank area so table has room for larger text
-BLANK_H = int(0.80 * DPI)   # 200  (event/group banner strip)
+# ── PAGE DIMENSIONS — 300 DPI, 1 group per page (full 11×8.5") ───────────────
+DPI     = 300
+PW      = int(11  * DPI)    # 3300
+PH      = int(8.5 * DPI)    # 2550
+BLANK_H = int(1.5 * DPI)    # 450 — banner strip (QR + event info)
 
 # ── COLORS ───────────────────────────────────────────────────────────────────
-GOLD    = (244, 236, 211)    # #f4ecd3
+GOLD    = (244, 236, 211)
 BLACK   = (0,   0,   0)
 WHITE   = (255, 255, 255)
 GRAY    = (80,  80,  80)
 LT_GRAY = (180, 180, 180)
 
 # ── COLUMN LAYOUT ────────────────────────────────────────────────────────────
-# Wider name column to accommodate 24pt player names
-NAME_W  = int(2.2 * DPI)    # 550
-N_DC    = 24   # H1-9, OUT, INT, H10-18, IN, TOT, HDP, NET
-DC_W    = (PW - NAME_W) // N_DC   # ~91
+NAME_W  = int(2.6 * DPI)          # 780 — wide enough for long names at 42pt
+N_DC    = 24
+DC_W    = (PW - NAME_W) // N_DC   # ~106
 TABLE_R = NAME_W + N_DC * DC_W
 
 DCOL = {**{h: h for h in range(1, 10)},
@@ -34,12 +31,12 @@ def clx(k): return NAME_W + (DCOL[k] - 1) * DC_W
 def crx(k): return NAME_W +  DCOL[k]      * DC_W
 def ccx(k): return clx(k) + DC_W // 2
 
-# Row heights scaled for 24pt body text (83px at 250 DPI)
-HDR_H = int(0.30 * DPI)   # 75  — header/tee/par/hdcp rows
-SCR_H = int(0.42 * DPI)   # 105 — player score rows
+# Row heights — 1.75× the original 250 DPI sizes
+HDR_H = 131   # was 75
+SCR_H = 184   # was 105
 
-# ── FONTS  — sizes in pixels; at 250 DPI: px = pt * 250/72 ───────────────────
-# 24pt = 83px, 18pt = 63px, 14pt = 49px, 22pt = 76px
+# ── FONTS — 1.75× original pt sizes at 300 DPI ───────────────────────────────
+# px = pt × DPI/72  |  18pt×1.75=31.5pt → 131px  |  24pt×1.75=42pt → 175px
 NARROW = '/usr/share/fonts/truetype/liberation/LiberationSansNarrow-Bold.ttf'
 DEJAVU = '/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf'
 
@@ -47,11 +44,11 @@ def fnt(path, size):
     try:    return ImageFont.truetype(path, size)
     except: return ImageFont.load_default()
 
-F18 = fnt(NARROW, 63)   # 18pt — column headers, yardages, par, hdcp
-F24 = fnt(NARROW, 83)   # 24pt — player names
-F17 = fnt(NARROW, 59)   # 17pt — footer labels
-FSY = fnt(DEJAVU,  49)  # 14pt — LD star symbol
-FLD = fnt(DEJAVU,  76)  # 22pt — contest footer text
+F18 = fnt(NARROW, 131)  # ~31pt — headers, yardages, par, hdcp
+F24 = fnt(NARROW, 175)  # ~42pt — player names
+F17 = fnt(NARROW, 121)  # ~29pt — footer labels
+FSY = fnt(DEJAVU,   90)  # ~22pt — LD star symbol
+FLD = fnt(DEJAVU,  133)  # ~32pt — contest footer text
 
 # ── TEXT HELPERS ──────────────────────────────────────────────────────────────
 def bbox(draw, txt, font):
@@ -75,7 +72,7 @@ def get_strokes(hdcp, si):
     return 2 if (hdcp > 18 and si <= hdcp - 18) else 1
 
 def draw_dots(draw, n, hole, row_top):
-    r, pad = 12, 16
+    r, pad = 7, 10
     rx = crx(hole)
     cy = row_top + pad + r
     if n == 1:
@@ -83,7 +80,7 @@ def draw_dots(draw, n, hole, row_top):
         draw.ellipse([cx-r, cy-r, cx+r, cy+r], fill=BLACK)
     elif n == 2:
         cx2 = rx - pad - r
-        cx1 = cx2 - 2*r - 5
+        cx1 = cx2 - 2*r - 4
         for cx in (cx1, cx2):
             draw.ellipse([cx-r, cy-r, cx+r, cy+r], fill=BLACK)
 
@@ -222,8 +219,8 @@ def draw_card(img, draw, group, card_top, course, event_config):
     text_cx = qr_right + (PW - qr_right) // 2
     group_line = f"Group {group['num']}   ·   {group['time']}"
     event_line = f"{event_name}  —  {event_date}"
-    tc(draw, group_line, text_cx, banner_cy - 45, F24)
-    tc(draw, event_line, text_cx, banner_cy + 30, F18)
+    tc(draw, group_line, text_cx, banner_cy - 55, F24)
+    tc(draw, event_line, text_cx, banner_cy + 55, F18)
 
     # Contest block (right-aligned, below table)
     contest_y = table_bot + 50
@@ -250,18 +247,12 @@ def draw_card(img, draw, group, card_top, course, event_config):
 
 
 def generate_pages(groups, course, event_config):
-    """Returns list of base64-encoded PNG strings, 2 groups per page."""
+    """Returns list of base64-encoded PNG strings, 1 group per page."""
     pages = []
-    for i in range(0, len(groups), 2):
+    for group in groups:
         img  = Image.new('RGB', (PW, PH), WHITE)
         draw = ImageDraw.Draw(img)
-        x = 0
-        while x < PW:
-            draw.line([x, CARD_H, min(x + 20, PW), CARD_H], fill=LT_GRAY, width=2)
-            x += 32
-        draw_card(img, draw, groups[i],     0,       course, event_config)
-        if i + 1 < len(groups):
-            draw_card(img, draw, groups[i + 1], CARD_H, course, event_config)
+        draw_card(img, draw, group, 0, course, event_config)
         buf = io.BytesIO()
         img.save(buf, format='PNG', dpi=(DPI, DPI))
         pages.append(base64.b64encode(buf.getvalue()).decode('utf-8'))
