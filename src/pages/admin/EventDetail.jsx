@@ -2,6 +2,7 @@ import { useEffect, useState, useCallback } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import { supabase } from '../../lib/supabase'
 import toast from 'react-hot-toast'
+import { useScorecardExport } from '../../hooks/useScorecardExport'
 import { computePayouts, DEFAULT_PAYOUT_CONFIG, CATEGORY_LABELS, ctpLabel, activePayoutKeys } from '../../lib/engines/payouts'
 import { computeLeaderboards } from '../../lib/engines/scoring'
 import { computeAllSkins } from '../../lib/engines/skins'
@@ -19,6 +20,18 @@ function visibleAdminTabs(event) {
   const hasCtp       = sides.includes('ctp')
   const showSideGames = hasLongDrive || hasCtp
   return ALL_ADMIN_TABS.filter(t => t !== 'Side Games' || showSideGames)
+}
+
+function ExportScorecardsButton({ eventId }) {
+  const { exportScorecards, loading, error } = useScorecardExport(eventId)
+  return (
+    <div className="flex flex-col items-end gap-1">
+      <Button onClick={exportScorecards} disabled={loading} variant="outline" size="sm">
+        {loading ? 'Generating…' : 'Export Scorecards'}
+      </Button>
+      {error && <p className="text-xs text-red-500">{error}</p>}
+    </div>
+  )
 }
 
 export default function EventDetail() {
@@ -90,7 +103,8 @@ export default function EventDetail() {
             {event.course?.name} · {formatDate(event.event_date)} · Entry: ${event.entry_fee}
           </p>
         </div>
-        <div className="flex gap-2 shrink-0">
+        <div className="flex gap-2 shrink-0 flex-wrap justify-end">
+          <ExportScorecardsButton eventId={event.id} />
           <Link to={`/schedule/${event.id}`} className="btn-secondary btn-sm btn">
             Pairings ↗
           </Link>
