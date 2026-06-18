@@ -87,7 +87,7 @@ def draw_dots(draw, n, hole, row_top):
         for cx in (cx1, cx2):
             draw.ellipse([cx-r, cy-r, cx+r, cy+r], fill=BLACK)
 
-def draw_card(draw, group, card_top, course, event_config):
+def draw_card(img, draw, group, card_top, course, event_config):
     PAR = course['par_per_hole']
     SI  = course['stroke_index']
     LD  = event_config.get('long_drive_hole')
@@ -196,7 +196,9 @@ def draw_card(draw, group, card_top, course, event_config):
 
     # QR code — left-aligned in banner if URL is available
     QR_SIZE = int(BLANK_H * 0.88)   # slightly smaller than strip height
-    qr_x = int(0.25 * DPI)          # left margin
+    qr_x    = int(0.25 * DPI)       # left margin
+    qr_right = qr_x                  # updated below if QR is drawn
+
     if scoring_url:
         qr = qrcode.QRCode(version=None, error_correction=qrcode.constants.ERROR_CORRECT_M, box_size=10, border=1)
         qr.add_data(scoring_url)
@@ -205,17 +207,18 @@ def draw_card(draw, group, card_top, course, event_config):
         qr_img = qr_img.resize((QR_SIZE, QR_SIZE), Image.LANCZOS)
         qr_top = card_top + (BLANK_H - QR_SIZE) // 2
         img.paste(qr_img, (qr_x, qr_top))
+        qr_right = qr_x + QR_SIZE
 
-        # Group code text above QR (centered over it)
+        # Group code text centered above the QR
         if group_code:
-            code_font  = fnt(NARROW, 76)   # ~22pt — large, bold
+            code_font  = fnt(NARROW, 76)   # ~22pt
             code_label = f'CODE: {group_code}'
             cw, _, cx0, cy0 = bbox(draw, code_label, code_font)
             code_cx = qr_x + QR_SIZE // 2
             draw.text((code_cx - cw // 2 - cx0, card_top + 18 - cy0), code_label, font=code_font, fill=BLACK)
 
-    # Event + group info — centered in the remaining right portion
-    text_cx = qr_x + QR_SIZE + (PW - (qr_x + QR_SIZE)) // 2
+    # Event + group info — centered in the portion to the right of the QR
+    text_cx = qr_right + (PW - qr_right) // 2
     group_line = f"Group {group['num']}   ·   {group['time']}"
     event_line = f"{event_name}  —  {event_date}"
     tc(draw, group_line, text_cx, banner_cy - 45, F24)
@@ -255,9 +258,9 @@ def generate_pages(groups, course, event_config):
         while x < PW:
             draw.line([x, CARD_H, min(x + 20, PW), CARD_H], fill=LT_GRAY, width=2)
             x += 32
-        draw_card(draw, groups[i],     0,       course, event_config)
+        draw_card(img, draw, groups[i],     0,       course, event_config)
         if i + 1 < len(groups):
-            draw_card(draw, groups[i + 1], CARD_H, course, event_config)
+            draw_card(img, draw, groups[i + 1], CARD_H, course, event_config)
         buf = io.BytesIO()
         img.save(buf, format='PNG', dpi=(DPI, DPI))
         pages.append(base64.b64encode(buf.getvalue()).decode('utf-8'))
@@ -266,22 +269,32 @@ def generate_pages(groups, course, event_config):
 
 class handler(BaseHTTPRequestHandler):
     def do_POST(self):
-        length  = int(self.headers.get('Content-Length', 0))
-        body    = json.loads(self.rfile.read(length))
+        try:
+            length  = int(self.headers.get('Content-Length', 0))
+            body    = json.loads(self.rfile.read(length))
 
-        groups       = body['groups']
-        course       = body['course']
-        event_config = body['event_config']
+            groups       = body['groups']
+            course       = body['course']
+            event_config = body['event_config']
 
-        pages = generate_pages(groups, course, event_config)
+            pages = generate_pages(groups, course, event_config)
 
-        response = json.dumps({'pages': pages}).encode()
-        self.send_response(200)
-        self.send_header('Content-Type', 'application/json')
-        self.send_header('Access-Control-Allow-Origin', '*')
-        self.send_header('Content-Length', len(response))
-        self.end_headers()
-        self.wfile.write(response)
+            response = json.dumps({'pages': pages}).encode()
+            self.send_response(200)
+            self.send_header('Content-Type', 'application/json')
+            self.send_header('Access-Control-Allow-Origin', '*')
+            self.send_header('Content-Length', len(response))
+            self.end_headers()
+            self.wfile.write(response)
+        except Exception as e:
+            import traceback
+            msg = traceback.format_exc().encode()
+            self.send_response(500)
+            self.send_header('Content-Type', 'text/plain')
+            self.send_header('Access-Control-Allow-Origin', '*')
+            self.send_header('Content-Length', len(msg))
+            self.end_headers()
+            self.wfile.write(msg)
 
     def do_OPTIONS(self):
         self.send_response(200)
