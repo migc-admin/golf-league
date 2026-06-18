@@ -104,7 +104,6 @@ export default function EventDetail() {
           </p>
         </div>
         <div className="flex gap-2 shrink-0 flex-wrap justify-end">
-          <ExportScorecardsButton eventId={event.id} />
           <Link to={`/schedule/${event.id}`} className="btn-secondary btn-sm btn">
             Pairings ↗
           </Link>
@@ -249,11 +248,20 @@ function TabOverview({ event, eventPlayers, allScores, course, conflicts, onUpda
           </dl>
         </Card>
 
-        {/* Scorecard link + Access Code — shown when active */}
-        {event.status === 'active' && (
+        {/* Scoring Access + Scorecard Export — shown when upcoming or active */}
+        {(event.status === 'upcoming' || event.status === 'active') && (
           <Card>
             <CardHeader title="Scoring Access" subtitle="Share with players to enter scores" />
-            <AccessCodeSection event={event} eventPlayers={eventPlayers} onUpdated={onUpdated} />
+            {event.status === 'active' && (
+              <AccessCodeSection event={event} eventPlayers={eventPlayers} onUpdated={onUpdated} />
+            )}
+            <div className="px-4 pb-4 pt-2 border-t border-gray-100 mt-2 flex items-center justify-between gap-4">
+              <div>
+                <p className="text-sm font-medium text-gray-700">Scorecard Export</p>
+                <p className="text-xs text-gray-500">Download printable scorecards for all groups</p>
+              </div>
+              <ExportScorecardsButton eventId={event.id} />
+            </div>
           </Card>
         )}
       </div>
