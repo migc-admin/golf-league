@@ -139,20 +139,10 @@ export default function Register() {
           <div className="bg-white rounded-2xl shadow-2xl p-6 space-y-4">
             <div>
               {(() => {
-                const bets = Number(event.entry_fee || 0)
-                const green = Number(event.green_fee || 0)
-                const total = bets + green
+                const total = Number(event.entry_fee || 0) + Number(event.green_fee || 0)
                 return (
-                  <div className="bg-gray-50 rounded-xl px-4 py-3 text-sm text-center mb-2 space-y-1">
-                    {green > 0 ? (
-                      <>
-                        <div className="flex justify-between text-gray-500"><span>Bets Entry</span><span>${bets.toFixed(2)}</span></div>
-                        <div className="flex justify-between text-gray-500"><span>Green Fee</span><span>${green.toFixed(2)}</span></div>
-                        <div className="flex justify-between font-bold text-gray-900 border-t border-gray-200 pt-1 mt-1"><span>Total to Play</span><span>${total.toFixed(2)}</span></div>
-                      </>
-                    ) : (
-                      <div className="flex justify-between font-semibold text-gray-800"><span>Entry Fee</span><span>${bets.toFixed(2)}</span></div>
-                    )}
+                  <div className="bg-gray-50 rounded-xl px-4 py-3 text-sm text-center mb-2">
+                    <div className="flex justify-between font-bold text-gray-900"><span>Event Fee</span><span>${total.toFixed(2)}</span></div>
                   </div>
                 )
               })()}
