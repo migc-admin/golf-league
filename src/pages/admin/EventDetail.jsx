@@ -11,7 +11,7 @@ import Modal from '../../components/ui/Modal'
 import Input, { Select } from '../../components/ui/Input'
 import Badge, { FlightBadge, StatusBadge } from '../../components/ui/Badge'
 
-const ALL_ADMIN_TABS = ['Overview', 'Players & Flights', 'Groups', 'Payout Config', 'Side Games', 'Payout Summary']
+const ALL_ADMIN_TABS = ['Overview', 'Registrations', 'Players & Flights', 'Groups', 'Payout Config', 'Side Games', 'Payout Summary']
 
 function visibleAdminTabs(event) {
   const sides = event?.side_game_options ?? []
@@ -121,6 +121,7 @@ export default function EventDetail() {
 
       {/* Tab content */}
       {activeTab === 'Overview'        && <TabOverview event={event} eventPlayers={eventPlayers} allScores={allScores} course={course} conflicts={conflicts} onUpdated={load} leagues={leagues} />}
+      {activeTab === 'Registrations'   && <TabRegistrations event={event} onUpdated={load} />}
       {activeTab === 'Players & Flights' && <TabFlights event={event} eventPlayers={eventPlayers} course={course} allPlayers={allPlayers} onUpdated={load} />}
       {activeTab === 'Groups'          && <TabGroups  event={event} eventPlayers={eventPlayers} onUpdated={load} />}
       {activeTab === 'Payout Config'   && <TabPayoutConfig event={event} eventPlayers={eventPlayers} course={course} onUpdated={load} />}
@@ -2060,6 +2061,179 @@ function AccessCodeSection({ event, eventPlayers, onUpdated }) {
           Copy
         </Button>
       </div>
+    </div>
+  )
+}
+
+// ─── Tab: Registrations ───────────────────────────────────────────
+function TabRegistrations({ event, onUpdated }) {
+  const [regs,    setRegs]    = useState([])
+  const [loading, setLoading] = useState(true)
+
+  const regUrl = `${window.location.origin}/register/${event.id}`
+
+  async function load() {
+    const { data } = await supabase
+      .from('registrations')
+      .select('*')
+      .eq('event_id', event.id)
+      .order('created_at', { ascending: false })
+    setRegs(data ?? [])
+    setLoading(false)
+  }
+
+  useEffect(() => { load() }, [event.id])
+
+  async function setStatus(id, status) {
+    const { error } = await supabase.from('registrations').update({ status }).eq('id', id)
+    if (error) { toast.error(error.message); return }
+    toast.success(status === 'confirmed' ? 'Registration confirmed' : 'Registration cancelled')
+    load()
+  }
+
+  async function addToRoster(reg) {
+    // Upsert player by email or name, then add to event_players
+    let playerId = null
+
+    if (reg.email) {
+      const { data: existing } = await supabase.from('players').select('id').eq('email', reg.email).maybeSingle()
+      if (existing) playerId = existing.id
+    }
+
+    if (!playerId) {
+      const { data: existing } = await supabase
+        .from('players')
+        .select('id')
+        .ilike('first_name', reg.first_name)
+        .ilike('last_name', reg.last_name)
+        .maybeSingle()
+      if (existing) playerId = existing.id
+    }
+
+    if (!playerId) {
+      const { data: newPlayer, error: pErr } = await supabase
+        .from('players')
+        .insert({ first_name: reg.first_name, last_name: reg.last_name, email: reg.email ?? null, handicap_index: reg.handicap_index ?? 0 })
+        .select('id')
+        .single()
+      if (pErr) { toast.error('Failed to create player: ' + pErr.message); return }
+      playerId = newPlayer.id
+    }
+
+    const { error: epErr } = await supabase.from('event_players').upsert({
+      event_id:                event.id,
+      player_id:               playerId,
+      handicap_index:          0,
+      adjusted_handicap_index: 0,
+    }, { onConflict: 'event_id,player_id' })
+
+    if (epErr) { toast.error('Failed to add to roster: ' + epErr.message); return }
+
+    await setStatus(reg.id, 'confirmed')
+    toast.success(`${reg.first_name} ${reg.last_name} added to roster`)
+    onUpdated()
+  }
+
+  const pending   = regs.filter(r => r.status === 'pending')
+  const confirmed = regs.filter(r => r.status === 'confirmed')
+  const cancelled = regs.filter(r => r.status === 'cancelled')
+
+  const STATUS_COLORS = {
+    pending:   'bg-amber-100 text-amber-700',
+    confirmed: 'bg-green-100 text-green-700',
+    cancelled: 'bg-red-100 text-red-600',
+  }
+
+  function RegRow({ reg }) {
+    return (
+      <div className="flex items-start justify-between py-3 gap-3">
+        <div className="flex-1 min-w-0">
+          <p className="text-sm font-semibold text-gray-900">
+            {reg.first_name} {reg.last_name}
+            {reg.flight && <span className="ml-2 text-xs text-gray-400">Flight {reg.flight}</span>}
+          </p>
+          <p className="text-xs text-gray-500">
+            {reg.email && <span className="mr-3">{reg.email}</span>}
+            {reg.handicap_index != null && <span>HI: {reg.handicap_index}</span>}
+          </p>
+          {reg.notes && <p className="text-xs text-gray-400 italic mt-0.5">"{reg.notes}"</p>}
+          <p className="text-xs text-gray-400 mt-0.5">
+            {new Date(reg.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })}
+          </p>
+        </div>
+        <div className="flex items-center gap-2 shrink-0">
+          <span className={`text-xs px-2 py-0.5 rounded-full font-medium capitalize ${STATUS_COLORS[reg.status]}`}>
+            {reg.status}
+          </span>
+          {reg.status === 'pending' && (
+            <>
+              <Button size="sm" variant="primary" onClick={() => addToRoster(reg)}>
+                Confirm + Add
+              </Button>
+              <Button size="sm" variant="ghost" onClick={() => setStatus(reg.id, 'cancelled')}>
+                Cancel
+              </Button>
+            </>
+          )}
+          {reg.status === 'cancelled' && (
+            <Button size="sm" variant="secondary" onClick={() => setStatus(reg.id, 'pending')}>
+              Restore
+            </Button>
+          )}
+        </div>
+      </div>
+    )
+  }
+
+  return (
+    <div className="space-y-4">
+      {/* Registration link */}
+      <Card>
+        <CardHeader title="Registration Link" subtitle="Share this link with players to register" />
+        <div className="flex items-center gap-2 px-4 pb-4">
+          <input readOnly value={regUrl} className="input text-xs flex-1 bg-gray-50" onFocus={e => e.target.select()} />
+          <Button size="sm" variant="secondary" onClick={() => { navigator.clipboard.writeText(regUrl); toast.success('Link copied!') }}>
+            Copy
+          </Button>
+        </div>
+        {!event.venmo_handle && (
+          <p className="text-xs text-amber-600 px-4 pb-3">
+            ⚠ No Venmo handle set on this event — players won't see a payment button. Add one in Event Settings.
+          </p>
+        )}
+      </Card>
+
+      {/* Pending */}
+      {loading ? (
+        <div className="text-sm text-gray-400">Loading…</div>
+      ) : (
+        <>
+          <Card>
+            <CardHeader
+              title={`Pending (${pending.length})`}
+              subtitle="Payment not yet confirmed"
+            />
+            {pending.length === 0
+              ? <p className="text-sm text-gray-400 px-4 pb-4">No pending registrations.</p>
+              : <div className="divide-y divide-gray-100 px-4">{pending.map(r => <RegRow key={r.id} reg={r} />)}</div>
+            }
+          </Card>
+
+          {confirmed.length > 0 && (
+            <Card>
+              <CardHeader title={`Confirmed (${confirmed.length})`} />
+              <div className="divide-y divide-gray-100 px-4">{confirmed.map(r => <RegRow key={r.id} reg={r} />)}</div>
+            </Card>
+          )}
+
+          {cancelled.length > 0 && (
+            <Card>
+              <CardHeader title={`Cancelled (${cancelled.length})`} />
+              <div className="divide-y divide-gray-100 px-4">{cancelled.map(r => <RegRow key={r.id} reg={r} />)}</div>
+            </Card>
+          )}
+        </>
+      )}
     </div>
   )
 }

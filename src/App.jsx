@@ -16,6 +16,7 @@ import Leaderboard    from './pages/Leaderboard'
 import Standings      from './pages/Standings'
 import Schedule       from './pages/Schedule'
 import Import         from './pages/admin/Import'
+import Register       from './pages/Register'
 
 export default function App() {
   return (
@@ -43,6 +44,9 @@ export default function App() {
           path="/scorecard/me"
           element={<ProtectedRoute><Scorecard /></ProtectedRoute>}
         />
+
+        {/* Public event registration — no auth required */}
+        <Route path="/register/:eventId" element={<Register />} />
 
         {/* Public schedule — no auth required, shareable with players */}
         <Route path="/schedule/:eventId" element={<Schedule />} />
