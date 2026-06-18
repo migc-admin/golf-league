@@ -29,7 +29,7 @@ function writeGuestSession(data) {
 function clearGuestSession() { localStorage.removeItem(GUEST_KEY) }
 
 import { useEffect, useState, useCallback, useRef } from 'react'
-import { useParams, Link, useNavigate } from 'react-router-dom'
+import { useParams, Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../hooks/useAuth'
 import { useOfflineQueue } from '../hooks/useOfflineQueue'
@@ -867,11 +867,12 @@ function TraditionalScorecard({ event, course, groupPlayers, scores, isComplete,
 
 // ─── Guest Code Entry ──────────────────────────────────────────────
 function GuestCodeEntry({ eventId, onSuccess }) {
+  const [searchParams]                 = useSearchParams()
   const [eventInfo,    setEventInfo]    = useState(null)
   const [groupPlayers, setGroupPlayers] = useState(null)  // null = not yet loaded
   const [matchedGroup, setMatchedGroup] = useState(null)
   const [matchedCode,  setMatchedCode]  = useState('')
-  const [code,         setCode]         = useState('')
+  const [code,         setCode]         = useState(() => (searchParams.get('code') ?? '').toUpperCase())
   const [error,        setError]        = useState('')
   const [checking,     setChecking]     = useState(false)
   const [selectedName, setSelectedName] = useState(null)
