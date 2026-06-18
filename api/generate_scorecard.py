@@ -7,7 +7,8 @@ DPI     = 250
 PW      = int(11  * DPI)    # 2750
 PH      = int(8.5 * DPI)    # 2125
 CARD_H  = PH // 2            # 1062
-BLANK_H = int(1.75 * DPI)   # 437
+# Reduced blank area so table has room for larger text
+BLANK_H = int(0.80 * DPI)   # 200  (event/group banner strip)
 
 # ── COLORS ───────────────────────────────────────────────────────────────────
 GOLD    = (244, 236, 211)    # #f4ecd3
@@ -17,9 +18,10 @@ GRAY    = (80,  80,  80)
 LT_GRAY = (180, 180, 180)
 
 # ── COLUMN LAYOUT ────────────────────────────────────────────────────────────
-NAME_W  = int(1.1 * DPI)
-N_DC    = 24   # H1-9, OUT, INT, H10-18, IN, TOT, HDP, NET  (no PUTTS)
-DC_W    = (PW - NAME_W) // N_DC
+# Wider name column to accommodate 24pt player names
+NAME_W  = int(2.2 * DPI)    # 550
+N_DC    = 24   # H1-9, OUT, INT, H10-18, IN, TOT, HDP, NET
+DC_W    = (PW - NAME_W) // N_DC   # ~91
 TABLE_R = NAME_W + N_DC * DC_W
 
 DCOL = {**{h: h for h in range(1, 10)},
@@ -31,10 +33,12 @@ def clx(k): return NAME_W + (DCOL[k] - 1) * DC_W
 def crx(k): return NAME_W +  DCOL[k]      * DC_W
 def ccx(k): return clx(k) + DC_W // 2
 
-HDR_H = int(0.148 * DPI)
-SCR_H = int(0.300 * DPI)
+# Row heights scaled for 24pt body text (83px at 250 DPI)
+HDR_H = int(0.30 * DPI)   # 75  — header/tee/par/hdcp rows
+SCR_H = int(0.42 * DPI)   # 105 — player score rows
 
-# ── FONTS (bundled Liberation + DejaVu available on Vercel Linux) ─────────────
+# ── FONTS  — sizes in pixels; at 250 DPI: px = pt * 250/72 ───────────────────
+# 24pt = 83px, 18pt = 63px, 14pt = 49px, 22pt = 76px
 NARROW = '/usr/share/fonts/truetype/liberation/LiberationSansNarrow-Bold.ttf'
 DEJAVU = '/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf'
 
@@ -42,11 +46,11 @@ def fnt(path, size):
     try:    return ImageFont.truetype(path, size)
     except: return ImageFont.load_default()
 
-F18 = fnt(NARROW, 18)
-F24 = fnt(NARROW, 24)
-F17 = fnt(NARROW, 17)
-FSY = fnt(DEJAVU,  14)
-FLD = fnt(DEJAVU,  24)
+F18 = fnt(NARROW, 63)   # 18pt — column headers, yardages, par, hdcp
+F24 = fnt(NARROW, 83)   # 24pt — player names
+F17 = fnt(NARROW, 59)   # 17pt — footer labels
+FSY = fnt(DEJAVU,  49)  # 14pt — LD star symbol
+FLD = fnt(DEJAVU,  76)  # 22pt — contest footer text
 
 # ── TEXT HELPERS ──────────────────────────────────────────────────────────────
 def bbox(draw, txt, font):
@@ -70,7 +74,7 @@ def get_strokes(hdcp, si):
     return 2 if (hdcp > 18 and si <= hdcp - 18) else 1
 
 def draw_dots(draw, n, hole, row_top):
-    r, pad = 5, 7
+    r, pad = 12, 16
     rx = crx(hole)
     cy = row_top + pad + r
     if n == 1:
@@ -78,7 +82,7 @@ def draw_dots(draw, n, hole, row_top):
         draw.ellipse([cx-r, cy-r, cx+r, cy+r], fill=BLACK)
     elif n == 2:
         cx2 = rx - pad - r
-        cx1 = cx2 - 2*r - 3
+        cx1 = cx2 - 2*r - 5
         for cx in (cx1, cx2):
             draw.ellipse([cx-r, cy-r, cx+r, cy+r], fill=BLACK)
 
@@ -181,34 +185,34 @@ def draw_card(draw, group, card_top, course, event_config):
         draw.line([x, ty, x, table_bot], fill=BLACK, width=lw)
     draw.rectangle([0, ty, TABLE_R, table_bot], outline=BLACK, width=2)
 
-    # Group info strip
+    # Group info strip (centered in the blank area above the table)
     event_name = event_config.get('name', '')
     event_date = event_config.get('date', '')
     info = f"Group {group['num']}   |   {group['time']}   |   {event_name} \u2014 {event_date}"
-    tc(draw, info, PW // 2, ty - 22, F24)
+    tc(draw, info, PW // 2, ty - BLANK_H // 2, F24)
 
-    # Contest block (right-aligned)
-    contest_y = table_bot + 35
+    # Contest block (right-aligned, below table)
+    contest_y = table_bot + 50
     if CTP:
         holes_str = ', '.join(f'#{h}' for h in CTP)
         tr(draw, f'Closest to Pin - Holes {holes_str}', TABLE_R, contest_y, FLD, BLACK, pad=12)
-        contest_y += 34
+        contest_y += 55
     if LD:
         tr(draw, f'Long Drive - Hole #{LD}', TABLE_R, contest_y, FLD, BLACK, pad=12)
 
-    # Footer
+    # Footer (date / attest signature lines)
     fpad = int(PW * 0.04)
-    llen = 3 * DC_W
-    fcy  = table_bot + 100
+    llen = 4 * DC_W
+    fcy  = table_bot + 130
     tl(draw, 'Date:', fpad, fcy, F17, pad=0)
     dw, _, _, _ = bbox(draw, 'Date:', F17)
-    lx = fpad + dw + 10
-    draw.line([lx, fcy + 12, lx + llen, fcy + 12], fill=GRAY, width=2)
-    ax = lx + llen + 60
+    lx = fpad + dw + 14
+    draw.line([lx, fcy + 16, lx + llen, fcy + 16], fill=GRAY, width=2)
+    ax = lx + llen + 80
     tl(draw, 'Attest:', ax, fcy, F17, pad=0)
     aw, _, _, _ = bbox(draw, 'Attest:', F17)
-    lx2 = ax + aw + 10
-    draw.line([lx2, fcy + 12, lx2 + llen, fcy + 12], fill=GRAY, width=2)
+    lx2 = ax + aw + 14
+    draw.line([lx2, fcy + 16, lx2 + llen, fcy + 16], fill=GRAY, width=2)
 
 
 def generate_pages(groups, course, event_config):
