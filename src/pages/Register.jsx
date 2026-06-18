@@ -19,8 +19,7 @@ const DEFAULT_VENMO = 'SD-Mulligans-Golf'
 
 function VenmoButton({ handle, amount, note }) {
   const encoded = encodeURIComponent(note)
-  // Venmo deeplink — opens app on mobile, falls back gracefully on desktop
-  const href = `venmo://paycharge?txn=pay&recipients=${handle}&amount=${amount}&note=${encoded}`
+  const href = `https://account.venmo.com/u/${handle}?txn=pay&amount=${amount}&note=${encoded}`
 
   return (
     <a
@@ -181,17 +180,6 @@ export default function Register() {
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-gray-600 mb-1">Notes</label>
-                <textarea
-                  value={notes}
-                  onChange={e => setNotes(e.target.value)}
-                  rows={2}
-                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-600 resize-none"
-                  placeholder="Any special requests or questions…"
-                />
-              </div>
-
-              <div>
                 <label className="block text-xs font-semibold text-gray-600 mb-1">Interested in inviting a guest? <span className="font-normal text-gray-400">(based on availability)</span></label>
                 <select
                   value={interestedGuest}
@@ -202,6 +190,17 @@ export default function Register() {
                   <option value="Yes">Yes</option>
                   <option value="No">No</option>
                 </select>
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-gray-600 mb-1">Notes</label>
+                <textarea
+                  value={notes}
+                  onChange={e => setNotes(e.target.value)}
+                  rows={2}
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-600 resize-none"
+                  placeholder="Any special requests or questions…"
+                />
               </div>
 
               {error && <p className="text-red-500 text-xs text-center">{error}</p>}
