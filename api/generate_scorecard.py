@@ -1,6 +1,7 @@
 from http.server import BaseHTTPRequestHandler
 import json, base64, io, os
 from PIL import Image, ImageDraw, ImageFont
+import qrcode
 
 # ── PAGE DIMENSIONS ──────────────────────────────────────────────────────────
 DPI     = 250
@@ -185,11 +186,40 @@ def draw_card(draw, group, card_top, course, event_config):
         draw.line([x, ty, x, table_bot], fill=BLACK, width=lw)
     draw.rectangle([0, ty, TABLE_R, table_bot], outline=BLACK, width=2)
 
-    # Group info strip (centered in the blank area above the table)
-    event_name = event_config.get('name', '')
-    event_date = event_config.get('date', '')
-    info = f"Group {group['num']}   |   {group['time']}   |   {event_name} \u2014 {event_date}"
-    tc(draw, info, PW // 2, ty - BLANK_H // 2, F24)
+    # ── Banner area (BLANK_H strip above the table) ─────────────────
+    event_name  = event_config.get('name', '')
+    event_date  = event_config.get('date', '')
+    scoring_url = group.get('scoring_url', '')
+    group_code  = group.get('code', '')
+
+    banner_cy = card_top + BLANK_H // 2  # vertical center of banner
+
+    # QR code — left-aligned in banner if URL is available
+    QR_SIZE = int(BLANK_H * 0.88)   # slightly smaller than strip height
+    qr_x = int(0.25 * DPI)          # left margin
+    if scoring_url:
+        qr = qrcode.QRCode(version=None, error_correction=qrcode.constants.ERROR_CORRECT_M, box_size=10, border=1)
+        qr.add_data(scoring_url)
+        qr.make(fit=True)
+        qr_img = qr.make_image(fill_color='black', back_color='white').convert('RGB')
+        qr_img = qr_img.resize((QR_SIZE, QR_SIZE), Image.LANCZOS)
+        qr_top = card_top + (BLANK_H - QR_SIZE) // 2
+        img.paste(qr_img, (qr_x, qr_top))
+
+        # Group code text above QR (centered over it)
+        if group_code:
+            code_font  = fnt(NARROW, 76)   # ~22pt — large, bold
+            code_label = f'CODE: {group_code}'
+            cw, _, cx0, cy0 = bbox(draw, code_label, code_font)
+            code_cx = qr_x + QR_SIZE // 2
+            draw.text((code_cx - cw // 2 - cx0, card_top + 18 - cy0), code_label, font=code_font, fill=BLACK)
+
+    # Event + group info — centered in the remaining right portion
+    text_cx = qr_x + QR_SIZE + (PW - (qr_x + QR_SIZE)) // 2
+    group_line = f"Group {group['num']}   ·   {group['time']}"
+    event_line = f"{event_name}  —  {event_date}"
+    tc(draw, group_line, text_cx, banner_cy - 45, F24)
+    tc(draw, event_line, text_cx, banner_cy + 30, F18)
 
     # Contest block (right-aligned, below table)
     contest_y = table_bot + 50

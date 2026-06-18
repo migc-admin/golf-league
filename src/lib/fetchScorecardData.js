@@ -41,11 +41,23 @@ export async function fetchScorecardData(eventId) {
   // Determine default tee — use tee_flight_a from event if stored, else first tee
   const defaultTee = course.tees?.[0]?.name?.toUpperCase() ?? 'YELLOW'
 
+  const groupCodes = event.group_codes ?? {}
+  const baseUrl    = `${window.location.origin}/scorecard/${eventId}`
+
   const groupMap = {}
   for (const ep of players) {
     const g = ep.group_number
     if (!g) continue
-    if (!groupMap[g]) groupMap[g] = { num: g, time: computeTeeTime(g), players: [] }
+    if (!groupMap[g]) {
+      const code = groupCodes[String(g)] ?? ''
+      groupMap[g] = {
+        num:         g,
+        time:        computeTeeTime(g),
+        code,
+        scoring_url: code ? `${baseUrl}?code=${code}` : baseUrl,
+        players:     [],
+      }
+    }
     const firstName = ep.player?.first_name ?? ''
     const lastName  = ep.player?.last_name  ?? ''
     groupMap[g].players.push({
