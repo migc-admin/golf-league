@@ -1902,10 +1902,7 @@ function EditEventModal({ open, onClose, event, onSaved }) {
           </div>
         </div>
 
-        <div className="grid grid-cols-2 gap-3">
-          <Input label="Entry Fee ($)" type="number" step="0.01" min="0" value={entryFee} onChange={e => setEntryFee(e.target.value)} required />
-          <Input label="Tee Interval (min)" type="number" min="1" max="60" value={interval} onChange={e => setInterval(e.target.value)} />
-        </div>
+        <Input label="Tee Interval (min)" type="number" min="1" max="60" value={interval} onChange={e => setInterval(e.target.value)} />
 
         {/* Payout Basis */}
         <div>
