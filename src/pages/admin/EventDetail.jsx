@@ -1774,10 +1774,11 @@ const EDIT_SIDE_GAME_OPTIONS = [
 ]
 
 function EditEventModal({ open, onClose, event, onSaved }) {
-  const [eventDate,   setEventDate]   = useState('')
-  const [eventName,   setEventName]   = useState('')
-  const [entryFee,        setEntryFee]        = useState('')
-  const [tournamentFee,   setTournamentFee]   = useState('')
+  const [eventDate,     setEventDate]     = useState('')
+  const [eventName,     setEventName]     = useState('')
+  const [eventNumber,   setEventNumber]   = useState('')
+  const [entryFee,      setEntryFee]      = useState('')
+  const [tournamentFee, setTournamentFee] = useState('')
   const [startTime,   setStartTime]   = useState('')
   const [interval,    setInterval]    = useState(10)
   const [formats,     setFormats]     = useState(new Set(['net_stroke']))
@@ -1791,6 +1792,7 @@ function EditEventModal({ open, onClose, event, onSaved }) {
     if (event && open) {
       setEventDate(event.event_date ?? '')
       setEventName(event.name ?? '')
+      setEventNumber(event.event_number ?? '')
       setEntryFee(event.entry_fee ?? '')
       setTournamentFee(event.tournament_fee ?? '')
       setStartTime(event.start_time ? event.start_time.slice(0, 5) : '')
@@ -1819,6 +1821,7 @@ function EditEventModal({ open, onClose, event, onSaved }) {
       .update({
         event_date:             eventDate,
         name:                   eventName.trim() || null,
+        event_number:           parseInt(eventNumber, 10),
         entry_fee:              parseFloat(entryFee),
         tournament_fee:         tournamentFee !== '' ? parseFloat(tournamentFee) : null,
         start_time:             startTime || null,
@@ -1843,7 +1846,10 @@ function EditEventModal({ open, onClose, event, onSaved }) {
           <Input label="Date" type="date" value={eventDate} onChange={e => setEventDate(e.target.value)} required />
           <Input label="Start Time" type="time" value={startTime} onChange={e => setStartTime(e.target.value)} />
         </div>
-        <Input label="Event Name (optional)" value={eventName} onChange={e => setEventName(e.target.value)} placeholder="e.g. Spring Opener…" />
+        <div className="grid grid-cols-2 gap-4">
+          <Input label="Event Name (optional)" value={eventName} onChange={e => setEventName(e.target.value)} placeholder="e.g. Spring Opener…" />
+          <Input label="Event #" type="number" min="1" value={eventNumber} onChange={e => setEventNumber(e.target.value)} required />
+        </div>
         <div className="grid grid-cols-2 gap-4">
           <Input label="Entry Fee ($)" type="number" step="0.01" min="0" value={entryFee} onChange={e => setEntryFee(e.target.value)} required />
           <Input label="Tournament Entry Fee ($)" type="number" step="0.01" min="0" value={tournamentFee} onChange={e => setTournamentFee(e.target.value)} placeholder="Charged at registration" />
