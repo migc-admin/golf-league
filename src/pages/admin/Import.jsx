@@ -172,7 +172,6 @@ function ImportPlayers() {
     supabase
       .from('events')
       .select('id, event_number, event_date, status, league:leagues(name), course:courses(name, slope, rating, par)')
-      .neq('status', 'complete')
       .order('event_date', { ascending: false })
       .then(({ data }) => setEvents(data ?? []))
   }, [])
@@ -652,7 +651,6 @@ function ImportRoster() {
     supabase
       .from('events')
       .select('id, event_number, event_date, status, league:leagues(name), course:courses(name, slope, rating, par)')
-      .neq('status', 'complete')
       .order('event_date', { ascending: false })
       .then(({ data }) => setEvents(data ?? []))
   }, [])
@@ -743,7 +741,7 @@ function ImportRoster() {
         course_handicap = Math.round((hi * slope / 113) + (rating - par))
       }
 
-      const { error } = await supabase.from('event_players').insert({
+      const { error: epErr } = await supabase.from('event_players').insert({
         event_id:                eventId,
         player_id:               playerId,
         handicap_index:          hi ?? null,
@@ -752,8 +750,8 @@ function ImportRoster() {
         ...(flight ? { flight } : {}),
       })
 
-      if (error) {
-        updated[i] = { ...row, _status: 'error', _message: error.message }
+      if (epErr) {
+        updated[i] = { ...row, _status: 'error', _message: `Roster error: ${epErr.message}` }
       } else {
         updated[i] = { ...row, _status: 'imported', _message: null }
       }
