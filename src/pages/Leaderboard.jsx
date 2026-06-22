@@ -215,7 +215,8 @@ export default function Leaderboard() {
             {activeTab === 'Front 9' && (
               <NetLeaderboard
                 complete={leaderboards.front9[activeFlight]}
-                inProgress={[]}
+                inProgress={leaderboards.front9[`${activeFlight}InProgress`]}
+                progressHolesKey="f9Holes"
                 flight={activeFlight}
                 maxPlaces={2}
                 label="Front 9 Net"
@@ -224,7 +225,8 @@ export default function Leaderboard() {
             {activeTab === 'Back 9' && (
               <NetLeaderboard
                 complete={leaderboards.back9[activeFlight]}
-                inProgress={[]}
+                inProgress={leaderboards.back9[`${activeFlight}InProgress`]}
+                progressHolesKey="b9Holes"
                 flight={activeFlight}
                 maxPlaces={2}
                 label="Back 9 Net"
@@ -260,7 +262,7 @@ export default function Leaderboard() {
 }
 
 // ─── Net Leaderboard ──────────────────────────────────────────────
-function NetLeaderboard({ complete, inProgress, flight, maxPlaces, label }) {
+function NetLeaderboard({ complete, inProgress, progressHolesKey = 'holesCompleted', flight, maxPlaces, label }) {
   const medals = ['🥇', '🥈', '🥉']
 
   if (!complete?.length && !inProgress?.length) {
@@ -339,7 +341,7 @@ function NetLeaderboard({ complete, inProgress, flight, maxPlaces, label }) {
                 <div className="font-medium text-gray-800 text-sm">
                   {p.player?.last_name}, {p.player?.first_name}
                 </div>
-                <div className="text-xs text-gray-400">thru {p.holesCompleted}</div>
+                <div className="text-xs text-gray-400">thru {p[progressHolesKey]}</div>
               </div>
               <div className={`font-bold text-sm ${scoreColor(p)}`}>
                 {scoreDisplay(p)}
