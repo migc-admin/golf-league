@@ -48,7 +48,7 @@ export function ExportScorecardsButton({ event, eventPlayers, course }) {
     try {
       for (const g of groupNums) {
         const players = eventPlayers
-          .filter(ep => ep.group_number === g && !ep.is_guest)
+          .filter(ep => ep.group_number === g)
           .sort((a, b) => (a.group_order ?? 0) - (b.group_order ?? 0))
 
         const code      = groupCodes[g] ?? ''
