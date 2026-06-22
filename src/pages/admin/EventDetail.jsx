@@ -933,10 +933,12 @@ function AddPlayerModal({ open, onClose, eventId, available, course, useFlights,
       let result
       if (flight === 'guest') {
         result = await supabase.from('event_players').insert({
-          event_id:  eventId,
-          player_id: playerId,
-          is_guest:  true,
-          flight:    null,
+          event_id:                eventId,
+          player_id:               playerId,
+          is_guest:                true,
+          flight:                  null,
+          handicap_index:          0,
+          adjusted_handicap_index: 0,
         })
       } else {
         const hiVal = parseFloat(hi)
