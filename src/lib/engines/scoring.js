@@ -238,10 +238,14 @@ export function computeLeaderboards(eventPlayers, allScores, course) {
     front9: {
       A: withRank(flightA.filter(p => p.f9Holes === 9), byNetF9, p => p.netF9),
       B: withRank(flightB.filter(p => p.f9Holes === 9), byNetF9, p => p.netF9),
+      AInProgress: withRank(flightA.filter(p => p.f9Holes > 0 && p.f9Holes < 9), byNetF9, p => p.netF9),
+      BInProgress: withRank(flightB.filter(p => p.f9Holes > 0 && p.f9Holes < 9), byNetF9, p => p.netF9),
     },
     back9: {
       A: withRank(flightA.filter(p => p.b9Holes === 9), byNetB9, p => p.netB9),
       B: withRank(flightB.filter(p => p.b9Holes === 9), byNetB9, p => p.netB9),
+      AInProgress: withRank(flightA.filter(p => p.b9Holes > 0 && p.b9Holes < 9), byNetB9, p => p.netB9),
+      BInProgress: withRank(flightB.filter(p => p.b9Holes > 0 && p.b9Holes < 9), byNetB9, p => p.netB9),
     },
     putts: withRank(players.filter(p => p.holesCompleted === 18 && p.totalPutts != null), byPutts, p => p.totalPutts),
   }
