@@ -1,12 +1,7 @@
 /**
  * ScorecardExport — Landscape 11"×8.5" PNG, two cards stacked per page.
  *
- * Column layout (balanced so INIT is the exact center fold line):
- *   LEFT HALF:  Label(138) | H1-9(9×36) | OUT(42)       = 504px
- *   FOLD:       INIT(56)                                  =  56px
- *   RIGHT HALF: H10-18(9×36) | IN(42) | TOT(42) | HCP(32) | NET(32) | PUTTS(32) = 504px
- *   TOTAL:      1064px
- *
+ * All data columns (holes + OUT/INIT/IN/TOT/HCP/NET/PUTTS) are equal width.
  * Rows: Hole · Tee×N (yardage) · Par · S.I. · Player×4
  */
 
@@ -22,14 +17,9 @@ const GAP       = 10
 const CARD_W    = PAGE_W - PAD * 2   // 1064
 const CARD_H    = Math.floor((PAGE_H - PAD * 2 - GAP) / 2)
 
-// Column widths — left and right halves are exactly equal (504px each)
-const COL_LABEL = 138
-const COL_HOLE  = 36
-const COL_SUMM  = 42   // OUT / IN / TOT
-const COL_INIT  = 56   // fold indicator
-const COL_HCP   = 32
-const COL_NET   = 32
-const COL_PUTTS = 32
+// All data columns equal width; label and INIT are narrower
+const COL_LABEL = 80   // player name / row label
+const COL_HOLE  = 36   // score cells + OUT/IN/TOT/INIT/HCP/NET/PUTTS all match this
 
 const CELL_H    = 24   // row height px
 
@@ -50,7 +40,6 @@ export function ExportScorecardsButton({ event, eventPlayers, course }) {
 
   const groupCodes    = event.group_codes ?? {}
   const scorecardBase = `${window.location.origin}/scorecard/${event.id}`
-  const logoUrl       = `${window.location.origin}/logo.png`
 
   async function handleExport() {
     if (!course || groupNums.length === 0) return
@@ -72,7 +61,7 @@ export function ExportScorecardsButton({ event, eventPlayers, course }) {
         if (!node) continue
         node.innerHTML = ''
 
-        const pageEl = buildPage({ event, course, groupNum: g, players, code, qrDataUrl, logoUrl })
+        const pageEl = buildPage({ event, course, groupNum: g, players, code, qrDataUrl })
         node.appendChild(pageEl)
 
         // Wait for images to load
@@ -129,7 +118,7 @@ export function ExportScorecardsButton({ event, eventPlayers, course }) {
 }
 
 // ─── Page: two cards stacked ──────────────────────────────────────
-function buildPage({ event, course, groupNum, players, code, qrDataUrl, logoUrl }) {
+function buildPage({ event, course, groupNum, players, code, qrDataUrl }) {
   const page = el('div', {
     width: PAGE_W + 'px', height: PAGE_H + 'px',
     background: '#ffffff',
@@ -139,14 +128,14 @@ function buildPage({ event, course, groupNum, players, code, qrDataUrl, logoUrl 
     boxSizing: 'border-box',
     fontFamily: 'Arial, Helvetica, sans-serif',
   })
-  const opts = { event, course, groupNum, players, code, qrDataUrl, logoUrl }
+  const opts = { event, course, groupNum, players, code, qrDataUrl }
   page.appendChild(buildCard(opts))
   page.appendChild(buildCard(opts))
   return page
 }
 
 // ─── Card ─────────────────────────────────────────────────────────
-function buildCard({ event, course, groupNum, players, code, qrDataUrl, logoUrl }) {
+function buildCard({ event, course, groupNum, players, code, qrDataUrl }) {
   const parPerHole  = course.par_per_hole  ?? []
   const strokeIndex = course.stroke_index  ?? []
   const courseTees  = course.tees          ?? []
@@ -159,16 +148,23 @@ function buildCard({ event, course, groupNum, players, code, qrDataUrl, logoUrl 
 
   // Unique tees used by players in this group (preserving course order)
   const playerTeeNames = [...new Set(players.map(p => p.tee).filter(Boolean))]
-  const groupTees = courseTees.filter(t => playerTeeNames.includes(t.name))
-  // Fall back: if no tee assignments, show all course tees
+  const groupTees  = courseTees.filter(t => playerTeeNames.includes(t.name))
   const teesToShow = groupTees.length > 0 ? groupTees : courseTees
 
-  // Flight + tee label for header (e.g. "Flight A · Blue Tees")
-  const flights    = [...new Set(players.map(p => p.flight).filter(Boolean))].sort()
-  const teeNames   = [...new Set(players.map(p => p.tee).filter(Boolean))]
-  const flightStr  = flights.length > 0 ? `Flight ${flights.join('/')}` : ''
-  const teeStr     = teeNames.length > 0 ? `${teeNames.join('/')} Tees` : ''
-  const subBadge   = [flightStr, teeStr].filter(Boolean).join(' · ')
+  // Per-flight tee labels: [{ flight: 'A', tee: 'Blue' }, { flight: 'B', tee: 'White' }]
+  const flightTeeMap = {}
+  players.forEach(p => {
+    if (p.flight) flightTeeMap[p.flight] = p.tee ?? null
+  })
+  // Lines like "Flight A - Blue Tees" or just "Flight A" if no tee
+  const flightTeeLines = Object.keys(flightTeeMap).sort().map(f => {
+    const t = flightTeeMap[f]
+    return t ? `Flight ${f} - ${t} Tees` : `Flight ${f}`
+  })
+  // If no flights at all, fall back to tee names only
+  if (flightTeeLines.length === 0 && playerTeeNames.length > 0) {
+    flightTeeLines.push(...playerTeeNames.map(t => `${t} Tees`))
+  }
 
   const card = el('div', {
     width: CARD_W + 'px',
@@ -190,42 +186,45 @@ function buildCard({ event, course, groupNum, players, code, qrDataUrl, logoUrl 
     alignItems: 'center',
     justifyContent: 'space-between',
     flexShrink: '0',
-    gap: '8px',
   })
 
-  // Logo
-  const logo = document.createElement('img')
-  logo.src = logoUrl
-  logo.style.cssText = 'height: 42px; width: auto; objectFit: contain; flexShrink: 0;'
-  header.appendChild(logo)
-
-  // Center text
-  const hCenter = el('div', { flex: '1', padding: '0 6px' })
-  hCenter.appendChild(txt('Mulligan\'s Island Golf Club', {
+  // Left: club / event text
+  const hLeft = el('div', { flex: '1' })
+  hLeft.appendChild(txt("Mulligan's Island Golf Club", {
     display: 'block', color: GOLD,
     fontSize: '13px', fontWeight: '700', letterSpacing: '0.02em',
   }))
-  hCenter.appendChild(txt(event.name ?? `Event #${event.event_number}`, {
+  hLeft.appendChild(txt(event.name ?? `Event #${event.event_number}`, {
     display: 'block', color: '#ffffff', fontSize: '10px', marginTop: '1px',
   }))
-  hCenter.appendChild(txt(`${course.name ?? ''} · ${eventDate}`, {
+  hLeft.appendChild(txt(`${course.name ?? ''} · ${eventDate}`, {
     display: 'block', color: 'rgba(255,255,255,0.6)', fontSize: '9px', marginTop: '1px',
   }))
-  header.appendChild(hCenter)
+  header.appendChild(hLeft)
 
-  // Right: sub-badge + group badge
-  const hRight = el('div', { display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '3px' })
-  if (subBadge) {
-    hRight.appendChild(txt(subBadge, {
-      color: 'rgba(255,255,255,0.8)', fontSize: '9px', fontWeight: '600',
-      whiteSpace: 'nowrap',
-    }))
+  // Right: flight/tee lines + group badge, all inline (row)
+  const hRight = el('div', {
+    display: 'flex', alignItems: 'center', gap: '10px',
+  })
+
+  // Flight/tee lines stacked to the left of group badge
+  if (flightTeeLines.length > 0) {
+    const ftBlock = el('div', { textAlign: 'right' })
+    flightTeeLines.forEach(line => {
+      ftBlock.appendChild(txt(line, {
+        display: 'block', color: 'rgba(255,255,255,0.85)',
+        fontSize: '9px', fontWeight: '600', whiteSpace: 'nowrap',
+        lineHeight: '1.5',
+      }))
+    })
+    hRight.appendChild(ftBlock)
   }
+
   const groupBadge = el('div', {
     background: GOLD, color: '#1a1a1a',
     fontWeight: '800', fontSize: '16px',
-    borderRadius: '5px', padding: '2px 10px',
-    whiteSpace: 'nowrap',
+    borderRadius: '5px', padding: '3px 10px',
+    whiteSpace: 'nowrap', flexShrink: '0',
   })
   groupBadge.textContent = `Group ${groupNum}`
   hRight.appendChild(groupBadge)
@@ -280,16 +279,16 @@ function buildTable({ parPerHole, strokeIndex, teesToShow, players }) {
     flex: 1;
   `
 
-  // Colgroup
+  // Colgroup — label + 18 holes + 7 equal-width special cols (OUT/INIT/IN/TOT/HCP/NET/PUTTS)
   const cg = document.createElement('colgroup')
   const colDefs = [
     COL_LABEL,
-    ...Array(9).fill(COL_HOLE),
-    COL_SUMM,
-    COL_INIT,
-    ...Array(9).fill(COL_HOLE),
-    COL_SUMM, COL_SUMM,
-    COL_HCP, COL_NET, COL_PUTTS,
+    ...Array(9).fill(COL_HOLE),   // H1-9
+    COL_HOLE,                      // OUT
+    COL_HOLE,                      // INIT
+    ...Array(9).fill(COL_HOLE),   // H10-18
+    COL_HOLE, COL_HOLE,            // IN, TOT
+    COL_HOLE, COL_HOLE, COL_HOLE, // HCP, NET, PUTTS
   ]
   colDefs.forEach(w => {
     const c = document.createElement('col')
@@ -303,10 +302,8 @@ function buildTable({ parPerHole, strokeIndex, teesToShow, players }) {
     const {
       bg = '#ffffff', color = '#111827', bold = false,
       align = 'center', fontSize = '10px', border = true,
-      leftBorder = null, rightBorder = null,
     } = opts
     const td = document.createElement('td')
-    const borderStr = `1px solid ${BORDER}`
     td.style.cssText = `
       height: ${CELL_H}px;
       text-align: ${align};
@@ -315,9 +312,7 @@ function buildTable({ parPerHole, strokeIndex, teesToShow, players }) {
       color: ${color};
       font-weight: ${bold ? '700' : '400'};
       font-size: ${fontSize};
-      border: ${border ? borderStr : 'none'};
-      ${leftBorder  ? `border-left:  ${leftBorder};`  : ''}
-      ${rightBorder ? `border-right: ${rightBorder};` : ''}
+      border: ${border ? `1px solid ${BORDER}` : 'none'};
       padding: 0 2px;
       white-space: nowrap;
       overflow: hidden;
@@ -333,12 +328,10 @@ function buildTable({ parPerHole, strokeIndex, teesToShow, players }) {
     return td
   }
 
-  // INIT fold-line cell
+  // INIT cell — same solid border as all others, light green tint
   function mkInitCell(content, opts = {}) {
     return mkTd(content, {
       bg: '#e8f0e8', color: GREEN, bold: true, fontSize: '9px',
-      leftBorder:  '2px dashed #aacaaa',
-      rightBorder: '2px dashed #aacaaa',
       ...opts,
     })
   }
