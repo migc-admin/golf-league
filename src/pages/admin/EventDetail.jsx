@@ -928,9 +928,11 @@ function AddPlayerModal({ open, onClose, eventId, available, course, useFlights,
     if (!allValid) return
     setSaving(true)
 
+    let errorMsg = null
     for (const [playerId, { hi, flight, autoHC, ch }] of selected) {
+      let result
       if (flight === 'guest') {
-        await supabase.from('event_players').insert({
+        result = await supabase.from('event_players').insert({
           event_id:  eventId,
           player_id: playerId,
           is_guest:  true,
@@ -945,7 +947,7 @@ function AddPlayerModal({ open, onClose, eventId, available, course, useFlights,
         } else if (!autoHC && ch !== '') {
           course_handicap = parseInt(ch, 10)
         }
-        await supabase.from('event_players').insert({
+        result = await supabase.from('event_players').insert({
           event_id:                eventId,
           player_id:               playerId,
           handicap_index:          hiVal,
@@ -954,9 +956,11 @@ function AddPlayerModal({ open, onClose, eventId, available, course, useFlights,
           flight:                  flight || null,
         })
       }
+      if (result.error) { errorMsg = result.error.message; break }
     }
 
     setSaving(false)
+    if (errorMsg) { toast.error(`Add failed: ${errorMsg}`); return }
     toast.success(`${selected.length} player${selected.length !== 1 ? 's' : ''} added`)
     onSaved()
     onClose()
