@@ -6,6 +6,7 @@ import { computePayouts, DEFAULT_PAYOUT_CONFIG, CATEGORY_LABELS, ctpLabel, activ
 import { computeLeaderboards } from '../../lib/engines/scoring'
 import { computeAllSkins } from '../../lib/engines/skins'
 import Card, { CardHeader } from '../../components/ui/Card'
+import { ExportScorecardsButton } from '../../components/ScorecardExport'
 import Button from '../../components/ui/Button'
 import Modal from '../../components/ui/Modal'
 import Input, { Select } from '../../components/ui/Input'
@@ -244,6 +245,9 @@ function TabOverview({ event, eventPlayers, allScores, course, conflicts, onUpda
           <Card>
             <CardHeader title="Scoring Access" subtitle="Share with players to enter scores" />
             <AccessCodeSection event={event} eventPlayers={eventPlayers} onUpdated={onUpdated} />
+            <div className="mt-3 pt-3 border-t border-gray-100">
+              <ExportScorecardsButton event={event} eventPlayers={eventPlayers} course={course} />
+            </div>
           </Card>
         )}
       </div>
