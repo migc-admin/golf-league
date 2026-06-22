@@ -189,8 +189,9 @@ function TabOverview({ event, eventPlayers, allScores, course, conflicts, onUpda
   const [scoreEditor, setScoreEditor] = useState(false)
 
   const holesEntered = new Set(allScores.map(s => `${s.player_id}-${s.hole_number}`)).size
-  const flightA = eventPlayers.filter(e => e.flight === 'A').length
-  const flightB = eventPlayers.filter(e => e.flight === 'B').length
+  const nonGuests = eventPlayers.filter(e => !e.is_guest)
+  const flightA = nonGuests.filter(e => e.flight === 'A').length
+  const flightB = nonGuests.filter(e => e.flight === 'B').length
 
   // Scorecard link shown when event is active
   const scorecardUrl = `${window.location.origin}/scorecard/${event.id}`
@@ -230,11 +231,11 @@ function TabOverview({ event, eventPlayers, allScores, course, conflicts, onUpda
         <Card>
           <CardHeader title="Players" />
           <dl className="space-y-2 text-sm">
-            <Row label="Total Players"  value={eventPlayers.length} />
+            <Row label="Total Players"  value={`${nonGuests.length}${nonGuests.length !== eventPlayers.length ? ` + ${eventPlayers.length - nonGuests.length} guest${eventPlayers.length - nonGuests.length !== 1 ? 's' : ''}` : ''}`} />
             {(event.use_flights ?? false) && <Row label="Flight A" value={flightA} />}
             {(event.use_flights ?? false) && <Row label="Flight B" value={flightB} />}
             <Row label="Scores Entered" value={`${holesEntered} hole entries`} />
-            <Row label="Total Pot"      value={`$${(event.entry_fee * eventPlayers.length).toFixed(2)}`} />
+            <Row label="Total Pot"      value={`$${(event.entry_fee * nonGuests.length).toFixed(2)}`} />
           </dl>
         </Card>
 
@@ -630,9 +631,11 @@ function TabFlights({ event, eventPlayers, course, allPlayers, onUpdated }) {
     else { toast.success('Player removed'); onUpdated() }
   }
 
-  const flightA = eventPlayers.filter(e => e.flight === 'A')
-  const flightB = eventPlayers.filter(e => e.flight === 'B')
-  const unassigned = eventPlayers.filter(e => !e.flight)
+  const guests   = eventPlayers.filter(e => e.is_guest)
+  const nonGuests = eventPlayers.filter(e => !e.is_guest)
+  const flightA = nonGuests.filter(e => e.flight === 'A')
+  const flightB = nonGuests.filter(e => e.flight === 'B')
+  const unassigned = nonGuests.filter(e => !e.flight)
 
   const courseTees = course?.tees ?? []
 
@@ -666,11 +669,16 @@ function TabFlights({ event, eventPlayers, course, allPlayers, onUpdated }) {
             {ep.player?.last_name}, {ep.player?.first_name}
           </div>
           <div className="text-xs text-gray-500 flex items-center gap-2 mt-1 flex-wrap">
-            <span>HI: {ep.handicap_index ?? '—'}</span>
-            {ep.adjusted_handicap_index != null && ep.adjusted_handicap_index !== ep.handicap_index && (
-              <span className="text-orange-600">Adj: {ep.adjusted_handicap_index}</span>
-            )}
-            {ep.course_handicap != null && <span>CH: {ep.course_handicap}</span>}
+            {ep.is_guest
+              ? <span className="bg-purple-100 text-purple-700 font-semibold px-2 py-0.5 rounded-full text-xs">Guest – Player Only</span>
+              : <>
+                  <span>HI: {ep.handicap_index ?? '—'}</span>
+                  {ep.adjusted_handicap_index != null && ep.adjusted_handicap_index !== ep.handicap_index && (
+                    <span className="text-orange-600">Adj: {ep.adjusted_handicap_index}</span>
+                  )}
+                  {ep.course_handicap != null && <span>CH: {ep.course_handicap}</span>}
+                </>
+            }
             {ep.tournament_wins_prior > 0 && (
               <span className="text-fairway-700 font-medium">{ep.tournament_wins_prior} win{ep.tournament_wins_prior !== 1 ? 's' : ''}</span>
             )}
@@ -767,8 +775,8 @@ function TabFlights({ event, eventPlayers, course, allPlayers, onUpdated }) {
         {eventPlayers.length > 0 && (
           <span className="text-sm text-gray-500">
             {useFlights
-              ? `${eventPlayers.length} players · Flight A: ${flightA.length} · Flight B: ${flightB.length}`
-              : `${eventPlayers.length} player${eventPlayers.length !== 1 ? 's' : ''}`
+              ? `${nonGuests.length} players · Flight A: ${flightA.length} · Flight B: ${flightB.length}${guests.length > 0 ? ` · ${guests.length} guest${guests.length !== 1 ? 's' : ''}` : ''}`
+              : `${nonGuests.length} player${nonGuests.length !== 1 ? 's' : ''}${guests.length > 0 ? ` · ${guests.length} guest${guests.length !== 1 ? 's' : ''}` : ''}`
             }
           </span>
         )}
@@ -910,8 +918,9 @@ function AddPlayerModal({ open, onClose, eventId, available, course, useFlights,
 
   const selected = Object.entries(bulk)
   const allValid = selected.length > 0 && selected.every(([, v]) =>
-    v.hi !== '' && !isNaN(parseFloat(v.hi)) &&
-    (v.autoHC || (v.ch !== '' && !isNaN(parseInt(v.ch, 10))))
+    v.flight === 'guest' ||
+    (v.hi !== '' && !isNaN(parseFloat(v.hi)) &&
+    (v.autoHC || (v.ch !== '' && !isNaN(parseInt(v.ch, 10)))))
   )
 
   async function handleSave(e) {
@@ -920,22 +929,31 @@ function AddPlayerModal({ open, onClose, eventId, available, course, useFlights,
     setSaving(true)
 
     for (const [playerId, { hi, flight, autoHC, ch }] of selected) {
-      const hiVal = parseFloat(hi)
-      let course_handicap = null
-      if (autoHC && course) {
-        const { slope, rating, par } = course
-        course_handicap = Math.round((hiVal * slope / 113) + (rating - par))
-      } else if (!autoHC && ch !== '') {
-        course_handicap = parseInt(ch, 10)
+      if (flight === 'guest') {
+        await supabase.from('event_players').insert({
+          event_id:  eventId,
+          player_id: playerId,
+          is_guest:  true,
+          flight:    null,
+        })
+      } else {
+        const hiVal = parseFloat(hi)
+        let course_handicap = null
+        if (autoHC && course) {
+          const { slope, rating, par } = course
+          course_handicap = Math.round((hiVal * slope / 113) + (rating - par))
+        } else if (!autoHC && ch !== '') {
+          course_handicap = parseInt(ch, 10)
+        }
+        await supabase.from('event_players').insert({
+          event_id:                eventId,
+          player_id:               playerId,
+          handicap_index:          hiVal,
+          adjusted_handicap_index: hiVal,
+          course_handicap,
+          flight:                  flight || null,
+        })
       }
-      await supabase.from('event_players').insert({
-        event_id:                eventId,
-        player_id:               playerId,
-        handicap_index:          hiVal,
-        adjusted_handicap_index: hiVal,
-        course_handicap,
-        flight:                  flight || null,
-      })
     }
 
     setSaving(false)
@@ -976,53 +994,55 @@ function AddPlayerModal({ open, onClose, eventId, available, course, useFlights,
                   </span>
                   {checked && (
                     <>
-                      <input
-                        type="number" step="0.1" min="-10" max="54"
-                        value={vals.hi}
-                        onChange={e => setField(p.id, 'hi', e.target.value)}
-                        placeholder="HI"
-                        className="input py-1 text-xs w-16 shrink-0"
-                        required
-                      />
-                      {useFlights && (
-                        <select
-                          value={vals.flight}
-                          onChange={e => setField(p.id, 'flight', e.target.value)}
-                          className="input py-1 text-xs w-20 shrink-0 bg-white"
-                        >
-                          <option value="">Flight?</option>
-                          <option value="A">Flight A</option>
-                          <option value="B">Flight B</option>
-                        </select>
-                      )}
-                      {/* Course handicap: auto or manual */}
-                      {vals.autoHC ? (
-                        <span
-                          className="text-xs text-gray-500 w-16 shrink-0 cursor-pointer hover:text-fairway-700"
-                          title="Click to enter manually"
-                          onClick={() => setField(p.id, 'autoHC', false)}
-                        >
-                          CH: {vals.ch !== '' ? vals.ch : '—'}
-                        </span>
-                      ) : (
-                        <input
-                          type="number" min="-5" max="54"
-                          value={vals.ch}
-                          onChange={e => setField(p.id, 'ch', e.target.value)}
-                          placeholder="CH"
-                          className="input py-1 text-xs w-16 shrink-0"
-                          title="Course handicap (manual)"
-                          required
-                        />
-                      )}
-                      <button
-                        type="button"
-                        onClick={() => setField(p.id, 'autoHC', !vals.autoHC)}
-                        className={`text-xs shrink-0 px-1.5 py-1 rounded font-medium ${vals.autoHC ? 'text-fairway-600 bg-fairway-50' : 'text-orange-600 bg-orange-50'}`}
-                        title={vals.autoHC ? 'Auto-calculating CH — click for manual' : 'Manual CH — click for auto'}
+                      <select
+                        value={vals.flight}
+                        onChange={e => setField(p.id, 'flight', e.target.value)}
+                        className="input py-1 text-xs w-28 shrink-0 bg-white"
                       >
-                        {vals.autoHC ? 'Auto' : 'Manual'}
-                      </button>
+                        <option value="">Flight?</option>
+                        {useFlights && <option value="A">Flight A</option>}
+                        {useFlights && <option value="B">Flight B</option>}
+                        <option value="guest">Guest Player</option>
+                      </select>
+                      {vals.flight !== 'guest' && (
+                        <>
+                          <input
+                            type="number" step="0.1" min="-10" max="54"
+                            value={vals.hi}
+                            onChange={e => setField(p.id, 'hi', e.target.value)}
+                            placeholder="HI"
+                            className="input py-1 text-xs w-16 shrink-0"
+                            required
+                          />
+                          {vals.autoHC ? (
+                            <span
+                              className="text-xs text-gray-500 w-16 shrink-0 cursor-pointer hover:text-fairway-700"
+                              title="Click to enter manually"
+                              onClick={() => setField(p.id, 'autoHC', false)}
+                            >
+                              CH: {vals.ch !== '' ? vals.ch : '—'}
+                            </span>
+                          ) : (
+                            <input
+                              type="number" min="-5" max="54"
+                              value={vals.ch}
+                              onChange={e => setField(p.id, 'ch', e.target.value)}
+                              placeholder="CH"
+                              className="input py-1 text-xs w-16 shrink-0"
+                              title="Course handicap (manual)"
+                              required
+                            />
+                          )}
+                          <button
+                            type="button"
+                            onClick={() => setField(p.id, 'autoHC', !vals.autoHC)}
+                            className={`text-xs shrink-0 px-1.5 py-1 rounded font-medium ${vals.autoHC ? 'text-fairway-600 bg-fairway-50' : 'text-orange-600 bg-orange-50'}`}
+                            title={vals.autoHC ? 'Auto-calculating CH — click for manual' : 'Manual CH — click for auto'}
+                          >
+                            {vals.autoHC ? 'Auto' : 'Manual'}
+                          </button>
+                        </>
+                      )}
                     </>
                   )}
                 </div>
@@ -1218,9 +1238,10 @@ function TabPayoutConfig({ event, eventPlayers, course, onUpdated }) {
   const [payoutBasis, setPayoutBasis] = useState(event.payout_basis ?? 'per_player')
   const [fixedTotal,  setFixedTotal]  = useState(event.payout_fixed_total ?? '')
 
-  const flightA = eventPlayers.filter(e => e.flight === 'A').length
-  const flightB = eventPlayers.filter(e => e.flight === 'B').length
-  const totalPlayers = eventPlayers.length
+  const nonGuestPlayers = eventPlayers.filter(e => !e.is_guest)
+  const flightA = nonGuestPlayers.filter(e => e.flight === 'A').length
+  const flightB = nonGuestPlayers.filter(e => e.flight === 'B').length
+  const totalPlayers = nonGuestPlayers.length
 
   // Active keys driven by event's formats + side_game_options + use_flights
   const eventActiveKeys = activePayoutKeys(event)
@@ -1627,11 +1648,12 @@ function TabPayoutSummary({ event, eventPlayers, allScores, sideGames, course })
     return <p className="text-sm text-gray-500">No data available yet.</p>
   }
 
-  const flightCounts  = { A: eventPlayers.filter(ep => ep.flight === 'A').length, B: eventPlayers.filter(ep => ep.flight === 'B').length }
-  const leaderboards  = computeLeaderboards(eventPlayers, allScores, course)
-  const skinsResults  = computeAllSkins(eventPlayers, allScores, course.stroke_index)
+  const nonGuestEPs   = eventPlayers.filter(ep => !ep.is_guest)
+  const flightCounts  = { A: nonGuestEPs.filter(ep => ep.flight === 'A').length, B: nonGuestEPs.filter(ep => ep.flight === 'B').length }
+  const leaderboards  = computeLeaderboards(nonGuestEPs, allScores, course)
+  const skinsResults  = computeAllSkins(nonGuestEPs, allScores, course.stroke_index)
   const { totalPot, byCategory, byPlayer, totalAllocated } = computePayouts(
-    event, eventPlayers.length, leaderboards, sideGames, skinsResults, flightCounts
+    event, nonGuestEPs.length, leaderboards, sideGames, skinsResults, flightCounts
   )
 
   const playerMap = Object.fromEntries(
@@ -1643,7 +1665,7 @@ function TabPayoutSummary({ event, eventPlayers, allScores, sideGames, course })
       <div className="flex items-center justify-between">
         <div>
           <p className="text-lg font-bold text-gray-900">Total Pot: ${totalPot.toFixed(2)}</p>
-          <p className="text-sm text-gray-500">{eventPlayers.length} players × ${event.entry_fee}</p>
+          <p className="text-sm text-gray-500">{nonGuestEPs.length} players × ${event.entry_fee}</p>
         </div>
       </div>
 
