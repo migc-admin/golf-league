@@ -103,7 +103,7 @@ export function stablefordPoints(netScore, par) {
 export function computeStableford(eventPlayers, allScores, course) {
   const { stroke_index: strokeIndexes, par_per_hole: parPerHole } = course
 
-  const players = eventPlayers.map(ep => {
+  const players = eventPlayers.filter(ep => !ep.is_guest).map(ep => {
     const playerScores = allScores.filter(s => s.player_id === ep.player_id)
     const ch = ep.course_handicap ?? 0
 
@@ -135,9 +135,10 @@ export function computeStableford(eventPlayers, allScores, course) {
       .sort((a, b) => b.totalPoints - a.totalPoints || b.holesPlayed - a.holesPlayed)
       .map((p, i) => ({ ...p, rank: i + 1 }))
 
+  const hasFlights = players.some(p => p.flight === 'A' || p.flight === 'B')
   return {
-    A: sorted(players.filter(p => p.flight === 'A')),
-    B: sorted(players.filter(p => p.flight === 'B')),
+    A: sorted(hasFlights ? players.filter(p => p.flight === 'A') : players),
+    B: sorted(hasFlights ? players.filter(p => p.flight === 'B') : []),
   }
 }
 
@@ -152,7 +153,10 @@ export function computeStableford(eventPlayers, allScores, course) {
 export function computeLeaderboards(eventPlayers, allScores, course) {
   const { stroke_index: strokeIndexes, par_per_hole: parPerHole } = course
 
-  const players = eventPlayers.map(ep => {
+  // Exclude guests from scoring
+  const scoringPlayers = eventPlayers.filter(ep => !ep.is_guest)
+
+  const players = scoringPlayers.map(ep => {
     const playerScores = allScores.filter(s => s.player_id === ep.player_id)
     const ch = ep.course_handicap ?? 0
     const netMap = buildPlayerNetMap(playerScores, ch, strokeIndexes)
@@ -224,9 +228,10 @@ export function computeLeaderboards(eventPlayers, allScores, course) {
     return ranked
   }
 
-  // Split by flight
-  const flightA = players.filter(p => p.flight === 'A')
-  const flightB = players.filter(p => p.flight === 'B')
+  // Split by flight; if no flights assigned treat everyone as Flight A
+  const hasFlights = players.some(p => p.flight === 'A' || p.flight === 'B')
+  const flightA = hasFlights ? players.filter(p => p.flight === 'A') : players
+  const flightB = hasFlights ? players.filter(p => p.flight === 'B') : []
 
   return {
     full: {

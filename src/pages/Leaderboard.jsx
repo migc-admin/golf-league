@@ -120,7 +120,8 @@ export default function Leaderboard() {
   const stablefordData  = course ? computeStableford(eventPlayers, allScores, course)                : null
   const matchData       = course ? computeMatchPoints(eventPlayers, allScores, course)               : null
 
-  const playerMap = Object.fromEntries(eventPlayers.map(ep => [ep.player_id, ep.player]))
+  const playerMap  = Object.fromEntries(eventPlayers.map(ep => [ep.player_id, ep.player]))
+  const hasFlights = eventPlayers.some(ep => !ep.is_guest && (ep.flight === 'A' || ep.flight === 'B'))
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -179,8 +180,8 @@ export default function Leaderboard() {
         </div>
       </div>
 
-      {/* Flight toggle */}
-      {!['Low Putts', 'Skins', 'Match Points', 'Payouts'].includes(activeTab) && (
+      {/* Flight toggle — only shown when flights are in use */}
+      {hasFlights && !['Low Putts', 'Skins', 'Match Points', 'Payouts'].includes(activeTab) && (
         <div className="max-w-2xl mx-auto px-4 pt-4 flex gap-2">
           {['A', 'B'].map(f => (
             <button
