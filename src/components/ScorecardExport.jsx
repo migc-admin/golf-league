@@ -188,13 +188,13 @@ function buildCard({ event, course, groupNum, players, code, qrDataUrl }) {
     flexShrink: '0',
   })
 
-  // Left: club / event text
+  // Left: club / event text (course name appears once, on the date line)
   const hLeft = el('div', { flex: '1' })
   hLeft.appendChild(txt("Mulligan's Island Golf Club", {
     display: 'block', color: GOLD,
     fontSize: '13px', fontWeight: '700', letterSpacing: '0.02em',
   }))
-  hLeft.appendChild(txt(event.name ?? `Event #${event.event_number}`, {
+  hLeft.appendChild(txt(`Event #${event.event_number}`, {
     display: 'block', color: '#ffffff', fontSize: '10px', marginTop: '1px',
   }))
   hLeft.appendChild(txt(`${course.name ?? ''} · ${eventDate}`, {
@@ -220,13 +220,21 @@ function buildCard({ event, course, groupNum, players, code, qrDataUrl }) {
     hRight.appendChild(ftBlock)
   }
 
+  const teeTime = computeTeeTime(event.start_time, event.tee_time_interval_mins ?? 10, groupNum)
+
   const groupBadge = el('div', {
     background: GOLD, color: '#1a1a1a',
-    fontWeight: '800', fontSize: '16px',
-    borderRadius: '5px', padding: '3px 10px',
-    whiteSpace: 'nowrap', flexShrink: '0',
+    fontWeight: '800', borderRadius: '5px', padding: '3px 10px',
+    whiteSpace: 'nowrap', flexShrink: '0', textAlign: 'center',
   })
-  groupBadge.textContent = `Group ${groupNum}`
+  const groupLine = txt(`Group ${groupNum}`, { display: 'block', fontSize: '16px', fontWeight: '800' })
+  groupBadge.appendChild(groupLine)
+  if (teeTime) {
+    groupBadge.appendChild(txt(teeTime, {
+      display: 'block', fontSize: '11px', fontWeight: '700',
+      color: '#3a2a00', marginTop: '1px',
+    }))
+  }
   hRight.appendChild(groupBadge)
   header.appendChild(hRight)
   card.appendChild(header)
@@ -339,7 +347,7 @@ function buildTable({ parPerHole, strokeIndex, teesToShow, players }) {
   // ── Helper: build a full row ─────────────────────────────────────
   function addRow(rowDef) {
     const {
-      label, labelBg = GRAY_BG, labelColor = '#374151',
+      label, labelBg = GRAY_BG, labelColor = '#374151', labelFontSize = '9px',
       h1to9,           // array[9] of values
       out,             // OUT cell value
       initCell,        // INIT cell value/options
@@ -352,7 +360,7 @@ function buildTable({ parPerHole, strokeIndex, teesToShow, players }) {
     } = rowDef
 
     const tr = document.createElement('tr')
-    tr.appendChild(mkLabel(label, { bg: labelBg, color: labelColor }))
+    tr.appendChild(mkLabel(label, { bg: labelBg, color: labelColor, fontSize: labelFontSize }))
 
     // H1-9
     ;(h1to9 ?? Array(9).fill('')).forEach(v =>
@@ -404,7 +412,7 @@ function buildTable({ parPerHole, strokeIndex, teesToShow, players }) {
 
     addRow({
       label: `${tee.name} Tees${ratingSlope}`,
-      labelBg: teeBg, labelColor: '#1a1a1a',
+      labelBg: teeBg, labelColor: '#1a1a1a', labelFontSize: '7px',
       h1to9:   yds.slice(0, 9).map(v => v || ''),
       out:     front || '',
       initCell: '',
@@ -494,6 +502,18 @@ function txt(content, styles = {}) {
   Object.assign(s.style, styles)
   s.textContent = content
   return s
+}
+
+/** Compute tee time string for a group (mirrors Schedule.jsx logic) */
+function computeTeeTime(startTime, intervalMins, groupNum) {
+  if (!startTime) return null
+  const [h, m] = startTime.split(':').map(Number)
+  const totalMins = h * 60 + m + (groupNum - 1) * intervalMins
+  const hh = Math.floor(totalMins / 60) % 24
+  const mm  = totalMins % 60
+  const ampm = hh >= 12 ? 'PM' : 'AM'
+  const hour12 = hh % 12 || 12
+  return `${hour12}:${mm.toString().padStart(2, '0')} ${ampm}`
 }
 
 /** Convert hex color to rgba with given alpha (0-1) */
