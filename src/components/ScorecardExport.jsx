@@ -8,6 +8,7 @@
 import { useRef, useState } from 'react'
 import { toPng } from 'html-to-image'
 import QRCode from 'qrcode'
+import { getStrokesOnHole } from '../lib/engines/scoring'
 
 // ─── Layout constants ─────────────────────────────────────────────
 const PAGE_W    = 1100
@@ -330,6 +331,29 @@ function buildTable({ parPerHole, strokeIndex, teesToShow, players }) {
     return td
   }
 
+  // Score cell with optional stroke dots in upper-right
+  function mkScoreCell(strokes, opts = {}) {
+    const td = mkTd('', { bg: 'transparent', ...opts })
+    td.style.position = 'relative'
+    if (strokes > 0) {
+      const dotWrap = document.createElement('span')
+      dotWrap.style.cssText = `
+        position: absolute; top: 2px; right: 2px;
+        display: flex; gap: 1px; align-items: center;
+      `
+      for (let i = 0; i < Math.min(strokes, 2); i++) {
+        const dot = document.createElement('span')
+        dot.style.cssText = `
+          display: inline-block; width: 4px; height: 4px;
+          border-radius: 50%; background: #1a6b2f;
+        `
+        dotWrap.appendChild(dot)
+      }
+      td.appendChild(dotWrap)
+    }
+    return td
+  }
+
   function mkLabel(content, opts = {}) {
     const td = mkTd(content, { bg: GRAY_BG, color: '#374151', bold: true, align: 'left', fontSize: '9px', ...opts })
     td.style.paddingLeft = '5px'
@@ -472,19 +496,34 @@ function buildTable({ parPerHole, strokeIndex, teesToShow, players }) {
       ? `${firstName?.[0] ?? ''}${lastName?.[0] ?? ''}`.toUpperCase()
       : ''
 
-    addRow({
-      label: nameLabel,
-      labelBg: 'transparent', labelColor: ep ? '#111827' : '#b0b0b0',
-      h1to9:   Array(9).fill(''),
-      out:     '',
-      initCell: initials,
-      h10to18: Array(9).fill(''),
-      inVal: '', tot: '',
-      hcp:   ch !== null ? ch : '',
-      net:   '', putts: '',
-      holeBg: 'transparent',
-      summBg: 'transparent', summColor: '#374151',
-    })
+    const tr = document.createElement('tr')
+    tr.appendChild(mkLabel(nameLabel, {
+      bg: 'transparent', color: ep ? '#111827' : '#b0b0b0', bold: false,
+    }))
+
+    // H1-9 with stroke dots
+    for (let h = 1; h <= 9; h++) {
+      const strokes = (ep && ch !== null) ? getStrokesOnHole(ch, strokeIndex[h - 1]) : 0
+      tr.appendChild(mkScoreCell(strokes))
+    }
+    // OUT
+    tr.appendChild(mkTd('', { bg: 'transparent', color: '#374151', bold: true }))
+    // INIT
+    tr.appendChild(mkInitCell(initials))
+    // H10-18 with stroke dots
+    for (let h = 10; h <= 18; h++) {
+      const strokes = (ep && ch !== null) ? getStrokesOnHole(ch, strokeIndex[h - 1]) : 0
+      tr.appendChild(mkScoreCell(strokes))
+    }
+    // IN / TOT
+    tr.appendChild(mkTd('', { bg: 'transparent', color: '#374151', bold: true }))
+    tr.appendChild(mkTd('', { bg: 'transparent', color: '#374151', bold: true }))
+    // HCP / NET / PUTTS
+    tr.appendChild(mkTd(ch !== null ? ch : '', { bg: '#deeede', color: GREEN, bold: ch !== null }))
+    tr.appendChild(mkTd('', { bg: '#f0f8f0', color: '#111827' }))
+    tr.appendChild(mkTd('', { bg: '#f0f8f0', color: '#111827' }))
+
+    tbl.appendChild(tr)
   })
 
   return tbl
