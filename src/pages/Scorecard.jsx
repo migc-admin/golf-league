@@ -184,7 +184,7 @@ export default function Scorecard() {
         query.eq('player_id', myPlayerId)
       }
 
-      const { data: eps } = await query.order('flight').order('adjusted_handicap_index')
+      const { data: eps } = await query.order('group_order').order('adjusted_handicap_index')
       setGroupPlayers(eps ?? [])
 
       const playerIds = (eps ?? []).map(ep => ep.player_id)
@@ -908,7 +908,7 @@ function GuestCodeEntry({ eventId, onSuccess }) {
       .select('player_id, player:players(first_name, last_name)')
       .eq('event_id', eventId)
       .eq('group_number', groupNum)
-      .order('player(last_name)')
+      .order('group_order')
 
     setGroupPlayers(eps ?? [])
     setMatchedGroup(groupNum)
