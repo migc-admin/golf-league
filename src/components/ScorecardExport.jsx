@@ -1,40 +1,45 @@
 /**
- * ScorecardExport — Landscape 11" × 8.5" PNG, two cards stacked top/bottom per group.
+ * ScorecardExport — Landscape 11"×8.5" PNG, two cards stacked per page.
  *
- * Columns: Label | H1-9 | OUT | INIT | H10-18 | IN | TOT | HCP | NET
- * Rows:    Hole · Par · S.I. · Tees · Player×4
+ * Column layout (balanced so INIT is the exact center fold line):
+ *   LEFT HALF:  Label(138) | H1-9(9×36) | OUT(42)       = 504px
+ *   FOLD:       INIT(56)                                  =  56px
+ *   RIGHT HALF: H10-18(9×36) | IN(42) | TOT(42) | HCP(32) | NET(32) | PUTTS(32) = 504px
+ *   TOTAL:      1064px
+ *
+ * Rows: Hole · Tee×N (yardage) · Par · S.I. · Player×4
  */
 
 import { useRef, useState } from 'react'
 import { toPng } from 'html-to-image'
 import QRCode from 'qrcode'
 
-// ─── Constants ────────────────────────────────────────────────────
-const GREEN   = '#1B4332'
-const GOLD    = '#C9A84C'
-const GRAY_BG = '#f5f5f3'
-const BORDER  = '#c8c8c8'
+// ─── Layout constants ─────────────────────────────────────────────
+const PAGE_W    = 1100
+const PAGE_H    = 850
+const PAD       = 18
+const GAP       = 10
+const CARD_W    = PAGE_W - PAD * 2   // 1064
+const CARD_H    = Math.floor((PAGE_H - PAD * 2 - GAP) / 2)
 
-// Page: landscape 11×8.5 @ base 1100×850 → 3x = 3300×2550px (300dpi)
-const PAGE_W  = 1100
-const PAGE_H  = 850
-const PAD     = 18   // outer page padding
-const GAP     = 10   // gap between two cards
-const CARD_W  = PAGE_W - PAD * 2
-const CARD_H  = Math.floor((PAGE_H - PAD * 2 - GAP) / 2)
-
-// Column widths (must sum close to CARD_W)
-const COL_LABEL = 64
-const COL_HOLE  = 38   // hole cells 1-9 and 10-18
+// Column widths — left and right halves are exactly equal (504px each)
+const COL_LABEL = 138
+const COL_HOLE  = 36
 const COL_SUMM  = 42   // OUT / IN / TOT
-const COL_INIT  = 34   // INIT (between OUT and hole 10)
-const COL_HCP   = 36
-const COL_NET   = 36
-// 64 + 18×38 + 3×42 + 34 + 36 + 36 = 64+684+126+34+36+36 = 980  (≤ CARD_W ✓)
+const COL_INIT  = 56   // fold indicator
+const COL_HCP   = 32
+const COL_NET   = 32
+const COL_PUTTS = 32
 
-const CELL_H    = 26   // row height px
+const CELL_H    = 24   // row height px
 
-// ─── Main Export Button ───────────────────────────────────────────
+// ─── Colors ───────────────────────────────────────────────────────
+const GREEN     = '#1B4332'
+const GOLD      = '#C9A84C'
+const GRAY_BG   = '#f5f5f3'
+const BORDER    = '#c0c0c0'
+
+// ─── Export Button ────────────────────────────────────────────────
 export function ExportScorecardsButton({ event, eventPlayers, course }) {
   const [exporting, setExporting] = useState(false)
   const containerRef = useRef(null)
@@ -43,8 +48,9 @@ export function ExportScorecardsButton({ event, eventPlayers, course }) {
     eventPlayers.map(ep => ep.group_number).filter(Boolean)
   )].sort((a, b) => a - b)
 
-  const groupCodes   = event.group_codes ?? {}
+  const groupCodes    = event.group_codes ?? {}
   const scorecardBase = `${window.location.origin}/scorecard/${event.id}`
+  const logoUrl       = `${window.location.origin}/logo.png`
 
   async function handleExport() {
     if (!course || groupNums.length === 0) return
@@ -55,8 +61,8 @@ export function ExportScorecardsButton({ event, eventPlayers, course }) {
           .filter(ep => ep.group_number === g && !ep.is_guest)
           .sort((a, b) => (a.group_order ?? 0) - (b.group_order ?? 0))
 
-        const code    = groupCodes[g] ?? ''
-        const qrUrl   = code ? `${scorecardBase}?code=${code}` : scorecardBase
+        const code      = groupCodes[g] ?? ''
+        const qrUrl     = code ? `${scorecardBase}?code=${code}` : scorecardBase
         const qrDataUrl = await QRCode.toDataURL(qrUrl, {
           width: 140, margin: 1,
           color: { dark: GREEN, light: '#ffffff' },
@@ -66,10 +72,16 @@ export function ExportScorecardsButton({ event, eventPlayers, course }) {
         if (!node) continue
         node.innerHTML = ''
 
-        const pageEl = buildPage({ event, course, groupNum: g, players, code, qrDataUrl })
+        const pageEl = buildPage({ event, course, groupNum: g, players, code, qrDataUrl, logoUrl })
         node.appendChild(pageEl)
 
-        await new Promise(r => setTimeout(r, 100))
+        // Wait for images to load
+        await Promise.all(
+          [...pageEl.querySelectorAll('img')].map(
+            img => img.complete ? Promise.resolve() : new Promise(r => { img.onload = r; img.onerror = r })
+          )
+        )
+        await new Promise(r => setTimeout(r, 80))
 
         const dataUrl = await toPng(pageEl, {
           pixelRatio: 3,
@@ -116,9 +128,9 @@ export function ExportScorecardsButton({ event, eventPlayers, course }) {
   )
 }
 
-// ─── Page builder (two cards stacked, landscape) ──────────────────
-function buildPage({ event, course, groupNum, players, code, qrDataUrl }) {
-  const page = mkEl('div', {
+// ─── Page: two cards stacked ──────────────────────────────────────
+function buildPage({ event, course, groupNum, players, code, qrDataUrl, logoUrl }) {
+  const page = el('div', {
     width: PAGE_W + 'px', height: PAGE_H + 'px',
     background: '#ffffff',
     display: 'flex', flexDirection: 'column',
@@ -127,15 +139,17 @@ function buildPage({ event, course, groupNum, players, code, qrDataUrl }) {
     boxSizing: 'border-box',
     fontFamily: 'Arial, Helvetica, sans-serif',
   })
-  page.appendChild(buildCard({ event, course, groupNum, players, code, qrDataUrl }))
-  page.appendChild(buildCard({ event, course, groupNum, players, code, qrDataUrl }))
+  const opts = { event, course, groupNum, players, code, qrDataUrl, logoUrl }
+  page.appendChild(buildCard(opts))
+  page.appendChild(buildCard(opts))
   return page
 }
 
-// ─── Single card ──────────────────────────────────────────────────
-function buildCard({ event, course, groupNum, players, code, qrDataUrl }) {
+// ─── Card ─────────────────────────────────────────────────────────
+function buildCard({ event, course, groupNum, players, code, qrDataUrl, logoUrl }) {
   const parPerHole  = course.par_per_hole  ?? []
   const strokeIndex = course.stroke_index  ?? []
+  const courseTees  = course.tees          ?? []
 
   const eventDate = event.event_date
     ? new Date(event.event_date + 'T00:00:00').toLocaleDateString('en-US', {
@@ -143,14 +157,24 @@ function buildCard({ event, course, groupNum, players, code, qrDataUrl }) {
       })
     : ''
 
-  // Tees used in this group (unique, sorted)
-  const tees = [...new Set(players.map(ep => ep.tee).filter(Boolean))].join(' / ') || '—'
+  // Unique tees used by players in this group (preserving course order)
+  const playerTeeNames = [...new Set(players.map(p => p.tee).filter(Boolean))]
+  const groupTees = courseTees.filter(t => playerTeeNames.includes(t.name))
+  // Fall back: if no tee assignments, show all course tees
+  const teesToShow = groupTees.length > 0 ? groupTees : courseTees
 
-  const card = mkEl('div', {
+  // Flight + tee label for header (e.g. "Flight A · Blue Tees")
+  const flights    = [...new Set(players.map(p => p.flight).filter(Boolean))].sort()
+  const teeNames   = [...new Set(players.map(p => p.tee).filter(Boolean))]
+  const flightStr  = flights.length > 0 ? `Flight ${flights.join('/')}` : ''
+  const teeStr     = teeNames.length > 0 ? `${teeNames.join('/')} Tees` : ''
+  const subBadge   = [flightStr, teeStr].filter(Boolean).join(' · ')
+
+  const card = el('div', {
     width: CARD_W + 'px',
     height: CARD_H + 'px',
     border: '2px solid ' + GREEN,
-    borderRadius: '7px',
+    borderRadius: '6px',
     overflow: 'hidden',
     display: 'flex',
     flexDirection: 'column',
@@ -159,62 +183,81 @@ function buildCard({ event, course, groupNum, players, code, qrDataUrl }) {
   })
 
   // ── Header ──────────────────────────────────────────────────────
-  const header = mkEl('div', {
+  const header = el('div', {
     background: GREEN,
-    padding: '6px 12px',
+    padding: '5px 10px',
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'space-between',
     flexShrink: '0',
+    gap: '8px',
   })
-  const hLeft = mkEl('div')
-  hLeft.appendChild(mkTxt("Mulligan's Island Golf Club", {
+
+  // Logo
+  const logo = document.createElement('img')
+  logo.src = logoUrl
+  logo.style.cssText = 'height: 42px; width: auto; objectFit: contain; flexShrink: 0;'
+  header.appendChild(logo)
+
+  // Center text
+  const hCenter = el('div', { flex: '1', padding: '0 6px' })
+  hCenter.appendChild(txt('Mulligan\'s Island Golf Club', {
     display: 'block', color: GOLD,
-    fontSize: '14px', fontWeight: '700', letterSpacing: '0.02em',
+    fontSize: '13px', fontWeight: '700', letterSpacing: '0.02em',
   }))
-  hLeft.appendChild(mkTxt(event.name ?? `Event #${event.event_number}`, {
-    display: 'block', color: '#ffffff', fontSize: '11px', marginTop: '1px',
+  hCenter.appendChild(txt(event.name ?? `Event #${event.event_number}`, {
+    display: 'block', color: '#ffffff', fontSize: '10px', marginTop: '1px',
   }))
-  hLeft.appendChild(mkTxt(`${course.name ?? ''} · ${eventDate}`, {
+  hCenter.appendChild(txt(`${course.name ?? ''} · ${eventDate}`, {
     display: 'block', color: 'rgba(255,255,255,0.6)', fontSize: '9px', marginTop: '1px',
   }))
-  header.appendChild(hLeft)
+  header.appendChild(hCenter)
 
-  const badge = mkEl('div', {
+  // Right: sub-badge + group badge
+  const hRight = el('div', { display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '3px' })
+  if (subBadge) {
+    hRight.appendChild(txt(subBadge, {
+      color: 'rgba(255,255,255,0.8)', fontSize: '9px', fontWeight: '600',
+      whiteSpace: 'nowrap',
+    }))
+  }
+  const groupBadge = el('div', {
     background: GOLD, color: '#1a1a1a',
-    fontWeight: '800', fontSize: '17px',
-    borderRadius: '5px', padding: '3px 10px',
+    fontWeight: '800', fontSize: '16px',
+    borderRadius: '5px', padding: '2px 10px',
     whiteSpace: 'nowrap',
   })
-  badge.textContent = `Group ${groupNum}`
-  header.appendChild(badge)
+  groupBadge.textContent = `Group ${groupNum}`
+  hRight.appendChild(groupBadge)
+  header.appendChild(hRight)
   card.appendChild(header)
 
   // ── Score table ──────────────────────────────────────────────────
-  card.appendChild(buildTable({ parPerHole, strokeIndex, players, tees }))
+  card.appendChild(buildTable({ parPerHole, strokeIndex, teesToShow, players }))
 
   // ── Footer ───────────────────────────────────────────────────────
-  const footer = mkEl('div', {
+  const footer = el('div', {
     display: 'flex', alignItems: 'center', gap: '10px',
-    padding: '6px 10px',
+    padding: '5px 10px',
     background: GRAY_BG,
     borderTop: '2px solid ' + GREEN,
     flexShrink: '0',
   })
   if (qrDataUrl) {
-    const img = mkEl('img', { width: '64px', height: '64px', flexShrink: '0' })
+    const img = document.createElement('img')
     img.src = qrDataUrl
+    img.style.cssText = 'width: 58px; height: 58px; flexShrink: 0;'
     footer.appendChild(img)
   }
-  const ftxt = mkEl('div')
-  ftxt.appendChild(mkTxt('Scan to enter scores', {
+  const ftxt = el('div')
+  ftxt.appendChild(txt('Scan to enter scores', {
     display: 'block', fontSize: '9px', color: '#6b7280', marginBottom: '2px',
   }))
   if (code) {
-    const codeRow = mkEl('div', { display: 'flex', alignItems: 'center', gap: '5px' })
-    codeRow.appendChild(mkTxt('Access Code:', { fontSize: '10px', color: '#374151' }))
-    codeRow.appendChild(mkTxt(code, {
-      fontSize: '19px', fontWeight: '800', color: GREEN,
+    const codeRow = el('div', { display: 'flex', alignItems: 'center', gap: '5px' })
+    codeRow.appendChild(txt('Access Code:', { fontSize: '10px', color: '#374151' }))
+    codeRow.appendChild(txt(code, {
+      fontSize: '18px', fontWeight: '800', color: GREEN,
       letterSpacing: '0.14em', fontFamily: 'monospace',
     }))
     ftxt.appendChild(codeRow)
@@ -226,42 +269,44 @@ function buildCard({ event, course, groupNum, players, code, qrDataUrl }) {
 }
 
 // ─── Score table ─────────────────────────────────────────────────
-function buildTable({ parPerHole, strokeIndex, players, tees }) {
-  const tbl = mkEl('table', {
-    width: '100%',
-    borderCollapse: 'collapse',
-    tableLayout: 'fixed',
-    fontSize: '10px',
-    fontFamily: 'Arial, Helvetica, sans-serif',
-    flex: '1',
-  })
+function buildTable({ parPerHole, strokeIndex, teesToShow, players }) {
+  const tbl = document.createElement('table')
+  tbl.style.cssText = `
+    width: 100%;
+    border-collapse: collapse;
+    table-layout: fixed;
+    font-size: 10px;
+    font-family: Arial, Helvetica, sans-serif;
+    flex: 1;
+  `
 
-  // ── Col widths ──────────────────────────────────────────────────
-  const colgroup = document.createElement('colgroup')
+  // Colgroup
+  const cg = document.createElement('colgroup')
   const colDefs = [
-    { w: COL_LABEL },                      // label
-    ...Array(9).fill({ w: COL_HOLE }),     // H1-9
-    { w: COL_SUMM },                       // OUT
-    { w: COL_INIT },                       // INIT
-    ...Array(9).fill({ w: COL_HOLE }),     // H10-18
-    { w: COL_SUMM },                       // IN
-    { w: COL_SUMM },                       // TOT
-    { w: COL_HCP  },                       // HCP
-    { w: COL_NET  },                       // NET
+    COL_LABEL,
+    ...Array(9).fill(COL_HOLE),
+    COL_SUMM,
+    COL_INIT,
+    ...Array(9).fill(COL_HOLE),
+    COL_SUMM, COL_SUMM,
+    COL_HCP, COL_NET, COL_PUTTS,
   ]
-  colDefs.forEach(c => {
-    const col = document.createElement('col')
-    col.style.width = c.w + 'px'
-    colgroup.appendChild(col)
+  colDefs.forEach(w => {
+    const c = document.createElement('col')
+    c.style.width = w + 'px'
+    cg.appendChild(c)
   })
-  tbl.appendChild(colgroup)
+  tbl.appendChild(cg)
 
-  function mkCell(txt, opts = {}) {
+  // ── Cell factories ───────────────────────────────────────────────
+  function mkTd(content, opts = {}) {
     const {
       bg = '#ffffff', color = '#111827', bold = false,
-      align = 'center', border = true, small = false,
+      align = 'center', fontSize = '10px', border = true,
+      leftBorder = null, rightBorder = null,
     } = opts
     const td = document.createElement('td')
+    const borderStr = `1px solid ${BORDER}`
     td.style.cssText = `
       height: ${CELL_H}px;
       text-align: ${align};
@@ -269,99 +314,140 @@ function buildTable({ parPerHole, strokeIndex, players, tees }) {
       background: ${bg};
       color: ${color};
       font-weight: ${bold ? '700' : '400'};
-      font-size: ${small ? '8px' : '10px'};
-      ${border ? `border: 1px solid ${BORDER};` : ''}
+      font-size: ${fontSize};
+      border: ${border ? borderStr : 'none'};
+      ${leftBorder  ? `border-left:  ${leftBorder};`  : ''}
+      ${rightBorder ? `border-right: ${rightBorder};` : ''}
       padding: 0 2px;
       white-space: nowrap;
       overflow: hidden;
       box-sizing: border-box;
     `
-    td.textContent = String(txt ?? '')
+    td.textContent = String(content ?? '')
     return td
   }
 
-  function mkLabelCell(txt, opts = {}) {
-    const td = mkCell(txt, { bg: GRAY_BG, color: '#374151', bold: true, align: 'left', ...opts })
+  function mkLabel(content, opts = {}) {
+    const td = mkTd(content, { bg: GRAY_BG, color: '#374151', bold: true, align: 'left', fontSize: '9px', ...opts })
     td.style.paddingLeft = '5px'
-    td.style.fontSize = '9px'
     return td
+  }
+
+  // INIT fold-line cell
+  function mkInitCell(content, opts = {}) {
+    return mkTd(content, {
+      bg: '#e8f0e8', color: GREEN, bold: true, fontSize: '9px',
+      leftBorder:  '2px dashed #aacaaa',
+      rightBorder: '2px dashed #aacaaa',
+      ...opts,
+    })
+  }
+
+  // ── Helper: build a full row ─────────────────────────────────────
+  function addRow(rowDef) {
+    const {
+      label, labelBg = GRAY_BG, labelColor = '#374151',
+      h1to9,           // array[9] of values
+      out,             // OUT cell value
+      initCell,        // INIT cell value/options
+      h10to18,         // array[9]
+      inVal, tot,
+      hcp, net, putts,
+      // style overrides
+      holeBg = '#ffffff', holeColor = '#111827', holeBold = false,
+      summBg = '#e8e8e4', summColor = '#1a1a1a',
+    } = rowDef
+
+    const tr = document.createElement('tr')
+    tr.appendChild(mkLabel(label, { bg: labelBg, color: labelColor }))
+
+    // H1-9
+    ;(h1to9 ?? Array(9).fill('')).forEach(v =>
+      tr.appendChild(mkTd(v, { bg: holeBg, color: holeColor, bold: holeBold }))
+    )
+    // OUT
+    tr.appendChild(mkTd(out ?? '', { bg: summBg, color: summColor, bold: true }))
+    // INIT
+    tr.appendChild(typeof initCell === 'object' && initCell !== null
+      ? (() => { const c = mkInitCell(initCell.val ?? ''); return c })()
+      : mkInitCell(initCell ?? '')
+    )
+    // H10-18
+    ;(h10to18 ?? Array(9).fill('')).forEach(v =>
+      tr.appendChild(mkTd(v, { bg: holeBg, color: holeColor, bold: holeBold }))
+    )
+    // IN / TOT
+    tr.appendChild(mkTd(inVal ?? '', { bg: summBg, color: summColor, bold: true }))
+    tr.appendChild(mkTd(tot   ?? '', { bg: summBg, color: summColor, bold: true }))
+    // HCP / NET / PUTTS
+    tr.appendChild(mkTd(hcp   ?? '', { bg: '#deeede', color: GREEN,     bold: !!hcp }))
+    tr.appendChild(mkTd(net   ?? '', { bg: '#f0f8f0', color: '#111827' }))
+    tr.appendChild(mkTd(putts ?? '', { bg: '#f0f8f0', color: '#111827' }))
+
+    tbl.appendChild(tr)
+    return tr
   }
 
   // ── Row: Hole numbers ────────────────────────────────────────────
-  const holeRow = document.createElement('tr')
-  holeRow.appendChild(mkLabelCell('Hole', { bg: GREEN, color: '#ffffff' }))
-  for (let h = 1; h <= 9; h++) {
-    holeRow.appendChild(mkCell(h, { bg: GREEN, color: '#ffffff', bold: true }))
-  }
-  holeRow.appendChild(mkCell('OUT', { bg: GOLD, color: '#1a1a1a', bold: true }))
-  holeRow.appendChild(mkCell('INIT', { bg: GREEN, color: '#ffffff', bold: true, small: true }))
-  for (let h = 10; h <= 18; h++) {
-    holeRow.appendChild(mkCell(h, { bg: GREEN, color: '#ffffff', bold: true }))
-  }
-  holeRow.appendChild(mkCell('IN',  { bg: GOLD, color: '#1a1a1a', bold: true }))
-  holeRow.appendChild(mkCell('TOT', { bg: GOLD, color: '#1a1a1a', bold: true }))
-  holeRow.appendChild(mkCell('HCP', { bg: GREEN, color: '#ffffff', bold: true, small: true }))
-  holeRow.appendChild(mkCell('NET', { bg: GREEN, color: '#ffffff', bold: true, small: true }))
-  tbl.appendChild(holeRow)
+  const holeNums = Array.from({ length: 9 }, (_, i) => i + 1)
+  addRow({
+    label: 'HOLE', labelBg: GREEN, labelColor: '#ffffff',
+    h1to9: holeNums, out: 'OUT', initCell: 'INIT',
+    h10to18: Array.from({ length: 9 }, (_, i) => i + 10), inVal: 'IN', tot: 'TOT',
+    hcp: 'HCP', net: 'NET', putts: 'PUTTS',
+    holeBg: GREEN, holeColor: '#ffffff', holeBold: true,
+    summBg: GOLD, summColor: '#1a1a1a',
+  })
+
+  // ── Tee rows (yardage per hole) ──────────────────────────────────
+  teesToShow.forEach(tee => {
+    const yds   = tee.yardage ?? []
+    const front = yds.slice(0, 9).reduce((a, b) => a + (b || 0), 0)
+    const back  = yds.slice(9, 18).reduce((a, b) => a + (b || 0), 0)
+    const ratingSlope = (tee.rating && tee.slope) ? ` (${tee.rating}/${tee.slope})` : ''
+    const teeBg = tee.color
+      ? hexWithAlpha(tee.color, 0.12)
+      : '#f0f4ee'
+
+    addRow({
+      label: `${tee.name} Tees${ratingSlope}`,
+      labelBg: teeBg, labelColor: '#1a1a1a',
+      h1to9:   yds.slice(0, 9).map(v => v || ''),
+      out:     front || '',
+      initCell: '',
+      h10to18: yds.slice(9, 18).map(v => v || ''),
+      inVal:  back || '',
+      tot:    (front + back) || '',
+      holeBg: teeBg, holeColor: '#1a1a1a',
+      summBg: '#dde8dd', summColor: '#1a1a1a',
+    })
+  })
 
   // ── Row: Par ─────────────────────────────────────────────────────
-  const parRow = document.createElement('tr')
-  parRow.appendChild(mkLabelCell('Par'))
-  const frontPar = parPerHole.slice(0, 9).reduce((a, b) => a + b, 0)
-  const backPar  = parPerHole.slice(9).reduce((a, b) => a + b, 0)
-  for (let h = 1; h <= 9; h++) {
-    parRow.appendChild(mkCell(parPerHole[h-1] ?? '', { bg: GRAY_BG, color: '#374151', bold: true }))
-  }
-  parRow.appendChild(mkCell(frontPar, { bg: '#e8e8e4', color: '#1a1a1a', bold: true }))
-  parRow.appendChild(mkCell('',       { bg: GRAY_BG }))
-  for (let h = 10; h <= 18; h++) {
-    parRow.appendChild(mkCell(parPerHole[h-1] ?? '', { bg: GRAY_BG, color: '#374151', bold: true }))
-  }
-  parRow.appendChild(mkCell(backPar,           { bg: '#e8e8e4', color: '#1a1a1a', bold: true }))
-  parRow.appendChild(mkCell(frontPar + backPar, { bg: '#e8e8e4', color: '#1a1a1a', bold: true }))
-  parRow.appendChild(mkCell('', { bg: GRAY_BG }))
-  parRow.appendChild(mkCell('', { bg: GRAY_BG }))
-  tbl.appendChild(parRow)
+  const fPar = parPerHole.slice(0, 9).reduce((a, b) => a + b, 0)
+  const bPar = parPerHole.slice(9).reduce((a, b) => a + b, 0)
+  addRow({
+    label: 'PAR', labelBg: GRAY_BG, labelColor: '#374151',
+    h1to9:   parPerHole.slice(0, 9),
+    out:     fPar,
+    initCell: '',
+    h10to18: parPerHole.slice(9, 18),
+    inVal:  bPar, tot: fPar + bPar,
+    holeBg: GRAY_BG, holeColor: '#374151', holeBold: true,
+    summBg: '#e0e0dc',
+  })
 
   // ── Row: Stroke Index ────────────────────────────────────────────
-  const siRow = document.createElement('tr')
-  siRow.appendChild(mkLabelCell('S.I.'))
-  for (let h = 1; h <= 9; h++) {
-    siRow.appendChild(mkCell(strokeIndex[h-1] ?? '', { bg: '#f0f0ee', color: '#6b7280' }))
-  }
-  siRow.appendChild(mkCell('', { bg: '#f0f0ee' }))
-  siRow.appendChild(mkCell('', { bg: '#f0f0ee' }))
-  for (let h = 10; h <= 18; h++) {
-    siRow.appendChild(mkCell(strokeIndex[h-1] ?? '', { bg: '#f0f0ee', color: '#6b7280' }))
-  }
-  siRow.appendChild(mkCell('', { bg: '#f0f0ee' }))
-  siRow.appendChild(mkCell('', { bg: '#f0f0ee' }))
-  siRow.appendChild(mkCell('', { bg: '#f0f0ee' }))
-  siRow.appendChild(mkCell('', { bg: '#f0f0ee' }))
-  tbl.appendChild(siRow)
-
-  // ── Row: Tees ────────────────────────────────────────────────────
-  const teesRow = document.createElement('tr')
-  const teesLabel = mkLabelCell('Tees')
-  teesRow.appendChild(teesLabel)
-  // Span all remaining columns with tee info
-  const teesTd = document.createElement('td')
-  teesTd.colSpan = 24
-  teesTd.style.cssText = `
-    height: ${CELL_H}px;
-    text-align: left;
-    vertical-align: middle;
-    background: ${GRAY_BG};
-    color: #374151;
-    font-size: 9px;
-    font-weight: 600;
-    border: 1px solid ${BORDER};
-    padding: 0 6px;
-    box-sizing: border-box;
-  `
-  teesTd.textContent = tees
-  teesRow.appendChild(teesTd)
-  tbl.appendChild(teesRow)
+  addRow({
+    label: 'S.I.', labelBg: '#efefed', labelColor: '#6b7280',
+    h1to9:   strokeIndex.slice(0, 9),
+    out:     '',
+    initCell: '',
+    h10to18: strokeIndex.slice(9, 18),
+    inVal: '', tot: '', hcp: '', net: '', putts: '',
+    holeBg: '#efefed', holeColor: '#6b7280',
+    summBg: '#efefed', summColor: '#9ca3af',
+  })
 
   // ── Player rows ──────────────────────────────────────────────────
   const slots = [...players]
@@ -372,67 +458,55 @@ function buildTable({ parPerHole, strokeIndex, players, tees }) {
     const lastName  = ep?.player?.last_name  ?? ''
     const flight    = ep?.flight ?? null
     const ch        = ep?.course_handicap ?? null
-    const isGuest   = ep?.is_guest
 
-    // "F. Last (A)" or "F. Last" or "Player N"
-    let nameLabel = ''
+    let nameLabel
     if (ep) {
       const abbr = firstName ? `${firstName[0]}. ${lastName}` : lastName
-      nameLabel = flight && !isGuest ? `${abbr} (${flight})` : abbr
+      nameLabel  = flight ? `${abbr} (${flight})` : abbr
     } else {
       nameLabel = `Player ${i + 1}`
     }
 
-    // Initials: first letter of first + first letter of last
     const initials = ep
       ? `${firstName?.[0] ?? ''}${lastName?.[0] ?? ''}`.toUpperCase()
       : ''
 
-    const rowBg    = ep ? '#ffffff' : '#fafafa'
-    const nameColor = ep ? '#111827' : '#b0b0b0'
-
-    const tr = document.createElement('tr')
-    const labelTd = mkLabelCell(nameLabel, { bg: rowBg, color: nameColor })
-    labelTd.style.fontSize = '9px'
-    tr.appendChild(labelTd)
-
-    // Holes 1-9 (empty score boxes)
-    for (let h = 1; h <= 9; h++) {
-      tr.appendChild(mkCell('', { bg: rowBg }))
-    }
-    // OUT summary (empty)
-    tr.appendChild(mkCell('', { bg: '#f5f5f3' }))
-    // INIT
-    tr.appendChild(mkCell(initials, { bg: '#eef4ee', color: GREEN, bold: true, small: true }))
-    // Holes 10-18 (empty score boxes)
-    for (let h = 10; h <= 18; h++) {
-      tr.appendChild(mkCell('', { bg: rowBg }))
-    }
-    // IN summary (empty)
-    tr.appendChild(mkCell('', { bg: '#f5f5f3' }))
-    // TOT (empty)
-    tr.appendChild(mkCell('', { bg: '#f5f5f3' }))
-    // HCP
-    tr.appendChild(mkCell(ch !== null ? ch : '', { bg: '#eef4ee', color: GREEN, bold: true }))
-    // NET (empty)
-    tr.appendChild(mkCell('', { bg: '#f0f8f0' }))
-
-    tbl.appendChild(tr)
+    addRow({
+      label: nameLabel,
+      labelBg: 'transparent', labelColor: ep ? '#111827' : '#b0b0b0',
+      h1to9:   Array(9).fill(''),
+      out:     '',
+      initCell: initials,
+      h10to18: Array(9).fill(''),
+      inVal: '', tot: '',
+      hcp:   ch !== null ? ch : '',
+      net:   '', putts: '',
+      holeBg: 'transparent',
+      summBg: 'transparent', summColor: '#374151',
+    })
   })
 
   return tbl
 }
 
 // ─── Helpers ─────────────────────────────────────────────────────
-function mkEl(tag, styles = {}) {
+function el(tag, styles = {}) {
   const e = document.createElement(tag)
   Object.assign(e.style, styles)
   return e
 }
 
-function mkTxt(content, styles = {}) {
+function txt(content, styles = {}) {
   const s = document.createElement('span')
   Object.assign(s.style, styles)
   s.textContent = content
   return s
+}
+
+/** Convert hex color to rgba with given alpha (0-1) */
+function hexWithAlpha(hex, alpha) {
+  const r = parseInt(hex.slice(1, 3), 16)
+  const g = parseInt(hex.slice(3, 5), 16)
+  const b = parseInt(hex.slice(5, 7), 16)
+  return `rgba(${r},${g},${b},${alpha})`
 }
