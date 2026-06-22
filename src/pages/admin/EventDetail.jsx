@@ -1000,16 +1000,32 @@ function AddPlayerModal({ open, onClose, eventId, available, course, useFlights,
                   </span>
                   {checked && (
                     <>
-                      <select
-                        value={vals.flight}
-                        onChange={e => setField(p.id, 'flight', e.target.value)}
-                        className="input py-1 text-xs w-28 shrink-0 bg-white"
-                      >
-                        <option value="">Flight?</option>
-                        {useFlights && <option value="A">Flight A</option>}
-                        {useFlights && <option value="B">Flight B</option>}
-                        <option value="guest">Guest Player</option>
-                      </select>
+                      {/* Flight dropdown — only when flights are enabled */}
+                      {useFlights && (
+                        <select
+                          value={vals.flight}
+                          onChange={e => setField(p.id, 'flight', e.target.value)}
+                          className="input py-1 text-xs w-28 shrink-0 bg-white"
+                        >
+                          <option value="">Flight?</option>
+                          <option value="A">Flight A</option>
+                          <option value="B">Flight B</option>
+                          <option value="guest">Guest Player</option>
+                        </select>
+                      )}
+
+                      {/* No-flights: Guest toggle button */}
+                      {!useFlights && (
+                        <button
+                          type="button"
+                          onClick={() => setField(p.id, 'flight', vals.flight === 'guest' ? '' : 'guest')}
+                          className={`text-xs shrink-0 px-2 py-1 rounded-full font-semibold border ${vals.flight === 'guest' ? 'bg-purple-100 text-purple-700 border-purple-300' : 'bg-gray-100 text-gray-500 border-gray-200'}`}
+                        >
+                          Guest
+                        </button>
+                      )}
+
+                      {/* HI / CH fields — hidden for guest */}
                       {vals.flight !== 'guest' && (
                         <>
                           <input
