@@ -282,9 +282,6 @@ function buildCard({ event, course, groupNum, players, code, qrDataUrl, ctpHoles
   const hasCtp = ctpHoles && ctpHoles.length > 0
   const hasLd  = !!longDriveHole
   if (hasCtp || hasLd) {
-    // Spacer to push panel right
-    footer.appendChild(el('div', { flex: '1' }))
-
     const panel = el('div', {
       display: 'flex', gap: '10px', alignItems: 'stretch',
     })
