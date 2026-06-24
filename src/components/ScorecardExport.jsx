@@ -62,7 +62,13 @@ export function ExportScorecardsButton({ event, eventPlayers, course }) {
         if (!node) continue
         node.innerHTML = ''
 
-        const pageEl = buildPage({ event, course, groupNum: g, players, code, qrDataUrl })
+        const ctpHoles     = Object.keys(event.payout_config ?? {})
+          .filter(k => k.startsWith('ctp_'))
+          .map(k => parseInt(k.replace('ctp_', ''), 10))
+          .sort((a, b) => a - b)
+        const longDriveHole = event.long_drive_hole ?? null
+
+        const pageEl = buildPage({ event, course, groupNum: g, players, code, qrDataUrl, ctpHoles, longDriveHole })
         node.appendChild(pageEl)
 
         // Wait for images to load
@@ -119,7 +125,7 @@ export function ExportScorecardsButton({ event, eventPlayers, course }) {
 }
 
 // ─── Page: two cards stacked ──────────────────────────────────────
-function buildPage({ event, course, groupNum, players, code, qrDataUrl }) {
+function buildPage({ event, course, groupNum, players, code, qrDataUrl, ctpHoles, longDriveHole }) {
   const page = el('div', {
     width: PAGE_W + 'px', height: PAGE_H + 'px',
     background: '#ffffff',
@@ -129,14 +135,14 @@ function buildPage({ event, course, groupNum, players, code, qrDataUrl }) {
     boxSizing: 'border-box',
     fontFamily: 'Arial, Helvetica, sans-serif',
   })
-  const opts = { event, course, groupNum, players, code, qrDataUrl }
+  const opts = { event, course, groupNum, players, code, qrDataUrl, ctpHoles, longDriveHole }
   page.appendChild(buildCard(opts))
   page.appendChild(buildCard(opts))
   return page
 }
 
 // ─── Card ─────────────────────────────────────────────────────────
-function buildCard({ event, course, groupNum, players, code, qrDataUrl }) {
+function buildCard({ event, course, groupNum, players, code, qrDataUrl, ctpHoles, longDriveHole }) {
   const parPerHole  = course.par_per_hole  ?? []
   const strokeIndex = course.stroke_index  ?? []
   const courseTees  = course.tees          ?? []
@@ -241,7 +247,7 @@ function buildCard({ event, course, groupNum, players, code, qrDataUrl }) {
   card.appendChild(header)
 
   // ── Score table ──────────────────────────────────────────────────
-  card.appendChild(buildTable({ parPerHole, strokeIndex, teesToShow, players }))
+  card.appendChild(buildTable({ parPerHole, strokeIndex, teesToShow, players, longDriveHole }))
 
   // ── Footer ───────────────────────────────────────────────────────
   const footer = el('div', {
@@ -271,13 +277,69 @@ function buildCard({ event, course, groupNum, players, code, qrDataUrl }) {
     ftxt.appendChild(codeRow)
   }
   footer.appendChild(ftxt)
+
+  // ── Competitions panel (CTP + Long Drive) ────────────────────────
+  const hasCtp = ctpHoles && ctpHoles.length > 0
+  const hasLd  = !!longDriveHole
+  if (hasCtp || hasLd) {
+    // Spacer to push panel right
+    footer.appendChild(el('div', { flex: '1' }))
+
+    const panel = el('div', {
+      display: 'flex', gap: '10px', alignItems: 'stretch',
+    })
+
+    if (hasCtp) {
+      const ctpBox = el('div', {
+        background: '#f0f7f0',
+        border: '1px solid #b6d8b6',
+        borderRadius: '8px',
+        padding: '6px 10px',
+        minWidth: '100px',
+      })
+      ctpBox.appendChild(txt('Closest to the Pin', {
+        display: 'block', fontSize: '8px', fontWeight: '700',
+        color: GREEN, textTransform: 'uppercase', letterSpacing: '0.05em',
+        marginBottom: '4px',
+      }))
+      const holeNums = ctpHoles.map(h => `#${h}`).join('  ·  ')
+      ctpBox.appendChild(txt(holeNums, {
+        display: 'block', fontSize: '13px', fontWeight: '800',
+        color: '#1a1a1a', letterSpacing: '0.03em',
+      }))
+      panel.appendChild(ctpBox)
+    }
+
+    if (hasLd) {
+      const ldBox = el('div', {
+        background: '#fffbe6',
+        border: '1px solid #f0d060',
+        borderRadius: '8px',
+        padding: '6px 10px',
+        minWidth: '80px',
+      })
+      ldBox.appendChild(txt('Long Drive', {
+        display: 'block', fontSize: '8px', fontWeight: '700',
+        color: '#7a5a00', textTransform: 'uppercase', letterSpacing: '0.05em',
+        marginBottom: '4px',
+      }))
+      ldBox.appendChild(txt(`#${longDriveHole}`, {
+        display: 'block', fontSize: '13px', fontWeight: '800',
+        color: '#1a1a1a', letterSpacing: '0.03em',
+      }))
+      panel.appendChild(ldBox)
+    }
+
+    footer.appendChild(panel)
+  }
+
   card.appendChild(footer)
 
   return card
 }
 
 // ─── Score table ─────────────────────────────────────────────────
-function buildTable({ parPerHole, strokeIndex, teesToShow, players }) {
+function buildTable({ parPerHole, strokeIndex, teesToShow, players, longDriveHole }) {
   const tbl = document.createElement('table')
   tbl.style.cssText = `
     width: 100%;
@@ -383,13 +445,18 @@ function buildTable({ parPerHole, strokeIndex, teesToShow, players }) {
       summBg = '#e8e8e4', summColor = '#1a1a1a',
     } = rowDef
 
+    const LD_BG = '#fffbe6'  // light yellow for long drive hole
+
     const tr = document.createElement('tr')
     tr.appendChild(mkLabel(label, { bg: labelBg, color: labelColor, fontSize: labelFontSize }))
 
     // H1-9
-    ;(h1to9 ?? Array(9).fill('')).forEach(v =>
-      tr.appendChild(mkTd(v, { bg: holeBg, color: holeColor, bold: holeBold }))
-    )
+    ;(h1to9 ?? Array(9).fill('')).forEach((v, i) => {
+      const hNum = i + 1
+      const isLd = longDriveHole === hNum
+      const bg   = isLd ? (holeBg === 'transparent' ? 'rgba(255,235,59,0.18)' : LD_BG) : holeBg
+      tr.appendChild(mkTd(v, { bg, color: holeColor, bold: holeBold }))
+    })
     // OUT
     tr.appendChild(mkTd(out ?? '', { bg: summBg, color: summColor, bold: true }))
     // INIT
@@ -398,9 +465,12 @@ function buildTable({ parPerHole, strokeIndex, teesToShow, players }) {
       : mkInitCell(initCell ?? '')
     )
     // H10-18
-    ;(h10to18 ?? Array(9).fill('')).forEach(v =>
-      tr.appendChild(mkTd(v, { bg: holeBg, color: holeColor, bold: holeBold }))
-    )
+    ;(h10to18 ?? Array(9).fill('')).forEach((v, i) => {
+      const hNum = i + 10
+      const isLd = longDriveHole === hNum
+      const bg   = isLd ? (holeBg === 'transparent' ? 'rgba(255,235,59,0.18)' : LD_BG) : holeBg
+      tr.appendChild(mkTd(v, { bg, color: holeColor, bold: holeBold }))
+    })
     // IN / TOT
     tr.appendChild(mkTd(inVal ?? '', { bg: summBg, color: summColor, bold: true }))
     tr.appendChild(mkTd(tot   ?? '', { bg: summBg, color: summColor, bold: true }))
@@ -501,19 +571,21 @@ function buildTable({ parPerHole, strokeIndex, teesToShow, players }) {
       bg: 'transparent', color: ep ? '#111827' : '#b0b0b0', bold: false,
     }))
 
-    // H1-9 with stroke dots
+    // H1-9 with stroke dots (+ long drive highlight)
     for (let h = 1; h <= 9; h++) {
       const strokes = (ep && ch !== null) ? getStrokesOnHole(ch, strokeIndex[h - 1]) : 0
-      tr.appendChild(mkScoreCell(strokes))
+      const bg = longDriveHole === h ? 'rgba(255,235,59,0.18)' : 'transparent'
+      tr.appendChild(mkScoreCell(strokes, { bg }))
     }
     // OUT
     tr.appendChild(mkTd('', { bg: 'transparent', color: '#374151', bold: true }))
     // INIT
     tr.appendChild(mkInitCell(initials))
-    // H10-18 with stroke dots
+    // H10-18 with stroke dots (+ long drive highlight)
     for (let h = 10; h <= 18; h++) {
       const strokes = (ep && ch !== null) ? getStrokesOnHole(ch, strokeIndex[h - 1]) : 0
-      tr.appendChild(mkScoreCell(strokes))
+      const bg = longDriveHole === h ? 'rgba(255,235,59,0.18)' : 'transparent'
+      tr.appendChild(mkScoreCell(strokes, { bg }))
     }
     // IN / TOT
     tr.appendChild(mkTd('', { bg: 'transparent', color: '#374151', bold: true }))

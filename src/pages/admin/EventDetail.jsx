@@ -1257,12 +1257,13 @@ function GroupRow({ ep, maxGroup, isFirst, isLast, onSetGroup, onToggleSK, onMov
 
 // ─── Tab: Payout Config ───────────────────────────────────────────
 function TabPayoutConfig({ event, eventPlayers, course, onUpdated }) {
-  const [config,      setConfig]      = useState({})
-  const [saving,      setSaving]      = useState(false)
-  const [ctpHoles,    setCtpHoles]    = useState([])   // array of hole numbers
-  const [ctpInput,    setCtpInput]    = useState('')
-  const [payoutBasis, setPayoutBasis] = useState(event.payout_basis ?? 'per_player')
-  const [fixedTotal,  setFixedTotal]  = useState(event.payout_fixed_total ?? '')
+  const [config,         setConfig]         = useState({})
+  const [saving,         setSaving]         = useState(false)
+  const [ctpHoles,       setCtpHoles]       = useState([])   // array of hole numbers
+  const [ctpInput,       setCtpInput]       = useState('')
+  const [longDriveHole,  setLongDriveHole]  = useState(event.long_drive_hole ?? '')
+  const [payoutBasis,    setPayoutBasis]    = useState(event.payout_basis ?? 'per_player')
+  const [fixedTotal,     setFixedTotal]     = useState(event.payout_fixed_total ?? '')
 
   const nonGuestPlayers = eventPlayers.filter(e => !e.is_guest)
   const flightA = nonGuestPlayers.filter(e => e.flight === 'A').length
@@ -1272,7 +1273,8 @@ function TabPayoutConfig({ event, eventPlayers, course, onUpdated }) {
   // Active keys driven by event's formats + side_game_options + use_flights
   const eventActiveKeys = activePayoutKeys(event)
 
-  const hasCtp = (event.side_game_options ?? []).includes('ctp')
+  const hasCtp      = (event.side_game_options ?? []).includes('ctp')
+  const hasLongDrive = (event.side_game_options ?? []).some(s => s.startsWith('long_drive'))
 
   // Rebuild config whenever event setup changes (formats, sides, use_flights)
   const eventConfigKey = [
@@ -1328,10 +1330,12 @@ function TabPayoutConfig({ event, eventPlayers, course, onUpdated }) {
 
   async function handleSave() {
     setSaving(true)
+    const ldHole = parseInt(longDriveHole, 10)
     const updates = {
       payout_config:       config,
       payout_basis:        payoutBasis,
       payout_fixed_total:  payoutBasis === 'fixed' ? parseFloat(fixedTotal) || 0 : null,
+      long_drive_hole:     hasLongDrive && !isNaN(ldHole) && ldHole >= 1 && ldHole <= 18 ? ldHole : null,
     }
     const { error } = await supabase.from('events').update(updates).eq('id', event.id)
     setSaving(false)
@@ -1414,6 +1418,27 @@ function TabPayoutConfig({ event, eventPlayers, course, onUpdated }) {
       </Card>
 
       {/* CTP hole assignment — only when CTP is selected */}
+      {/* Long Drive hole — only when Long Drive is selected */}
+      {hasLongDrive && <Card>
+        <CardHeader title="Long Drive Hole" subtitle="Designate which hole the Long Drive contest is on" />
+        <div className="flex items-center gap-3">
+          <input
+            type="number" min="1" max="18"
+            value={longDriveHole}
+            onChange={e => setLongDriveHole(e.target.value)}
+            placeholder="Hole #"
+            className="input py-1 text-sm w-24"
+          />
+          {longDriveHole && !isNaN(parseInt(longDriveHole)) && (
+            <span className="inline-flex items-center gap-1 bg-yellow-100 text-yellow-800 text-xs font-semibold px-2.5 py-1 rounded-full">
+              Hole {longDriveHole}
+              <button onClick={() => setLongDriveHole('')} className="text-yellow-600 hover:text-yellow-900 ml-0.5">×</button>
+            </span>
+          )}
+        </div>
+        <p className="text-xs text-gray-400 mt-2">This hole will be highlighted on exported scorecards.</p>
+      </Card>}
+
       {hasCtp && <Card>
         <CardHeader title="Closest to Pin Holes" subtitle="Add the specific hole numbers for CTP contests at this course" />
         <div className="flex flex-wrap gap-2 mb-3">
