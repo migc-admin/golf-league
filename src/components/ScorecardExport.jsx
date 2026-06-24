@@ -293,16 +293,17 @@ function buildCard({ event, course, groupNum, players, code, qrDataUrl, ctpHoles
         borderRadius: '8px',
         padding: '6px 10px',
         minWidth: '100px',
+        textAlign: 'center',
       })
       ctpBox.appendChild(txt('Closest to the Pin', {
         display: 'block', fontSize: '8px', fontWeight: '700',
         color: GREEN, textTransform: 'uppercase', letterSpacing: '0.05em',
-        marginBottom: '4px',
+        marginBottom: '4px', textAlign: 'center',
       }))
       const holeNums = ctpHoles.map(h => `#${h}`).join('  ·  ')
       ctpBox.appendChild(txt(holeNums, {
         display: 'block', fontSize: '13px', fontWeight: '800',
-        color: '#1a1a1a', letterSpacing: '0.03em',
+        color: '#1a1a1a', letterSpacing: '0.03em', textAlign: 'center',
       }))
       panel.appendChild(ctpBox)
     }
@@ -314,15 +315,16 @@ function buildCard({ event, course, groupNum, players, code, qrDataUrl, ctpHoles
         borderRadius: '8px',
         padding: '6px 10px',
         minWidth: '80px',
+        textAlign: 'center',
       })
       ldBox.appendChild(txt('Long Drive', {
         display: 'block', fontSize: '8px', fontWeight: '700',
         color: '#7a5a00', textTransform: 'uppercase', letterSpacing: '0.05em',
-        marginBottom: '4px',
+        marginBottom: '4px', textAlign: 'center',
       }))
       ldBox.appendChild(txt(`#${longDriveHole}`, {
         display: 'block', fontSize: '13px', fontWeight: '800',
-        color: '#1a1a1a', letterSpacing: '0.03em',
+        color: '#1a1a1a', letterSpacing: '0.03em', textAlign: 'center',
       }))
       panel.appendChild(ldBox)
     }
@@ -440,6 +442,7 @@ function buildTable({ parPerHole, strokeIndex, teesToShow, players, longDriveHol
       // style overrides
       holeBg = '#ffffff', holeColor = '#111827', holeBold = false,
       summBg = '#e8e8e4', summColor = '#1a1a1a',
+      skipLdHighlight = false,
     } = rowDef
 
     const LD_BG = '#fffbe6'  // light yellow for long drive hole
@@ -450,7 +453,7 @@ function buildTable({ parPerHole, strokeIndex, teesToShow, players, longDriveHol
     // H1-9
     ;(h1to9 ?? Array(9).fill('')).forEach((v, i) => {
       const hNum = i + 1
-      const isLd = longDriveHole === hNum
+      const isLd = !skipLdHighlight && longDriveHole === hNum
       const bg   = isLd ? (holeBg === 'transparent' ? 'rgba(255,235,59,0.18)' : LD_BG) : holeBg
       tr.appendChild(mkTd(v, { bg, color: holeColor, bold: holeBold }))
     })
@@ -464,7 +467,7 @@ function buildTable({ parPerHole, strokeIndex, teesToShow, players, longDriveHol
     // H10-18
     ;(h10to18 ?? Array(9).fill('')).forEach((v, i) => {
       const hNum = i + 10
-      const isLd = longDriveHole === hNum
+      const isLd = !skipLdHighlight && longDriveHole === hNum
       const bg   = isLd ? (holeBg === 'transparent' ? 'rgba(255,235,59,0.18)' : LD_BG) : holeBg
       tr.appendChild(mkTd(v, { bg, color: holeColor, bold: holeBold }))
     })
@@ -489,6 +492,7 @@ function buildTable({ parPerHole, strokeIndex, teesToShow, players, longDriveHol
     hcp: 'HCP', net: 'NET', putts: 'PUTTS',
     holeBg: GREEN, holeColor: '#ffffff', holeBold: true,
     summBg: GOLD, summColor: '#1a1a1a',
+    skipLdHighlight: true,
   })
 
   // ── Tee rows (yardage per hole) ──────────────────────────────────
