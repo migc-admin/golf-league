@@ -44,8 +44,9 @@ export default {
         },
       },
       fontFamily: {
-        sans:  ['DM Sans', '-apple-system', 'BlinkMacSystemFont', 'sans-serif'],
-        serif: ['Playfair Display', 'Georgia', 'serif'],
+        sans:    ['DM Sans', '-apple-system', 'BlinkMacSystemFont', 'sans-serif'],
+        serif:   ['Manrope', 'DM Sans', 'sans-serif'],
+        display: ['Manrope', 'DM Sans', 'sans-serif'],
       },
       backgroundImage: {
         'augusta-gradient': 'linear-gradient(150deg, #0b2318 0%, #1B4332 45%, #1f5c3e 100%)',

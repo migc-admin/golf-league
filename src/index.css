@@ -15,8 +15,11 @@
     -webkit-font-smoothing: antialiased;
   }
 
+  /* Change 1: Manrope replaces Playfair Display for headings */
   h1, h2, h3 {
-    font-family: 'Playfair Display', serif;
+    font-family: 'Manrope', 'DM Sans', sans-serif;
+    font-weight: 700;
+    letter-spacing: -0.015em;
   }
 
   input[type='number']::-webkit-inner-spin-button,
@@ -61,12 +64,11 @@
     @apply px-6 py-3 text-base;
   }
 
-  /* Card — white, gold top accent, soft shadow */
+  /* Change 4: green-tinted shadow, keep gold top-border + white bg */
   .card {
     background: #fff;
     border-radius: 8px;
-    box-shadow: 0 2px 8px rgba(0,0,0,0.07);
-    border-top: 3px solid #D4AF37;
+    box-shadow: 0 4px 20px rgba(15, 61, 46, 0.05);
     border: 1px solid #dee2e6;
     border-top: 3px solid #D4AF37;
   }
@@ -114,11 +116,12 @@
     color: #2D6A4F;
   }
 
-  /* Section header with gold rule */
+  /* Change 1: section-heading now uses Manrope */
   .section-heading {
-    font-family: 'Playfair Display', serif;
+    font-family: 'Manrope', 'DM Sans', sans-serif;
     font-size: 1.2rem;
     font-weight: 700;
+    letter-spacing: -0.015em;
     color: #1B4332;
   }
 
@@ -132,5 +135,79 @@
     letter-spacing: 0.1em;
     padding: 3px 9px;
     border-radius: 2px;
+  }
+
+  /* Change 3: Leaderboard table zebra striping — borderless rows */
+  .lb-table {
+    width: 100%;
+    border-collapse: collapse;
+  }
+  .lb-table thead th {
+    font-family: 'Manrope', 'DM Sans', sans-serif;
+    font-weight: 600;
+    font-size: 0.7rem;
+    text-transform: uppercase;
+    letter-spacing: 0.07em;
+    color: #2D6A4F;
+    padding: 8px 12px;
+    border-bottom: 1px solid #dee2e6;
+    background: transparent;
+  }
+  .lb-table tbody tr:nth-child(even) {
+    background: rgba(27, 67, 50, 0.035);
+  }
+  .lb-table tbody tr:nth-child(odd) {
+    background: transparent;
+  }
+  .lb-table tbody td {
+    padding: 10px 12px;
+    border: none;
+    font-size: 0.875rem;
+    color: #212529;
+  }
+  .lb-table .col-rank {
+    font-family: 'Manrope', 'DM Sans', sans-serif;
+    font-weight: 600;
+    color: #1B4332;
+    width: 2.5rem;
+  }
+  .lb-score-under { color: #BA1A1A; font-weight: 600; }
+  .lb-score-even  { color: #212529; }
+  .lb-score-over  { color: #212529; }
+
+  /* Change 5: List-row card treatment */
+  .row-card {
+    background: #fff;
+    border-radius: 8px;
+    border: 1px solid #dee2e6;
+    box-shadow: 0 4px 20px rgba(15, 61, 46, 0.05);
+    padding: 24px;
+    position: relative;
+    overflow: hidden;
+    display: flex;
+    align-items: center;
+    gap: 16px;
+  }
+  .row-card-featured {
+    border-left: 3px solid #D4AF37;
+  }
+  .row-card-avatar {
+    width: 44px;
+    height: 44px;
+    border-radius: 50%;
+    background: #dceee6;
+    color: #1B4332;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-family: 'Manrope', sans-serif;
+    font-weight: 700;
+    font-size: 0.875rem;
+    flex-shrink: 0;
+  }
+  .row-card-chevron {
+    margin-left: auto;
+    color: #adb5bd;
+    flex-shrink: 0;
   }
 }
