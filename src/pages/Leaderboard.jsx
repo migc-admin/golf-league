@@ -161,17 +161,18 @@ export default function Leaderboard() {
           </div>
         </div>
 
-        {/* Tabs */}
-        <div className="max-w-2xl mx-auto">
-          <div className="flex overflow-x-auto border-t border-fairway-600">
+        {/* Tabs — pill style */}
+        <div className="max-w-2xl mx-auto border-t border-fairway-600/50">
+          <div className="flex overflow-x-auto px-3 py-2 gap-1">
             {tabs.map(tab => (
               <button
                 key={tab}
                 onClick={() => setActiveTab(tab)}
                 aria-label={`View ${tab} leaderboard`}
-                className={`flex-none px-4 py-2.5 text-xs font-semibold transition-colors whitespace-nowrap cursor-pointer ${
+                aria-pressed={activeTab === tab}
+                className={`flex-none px-3.5 py-1.5 text-xs font-semibold transition-colors whitespace-nowrap cursor-pointer rounded-full ${
                   activeTab === tab
-                    ? 'bg-white/20 text-white border-b-2 border-white'
+                    ? 'bg-white text-fairway-900'
                     : 'text-fairway-200 hover:text-white hover:bg-white/10'
                 }`}
               >
@@ -268,8 +269,6 @@ export default function Leaderboard() {
 
 // ─── Net Leaderboard ──────────────────────────────────────────────
 function NetLeaderboard({ complete, inProgress, progressHolesKey = 'holesCompleted', flight, maxPlaces, label }) {
-  const medals = ['🥇', '🥈', '🥉']
-
   if (!complete?.length && !inProgress?.length) {
     return (
       <div className="text-center py-12 text-gray-400">
@@ -279,13 +278,10 @@ function NetLeaderboard({ complete, inProgress, progressHolesKey = 'holesComplet
     )
   }
 
-  // Include all players whose rank falls within maxPlaces (handles ties at cut line)
-  const topFinishers = complete?.filter(p => p.rank <= maxPlaces) ?? []
-  const restFinishers = complete?.filter(p => p.rank > maxPlaces) ?? []
+  const allComplete = complete ?? []
 
   function rankLabel(p) {
-    // Check if anyone else shares this rank
-    const tied = complete.filter(x => x.rank === p.rank).length > 1
+    const tied = allComplete.filter(x => x.rank === p.rank).length > 1
     return tied ? `T${p.rank}` : `${p.rank}`
   }
 
@@ -296,82 +292,71 @@ function NetLeaderboard({ complete, inProgress, progressHolesKey = 'holesComplet
 
   function scoreColor(p) {
     const vs = p.netVsPar ?? p.f9VsPar ?? p.b9VsPar
-    return vs < 0 ? 'text-red-600' : vs === 0 ? 'text-gray-700' : 'text-blue-600'
+    return vs < 0 ? 'text-[#BA1A1A] font-bold' : vs === 0 ? 'text-gray-700' : 'text-gray-500'
   }
 
   return (
-    <div className="space-y-2">
-      {/* Top finishers — all players within maxPlaces including ties */}
-      {topFinishers.map(p => {
+    <div className="rounded-xl overflow-hidden border border-gray-200 shadow-[0_4px_20px_rgba(27,67,50,0.08)]">
+      {/* Table header */}
+      <div className="grid grid-cols-[2.5rem_1fr_3.5rem_3rem] bg-[#012d1d] text-white/80 text-[10px] font-bold uppercase tracking-widest px-4 py-2.5">
+        <span>Pos</span>
+        <span>Player</span>
+        <span className="text-right">Score</span>
+        <span className="text-right">Thru</span>
+      </div>
+
+      {/* Completed rows */}
+      {allComplete.map((p, i) => {
         const rl = rankLabel(p)
-        const isTied = rl.startsWith('T')
         const isFirst = p.rank === 1
+        const holesThru = p.holesCompleted ?? p.f9Holes ?? p.b9Holes ?? 18
         return (
-          <div key={p.player_id} className={`bg-white rounded-xl border overflow-hidden ${isFirst && !isTied ? 'border-yellow-300 shadow-md shadow-yellow-100' : isTied && p.rank === 1 ? 'border-yellow-300 shadow-md shadow-yellow-100' : 'border-gray-200'}`}>
-            <div className="flex items-center px-4 py-3.5">
-              <div className="w-10 text-xl">
-                {isTied
-                  ? <span className="text-sm font-bold text-gray-500">{rl}</span>
-                  : (medals[p.rank - 1] ?? `${p.rank}.`)
-                }
+          <div
+            key={p.player_id}
+            className={`grid grid-cols-[2.5rem_1fr_3.5rem_3rem] items-center px-4 py-3 border-b border-gray-100 last:border-0 ${i % 2 === 1 ? 'bg-[rgba(27,67,50,0.025)]' : 'bg-white'} ${isFirst ? 'border-l-2 border-l-[#cba72f]' : ''}`}
+          >
+            <span className="text-sm font-semibold text-gray-500 tabular-nums">{rl}</span>
+            <div>
+              <div className="font-semibold text-sm text-gray-900 leading-tight">
+                {p.player?.last_name}, {p.player?.first_name}
               </div>
-              <div className="flex-1">
-                <div className="font-semibold text-gray-900">
-                  {p.player?.last_name}, {p.player?.first_name}
-                </div>
-                <div className="text-xs text-gray-400 mt-0.5">
-                  CH: {p.course_handicap} · Gross: {p.gross18 ?? p.grossF9 ?? p.grossB9}
-                </div>
-              </div>
-              <div className="text-right">
-                <div className={`text-2xl font-black tabular-nums ${scoreColor(p)}`}>
-                  {scoreDisplay(p)}
-                </div>
-                <div className="text-xs text-gray-400">
-                  Net {p.net18 ?? p.netF9 ?? p.netB9}
-                </div>
+              <div className="text-[10px] text-gray-400 mt-0.5">
+                CH {p.course_handicap} · Gross {p.gross18 ?? p.grossF9 ?? p.grossB9}
               </div>
             </div>
+            <span className={`text-sm tabular-nums text-right ${scoreColor(p)}`}>
+              {scoreDisplay(p)}
+            </span>
+            <span className="text-xs text-gray-400 text-right tabular-nums">
+              {holesThru === 18 ? 'F' : holesThru}
+            </span>
           </div>
         )
       })}
 
-      {/* In progress */}
+      {/* In-progress rows */}
       {inProgress?.length > 0 && (
-        <div>
-          <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mt-4 mb-2">In Progress</p>
-          {inProgress.map(p => (
-            <div key={p.player_id} className="bg-white rounded-xl border border-gray-200 flex items-center px-4 py-3 mb-2">
-              <div className="flex-1">
-                <div className="font-medium text-gray-800 text-sm">
-                  {p.player?.last_name}, {p.player?.first_name}
-                </div>
-                <div className="text-xs text-gray-400">thru {p[progressHolesKey]}</div>
-              </div>
-              <div className={`font-bold text-sm tabular-nums ${scoreColor(p)}`}>
-                {scoreDisplay(p)}
-              </div>
-            </div>
-          ))}
-        </div>
-      )}
-
-      {/* Rest of finishers */}
-      {restFinishers.length > 0 && (
-        <div>
-          <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mt-4 mb-2">Full Results</p>
-          {restFinishers.map(p => (
-            <div key={p.player_id} className="bg-white rounded-xl border border-gray-200 flex items-center px-4 py-2.5 mb-2">
-              <span className="w-8 text-sm text-gray-400 font-medium">{rankLabel(p)}</span>
-              <div className="flex-1 text-sm text-gray-800">
+        <>
+          <div className="px-4 py-1.5 bg-gray-50 border-t border-b border-gray-100">
+            <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">In Progress</span>
+          </div>
+          {inProgress.map((p, i) => (
+            <div key={p.player_id}
+              className={`grid grid-cols-[2.5rem_1fr_3.5rem_3rem] items-center px-4 py-3 border-b border-gray-100 last:border-0 ${i % 2 === 0 ? 'bg-white' : 'bg-[rgba(27,67,50,0.025)]'}`}
+            >
+              <span className="text-xs text-gray-300">—</span>
+              <div className="font-medium text-sm text-gray-800">
                 {p.player?.last_name}, {p.player?.first_name}
               </div>
-              <span className={`font-semibold text-sm tabular-nums ${scoreColor(p)}`}>
+              <span className={`text-sm tabular-nums text-right ${scoreColor(p)}`}>
                 {scoreDisplay(p)}
+              </span>
+              <span className="text-xs text-gray-400 text-right tabular-nums">
+                {p[progressHolesKey]}
               </span>
             </div>
           ))}
-        </div>
+        </>
       )}
     </div>
   )
@@ -379,21 +364,27 @@ function NetLeaderboard({ complete, inProgress, progressHolesKey = 'holesComplet
 
 // ─── Putt Leaderboard ─────────────────────────────────────────────
 function PuttLeaderboard({ data, playerMap }) {
-  const medals = ['🥇', '🥈', '🥉']
   if (!data?.length) return (
     <div className="text-center py-12 text-gray-400">
       <p>No complete rounds yet.</p>
     </div>
   )
   return (
-    <div className="space-y-2">
+    <div className="rounded-xl overflow-hidden border border-gray-200 shadow-[0_4px_20px_rgba(27,67,50,0.08)]">
+      <div className="grid grid-cols-[2.5rem_1fr_3.5rem] bg-[#012d1d] text-white/80 text-[10px] font-bold uppercase tracking-widest px-4 py-2.5">
+        <span>Pos</span>
+        <span>Player</span>
+        <span className="text-right">Putts</span>
+      </div>
       {data.map((p, i) => (
-        <div key={p.player_id} className={`bg-white rounded-xl border flex items-center px-4 py-3.5 ${i === 0 ? 'border-yellow-300 shadow-md shadow-yellow-100' : 'border-gray-200'}`}>
-          <span className="w-10 text-xl">{medals[i] ?? `${i+1}.`}</span>
-          <div className="flex-1 font-medium text-gray-900">
+        <div key={p.player_id}
+          className={`grid grid-cols-[2.5rem_1fr_3.5rem] items-center px-4 py-3 border-b border-gray-100 last:border-0 ${i % 2 === 1 ? 'bg-[rgba(27,67,50,0.025)]' : 'bg-white'} ${i === 0 ? 'border-l-2 border-l-[#cba72f]' : ''}`}
+        >
+          <span className="text-sm font-semibold text-gray-500 tabular-nums">{i + 1}</span>
+          <div className="font-medium text-sm text-gray-900">
             {p.player?.last_name}, {p.player?.first_name}
           </div>
-          <span className="text-2xl font-black tabular-nums text-fairway-700">{p.totalPutts}</span>
+          <span className="text-sm font-black tabular-nums text-fairway-700 text-right">{p.totalPutts}</span>
         </div>
       ))}
     </div>
@@ -499,8 +490,7 @@ function SkinsBoard({ skinsResults, playerMap }) {
 
 // ─── Stableford Leaderboard ───────────────────────────────────────
 function StablefordLeaderboard({ data, activeFlight }) {
-  const medals = ['🥇', '🥈', '🥉']
-  const list   = data[activeFlight] ?? []
+  const list = data[activeFlight] ?? []
 
   if (!list.length) return (
     <div className="text-center py-12 text-gray-400">
@@ -510,32 +500,31 @@ function StablefordLeaderboard({ data, activeFlight }) {
   )
 
   return (
-    <div className="space-y-2">
-      {list.map((p, i) => (
-        <div
-          key={p.player_id}
-          className={`bg-white rounded-xl border overflow-hidden ${i === 0 ? 'border-yellow-300 shadow-md shadow-yellow-100' : 'border-gray-200'}`}
-        >
-          <div className="flex items-center px-4 py-3.5">
-            <div className="w-10 text-xl">{medals[i] ?? `${i + 1}.`}</div>
-            <div className="flex-1">
-              <div className="font-semibold text-gray-900">
+    <div className="space-y-3">
+      <div className="rounded-xl overflow-hidden border border-gray-200 shadow-[0_4px_20px_rgba(27,67,50,0.08)]">
+        <div className="grid grid-cols-[2.5rem_1fr_3.5rem] bg-[#012d1d] text-white/80 text-[10px] font-bold uppercase tracking-widest px-4 py-2.5">
+          <span>Pos</span>
+          <span>Player</span>
+          <span className="text-right">Pts</span>
+        </div>
+        {list.map((p, i) => (
+          <div key={p.player_id}
+            className={`grid grid-cols-[2.5rem_1fr_3.5rem] items-center px-4 py-3 border-b border-gray-100 last:border-0 ${i % 2 === 1 ? 'bg-[rgba(27,67,50,0.025)]' : 'bg-white'} ${i === 0 ? 'border-l-2 border-l-[#cba72f]' : ''}`}
+          >
+            <span className="text-sm font-semibold text-gray-500 tabular-nums">{i + 1}</span>
+            <div>
+              <div className="font-semibold text-sm text-gray-900 leading-tight">
                 {p.player?.last_name}, {p.player?.first_name}
               </div>
-              <div className="text-xs text-gray-400 mt-0.5">
-                CH: {p.course_handicap} · {p.holesPlayed} hole{p.holesPlayed !== 1 ? 's' : ''} played
+              <div className="text-[10px] text-gray-400 mt-0.5">
+                CH {p.course_handicap} · {p.holesPlayed} holes
               </div>
             </div>
-            <div className="text-right">
-              <div className="text-2xl font-black text-fairway-700">{p.totalPoints}</div>
-              <div className="text-xs text-gray-400">pts</div>
-            </div>
+            <span className="text-sm font-black tabular-nums text-fairway-700 text-right">{p.totalPoints}</span>
           </div>
-        </div>
-      ))}
-      <p className="text-xs text-center text-gray-400 pt-2">
-        Eagle=4 · Birdie=3 · Par=2 · Bogey=1 · DBL+=0 (net)
-      </p>
+        ))}
+      </div>
+      <p className="text-xs text-center text-gray-400">Eagle=4 · Birdie=3 · Par=2 · Bogey=1 · DBL+=0 (net)</p>
     </div>
   )
 }
