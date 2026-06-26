@@ -132,11 +132,13 @@ function PreviewTable({ headers, rows, statusKey = '_status', messageKey = '_mes
             return (
               <tr key={i} className={
                 status === 'imported' ? 'bg-green-50' :
-                status === 'error'    ? 'bg-red-50' :
+                status === 'matched'  ? 'bg-blue-50'  :
+                status === 'error'    ? 'bg-red-50'   :
                 status === 'skipped'  ? 'bg-yellow-50' : ''
               }>
                 <td className="px-3 py-2 font-medium whitespace-nowrap">
-                  {status === 'imported' && <span className="text-green-700">✓ Imported</span>}
+                  {status === 'imported' && <span className="text-green-700">✓ Created</span>}
+                  {status === 'matched'  && <span className="text-blue-700">↗ Matched existing</span>}
                   {status === 'error'    && <span className="text-red-600">✕ {message}</span>}
                   {status === 'skipped'  && <span className="text-yellow-700">⚠ {message}</span>}
                   {!status               && <span className="text-gray-400">—</span>}
@@ -212,17 +214,28 @@ function ImportPlayers() {
         continue
       }
 
-      // Check for duplicate email
-      let playerId = null
+      // 1. Match by email
+      let playerId   = null
+      let wasMatched = false
       if (email) {
-        const { data: existing } = await supabase
-          .from('players').select('id').eq('email', email).single()
-        if (existing) {
-          playerId = existing.id
-          // Don't skip — still enroll in event below if selected
-        }
+        const { data: byEmail } = await supabase
+          .from('players').select('id').eq('email', email).maybeSingle()
+        if (byEmail) { playerId = byEmail.id; wasMatched = true }
       }
 
+      // 2. Match by first + last name (case-insensitive) if no email match
+      if (!playerId) {
+        const { data: byName } = await supabase
+          .from('players')
+          .select('id')
+          .ilike('first_name', first)
+          .ilike('last_name', last)
+          .limit(1)
+          .maybeSingle()
+        if (byName) { playerId = byName.id; wasMatched = true }
+      }
+
+      // 3. Create new player only if no match found
       if (!playerId) {
         const payload = { first_name: first, last_name: last, intended_role: role }
         if (email) payload.email = email
@@ -264,16 +277,17 @@ function ImportPlayers() {
         }
       }
 
-      updated[i] = { ...row, _status: 'imported', _message: null }
+      updated[i] = { ...row, _status: wasMatched ? 'matched' : 'imported', _message: null }
       setRows([...updated])
     }
 
     setImporting(false)
     setDone(true)
     const imported = updated.filter(r => r._status === 'imported').length
+    const matched  = updated.filter(r => r._status === 'matched').length
     const skipped  = updated.filter(r => r._status === 'skipped').length
     const errors   = updated.filter(r => r._status === 'error').length
-    toast.success(`Done — ${imported} imported, ${skipped} skipped, ${errors} errors`)
+    toast.success(`Done — ${imported} created, ${matched} matched existing, ${skipped} skipped, ${errors} errors`)
   }
 
   const importedCount = rows.filter(r => r._status === 'imported').length
@@ -304,11 +318,11 @@ function ImportPlayers() {
         </div>
         <ul className="mt-3 text-xs text-gray-500 space-y-1 list-disc list-inside">
           <li><strong>first_name</strong> and <strong>last_name</strong> are required</li>
-          <li><strong>email</strong> is optional but used to prevent duplicates</li>
+          <li><strong>email</strong> is optional — used for matching first, then falls back to first+last name match. No duplicate profiles are created either way.</li>
           <li><strong>handicap_index</strong> — used for course handicap if also enrolling in an event</li>
           <li><strong>flight</strong> — A or B. Only applied when enrolling in an event (optional).</li>
           <li><strong>role</strong> — <code>player</code> (default), <code>admin</code>, or <code>scorekeeper</code></li>
-          <li>Players already in the system (matching email) are still enrolled in the selected event</li>
+          <li>Players already in the system (matched by email or name) are reused — not duplicated. They are still enrolled in the selected event if one is chosen.</li>
         </ul>
       </Card>
 
