@@ -2,6 +2,10 @@
 @tailwind components;
 @tailwind utilities;
 
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
 @layer base {
   html {
     -webkit-tap-highlight-color: transparent;
@@ -103,6 +107,7 @@
     font-size: 0.8rem;
     text-transform: uppercase;
     letter-spacing: 0.08em;
+    cursor: pointer;
   }
 
   .tab-inactive {
@@ -111,6 +116,7 @@
     font-size: 0.8rem;
     text-transform: uppercase;
     letter-spacing: 0.08em;
+    cursor: pointer;
   }
   .tab-inactive:hover {
     color: #2D6A4F;
