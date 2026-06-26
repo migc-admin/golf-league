@@ -23,7 +23,7 @@ export default function Layout({ children }) {
   return (
     <div className="min-h-screen flex flex-col" style={{ background: '#EEF1EC' }}>
       {/* Top nav — MIGC gradient + gold border */}
-      <header className="sticky top-0 z-40 shadow-lg" style={{ background: 'linear-gradient(150deg,#0b2318 0%,#1B4332 45%,#1f5c3e 100%)', borderBottom: '3px solid #D4AF37' }}>
+      <header className="sticky top-0 z-40 shadow-lg" style={{ background: 'linear-gradient(150deg,#0b2318 0%,#1B4332 45%,#1f5c3e 100%)', borderBottom: '3px solid #cba72f' }}>
         <div className="max-w-7xl mx-auto px-4 flex items-center justify-between h-14">
           <Link to="/admin" className="flex items-center gap-2.5 tracking-tight">
             <img src="/logo.png" alt="Mulligan's Island Golf Club" className="w-9 h-9 rounded-full object-cover" />
