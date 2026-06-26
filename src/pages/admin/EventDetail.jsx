@@ -12,15 +12,8 @@ import Modal from '../../components/ui/Modal'
 import Input, { Select } from '../../components/ui/Input'
 import Badge, { FlightBadge, StatusBadge } from '../../components/ui/Badge'
 
-const ALL_ADMIN_TABS = ['Overview', 'Registrations', 'Players & Flights', 'Groups', 'Payout Config', 'Side Games', 'Payout Summary']
-
-function visibleAdminTabs(event) {
-  const sides = event?.side_game_options ?? []
-  const hasLongDrive = sides.some(s => s.startsWith('long_drive'))
-  const hasCtp       = sides.includes('ctp')
-  const showSideGames = hasLongDrive || hasCtp
-  return ALL_ADMIN_TABS.filter(t => t !== 'Side Games' || showSideGames)
-}
+// Collapsed from 7 → 4 tabs: Players = Registrations + Players & Flights; Payout = Config + Side Games + Summary
+const ALL_ADMIN_TABS = ['Overview', 'Players', 'Groups', 'Payout']
 
 
 export default function EventDetail() {
@@ -106,7 +99,7 @@ export default function EventDetail() {
       {/* Tabs */}
       <div className="border-b border-gray-200">
         <nav className="-mb-px flex gap-1 overflow-x-auto">
-          {visibleAdminTabs(event).map(tab => (
+          {ALL_ADMIN_TABS.map(tab => (
             <button
               key={tab}
               onClick={() => setActiveTab(tab)}
@@ -121,13 +114,45 @@ export default function EventDetail() {
       </div>
 
       {/* Tab content */}
-      {activeTab === 'Overview'        && <TabOverview event={event} eventPlayers={eventPlayers} allScores={allScores} course={course} conflicts={conflicts} onUpdated={load} leagues={leagues} />}
-      {activeTab === 'Registrations'   && <TabRegistrations event={event} onUpdated={load} />}
-      {activeTab === 'Players & Flights' && <TabFlights event={event} eventPlayers={eventPlayers} course={course} allPlayers={allPlayers} onUpdated={load} />}
-      {activeTab === 'Groups'          && <TabGroups  event={event} eventPlayers={eventPlayers} onUpdated={load} />}
-      {activeTab === 'Payout Config'   && <TabPayoutConfig event={event} eventPlayers={eventPlayers} course={course} onUpdated={load} />}
-      {activeTab === 'Side Games'      && <TabSideGames event={event} eventPlayers={eventPlayers} course={course} sideGames={sideGames} onUpdated={load} />}
-      {activeTab === 'Payout Summary'  && <TabPayoutSummary event={event} eventPlayers={eventPlayers} allScores={allScores} sideGames={sideGames} course={course} />}
+      {activeTab === 'Overview' && (
+        <TabOverview event={event} eventPlayers={eventPlayers} allScores={allScores} course={course} conflicts={conflicts} onUpdated={load} leagues={leagues} />
+      )}
+
+      {activeTab === 'Players' && (
+        <div className="space-y-6">
+          <div>
+            <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-widest mb-3">Registrations</h3>
+            <TabRegistrations event={event} onUpdated={load} />
+          </div>
+          <div className="border-t border-gray-100 pt-6">
+            <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-widest mb-3">Players &amp; Flights</h3>
+            <TabFlights event={event} eventPlayers={eventPlayers} course={course} allPlayers={allPlayers} onUpdated={load} />
+          </div>
+        </div>
+      )}
+
+      {activeTab === 'Groups' && (
+        <TabGroups event={event} eventPlayers={eventPlayers} onUpdated={load} />
+      )}
+
+      {activeTab === 'Payout' && (
+        <div className="space-y-6">
+          <div>
+            <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-widest mb-3">Payout Config</h3>
+            <TabPayoutConfig event={event} eventPlayers={eventPlayers} course={course} onUpdated={load} />
+          </div>
+          {(event?.side_game_options ?? []).length > 0 && (
+            <div className="border-t border-gray-100 pt-6">
+              <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-widest mb-3">Side Games</h3>
+              <TabSideGames event={event} eventPlayers={eventPlayers} course={course} sideGames={sideGames} onUpdated={load} />
+            </div>
+          )}
+          <div className="border-t border-gray-100 pt-6">
+            <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-widest mb-3">Payout Summary</h3>
+            <TabPayoutSummary event={event} eventPlayers={eventPlayers} allScores={allScores} sideGames={sideGames} course={course} />
+          </div>
+        </div>
+      )}
     </div>
   )
 }
@@ -871,9 +896,10 @@ function AddPlayerModal({ open, onClose, eventId, available, course, useFlights,
   // bulk: { [playerId]: { hi, flight, checked } }
   const [bulk,    setBulk]    = useState({})
   const [saving,  setSaving]  = useState(false)
+  const [search,  setSearch]  = useState('')
 
   useEffect(() => {
-    if (!open) { setBulk({}) }
+    if (!open) { setBulk({}); setSearch('') }
   }, [open])
 
   function toggle(playerId) {
@@ -919,6 +945,13 @@ function AddPlayerModal({ open, onClose, eventId, available, course, useFlights,
   }
 
   function clearAll() { setBulk({}) }
+
+  const filtered = search.trim()
+    ? available.filter(p =>
+        `${p.first_name} ${p.last_name}`.toLowerCase().includes(search.toLowerCase()) ||
+        `${p.last_name} ${p.first_name}`.toLowerCase().includes(search.toLowerCase())
+      )
+    : available
 
   const selected = Object.entries(bulk)
   const allValid = selected.length > 0 && selected.every(([, v]) =>
@@ -987,8 +1020,27 @@ function AddPlayerModal({ open, onClose, eventId, available, course, useFlights,
         {available.length === 0 ? (
           <p className="text-sm text-gray-400 py-4 text-center">All players from the roster are already on this event.</p>
         ) : (
-          <div className="max-h-96 overflow-y-auto border border-gray-200 rounded-xl divide-y divide-gray-100">
-            {available.map(p => {
+          <div className="border border-gray-200 rounded-xl overflow-hidden">
+            {/* Sticky search */}
+            <div className="sticky top-0 z-10 bg-white border-b border-gray-100 px-3 py-2">
+              <div className="relative">
+                <svg className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/>
+                </svg>
+                <input
+                  type="text"
+                  value={search}
+                  onChange={e => setSearch(e.target.value)}
+                  placeholder="Search players…"
+                  className="input py-1.5 pl-8 text-sm"
+                />
+              </div>
+            </div>
+            <div className="max-h-80 overflow-y-auto divide-y divide-gray-100">
+            {filtered.length === 0 && (
+              <p className="text-sm text-gray-400 py-4 text-center">No players match "{search}"</p>
+            )}
+            {filtered.map(p => {
               const checked = !!bulk[p.id]
               const vals    = bulk[p.id] ?? { hi: '', flight: '' }
               return (
@@ -1074,6 +1126,7 @@ function AddPlayerModal({ open, onClose, eventId, available, course, useFlights,
                 </div>
               )
             })}
+            </div>
           </div>
         )}
 
