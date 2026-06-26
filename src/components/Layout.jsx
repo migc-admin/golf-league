@@ -61,7 +61,7 @@ export default function Layout({ children }) {
             <button
               onClick={handleSignOut}
               className="text-xs font-semibold uppercase tracking-wider px-3 py-1.5 transition-colors hover:bg-white/10 rounded"
-              style={{ color: '#D4AF37', letterSpacing: '0.08em' }}
+              style={{ color: 'rgba(255,255,255,0.75)', letterSpacing: '0.08em' }}
             >
               Sign out
             </button>
@@ -70,6 +70,8 @@ export default function Layout({ children }) {
             <button
               className="md:hidden p-2 rounded hover:bg-white/10"
               onClick={() => setMenuOpen(v => !v)}
+              aria-label={menuOpen ? 'Close navigation menu' : 'Open navigation menu'}
+              aria-expanded={menuOpen}
             >
               <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 {menuOpen
