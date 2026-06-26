@@ -27,7 +27,7 @@ export default function Layout({ children }) {
         <div className="max-w-7xl mx-auto px-4 flex items-center justify-between h-14">
           <Link to="/admin" className="flex items-center gap-2.5 tracking-tight">
             <img src="/logo.png" alt="Mulligan's Island Golf Club" className="w-9 h-9 rounded-full object-cover" />
-            <span className="hidden sm:inline font-bold text-white" style={{ fontFamily: "'Playfair Display', serif", fontSize: '1.15rem', letterSpacing: '0.02em' }}>
+            <span className="hidden sm:inline font-bold text-white" style={{ fontFamily: "'Manrope', 'DM Sans', sans-serif", fontSize: '1.15rem', letterSpacing: '-0.01em' }}>
               Mulligan's Island Golf Club
             </span>
           </Link>
