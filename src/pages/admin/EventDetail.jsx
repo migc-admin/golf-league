@@ -1376,18 +1376,15 @@ function TabPayoutConfig({ event, eventPlayers, course, onUpdated }) {
 
   return (
     <div className="space-y-4">
-      {/* Summary + save */}
-      <div className="flex items-center justify-between flex-wrap gap-2">
-        <div className="text-sm text-gray-600 space-y-0.5">
-          {useFlights
-            ? <p>Flight A: <strong>{flightA}</strong> · Flight B: <strong>{flightB}</strong> · Total: <strong>{totalPlayers} players</strong> · Pot: <strong>${totalPot.toFixed(2)}</strong></p>
-            : <p>Total: <strong>{totalPlayers} players</strong> · Pot: <strong>${totalPot.toFixed(2)}</strong></p>
-          }
-          <p className={overBudget ? 'text-red-600 font-medium' : 'text-fairway-700 font-medium'}>
-            Allocated: ${totalAllocated.toFixed(2)}{overBudget ? ' — exceeds pot!' : ` of $${totalPot.toFixed(2)}`}
-          </p>
-        </div>
-        <Button onClick={handleSave} loading={saving}>Save Config</Button>
+      {/* Summary */}
+      <div className="text-sm text-gray-600 space-y-0.5">
+        {useFlights
+          ? <p>Flight A: <strong>{flightA}</strong> · Flight B: <strong>{flightB}</strong> · Total: <strong>{totalPlayers} players</strong> · Pot: <strong className="tabular-nums">${totalPot.toFixed(2)}</strong></p>
+          : <p>Total: <strong>{totalPlayers} players</strong> · Pot: <strong className="tabular-nums">${totalPot.toFixed(2)}</strong></p>
+        }
+        <p className={`tabular-nums ${overBudget ? 'text-red-600 font-medium' : 'text-fairway-700 font-medium'}`}>
+          Allocated: ${totalAllocated.toFixed(2)}{overBudget ? ' — exceeds pot!' : ` of $${totalPot.toFixed(2)}`}
+        </p>
       </div>
 
       {/* Payout basis */}
@@ -1514,6 +1511,14 @@ function TabPayoutConfig({ event, eventPlayers, course, onUpdated }) {
           <PayoutTable rows={rows.filter(r => r.isField)} onChange={setVal} colLabel="$ per player (All)" />
         </Card>
       )}
+
+      {/* Save — at bottom after all config is filled out */}
+      <div className="flex items-center justify-between pt-2 border-t border-gray-100">
+        <p className={`text-sm tabular-nums ${overBudget ? 'text-red-600 font-medium' : 'text-fairway-700 font-medium'}`}>
+          {overBudget ? `⚠ Over budget by $${(totalAllocated - totalPot).toFixed(2)}` : `$${totalAllocated.toFixed(2)} allocated of $${totalPot.toFixed(2)}`}
+        </p>
+        <Button onClick={handleSave} loading={saving}>Save Config</Button>
+      </div>
     </div>
   )
 }
@@ -1546,8 +1551,8 @@ function PayoutTable({ rows, onChange, colLabel }) {
                 />
               </div>
             </td>
-            <td className="px-3 py-2 text-xs text-gray-400">× {mult}</td>
-            <td className="px-3 py-2 text-xs font-semibold text-gray-800 text-right">${total.toFixed(2)}</td>
+            <td className="px-3 py-2 text-xs text-gray-400 tabular-nums">× {mult}</td>
+            <td className="px-3 py-2 text-xs font-semibold text-gray-800 text-right tabular-nums">${total.toFixed(2)}</td>
           </tr>
         ))}
       </tbody>
