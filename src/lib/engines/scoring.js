@@ -186,11 +186,22 @@ export function computeLeaderboards(eventPlayers, allScores, course) {
     const parF9      = playerScores.filter(s => s.hole_number <= 9) .reduce((acc, s) => acc + parPerHole[s.hole_number - 1], 0)
     const parB9      = playerScores.filter(s => s.hole_number >= 10).reduce((acc, s) => acc + parPerHole[s.hole_number - 1], 0)
 
+    // Strokes allocated to each 9 (based on stroke index allocation)
+    let f9Handicap = 0, b9Handicap = 0
+    for (let h = 1; h <= 18; h++) {
+      const si = strokeIndexes[h - 1]
+      const strokes = getStrokesOnHole(ch, si)
+      if (h <= 9) f9Handicap += strokes
+      else        b9Handicap += strokes
+    }
+
     return {
       player_id:      ep.player_id,
       player:         ep.player,
       flight:         ep.flight,
       course_handicap: ch,
+      f9Handicap,
+      b9Handicap,
       holesCompleted,
       gross18, net18,
       grossF9, netF9, f9Holes,
