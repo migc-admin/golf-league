@@ -698,13 +698,15 @@ function PayoutsBoard({ event, eventPlayers, leaderboards, sideGames, skinsResul
     )
   }
 
+  const payingPlayers = eventPlayers.filter(ep => !ep.is_guest)
+
   const flightCounts = {
-    A: eventPlayers.filter(ep => ep.flight === 'A').length,
-    B: eventPlayers.filter(ep => ep.flight === 'B').length,
+    A: payingPlayers.filter(ep => ep.flight === 'A').length,
+    B: payingPlayers.filter(ep => ep.flight === 'B').length,
   }
 
   const { totalPot, byCategory, byPlayer, totalAllocated } = computePayouts(
-    event, eventPlayers.length, leaderboards, sideGames ?? [], skinsResults, flightCounts
+    event, payingPlayers.length, leaderboards, sideGames ?? [], skinsResults, flightCounts
   )
 
   return (
