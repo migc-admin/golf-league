@@ -218,6 +218,7 @@ export default function Leaderboard() {
                 vsParKey="netVsPar"
                 grossKey="gross18"
                 netKey="net18"
+                handicapKey="course_handicap"
                 progressHolesKey="holesCompleted"
                 maxHoles={18}
               />
@@ -230,6 +231,7 @@ export default function Leaderboard() {
                 vsParKey="f9VsPar"
                 grossKey="grossF9"
                 netKey="netF9"
+                handicapKey="f9Handicap"
                 progressHolesKey="f9Holes"
                 maxHoles={9}
               />
@@ -242,6 +244,7 @@ export default function Leaderboard() {
                 vsParKey="b9VsPar"
                 grossKey="grossB9"
                 netKey="netB9"
+                handicapKey="b9Handicap"
                 progressHolesKey="b9Holes"
                 maxHoles={9}
               />
@@ -276,7 +279,7 @@ export default function Leaderboard() {
 }
 
 // ─── Net Leaderboard ──────────────────────────────────────────────
-function NetLeaderboard({ complete, inProgress, flight, vsParKey = 'netVsPar', grossKey = 'gross18', netKey = 'net18', progressHolesKey = 'holesCompleted', maxHoles = 18 }) {
+function NetLeaderboard({ complete, inProgress, flight, vsParKey = 'netVsPar', grossKey = 'gross18', netKey = 'net18', handicapKey = 'course_handicap', progressHolesKey = 'holesCompleted', maxHoles = 18 }) {
   if (!complete?.length && !inProgress?.length) {
     return (
       <div className="text-center py-12 text-gray-400">
@@ -347,7 +350,7 @@ function NetLeaderboard({ complete, inProgress, flight, vsParKey = 'netVsPar', g
                 {p.player?.last_name}, {p.player?.first_name}
               </div>
               <div className="text-[10px] text-gray-400 mt-0.5">
-                CH {p.course_handicap} · Gross {p[grossKey] ?? '—'}
+                CH {p[handicapKey] ?? p.course_handicap} · Gross {p[grossKey] ?? '—'}
               </div>
             </div>
             <span className={`text-sm tabular-nums text-right ${scoreColor(p)}`}>
