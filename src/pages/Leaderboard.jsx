@@ -215,27 +215,35 @@ export default function Leaderboard() {
                 complete={leaderboards.full[activeFlight]}
                 inProgress={leaderboards.full[`${activeFlight}InProgress`]}
                 flight={activeFlight}
-                maxPlaces={3}
+                vsParKey="netVsPar"
+                grossKey="gross18"
+                netKey="net18"
+                progressHolesKey="holesCompleted"
+                maxHoles={18}
               />
             )}
             {activeTab === 'Front 9' && (
               <NetLeaderboard
                 complete={leaderboards.front9[activeFlight]}
                 inProgress={leaderboards.front9[`${activeFlight}InProgress`]}
-                progressHolesKey="f9Holes"
                 flight={activeFlight}
-                maxPlaces={2}
-                label="Front 9 Net"
+                vsParKey="f9VsPar"
+                grossKey="grossF9"
+                netKey="netF9"
+                progressHolesKey="f9Holes"
+                maxHoles={9}
               />
             )}
             {activeTab === 'Back 9' && (
               <NetLeaderboard
                 complete={leaderboards.back9[activeFlight]}
                 inProgress={leaderboards.back9[`${activeFlight}InProgress`]}
-                progressHolesKey="b9Holes"
                 flight={activeFlight}
-                maxPlaces={2}
-                label="Back 9 Net"
+                vsParKey="b9VsPar"
+                grossKey="grossB9"
+                netKey="netB9"
+                progressHolesKey="b9Holes"
+                maxHoles={9}
               />
             )}
             {activeTab === 'Low Putts' && (
@@ -268,7 +276,7 @@ export default function Leaderboard() {
 }
 
 // ─── Net Leaderboard ──────────────────────────────────────────────
-function NetLeaderboard({ complete, inProgress, progressHolesKey = 'holesCompleted', flight, maxPlaces, label }) {
+function NetLeaderboard({ complete, inProgress, flight, vsParKey = 'netVsPar', grossKey = 'gross18', netKey = 'net18', progressHolesKey = 'holesCompleted', maxHoles = 18 }) {
   if (!complete?.length && !inProgress?.length) {
     return (
       <div className="text-center py-12 text-gray-400">
@@ -286,12 +294,12 @@ function NetLeaderboard({ complete, inProgress, progressHolesKey = 'holesComplet
   }
 
   function scoreDisplay(p) {
-    const vs = p.netVsPar ?? p.f9VsPar ?? p.b9VsPar
-    return vs === 0 ? 'E' : `${vs > 0 ? '+' : ''}${vs}`
+    const vs = p[vsParKey]
+    return vs == null ? '—' : vs === 0 ? 'E' : `${vs > 0 ? '+' : ''}${vs}`
   }
 
   function scoreColor(p) {
-    const vs = p.netVsPar ?? p.f9VsPar ?? p.b9VsPar
+    const vs = p[vsParKey]
     return vs < 0 ? 'text-[#BA1A1A] font-bold' : vs === 0 ? 'text-gray-700' : 'text-gray-500'
   }
 
@@ -300,22 +308,16 @@ function NetLeaderboard({ complete, inProgress, progressHolesKey = 'holesComplet
     ...(allComplete ?? []).map(p => ({ ...p, finished: true })),
     ...(inProgress  ?? []).map(p => ({ ...p, finished: false })),
   ].sort((a, b) => {
-    const aVs = a.netVsPar ?? a.f9VsPar ?? a.b9VsPar ?? 999
-    const bVs = b.netVsPar ?? b.f9VsPar ?? b.b9VsPar ?? 999
+    const aVs = a[vsParKey] ?? 999
+    const bVs = b[vsParKey] ?? 999
     return aVs - bVs
   })
 
   // Assign display ranks across merged list (ties share rank)
   const withRanks = allPlayers.map((p, _, arr) => {
-    const vs = p.netVsPar ?? p.f9VsPar ?? p.b9VsPar
-    const rank = arr.filter(x => {
-      const xVs = x.netVsPar ?? x.f9VsPar ?? x.b9VsPar
-      return xVs < vs
-    }).length + 1
-    const tied = arr.filter(x => {
-      const xVs = x.netVsPar ?? x.f9VsPar ?? x.b9VsPar
-      return xVs === vs
-    }).length > 1
+    const vs = p[vsParKey]
+    const rank = arr.filter(x => (x[vsParKey] ?? 999) < (vs ?? 999)).length + 1
+    const tied = arr.filter(x => x[vsParKey] === vs).length > 1
     return { ...p, mergedRank: rank, mergedRankLabel: tied ? `T${rank}` : `${rank}` }
   })
 
@@ -345,14 +347,14 @@ function NetLeaderboard({ complete, inProgress, progressHolesKey = 'holesComplet
                 {p.player?.last_name}, {p.player?.first_name}
               </div>
               <div className="text-[10px] text-gray-400 mt-0.5">
-                CH {p.course_handicap} · Gross {p.gross18 ?? p.grossF9 ?? p.grossB9 ?? '—'}
+                CH {p.course_handicap} · Gross {p[grossKey] ?? '—'}
               </div>
             </div>
             <span className={`text-sm tabular-nums text-right ${scoreColor(p)}`}>
               {scoreDisplay(p)}
             </span>
             <span className="text-xs text-gray-400 text-right tabular-nums">
-              {p.finished && holesThru === 18 ? 'F' : holesThru || '—'}
+              {p.finished && holesThru === maxHoles ? 'F' : holesThru || '—'}
             </span>
           </div>
         )
