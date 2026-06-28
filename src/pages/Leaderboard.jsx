@@ -799,124 +799,113 @@ function PlayerScorecardModal({ player, allScores, course, onClose }) {
     const h = i + 1
     const g = scoreMap[h] ?? null
     const si = sis[i]
-    const strokes = g != null ? Math.floor(ch / 18) + (si <= (ch % 18) ? 1 : 0) : 0
+    const strokes = Math.floor(ch / 18) + (si <= (ch % 18) ? 1 : 0)
     const net = g != null ? g - strokes : null
     const netVsPar = net != null ? net - pars[i] : null
-    return { h, g, net, netVsPar, par: pars[i] }
+    return { h, g, net, netVsPar, par: pars[i], strokes }
   })
+
+  function netColor(netVsPar) {
+    if (netVsPar == null) return 'text-gray-300'
+    if (netVsPar <= -2)   return 'text-yellow-600 font-black'
+    if (netVsPar === -1)  return 'text-[#BA1A1A] font-bold'
+    if (netVsPar === 0)   return 'text-gray-700'
+    if (netVsPar === 1)   return 'text-gray-400'
+    return 'text-gray-400'
+  }
 
   const frontHoles = holes.slice(0, 9)
   const backHoles  = holes.slice(9)
-
-  function cellStyle(netVsPar) {
-    if (netVsPar == null)  return 'text-gray-200'
-    if (netVsPar <= -2)    return 'bg-yellow-400 text-yellow-900 font-black rounded'
-    if (netVsPar === -1)   return 'bg-green-100 text-green-800 font-bold rounded'
-    if (netVsPar === 0)    return 'text-gray-700'
-    if (netVsPar === 1)    return 'text-red-500'
-    return 'text-red-700 font-bold'
-  }
-
-  const totalGross = playerScores.reduce((s, r) => s + r.gross_score, 0)
-  const totalNet   = holes.reduce((s, h) => h.net != null ? s + h.net : s, 0)
+  const frontGross = frontHoles.reduce((s, h) => h.g != null ? s + h.g : s, 0)
+  const backGross  = backHoles.reduce((s, h) => h.g != null ? s + h.g : s, 0)
+  const frontNet   = frontHoles.reduce((s, h) => h.net != null ? s + h.net : s, 0)
+  const backNet    = backHoles.reduce((s, h) => h.net != null ? s + h.net : s, 0)
   const totalVsPar = holes.reduce((s, h) => h.netVsPar != null ? s + h.netVsPar : s, 0)
+  const holesPlayed = playerScores.length
   const name = `${player.player?.first_name ?? ''} ${player.player?.last_name ?? ''}`.trim()
+  const vsParDisplay = holesPlayed === 0 ? '—' : totalVsPar === 0 ? 'E' : `${totalVsPar > 0 ? '+' : ''}${totalVsPar}`
 
   return (
-    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4" onClick={onClose}>
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center" onClick={onClose}>
       <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" />
       <div
-        className="relative bg-white w-full sm:max-w-2xl sm:rounded-2xl rounded-t-2xl shadow-2xl max-h-[90vh] overflow-y-auto"
+        className="relative bg-white w-full sm:max-w-md rounded-t-2xl sm:rounded-2xl shadow-2xl flex flex-col"
+        style={{ maxHeight: '92dvh' }}
         onClick={e => e.stopPropagation()}
       >
         {/* Header */}
-        <div className="sticky top-0 bg-[#012d1d] text-white px-5 py-4 flex items-center justify-between rounded-t-2xl">
+        <div className="bg-[#012d1d] text-white px-5 py-4 flex items-center justify-between rounded-t-2xl flex-shrink-0">
           <div>
-            <div className="font-bold text-base">{name}</div>
+            <div className="font-bold text-base leading-tight">{name}</div>
             <div className="text-xs text-white/60 mt-0.5">CH {ch} · {course.name}</div>
           </div>
-          <button onClick={onClose} className="w-8 h-8 flex items-center justify-center rounded-full bg-white/10 hover:bg-white/20 transition-colors text-white">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><path d="M18 6L6 18M6 6l12 12"/></svg>
-          </button>
+          <div className="flex items-center gap-3">
+            <div className={`text-2xl font-black tabular-nums ${totalVsPar < 0 ? 'text-[#BA1A1A]' : totalVsPar === 0 ? 'text-white' : 'text-white/60'}`}>
+              {vsParDisplay}
+            </div>
+            <button onClick={onClose} className="w-8 h-8 flex items-center justify-center rounded-full bg-white/10 hover:bg-white/20 transition-colors">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><path d="M18 6L6 18M6 6l12 12"/></svg>
+            </button>
+          </div>
         </div>
 
-        {/* Scorecard table */}
-        <div className="overflow-x-auto">
-          <table className="w-full text-xs text-center border-collapse">
-            <thead>
-              <tr className="bg-gray-50 border-b border-gray-200">
-                <th className="text-left px-3 py-2 text-gray-500 font-semibold">Hole</th>
-                {frontHoles.map(({ h }) => <th key={h} className="px-2 py-2 text-gray-500 font-semibold w-8">{h}</th>)}
-                <th className="px-2 py-2 text-gray-500 font-semibold bg-gray-100">OUT</th>
-                {backHoles.map(({ h }) => <th key={h} className="px-2 py-2 text-gray-500 font-semibold w-8">{h}</th>)}
-                <th className="px-2 py-2 text-gray-500 font-semibold bg-gray-100">IN</th>
-                <th className="px-2 py-2 text-gray-600 font-bold bg-gray-100">TOT</th>
-              </tr>
-              <tr className="border-b border-gray-100">
-                <td className="text-left px-3 py-1.5 text-gray-400 font-medium">Par</td>
-                {frontHoles.map(({ h, par }) => <td key={h} className="px-2 py-1.5 text-gray-400">{par}</td>)}
-                <td className="px-2 py-1.5 text-gray-500 font-semibold bg-gray-50">{pars.slice(0,9).reduce((a,b)=>a+b,0)}</td>
-                {backHoles.map(({ h, par }) => <td key={h} className="px-2 py-1.5 text-gray-400">{par}</td>)}
-                <td className="px-2 py-1.5 text-gray-500 font-semibold bg-gray-50">{pars.slice(9).reduce((a,b)=>a+b,0)}</td>
-                <td className="px-2 py-1.5 text-gray-600 font-bold bg-gray-50">{pars.reduce((a,b)=>a+b,0)}</td>
-              </tr>
-            </thead>
-            <tbody>
-              {/* Gross row */}
-              <tr className="border-b border-gray-100">
-                <td className="text-left px-3 py-2 text-gray-500 font-medium">Gross</td>
-                {frontHoles.map(({ h, g }) => (
-                  <td key={h} className="px-1 py-2">
-                    {g != null ? <span className="font-semibold text-gray-800">{g}</span> : <span className="text-gray-200">—</span>}
-                  </td>
-                ))}
-                <td className="px-2 py-2 font-bold text-gray-700 bg-gray-50">
-                  {frontHoles.reduce((s,h) => h.g != null ? s + h.g : s, 0) || '—'}
-                </td>
-                {backHoles.map(({ h, g }) => (
-                  <td key={h} className="px-1 py-2">
-                    {g != null ? <span className="font-semibold text-gray-800">{g}</span> : <span className="text-gray-200">—</span>}
-                  </td>
-                ))}
-                <td className="px-2 py-2 font-bold text-gray-700 bg-gray-50">
-                  {backHoles.reduce((s,h) => h.g != null ? s + h.g : s, 0) || '—'}
-                </td>
-                <td className="px-2 py-2 font-bold text-gray-800 bg-gray-50">{totalGross || '—'}</td>
-              </tr>
-              {/* Net row */}
-              <tr>
-                <td className="text-left px-3 py-2 text-gray-500 font-medium">Net</td>
-                {frontHoles.map(({ h, net, netVsPar }) => (
-                  <td key={h} className="px-1 py-2">
-                    <span className={`inline-flex items-center justify-center w-7 h-7 text-xs ${cellStyle(netVsPar)}`}>
-                      {net ?? '—'}
-                    </span>
-                  </td>
-                ))}
-                <td className="px-2 py-2 font-bold text-gray-700 bg-gray-50">
-                  {frontHoles.reduce((s,h) => h.net != null ? s + h.net : s, 0) || '—'}
-                </td>
-                {backHoles.map(({ h, net, netVsPar }) => (
-                  <td key={h} className="px-1 py-2">
-                    <span className={`inline-flex items-center justify-center w-7 h-7 text-xs ${cellStyle(netVsPar)}`}>
-                      {net ?? '—'}
-                    </span>
-                  </td>
-                ))}
-                <td className="px-2 py-2 font-bold text-gray-700 bg-gray-50">
-                  {backHoles.reduce((s,h) => h.net != null ? s + h.net : s, 0) || '—'}
-                </td>
-                <td className="px-2 py-2 font-bold text-gray-800 bg-gray-50">{totalNet || '—'}</td>
-              </tr>
-            </tbody>
-          </table>
+        {/* Two-column 9-hole grids side by side */}
+        <div className="flex divide-x divide-gray-100 flex-shrink-0">
+          {[{ label: 'Front 9', holeList: frontHoles, grossTotal: frontGross, netTotal: frontNet },
+            { label: 'Back 9',  holeList: backHoles,  grossTotal: backGross,  netTotal: backNet }
+          ].map(({ label, holeList, grossTotal, netTotal }) => (
+            <div key={label} className="flex-1">
+              {/* Section label */}
+              <div className="bg-gray-50 px-3 py-1.5 border-b border-gray-100">
+                <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">{label}</span>
+              </div>
+              {/* Column headers */}
+              <div className="grid grid-cols-[1.5rem_1.5rem_2rem_2rem] gap-0 px-3 py-1.5 border-b border-gray-100">
+                <span className="text-[10px] font-bold text-gray-400 uppercase">Hole</span>
+                <span className="text-[10px] font-bold text-gray-400 uppercase text-center">Par</span>
+                <span className="text-[10px] font-bold text-gray-400 uppercase text-center">Grs</span>
+                <span className="text-[10px] font-bold text-gray-400 uppercase text-center">Net</span>
+              </div>
+              {/* Hole rows */}
+              {holeList.map(({ h, g, net, netVsPar, par, strokes }, i) => (
+                <div key={h} className={`grid grid-cols-[1.5rem_1.5rem_2rem_2rem] gap-0 px-3 py-1.5 ${i % 2 === 1 ? 'bg-[rgba(27,67,50,0.025)]' : ''}`}>
+                  <span className="text-xs font-semibold text-gray-400 tabular-nums">{h}</span>
+                  <span className="text-xs text-gray-400 text-center tabular-nums">{par}</span>
+                  <span className="text-xs font-semibold text-gray-700 text-center tabular-nums">
+                    {g ?? <span className="text-gray-200">—</span>}
+                  </span>
+                  <span className={`text-xs text-center tabular-nums ${netColor(netVsPar)}`}>
+                    {net != null ? net : <span className="text-gray-200">—</span>}
+                  </span>
+                </div>
+              ))}
+              {/* Subtotal */}
+              <div className="grid grid-cols-[1.5rem_1.5rem_2rem_2rem] gap-0 px-3 py-2 bg-[#012d1d]/5 border-t border-gray-200 mt-0.5">
+                <span className="text-[10px] font-bold text-gray-500 uppercase col-span-2">Tot</span>
+                <span className="text-xs font-black text-gray-800 text-center tabular-nums">{grossTotal || '—'}</span>
+                <span className="text-xs font-black text-gray-800 text-center tabular-nums">{netTotal || '—'}</span>
+              </div>
+            </div>
+          ))}
         </div>
 
-        {/* Summary footer */}
-        <div className="px-5 py-4 border-t border-gray-100 flex items-center justify-between bg-gray-50 rounded-b-2xl">
-          <div className="text-sm text-gray-500">Net vs Par</div>
-          <div className={`text-2xl font-black tabular-nums ${totalVsPar < 0 ? 'text-[#BA1A1A]' : totalVsPar === 0 ? 'text-gray-700' : 'text-gray-500'}`}>
-            {playerScores.length === 0 ? '—' : totalVsPar === 0 ? 'E' : `${totalVsPar > 0 ? '+' : ''}${totalVsPar}`}
+        {/* Overall totals footer */}
+        <div className="flex items-center justify-between px-5 py-3 border-t border-gray-200 bg-gray-50 rounded-b-2xl flex-shrink-0">
+          <div className="grid grid-cols-2 gap-6 text-center">
+            <div>
+              <div className="text-[10px] text-gray-400 uppercase tracking-wide font-bold">Gross</div>
+              <div className="text-lg font-black text-gray-800 tabular-nums">{frontGross + backGross || '—'}</div>
+            </div>
+            <div>
+              <div className="text-[10px] text-gray-400 uppercase tracking-wide font-bold">Net</div>
+              <div className="text-lg font-black text-gray-800 tabular-nums">{frontNet + backNet || '—'}</div>
+            </div>
+          </div>
+          <div className="text-right">
+            <div className="text-[10px] text-gray-400 uppercase tracking-wide font-bold mb-0.5">Net vs Par</div>
+            <div className={`text-3xl font-black tabular-nums ${totalVsPar < 0 ? 'text-[#BA1A1A]' : totalVsPar === 0 ? 'text-gray-700' : 'text-gray-500'}`}>
+              {vsParDisplay}
+            </div>
           </div>
         </div>
       </div>
