@@ -295,6 +295,30 @@ function NetLeaderboard({ complete, inProgress, progressHolesKey = 'holesComplet
     return vs < 0 ? 'text-[#BA1A1A] font-bold' : vs === 0 ? 'text-gray-700' : 'text-gray-500'
   }
 
+  // Merge all players and sort by score — lowest net score wins regardless of holes played
+  const allPlayers = [
+    ...(allComplete ?? []).map(p => ({ ...p, finished: true })),
+    ...(inProgress  ?? []).map(p => ({ ...p, finished: false })),
+  ].sort((a, b) => {
+    const aVs = a.netVsPar ?? a.f9VsPar ?? a.b9VsPar ?? 999
+    const bVs = b.netVsPar ?? b.f9VsPar ?? b.b9VsPar ?? 999
+    return aVs - bVs
+  })
+
+  // Assign display ranks across merged list (ties share rank)
+  const withRanks = allPlayers.map((p, _, arr) => {
+    const vs = p.netVsPar ?? p.f9VsPar ?? p.b9VsPar
+    const rank = arr.filter(x => {
+      const xVs = x.netVsPar ?? x.f9VsPar ?? x.b9VsPar
+      return xVs < vs
+    }).length + 1
+    const tied = arr.filter(x => {
+      const xVs = x.netVsPar ?? x.f9VsPar ?? x.b9VsPar
+      return xVs === vs
+    }).length > 1
+    return { ...p, mergedRank: rank, mergedRankLabel: tied ? `T${rank}` : `${rank}` }
+  })
+
   return (
     <div className="rounded-xl overflow-hidden border border-gray-200 shadow-[0_4px_20px_rgba(27,67,50,0.08)]">
       {/* Table header */}
@@ -305,59 +329,34 @@ function NetLeaderboard({ complete, inProgress, progressHolesKey = 'holesComplet
         <span className="text-right">Thru</span>
       </div>
 
-      {/* Completed rows */}
-      {allComplete.map((p, i) => {
-        const rl = rankLabel(p)
-        const isFirst = p.rank === 1
-        const holesThru = p.holesCompleted ?? p.f9Holes ?? p.b9Holes ?? 18
+      {withRanks.map((p, i) => {
+        const holesThru = p.finished
+          ? (p.holesCompleted ?? p.f9Holes ?? p.b9Holes ?? 18)
+          : (p[progressHolesKey] ?? 0)
+        const isFirst = p.mergedRank === 1
         return (
           <div
             key={p.player_id}
             className={`grid grid-cols-[2.5rem_1fr_3.5rem_3rem] items-center px-4 py-3 border-b border-gray-100 last:border-0 ${i % 2 === 1 ? 'bg-[rgba(27,67,50,0.025)]' : 'bg-white'} ${isFirst ? 'border-l-2 border-l-[#cba72f]' : ''}`}
           >
-            <span className="text-sm font-semibold text-gray-500 tabular-nums">{rl}</span>
+            <span className="text-sm font-semibold text-gray-500 tabular-nums">{p.mergedRankLabel}</span>
             <div>
               <div className="font-semibold text-sm text-gray-900 leading-tight">
                 {p.player?.last_name}, {p.player?.first_name}
               </div>
               <div className="text-[10px] text-gray-400 mt-0.5">
-                CH {p.course_handicap} · Gross {p.gross18 ?? p.grossF9 ?? p.grossB9}
+                CH {p.course_handicap} · Gross {p.gross18 ?? p.grossF9 ?? p.grossB9 ?? '—'}
               </div>
             </div>
             <span className={`text-sm tabular-nums text-right ${scoreColor(p)}`}>
               {scoreDisplay(p)}
             </span>
             <span className="text-xs text-gray-400 text-right tabular-nums">
-              {holesThru === 18 ? 'F' : holesThru}
+              {p.finished && holesThru === 18 ? 'F' : holesThru || '—'}
             </span>
           </div>
         )
       })}
-
-      {/* In-progress rows */}
-      {inProgress?.length > 0 && (
-        <>
-          <div className="px-4 py-1.5 bg-gray-50 border-t border-b border-gray-100">
-            <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">In Progress</span>
-          </div>
-          {inProgress.map((p, i) => (
-            <div key={p.player_id}
-              className={`grid grid-cols-[2.5rem_1fr_3.5rem_3rem] items-center px-4 py-3 border-b border-gray-100 last:border-0 ${i % 2 === 0 ? 'bg-white' : 'bg-[rgba(27,67,50,0.025)]'}`}
-            >
-              <span className="text-xs text-gray-300">—</span>
-              <div className="font-medium text-sm text-gray-800">
-                {p.player?.last_name}, {p.player?.first_name}
-              </div>
-              <span className={`text-sm tabular-nums text-right ${scoreColor(p)}`}>
-                {scoreDisplay(p)}
-              </span>
-              <span className="text-xs text-gray-400 text-right tabular-nums">
-                {p[progressHolesKey]}
-              </span>
-            </div>
-          ))}
-        </>
-      )}
     </div>
   )
 }
@@ -369,6 +368,15 @@ function PuttLeaderboard({ data, playerMap }) {
       <p>No complete rounds yet.</p>
     </div>
   )
+
+  // Assign ranks with tie detection (lowest putts = best)
+  const ranked = data.map((p, i, arr) => {
+    const tiedWith = arr.filter(x => x.totalPutts === p.totalPutts)
+    const rank = arr.filter(x => x.totalPutts < p.totalPutts).length + 1
+    const rankLabel = tiedWith.length > 1 ? `T${rank}` : `${rank}`
+    return { ...p, rank, rankLabel }
+  })
+
   return (
     <div className="rounded-xl overflow-hidden border border-gray-200 shadow-[0_4px_20px_rgba(27,67,50,0.08)]">
       <div className="grid grid-cols-[2.5rem_1fr_3.5rem] bg-[#012d1d] text-white/80 text-[10px] font-bold uppercase tracking-widest px-4 py-2.5">
@@ -376,11 +384,11 @@ function PuttLeaderboard({ data, playerMap }) {
         <span>Player</span>
         <span className="text-right">Putts</span>
       </div>
-      {data.map((p, i) => (
+      {ranked.map((p, i) => (
         <div key={p.player_id}
-          className={`grid grid-cols-[2.5rem_1fr_3.5rem] items-center px-4 py-3 border-b border-gray-100 last:border-0 ${i % 2 === 1 ? 'bg-[rgba(27,67,50,0.025)]' : 'bg-white'} ${i === 0 ? 'border-l-2 border-l-[#cba72f]' : ''}`}
+          className={`grid grid-cols-[2.5rem_1fr_3.5rem] items-center px-4 py-3 border-b border-gray-100 last:border-0 ${i % 2 === 1 ? 'bg-[rgba(27,67,50,0.025)]' : 'bg-white'} ${p.rank === 1 ? 'border-l-2 border-l-[#cba72f]' : ''}`}
         >
-          <span className="text-sm font-semibold text-gray-500 tabular-nums">{i + 1}</span>
+          <span className="text-sm font-semibold text-gray-500 tabular-nums">{p.rankLabel}</span>
           <div className="font-medium text-sm text-gray-900">
             {p.player?.last_name}, {p.player?.first_name}
           </div>
