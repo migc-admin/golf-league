@@ -467,7 +467,7 @@ export default function Scorecard() {
             <p className="text-sm mt-1">Contact your admin.</p>
           </div>
         )}
-        {groupPlayers.map(ep => (
+        {groupPlayers.map((ep, idx) => (
           <PlayerScoreCard
             key={ep.player_id}
             ep={ep}
@@ -479,6 +479,11 @@ export default function Scorecard() {
             courseStrokeIndexes={course.stroke_index}
             trackPutts={trackPutts}
             onChange={(field, val) => updateScore(ep.player_id, hole, field, val)}
+            onGrossDone={() => {
+              // Focus next player's gross input
+              const nextCard = document.querySelectorAll('[data-player-gross]')[idx + 1]
+              if (nextCard) { nextCard.focus(); nextCard.select() }
+            }}
           />
         ))}
       </div>
@@ -544,9 +549,10 @@ export default function Scorecard() {
 }
 
 // ─── Player Score Card ─────────────────────────────────────────────
-function PlayerScoreCard({ ep, hole, par, si, score, allHoleScores, courseStrokeIndexes, trackPutts, onChange }) {
-  const grossRef = useRef(null)
-  const puttsRef = useRef(null)
+function PlayerScoreCard({ ep, hole, par, si, score, allHoleScores, courseStrokeIndexes, trackPutts, onChange, onGrossDone }) {
+  const grossRef    = useRef(null)
+  const puttsRef    = useRef(null)
+  const advanceTimer = useRef(null)
 
   const ch      = ep.course_handicap ?? 0
   const strokes = getStrokesOnHole(ch, si)
@@ -626,11 +632,29 @@ function PlayerScoreCard({ ep, hole, par, si, score, allHoleScores, courseStroke
               inputMode="numeric"
               pattern="[0-9]*"
               value={grossDisplay}
-              onChange={e => onChange('gross', e.target.value === '' ? '' : parseInt(e.target.value, 10) || '')}
+              onChange={e => {
+                const raw = e.target.value
+                const val = raw === '' ? '' : parseInt(raw, 10) || ''
+                onChange('gross', val)
+                // Auto-advance: immediate unless value starts with '1' (could be 11-19)
+                if (val !== '' && advanceTimer.current) clearTimeout(advanceTimer.current)
+                if (val !== '') {
+                  const delay = String(val) === '1' ? 800 : 0
+                  advanceTimer.current = setTimeout(() => {
+                    if (trackPutts && puttsRef.current) {
+                      puttsRef.current.focus()
+                      puttsRef.current.select()
+                    } else if (onGrossDone) {
+                      onGrossDone()
+                    }
+                  }, delay)
+                }
+              }}
               onFocus={e => e.target.select()}
               placeholder="—"
               min={1}
               max={20}
+              data-player-gross
               className="w-16 h-16 text-center text-3xl font-black border-2 border-fairway-700 rounded-xl focus:border-fairway-500 focus:ring-2 focus:ring-fairway-200 outline-none bg-white"
               style={{ WebkitAppearance: 'none', MozAppearance: 'textfield' }}
             />
@@ -648,7 +672,14 @@ function PlayerScoreCard({ ep, hole, par, si, score, allHoleScores, courseStroke
             inputMode="numeric"
             pattern="[0-9]*"
             value={puttsDisplay}
-            onChange={e => onChange('putts', e.target.value === '' ? '' : parseInt(e.target.value, 10) || '')}
+            onChange={e => {
+              const val = e.target.value === '' ? '' : parseInt(e.target.value, 10) || ''
+              onChange('putts', val)
+              // Advance to next player after putts entered
+              if (val !== '' && onGrossDone) {
+                setTimeout(() => onGrossDone(), 0)
+              }
+            }}
             onFocus={e => e.target.select()}
             placeholder="0"
             min={0}
