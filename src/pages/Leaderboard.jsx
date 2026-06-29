@@ -709,6 +709,30 @@ function PayoutsBoard({ event, eventPlayers, leaderboards, sideGames, skinsResul
     event, payingPlayers.length, leaderboards, sideGames ?? [], skinsResults, flightCounts
   )
 
+  // Sort categories in the desired display order
+  const categorySortKey = (key) => {
+    if (key.startsWith('18_net_a_')) return 0
+    if (key.startsWith('f9_a_'))    return 10
+    if (key.startsWith('b9_a_'))    return 20
+    if (key.startsWith('18_net_b_')) return 30
+    if (key.startsWith('f9_b_'))    return 40
+    if (key.startsWith('b9_b_'))    return 50
+    // No-flight overall/9s
+    if (key.startsWith('18_net_'))  return 0
+    if (key.startsWith('f9_'))      return 10
+    if (key.startsWith('b9_'))      return 20
+    if (key === 'long_drive_a')     return 60
+    if (key === 'long_drive_b')     return 70
+    if (key === 'long_drive')       return 60
+    if (key === 'low_putts')        return 80
+    if (key.startsWith('ctp_'))     return 90 + (parseInt(key.replace('ctp_', ''), 10) || 0)
+    if (key.startsWith('skins_a'))  return 100
+    if (key.startsWith('skins_b'))  return 110
+    if (key === 'skins')            return 100
+    return 200
+  }
+  const sortedCategories = [...byCategory].sort((a, b) => categorySortKey(a.key) - categorySortKey(b.key))
+
   return (
     <div className="space-y-4">
       {/* Summary banner */}
@@ -721,6 +745,36 @@ function PayoutsBoard({ event, eventPlayers, leaderboards, sideGames, skinsResul
         <div className="text-right">
           <div className="text-xs text-fairway-300 font-medium">Allocated</div>
           <div className="text-2xl font-bold">${totalAllocated.toFixed(2)}</div>
+        </div>
+      </div>
+
+      {/* By category (games played) */}
+      <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+        <div className="px-4 py-3 border-b bg-gray-50">
+          <h3 className="font-semibold text-sm text-gray-800">Games Played</h3>
+        </div>
+        <div className="divide-y divide-gray-100">
+          {sortedCategories.map(cat => {
+            const winners = (cat.playerIds ?? (cat.playerId ? [cat.playerId] : []))
+              .map(pid => playerMap[pid])
+              .filter(Boolean)
+            return (
+              <div key={cat.key} className="flex items-center justify-between px-4 py-2.5">
+                <div>
+                  <div className="text-sm text-gray-700">{cat.label}</div>
+                  <div className="text-xs text-gray-400">
+                    {winners.length > 0
+                      ? winners.map(p => `${p.last_name}, ${p.first_name}`).join(' · ')
+                      : '— Unresolved'}
+                  </div>
+                </div>
+                <span className="font-bold text-gray-900">${cat.amount.toFixed(2)}</span>
+              </div>
+            )
+          })}
+          {sortedCategories.length === 0 && (
+            <p className="px-4 py-4 text-sm text-gray-400">No payouts resolved yet.</p>
+          )}
         </div>
       </div>
 
@@ -755,36 +809,6 @@ function PayoutsBoard({ event, eventPlayers, leaderboards, sideGames, skinsResul
           </div>
         </div>
       )}
-
-      {/* By category */}
-      <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
-        <div className="px-4 py-3 border-b bg-gray-50">
-          <h3 className="font-semibold text-sm text-gray-800">By Category</h3>
-        </div>
-        <div className="divide-y divide-gray-100">
-          {byCategory.map(cat => {
-            const winners = (cat.playerIds ?? (cat.playerId ? [cat.playerId] : []))
-              .map(pid => playerMap[pid])
-              .filter(Boolean)
-            return (
-              <div key={cat.key} className="flex items-center justify-between px-4 py-2.5">
-                <div>
-                  <div className="text-sm text-gray-700">{cat.label}</div>
-                  <div className="text-xs text-gray-400">
-                    {winners.length > 0
-                      ? winners.map(p => `${p.last_name}, ${p.first_name}`).join(' · ')
-                      : '— Unresolved'}
-                  </div>
-                </div>
-                <span className="font-bold text-gray-900">${cat.amount.toFixed(2)}</span>
-              </div>
-            )
-          })}
-          {byCategory.length === 0 && (
-            <p className="px-4 py-4 text-sm text-gray-400">No payouts resolved yet.</p>
-          )}
-        </div>
-      </div>
     </div>
   )
 }
