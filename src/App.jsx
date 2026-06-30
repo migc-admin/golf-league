@@ -31,7 +31,7 @@ export default function App() {
           <Route path="leagues"       element={<Leagues />} />
           <Route path="courses"       element={<Courses />} />
           <Route path="players"       element={<Players />} />
-          <Route path="events/:id"    element={<EventDetail />} />
+          <Route path="leagues/:leagueSlug/events/:eventNumber" element={<EventDetail />} />
           <Route path="import"        element={<Import />} />
         </Route>
 
@@ -39,21 +39,18 @@ export default function App() {
         <Route path="/join/:eventId" element={<ScorecardJoin />} />
 
         {/* Scorecard — public for specific eventId (shareable link), auth required for /me */}
-        <Route path="/scorecard/:eventId" element={<Scorecard />} />
-        <Route
-          path="/scorecard/me"
-          element={<ProtectedRoute><Scorecard /></ProtectedRoute>}
-        />
+        <Route path="/scorecard/me" element={<ProtectedRoute><Scorecard /></ProtectedRoute>} />
+        <Route path="/leagues/:leagueSlug/events/:eventNumber/scorecard" element={<Scorecard />} />
 
         {/* Public event registration — no auth required */}
         <Route path="/register/:eventId" element={<Register />} />
 
         {/* Public schedule — no auth required, shareable with players */}
-        <Route path="/schedule/:eventId" element={<Schedule />} />
+        <Route path="/leagues/:leagueSlug/events/:eventNumber/schedule" element={<Schedule />} />
 
         {/* Leaderboard & Standings — public, shareable links */}
-        <Route path="/leaderboard/:eventId" element={<Leaderboard />} />
-        <Route path="/standings/:leagueId"  element={<Standings />} />
+        <Route path="/leagues/:leagueSlug/events/:eventNumber/leaderboard" element={<Leaderboard />} />
+        <Route path="/leagues/:leagueSlug/standings" element={<Standings />} />
 
         <Route path="/" element={<Navigate to="/home" replace />} />
         <Route path="*" element={<Navigate to="/home" replace />} />

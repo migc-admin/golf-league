@@ -24,7 +24,7 @@ export default function Dashboard() {
         supabase.from('events').select('*', { count: 'exact', head: true }),
         supabase
           .from('events')
-          .select('id, event_date, event_number, status, entry_fee, league:leagues(name), course:courses(name), event_players(count)')
+          .select('id, event_date, event_number, status, entry_fee, league:leagues(name, slug), course:courses(name), event_players(count)')
           .order('event_date', { ascending: false })
           .limit(10),
       ])
@@ -97,7 +97,7 @@ export default function Dashboard() {
               {completedEvents.map(ev => (
                 <Link
                   key={ev.id}
-                  to={`/admin/events/${ev.id}`}
+                  to={`/admin/leagues/${ev.league?.slug}/events/${ev.event_number}`}
                   className="flex items-center justify-between px-5 py-3.5 hover:bg-gray-50 transition-colors cursor-pointer"
                 >
                   <div>
@@ -176,19 +176,19 @@ function HeroEventCard({ event: ev }) {
         </div>
         <div className="flex items-center gap-3 mt-4 pt-4 border-t border-gray-100">
           <Link
-            to={`/admin/events/${ev.id}`}
+            to={`/admin/leagues/${ev.league?.slug}/events/${ev.event_number}`}
             className="btn btn-primary btn-sm"
           >
             Manage Event
           </Link>
           <Link
-            to={`/leaderboard/${ev.id}`}
+            to={`/leagues/${ev.league?.slug}/events/${ev.event_number}/leaderboard`}
             className="btn btn-secondary btn-sm"
           >
             Leaderboard
           </Link>
           <Link
-            to={`/schedule/${ev.id}`}
+            to={`/leagues/${ev.league?.slug}/events/${ev.event_number}/schedule`}
             className="text-xs text-gray-500 font-medium hover:underline ml-1"
           >
             Pairings →
@@ -201,7 +201,7 @@ function HeroEventCard({ event: ev }) {
 
 function EventCard({ event: ev }) {
   return (
-    <Link to={`/admin/events/${ev.id}`} className="block card border border-gray-200 p-4 hover:shadow-md transition-shadow cursor-pointer">
+    <Link to={`/admin/leagues/${ev.league?.slug}/events/${ev.event_number}`} className="block card border border-gray-200 p-4 hover:shadow-md transition-shadow cursor-pointer">
       <div className="flex items-start justify-between">
         <div>
           <div className="font-semibold text-gray-900 text-sm">

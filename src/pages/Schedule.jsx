@@ -25,7 +25,7 @@ const FORMAT_DESCRIPTIONS = {
 }
 
 export default function Schedule() {
-  const { eventId } = useParams()
+  const { leagueSlug, eventNumber } = useParams()
   const navigate = useNavigate()
   const [event,        setEvent]        = useState(null)
   const [eventPlayers, setEventPlayers] = useState([])
@@ -34,13 +34,19 @@ export default function Schedule() {
 
   useEffect(() => {
     async function load() {
+      const { data: league } = await supabase.from('leagues').select('id, name, slug').eq('slug', leagueSlug).single()
+      if (!league) { setError('Event not found.'); setLoading(false); return }
+
       const { data: ev } = await supabase
         .from('events')
-        .select('*, course:courses(name), league:leagues(name, season_year)')
-        .eq('id', eventId)
+        .select('*, course:courses(name), league:leagues(name, season_year, slug)')
+        .eq('league_id', league.id)
+        .eq('event_number', parseInt(eventNumber, 10))
         .single()
 
       if (!ev) { setError('Event not found.'); setLoading(false); return }
+
+      const eventId = ev.id
 
       const { data: eps } = await supabase
         .from('event_players')
@@ -55,7 +61,7 @@ export default function Schedule() {
       setLoading(false)
     }
     load()
-  }, [eventId])
+  }, [leagueSlug, eventNumber])
 
   if (loading) return <ScheduleSkeleton />
 
@@ -156,7 +162,7 @@ export default function Schedule() {
       {event.status !== 'upcoming' && (
         <div className="max-w-xl mx-auto px-4 pt-4">
           <Link
-            to={`/leaderboard/${eventId}`}
+            to={`/leagues/${event.league?.slug}/events/${event.event_number}/leaderboard`}
             className="flex items-center justify-between bg-fairway-700 text-white rounded-xl px-4 py-3 shadow-sm hover:bg-fairway-800 transition-colors"
           >
             <div className="flex items-center gap-3">

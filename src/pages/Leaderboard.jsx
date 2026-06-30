@@ -41,13 +41,13 @@ const FORMAT_LABELS = {
 }
 
 export default function Leaderboard() {
-  const { eventId } = useParams()
+  const { leagueSlug, eventNumber } = useParams()
   const navigate = useNavigate()
   const location = useLocation()
   const { user, isAdmin } = useAuth()
   const homeLink = isAdmin ? '/admin' : user ? '/home' : null
   const fromScorecard = location.state?.from === 'scorecard'
-  const scorecardEventId = location.state?.scorecardEventId ?? eventId
+  const scorecardEventId = location.state?.scorecardEventId ?? null
   const [event,        setEvent]        = useState(null)
   const [eventPlayers, setEventPlayers] = useState([])
   const [allScores,    setAllScores]    = useState([])
@@ -68,12 +68,18 @@ export default function Leaderboard() {
 
   useEffect(() => {
     async function init() {
+      const { data: league } = await supabase.from('leagues').select('id, name, slug').eq('slug', leagueSlug).single()
+      if (!league) { setLoading(false); return }
+
       const { data: ev } = await supabase
         .from('events')
-        .select('*, course:courses(*), league:leagues(name)')
-        .eq('id', eventId)
+        .select('*, course:courses(*), league:leagues(name, slug)')
+        .eq('league_id', league.id)
+        .eq('event_number', parseInt(eventNumber, 10))
         .single()
       if (!ev) { setLoading(false); return }
+
+      const eventId = ev.id
 
       const [{ data: eps }, { data: sg }, { data: mp }] = await Promise.all([
         supabase.from('event_players').select('*, player:players(*)').eq('event_id', eventId),
@@ -109,7 +115,7 @@ export default function Leaderboard() {
     return () => {
       if (subRef.current) supabase.removeChannel(subRef.current)
     }
-  }, [eventId])
+  }, [leagueSlug, eventNumber])
 
   if (loading) return <LeaderboardSkeleton />
   if (!event)  return (
@@ -158,7 +164,7 @@ export default function Leaderboard() {
           </div>
           <div className="flex flex-col items-end gap-1.5">
             <StatusBadge status={event.status} />
-            <Link to={`/schedule/${event.id}`} className="text-xs text-fairway-300 hover:text-white">
+            <Link to={`/leagues/${event.league?.slug}/events/${event.event_number}/schedule`} className="text-xs text-fairway-300 hover:text-white">
               Pairings ↗
             </Link>
           </div>

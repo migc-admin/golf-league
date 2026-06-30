@@ -22,7 +22,7 @@ export default function Leagues() {
     const { data } = await supabase
       .from('leagues')
       .select(`
-        id, name, season_year, created_at,
+        id, name, slug, season_year, created_at,
         events(id, event_number, event_date, status, course:courses(name))
       `)
       .order('season_year', { ascending: false })
@@ -76,7 +76,7 @@ export default function Leagues() {
                     <div className="text-xs text-gray-500 mt-0.5">Season {league.season_year} · {events.length} event{events.length !== 1 ? 's' : ''}</div>
                   </div>
                   <div className="flex items-center gap-2">
-                    <Link to={`/standings/${league.id}`} className="btn btn-secondary btn-sm">Standings</Link>
+                    <Link to={`/leagues/${league.slug}/standings`} className="btn btn-secondary btn-sm">Standings</Link>
                     <Button size="sm" onClick={() => openCreateEvent(league)}>+ Event</Button>
                     <Button size="sm" variant="secondary" onClick={() => openEditLeague(league)}>Edit</Button>
                     <Button size="sm" variant="danger" onClick={() => handleDeleteLeague(league.id)}>Delete</Button>
@@ -93,7 +93,7 @@ export default function Leagues() {
                     {events.map(ev => (
                       <Link
                         key={ev.id}
-                        to={`/admin/events/${ev.id}`}
+                        to={`/admin/leagues/${league.slug}/events/${ev.event_number}`}
                         className="flex items-center justify-between px-5 py-3 hover:bg-gray-50 transition-colors"
                       >
                         <div>
@@ -103,7 +103,7 @@ export default function Leagues() {
                         </div>
                         <div className="flex items-center gap-3">
                           <Link
-                            to={`/leaderboard/${ev.id}`}
+                            to={`/leagues/${league.slug}/events/${ev.event_number}/leaderboard`}
                             onClick={e => e.stopPropagation()}
                             className="text-xs text-fairway-700 hover:underline"
                           >

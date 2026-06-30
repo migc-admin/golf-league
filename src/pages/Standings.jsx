@@ -11,7 +11,7 @@ import Card, { CardHeader } from '../components/ui/Card'
 import { FlightBadge } from '../components/ui/Badge'
 
 export default function Standings() {
-  const { leagueId } = useParams()
+  const { leagueSlug } = useParams()
   const [league,    setLeague]    = useState(null)
   const [standings, setStandings] = useState([])
   const [categories, setCategories] = useState([])
@@ -21,12 +21,14 @@ export default function Standings() {
 
   useEffect(() => {
     async function load() {
+      const { data: lg } = await supabase.from('leagues').select('*').eq('slug', leagueSlug).single()
+      if (!lg) { setLoading(false); return }
+      const leagueId = lg.id
+
       const [
-        { data: lg },
         { data: earnings },
         { data: evs },
       ] = await Promise.all([
-        supabase.from('leagues').select('*').eq('id', leagueId).single(),
         supabase.from('season_earnings')
           .select('*, player:players(*)')
           .eq('league_id', leagueId)
@@ -40,6 +42,7 @@ export default function Standings() {
 
       setLeague(lg)
       setEvents(evs ?? [])
+
 
       // Build standings
       const playerMap   = {}  // playerId → { player, totalEarnings, eventCount, byCategory }
@@ -70,7 +73,7 @@ export default function Standings() {
       setLoading(false)
     }
     load()
-  }, [leagueId])
+  }, [leagueSlug])
 
   if (loading) return (
     <div className="min-h-screen bg-gray-50 flex items-center justify-center">
