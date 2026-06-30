@@ -686,7 +686,10 @@ function PlayerScoreCard({ ep, hole, par, si, score, allHoleScores, courseStroke
             pattern="[0-9]*"
             value={puttsDisplay}
             onChange={e => {
-              const val = e.target.value === '' ? '' : parseInt(e.target.value, 10) || ''
+              const raw = e.target.value
+              const val = raw === '' ? '' : parseInt(raw, 10)
+              const valid = val === '' || (!isNaN(val) && val >= 0)
+              if (!valid) return
               onChange('putts', val)
               // Always advance immediately — double-digit putts are not realistic
               if (val !== '' && onGrossDone) onGrossDone()
