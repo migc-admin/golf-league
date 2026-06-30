@@ -673,7 +673,12 @@ function PlayerScoreCard({ ep, hole, par, si, score, allHoleScores, courseStroke
       {/* Putts row */}
       {trackPutts && (
         <div className="flex items-center justify-between px-4 py-2 bg-gray-50 border-t border-gray-100">
-          <span className="text-xs text-gray-500 font-medium">Putts on this hole</span>
+          <div>
+            <span className="text-xs text-gray-500 font-medium">Putts on this hole</span>
+            {grossVal != null && score.putts !== '' && score.putts != null && parseInt(score.putts, 10) > grossVal && (
+              <div className="text-xs text-red-600 font-semibold mt-0.5">⚠ Putts exceed score</div>
+            )}
+          </div>
           <input
             ref={puttsRef}
             type="number"
@@ -690,7 +695,11 @@ function PlayerScoreCard({ ep, hole, par, si, score, allHoleScores, courseStroke
             placeholder="0"
             min={0}
             max={10}
-            className="w-14 h-11 text-center text-xl font-bold border-2 border-gray-300 rounded-lg focus:border-fairway-500 focus:ring-2 focus:ring-fairway-200 outline-none bg-white"
+            className={`w-14 h-11 text-center text-xl font-bold border-2 rounded-lg focus:ring-2 outline-none bg-white ${
+              grossVal != null && score.putts !== '' && score.putts != null && parseInt(score.putts, 10) > grossVal
+                ? 'border-red-400 focus:border-red-500 focus:ring-red-200'
+                : 'border-gray-300 focus:border-fairway-500 focus:ring-fairway-200'
+            }`}
             style={{ WebkitAppearance: 'none', MozAppearance: 'textfield' }}
           />
         </div>
