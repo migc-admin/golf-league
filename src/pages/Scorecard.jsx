@@ -66,6 +66,8 @@ export default function Scorecard() {
   const [needsCode,     setNeedsCode]     = useState(false)
   const [codeEventId,   setCodeEventId]   = useState(null)
   const [loadTrigger,   setLoadTrigger]   = useState(0)
+  // Prevent hole from resetting on auth re-renders after initial load
+  const holeInitKey = useRef(null)
 
   useEffect(() => {
     // Wait for auth to resolve before loading
@@ -205,7 +207,12 @@ export default function Scorecard() {
         const lastComplete = Math.max(0,
           ...playerIds.flatMap(pid => Object.keys(map[pid] ?? {}).map(Number))
         )
-        setCurrentHole(Math.min(18, lastComplete + 1))
+        // Only set the starting hole once per event/session load — prevents toggling on auth re-renders
+        const initKey = `${evId}:${loadTrigger}`
+        if (holeInitKey.current !== initKey) {
+          holeInitKey.current = initKey
+          setCurrentHole(Math.min(18, lastComplete + 1))
+        }
 
         const allDone = playerIds.every(pid => Object.keys(map[pid] ?? {}).length === 18)
         if (allDone || ev.status === 'complete') setShowScorecard(true)
@@ -675,10 +682,8 @@ function PlayerScoreCard({ ep, hole, par, si, score, allHoleScores, courseStroke
             onChange={e => {
               const val = e.target.value === '' ? '' : parseInt(e.target.value, 10) || ''
               onChange('putts', val)
-              // Advance to next player after putts entered
-              if (val !== '' && onGrossDone) {
-                setTimeout(() => onGrossDone(), 0)
-              }
+              // Always advance immediately — double-digit putts are not realistic
+              if (val !== '' && onGrossDone) onGrossDone()
             }}
             onFocus={e => e.target.select()}
             placeholder="0"
