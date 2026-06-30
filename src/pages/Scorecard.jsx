@@ -359,6 +359,7 @@ export default function Scorecard() {
         course={course}
         groupPlayers={groupPlayers}
         scores={scores}
+        trackPutts={trackPutts}
         isComplete={isComplete}
         canEdit={canEdit}
         onEdit={() => setShowScorecard(false)}
@@ -712,7 +713,7 @@ function PlayerScoreCard({ ep, hole, par, si, score, allHoleScores, courseStroke
 }
 
 // ─── Traditional Scorecard View (vertical: holes=rows, players=cols) ──
-function TraditionalScorecard({ event, course, groupPlayers, scores, isComplete, canEdit, onEdit, homeLink, onSignOut }) {
+function TraditionalScorecard({ event, course, groupPlayers, scores, isComplete, canEdit, onEdit, homeLink, onSignOut, trackPutts }) {
   const pars  = course.par_per_hole
   const sis   = course.stroke_index
 
@@ -721,25 +722,31 @@ function TraditionalScorecard({ event, course, groupPlayers, scores, isComplete,
     const ch = ep.course_handicap ?? 0
     const name = ep.player?.first_name ?? ''
     let frontGross = 0, backGross = 0, frontNet = 0, backNet = 0
+    let frontPutts = 0, backPutts = 0, hasPutts = false
 
     const cells = Array.from({ length: 18 }, (_, i) => {
       const h = i + 1
       const sc = scores[ep.player_id]?.[h]
       const g = sc ? parseInt(sc.gross, 10) : null
+      const putts = sc && sc.putts !== '' && sc.putts != null ? parseInt(sc.putts, 10) : null
+      if (putts != null) hasPutts = true
       const strokes = getStrokesOnHole(ch, sis[i])
       const net = g != null ? g - strokes : null
       const p = pars[i]
       if (g != null) {
-        if (i < 9) { frontGross += g; frontNet += (net ?? g) }
-        else        { backGross  += g; backNet  += (net ?? g) }
+        if (i < 9) { frontGross += g; frontNet += (net ?? g); if (putts != null) frontPutts += putts }
+        else        { backGross  += g; backNet  += (net ?? g); if (putts != null) backPutts  += putts }
       }
       const netVsPar = net != null ? net - p : null
-      return { g, net, netVsPar }
+      return { g, net, netVsPar, putts }
     })
 
     return { ep, name, ch, cells, frontGross, backGross, frontNet, backNet,
-      totalGross: frontGross + backGross, totalNet: frontNet + backNet }
+      totalGross: frontGross + backGross, totalNet: frontNet + backNet,
+      frontPutts, backPutts, totalPutts: frontPutts + backPutts, hasPutts }
   })
+
+  const anyPutts = trackPutts && playerData.some(p => p.hasPutts)
 
   // Color for a cell by netVsPar
   function cellBg(netVsPar) {
@@ -818,11 +825,18 @@ function TraditionalScorecard({ event, course, groupPlayers, scores, isComplete,
                     {playerData.map(({ ep, cells }) => {
                       const c = cells[i]
                       return (
-                        <td key={ep.player_id} className="text-center px-1 py-1.5">
+                        <td key={ep.player_id} className="text-center px-1 py-1">
                           {c.g != null ? (
-                            <span className={`inline-flex items-center justify-center w-9 h-9 rounded-lg text-sm font-bold ${cellBg(c.netVsPar)}`}>
-                              {c.g}
-                            </span>
+                            <div className="flex flex-col items-center gap-0.5">
+                              <span className={`inline-flex items-center justify-center w-9 h-9 rounded-lg text-sm font-bold ${cellBg(c.netVsPar)}`}>
+                                {c.g}
+                              </span>
+                              {anyPutts && (
+                                <span className="text-xs text-gray-400 leading-none">
+                                  {c.putts != null ? `${c.putts}p` : ''}
+                                </span>
+                              )}
+                            </div>
                           ) : (
                             <span className="text-gray-200 text-sm">—</span>
                           )}
@@ -836,9 +850,10 @@ function TraditionalScorecard({ event, course, groupPlayers, scores, isComplete,
               <tr className="bg-fairway-700 text-white">
                 <td className="px-3 py-2 text-xs font-bold">OUT</td>
                 <td className="text-center px-2 py-2 text-xs font-bold">{frontPar}</td>
-                {playerData.map(({ ep, frontGross }) => (
-                  <td key={ep.player_id} className="text-center px-2 py-2 font-black text-sm">
-                    {frontGross || '—'}
+                {playerData.map(({ ep, frontGross, frontPutts, hasPutts }) => (
+                  <td key={ep.player_id} className="text-center px-2 py-2 text-sm">
+                    <div className="font-black">{frontGross || '—'}</div>
+                    {anyPutts && hasPutts && <div className="text-xs text-fairway-300">{frontPutts}p</div>}
                   </td>
                 ))}
               </tr>
@@ -861,11 +876,18 @@ function TraditionalScorecard({ event, course, groupPlayers, scores, isComplete,
                     {playerData.map(({ ep, cells }) => {
                       const c = cells[i + 9]
                       return (
-                        <td key={ep.player_id} className="text-center px-1 py-1.5">
+                        <td key={ep.player_id} className="text-center px-1 py-1">
                           {c.g != null ? (
-                            <span className={`inline-flex items-center justify-center w-9 h-9 rounded-lg text-sm font-bold ${cellBg(c.netVsPar)}`}>
-                              {c.g}
-                            </span>
+                            <div className="flex flex-col items-center gap-0.5">
+                              <span className={`inline-flex items-center justify-center w-9 h-9 rounded-lg text-sm font-bold ${cellBg(c.netVsPar)}`}>
+                                {c.g}
+                              </span>
+                              {anyPutts && (
+                                <span className="text-xs text-gray-400 leading-none">
+                                  {c.putts != null ? `${c.putts}p` : ''}
+                                </span>
+                              )}
+                            </div>
                           ) : (
                             <span className="text-gray-200 text-sm">—</span>
                           )}
@@ -879,9 +901,10 @@ function TraditionalScorecard({ event, course, groupPlayers, scores, isComplete,
               <tr className="bg-fairway-700 text-white">
                 <td className="px-3 py-2 text-xs font-bold">IN</td>
                 <td className="text-center px-2 py-2 text-xs font-bold">{backPar}</td>
-                {playerData.map(({ ep, backGross }) => (
-                  <td key={ep.player_id} className="text-center px-2 py-2 font-black text-sm">
-                    {backGross || '—'}
+                {playerData.map(({ ep, backGross, backPutts, hasPutts }) => (
+                  <td key={ep.player_id} className="text-center px-2 py-2 text-sm">
+                    <div className="font-black">{backGross || '—'}</div>
+                    {anyPutts && hasPutts && <div className="text-xs text-fairway-300">{backPutts}p</div>}
                   </td>
                 ))}
               </tr>
@@ -889,10 +912,11 @@ function TraditionalScorecard({ event, course, groupPlayers, scores, isComplete,
               <tr className="bg-fairway-900 text-white">
                 <td className="px-3 py-2.5 text-sm font-black">TOTAL</td>
                 <td className="text-center px-2 py-2.5 text-sm font-bold">{frontPar + backPar}</td>
-                {playerData.map(({ ep, totalGross, totalNet, ch }) => (
+                {playerData.map(({ ep, totalGross, totalNet, totalPutts, hasPutts }) => (
                   <td key={ep.player_id} className="text-center px-2 py-2.5">
                     <div className="font-black text-base leading-none">{totalGross || '—'}</div>
                     {totalNet > 0 && <div className="text-fairway-300 text-xs mt-0.5">Net {totalNet}</div>}
+                    {anyPutts && hasPutts && <div className="text-fairway-400 text-xs mt-0.5">{totalPutts} putts</div>}
                   </td>
                 ))}
               </tr>
