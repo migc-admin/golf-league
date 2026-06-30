@@ -6,11 +6,35 @@
  *   match_points — individual match play within groups (pairs by handicap order)
  *   ryder_cup    — team match play, Flight A vs Flight B
  *
- * Scoring per hole:
- *   Win  = 1.0 point
- *   Halve = 0.5 points each
- *   Loss = 0 points
+ * USGA match play scoring:
+ *   Win a hole  → go 1 UP
+ *   Halve a hole → status unchanged
+ *   Lose a hole → go 1 DOWN
+ *   Match ends when lead > holes remaining (e.g. 3&2, 1 UP, All Square)
  */
+
+/**
+ * Format a USGA match play status string.
+ * upBy > 0 means A leads, upBy < 0 means B leads.
+ * holesRemaining = 18 - holesPlayed (before this hole) OR 0 if match is done.
+ */
+function matchStatusLabel(upBy, holesPlayed, closed = false) {
+  const remaining = 18 - holesPlayed
+  if (upBy === 0) return 'All Square'
+  const leader = upBy > 0 ? 'A' : 'B'
+  const margin = Math.abs(upBy)
+  if (closed) {
+    // Match ended early (e.g. 3&2)
+    if (remaining > 0) return `${margin}&${remaining}`
+    return `${margin} UP`  // won on 18th
+  }
+  if (holesPlayed === 18) {
+    return `${margin} UP`
+  }
+  // Dormie: lead equals remaining holes
+  if (margin === remaining) return `Dormie ${margin} (${leader})`
+  return `${margin} UP (${leader})`
+}
 
 import { getStrokesOnHole } from './scoring'
 
@@ -56,15 +80,24 @@ function computePairingResult(playerA, playerB, allScores, strokeIndexes, parPer
     allScores.filter(s => s.player_id === playerB.player_id).map(s => [s.hole_number, s])
   )
 
-  let pointsA = 0
-  let pointsB = 0
+  // upBy > 0 = A leads, upBy < 0 = B leads
+  let upBy = 0
+  let holesPlayed = 0
+  let matchClosed = false   // match ended before hole 18
+  let closedAfterHole = null
   const holes = []
 
   for (let h = 1; h <= 18; h++) {
+    // If match is already closed, remaining holes are moot
+    if (matchClosed) {
+      holes.push({ hole: h, status: 'conceded', result: null, netA: null, netB: null, upByAfter: upBy })
+      continue
+    }
+
     const sA = scoresA[h]
     const sB = scoresB[h]
     if (!sA || !sB) {
-      holes.push({ hole: h, status: 'pending', pointsA: null, pointsB: null, netA: null, netB: null })
+      holes.push({ hole: h, status: 'pending', result: null, netA: null, netB: null, upByAfter: upBy })
       continue
     }
 
@@ -76,41 +109,46 @@ function computePairingResult(playerA, playerB, allScores, strokeIndexes, parPer
     const netA = sA.gross_score - strokesA
     const netB = sB.gross_score - strokesB
 
-    let holePointsA, holePointsB, result
-    if (netA < netB)       { holePointsA = 1; holePointsB = 0; result = 'A' }
-    else if (netB < netA)  { holePointsA = 0; holePointsB = 1; result = 'B' }
-    else                   { holePointsA = 0.5; holePointsB = 0.5; result = 'halve' }
+    let result
+    if (netA < netB)      { upBy++; result = 'A' }
+    else if (netB < netA) { upBy--; result = 'B' }
+    else                  { result = 'halve' }
 
-    pointsA += holePointsA
-    pointsB += holePointsB
+    holesPlayed++
+    const remaining = 18 - holesPlayed
 
-    holes.push({
-      hole:     h,
-      status:   'played',
-      result,
-      netA,
-      netB,
-      par,
-      pointsA:  holePointsA,
-      pointsB:  holePointsB,
-    })
+    // Check if match is over: lead > holes remaining
+    if (Math.abs(upBy) > remaining) {
+      matchClosed = true
+      closedAfterHole = h
+    }
+
+    holes.push({ hole: h, status: 'played', result, netA, netB, par, upByAfter: upBy })
   }
 
-  const holesPlayed = holes.filter(h => h.status === 'played').length
-  let matchStatus
-  if (pointsA > pointsB)  matchStatus = 'A leads'
-  else if (pointsB > pointsA) matchStatus = 'B leads'
-  else                        matchStatus = 'All square'
+  // Final status label
+  const isClosed = matchClosed || holesPlayed === 18
+  const matchStatusLabel_ = holesPlayed === 0
+    ? 'Not started'
+    : matchStatusLabel(upBy, holesPlayed, isClosed && upBy !== 0)
+
+  const winner = isClosed
+    ? (upBy > 0 ? 'A' : upBy < 0 ? 'B' : 'halve')
+    : null
 
   return {
     playerA,
     playerB,
-    pointsA,
-    pointsB,
+    upBy,           // net holes up (+ = A, - = B)
     holesPlayed,
-    matchStatus,
-    winner: holesPlayed === 18 ? (pointsA > pointsB ? 'A' : pointsB > pointsA ? 'B' : 'halve') : null,
+    matchClosed,
+    closedAfterHole,
+    matchStatus: matchStatusLabel_,
+    winner,
     holes,
+    // Keep pointsA/B for backward compat with team totals
+    pointsA: upBy > 0 ? 1 : upBy === 0 && holesPlayed === 18 ? 0.5 : 0,
+    pointsB: upBy < 0 ? 1 : upBy === 0 && holesPlayed === 18 ? 0.5 : 0,
   }
 }
 
