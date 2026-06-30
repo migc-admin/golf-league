@@ -298,6 +298,7 @@ export default function Scorecard() {
 
     if (allValid && currentHole < 18) {
       setCurrentHole(h => h + 1)
+      window.scrollTo({ top: 0, behavior: 'instant' })
     } else if (allValid && currentHole === 18) {
       toast.success('Round complete! All 18 holes saved.')
       setShowScorecard(true)
@@ -646,7 +647,7 @@ function PlayerScoreCard({ ep, hole, par, si, score, allHoleScores, courseStroke
                 // Auto-advance: immediate unless value starts with '1' (could be 11-19)
                 if (val !== '' && advanceTimer.current) clearTimeout(advanceTimer.current)
                 if (val !== '') {
-                  const delay = String(val) === '1' ? 800 : 0
+                  const delay = String(val) === '1' ? 1600 : 0
                   advanceTimer.current = setTimeout(() => {
                     if (trackPutts && puttsRef.current) {
                       puttsRef.current.focus()
