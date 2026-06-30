@@ -37,7 +37,7 @@ import { getStrokesOnHole } from '../lib/engines/scoring'
 import toast from 'react-hot-toast'
 
 export default function Scorecard() {
-  const { eventId } = useParams()
+  const { leagueSlug, eventNumber } = useParams()
   const { user, profile, loading: authLoading, isAdmin, signOut } = useAuth()
   const navigate = useNavigate()
   const homeLink = isAdmin ? '/admin' : '/home'
@@ -74,7 +74,20 @@ export default function Scorecard() {
     if (authLoading || profile === undefined) return
 
     async function load() {
-      let evId = eventId
+      // Resolve the event UUID from leagueSlug + eventNumber params
+      let evId = null
+      if (leagueSlug && eventNumber) {
+        const { data: lg } = await supabase.from('leagues').select('id').eq('slug', leagueSlug).single()
+        if (lg) {
+          const { data: ev } = await supabase.from('events').select('id').eq('league_id', lg.id).eq('event_number', parseInt(eventNumber, 10)).single()
+          evId = ev?.id ?? null
+        }
+        if (!evId) { setError('Event not found.'); setLoading(false); return }
+      } else {
+        // /scorecard/me route — no slug/number params, resolve via scorekeeper assignment
+        evId = 'me'
+      }
+
       let guestGroupNum = null
 
       // Guest access: check sessionStorage for a valid guest session
@@ -232,7 +245,7 @@ export default function Scorecard() {
     }
 
     load()
-  }, [eventId, user, profile, authLoading, isAdmin, loadTrigger])
+  }, [leagueSlug, eventNumber, user, profile, authLoading, isAdmin, loadTrigger])
 
   function getScore(playerId, hole) {
     return scores[playerId]?.[hole] ?? { gross: '', putts: '' }
@@ -396,7 +409,7 @@ export default function Scorecard() {
               </button>
             )}
             <Link
-              to={`/leaderboard/${event.id}`}
+              to={`/leagues/${event.league?.slug}/events/${event.event_number}/leaderboard`}
               state={{ from: 'scorecard', scorecardEventId: event.id }}
               className="text-fairway-200 text-xs hover:text-white border border-fairway-500 rounded px-2 py-1"
             >
@@ -772,7 +785,7 @@ function TraditionalScorecard({ event, course, groupPlayers, scores, isComplete,
           </div>
           <div className="flex items-center gap-2">
             <Link
-              to={`/leaderboard/${event.id}`}
+              to={`/leagues/${event.league?.slug}/events/${event.event_number}/leaderboard`}
               state={{ from: 'scorecard', scorecardEventId: event.id }}
               className="text-fairway-200 text-xs hover:text-white border border-fairway-500 rounded px-2 py-1"
             >
