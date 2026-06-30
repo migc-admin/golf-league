@@ -117,15 +117,35 @@ function computePairingResult(playerA, playerB, allScores, strokeIndexes, parPer
 /**
  * Compute match play results for an entire event.
  * Groups players by group_number, pairs A vs B within each group.
+ * If storedPairings are provided (length > 0), use those instead of auto-pairing.
  *
  * @param {Array}  eventPlayers
  * @param {Array}  allScores
  * @param {Object} course
+ * @param {Array}  storedPairings  — optional array of { player_a_id, player_b_id, match_number }
  * @returns {{ pairings, playerPoints, teamPoints }}
  */
-export function computeMatchPoints(eventPlayers, allScores, course) {
+export function computeMatchPoints(eventPlayers, allScores, course, storedPairings = []) {
   const { stroke_index: strokeIndexes, par_per_hole: parPerHole } = course
 
+  const pairings = []
+  const playerPoints = {}  // playerId → total points
+
+  if (storedPairings.length > 0) {
+    // Use explicit stored pairings
+    const playerMap = Object.fromEntries(eventPlayers.map(ep => [ep.player_id, ep]))
+    for (const pairing of storedPairings) {
+      const playerA = playerMap[pairing.player_a_id]
+      const playerB = playerMap[pairing.player_b_id]
+      if (!playerA || !playerB) continue
+      const result = computePairingResult(playerA, playerB, allScores, strokeIndexes, parPerHole)
+      result.groupNumber = pairing.match_number
+      pairings.push(result)
+
+      playerPoints[playerA.player_id] = (playerPoints[playerA.player_id] ?? 0) + result.pointsA
+      playerPoints[playerB.player_id] = (playerPoints[playerB.player_id] ?? 0) + result.pointsB
+    }
+  } else {
   // Group players
   const groups = {}
   for (const ep of eventPlayers) {
@@ -133,9 +153,6 @@ export function computeMatchPoints(eventPlayers, allScores, course) {
     if (!groups[g]) groups[g] = []
     groups[g].push(ep)
   }
-
-  const pairings = []
-  const playerPoints = {}  // playerId → total points
 
   for (const [groupNum, members] of Object.entries(groups)) {
     const pairs = buildPairings(members)
@@ -147,6 +164,7 @@ export function computeMatchPoints(eventPlayers, allScores, course) {
       playerPoints[playerA.player_id] = (playerPoints[playerA.player_id] ?? 0) + result.pointsA
       playerPoints[playerB.player_id] = (playerPoints[playerB.player_id] ?? 0) + result.pointsB
     }
+  }
   }
 
   // Team totals (Ryder Cup style: Flight A vs Flight B)
