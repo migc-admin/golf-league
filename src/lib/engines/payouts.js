@@ -20,6 +20,14 @@
 
 import { computeSkinsPayout } from './skins.js'
 
+// Extract base competition and rank from a ranked key (e.g. '18_net_a_2nd' → { base: '18_net_a', rank: 2 })
+function getRankInfo(key) {
+  if (key.endsWith('_1st')) return { base: key.slice(0, -4), rank: 1 }
+  if (key.endsWith('_2nd')) return { base: key.slice(0, -4), rank: 2 }
+  if (key.endsWith('_3rd')) return { base: key.slice(0, -4), rank: 3 }
+  return null
+}
+
 export const CATEGORY_LABELS = {
   // With flights
   '18_net_a_1st':  '18-Hole Net — Flight A, 1st',
@@ -198,13 +206,65 @@ export function computePayouts(event, playerCount, leaderboards, sideGames, skin
   const byCategory = []
   const byPlayer   = {}
 
+  // Separate ranked keys (1st/2nd/3rd) from standalone keys
+  // Ranked keys need tie-absorption (2nd+3rd money combined when 2nd is tied)
+  const rankedGroups = {}  // base → [{ key, rank, amount }]
+  const standaloneEntries = []
+
   for (const [key, dollarVal] of Object.entries(config)) {
     if (!dollarVal || dollarVal <= 0) continue
-
     const multiplier = keyMultiplier(key)
     const count = multiplier === 'field' ? playerCount : multiplier === 'flight_b' ? fcB : fcA
     const amount = Math.round(dollarVal * count * 100) / 100
+    const rankInfo = getRankInfo(key)
+    if (rankInfo) {
+      if (!rankedGroups[rankInfo.base]) rankedGroups[rankInfo.base] = []
+      rankedGroups[rankInfo.base].push({ key, rank: rankInfo.rank, amount })
+    } else {
+      standaloneEntries.push({ key, amount })
+    }
+  }
 
+  // Process ranked groups with tie-absorption
+  for (const places of Object.values(rankedGroups)) {
+    places.sort((a, b) => a.rank - b.rank)
+    const absorbed = new Set()
+
+    for (let i = 0; i < places.length; i++) {
+      const place = places[i]
+      if (absorbed.has(place.rank)) continue  // absorbed by a higher tie — skip silently
+
+      const winners = resolveWinners(place.key, leaderboards, sideGames)
+      const label = CATEGORY_LABELS[place.key] ?? place.key
+
+      if (winners.length > 1) {
+        // Tie: absorb next (winners.length - 1) places and combine their money
+        let combinedAmount = place.amount
+        for (let j = 1; j < winners.length && i + j < places.length; j++) {
+          absorbed.add(places[i + j].rank)
+          combinedAmount += places[i + j].amount
+        }
+        const split = Math.round((combinedAmount / winners.length) * 100) / 100
+        const tieLabel = `${label} (Tied — split ${winners.length} ways)`
+        byCategory.push({ key: place.key, label: tieLabel, amount: combinedAmount, playerIds: winners, isSkin: false, isTied: true })
+        for (const pid of winners) {
+          if (!byPlayer[pid]) byPlayer[pid] = { total: 0, items: [] }
+          byPlayer[pid].total += split
+          byPlayer[pid].items.push({ category: tieLabel, amount: split })
+        }
+      } else {
+        byCategory.push({ key: place.key, label, amount: place.amount, playerId: winners[0] ?? null, playerIds: winners, isSkin: false, isTied: false })
+        if (winners[0]) {
+          if (!byPlayer[winners[0]]) byPlayer[winners[0]] = { total: 0, items: [] }
+          byPlayer[winners[0]].total += place.amount
+          byPlayer[winners[0]].items.push({ category: label, amount: place.amount })
+        }
+      }
+    }
+  }
+
+  // Process standalone keys (skins, long drive, low putts, ctp)
+  for (const { key, amount } of standaloneEntries) {
     // Skins handled separately
     if (key === 'skins_a' || key === 'skins_b') {
       const flight      = key === 'skins_a' ? 'A' : 'B'
@@ -221,16 +281,15 @@ export function computePayouts(event, playerCount, leaderboards, sideGames, skin
       continue
     }
 
-    const label    = key.startsWith('ctp_')
+    const label   = key.startsWith('ctp_')
       ? ctpLabel(parseInt(key.replace('ctp_', ''), 10))
       : (CATEGORY_LABELS[key] ?? key)
-    const winners  = resolveWinners(key, leaderboards, sideGames)
-    const isTied   = winners.length > 1
-    const split    = winners.length > 0 ? Math.round((amount / winners.length) * 100) / 100 : 0
+    const winners = resolveWinners(key, leaderboards, sideGames)
+    const isTied  = winners.length > 1
+    const split   = winners.length > 0 ? Math.round((amount / winners.length) * 100) / 100 : 0
     const tieLabel = isTied ? `${label} (Tied — split ${winners.length} ways)` : label
 
     byCategory.push({ key, label: tieLabel, amount, playerId: winners[0] ?? null, playerIds: winners, isSkin: false, isTied })
-
     for (const pid of winners) {
       if (!byPlayer[pid]) byPlayer[pid] = { total: 0, items: [] }
       byPlayer[pid].total += split
