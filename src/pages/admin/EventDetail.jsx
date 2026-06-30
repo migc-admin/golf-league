@@ -132,7 +132,16 @@ export default function EventDetail() {
       )}
 
       {activeTab === 'Groups' && (
-        <TabGroups event={event} eventPlayers={eventPlayers} onUpdated={load} />
+        <div className="space-y-6">
+          <TabGroups event={event} eventPlayers={eventPlayers} onUpdated={load} />
+          {((event.formats ?? (event.format ? [event.format] : [])).includes('match_points') ||
+            (event.formats ?? (event.format ? [event.format] : [])).includes('ryder_cup')) && (
+            <div className="border-t border-gray-100 pt-6">
+              <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-widest mb-3">Match Play Pairings</h3>
+              <MatchPairingsManager eventId={event.id} eventPlayers={eventPlayers} />
+            </div>
+          )}
+        </div>
       )}
 
       {activeTab === 'Payout' && (
@@ -1142,6 +1151,155 @@ function AddPlayerModal({ open, onClose, eventId, available, course, useFlights,
 }
 
 // ─── Tab: Groups ──────────────────────────────────────────────────
+// ─── Match Pairings Manager ───────────────────────────────────────
+function MatchPairingsManager({ eventId, eventPlayers }) {
+  const [pairings,    setPairings]    = useState([])
+  const [playerAId,   setPlayerAId]   = useState('')
+  const [playerBId,   setPlayerBId]   = useState('')
+  const [matchNumber, setMatchNumber] = useState(1)
+  const [saving,      setSaving]      = useState(false)
+
+  async function loadPairings() {
+    const { data } = await supabase
+      .from('match_pairings')
+      .select('*, playerA:players!player_a_id(first_name,last_name), playerB:players!player_b_id(first_name,last_name)')
+      .eq('event_id', eventId)
+      .order('match_number')
+    setPairings(data ?? [])
+  }
+
+  useEffect(() => { loadPairings() }, [eventId])
+
+  // Players already paired (either as A or B)
+  const pairedIds = new Set(pairings.flatMap(p => [p.player_a_id, p.player_b_id]))
+
+  const unpairedPlayers = eventPlayers.filter(ep => !pairedIds.has(ep.player_id))
+
+  async function addPairing() {
+    if (!playerAId || !playerBId || playerAId === playerBId) {
+      toast.error('Select two different players')
+      return
+    }
+    setSaving(true)
+    const { error } = await supabase.from('match_pairings').insert({
+      event_id:    eventId,
+      player_a_id: playerAId,
+      player_b_id: playerBId,
+      match_number: matchNumber,
+    })
+    setSaving(false)
+    if (error) { toast.error(error.message); return }
+    setPlayerAId('')
+    setPlayerBId('')
+    await loadPairings()
+  }
+
+  async function deletePairing(id) {
+    const { error } = await supabase.from('match_pairings').delete().eq('id', id)
+    if (error) { toast.error(error.message); return }
+    await loadPairings()
+  }
+
+  function playerName(ep) {
+    return `${ep.player?.last_name ?? ''}, ${ep.player?.first_name ?? ''} (CH: ${ep.course_handicap ?? '—'})`
+  }
+
+  return (
+    <div className="space-y-4">
+      {/* Current pairings */}
+      <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+        <div className="px-4 py-3 bg-gray-50 border-b border-gray-100">
+          <h3 className="text-sm font-semibold text-gray-800">Current Match Pairings</h3>
+        </div>
+        {pairings.length === 0 ? (
+          <p className="px-4 py-4 text-sm text-gray-400">No pairings assigned yet.</p>
+        ) : (
+          <div className="divide-y divide-gray-100">
+            {pairings.map(p => (
+              <div key={p.id} className="flex items-center justify-between px-4 py-3">
+                <div className="text-sm text-gray-800">
+                  <span className="font-semibold text-blue-700">
+                    {p.playerA?.last_name}, {p.playerA?.first_name}
+                  </span>
+                  {' '}
+                  <span className="text-gray-400">vs</span>
+                  {' '}
+                  <span className="font-semibold text-purple-700">
+                    {p.playerB?.last_name}, {p.playerB?.first_name}
+                  </span>
+                  <span className="ml-3 text-xs text-gray-400">Match #{p.match_number}</span>
+                </div>
+                <Button size="sm" variant="danger" onClick={() => deletePairing(p.id)}>Remove</Button>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* Add pairing form */}
+      {unpairedPlayers.length >= 2 && (
+        <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+          <div className="px-4 py-3 bg-gray-50 border-b border-gray-100">
+            <h3 className="text-sm font-semibold text-gray-800">Add Pairing</h3>
+          </div>
+          <div className="p-4 space-y-3">
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="block text-xs font-medium text-gray-600 mb-1">Player A</label>
+                <select
+                  className="input w-full"
+                  value={playerAId}
+                  onChange={e => setPlayerAId(e.target.value)}
+                >
+                  <option value="">Select player…</option>
+                  {unpairedPlayers
+                    .filter(ep => ep.player_id !== playerBId)
+                    .map(ep => (
+                      <option key={ep.player_id} value={ep.player_id}>{playerName(ep)}</option>
+                    ))}
+                </select>
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-gray-600 mb-1">Player B</label>
+                <select
+                  className="input w-full"
+                  value={playerBId}
+                  onChange={e => setPlayerBId(e.target.value)}
+                >
+                  <option value="">Select player…</option>
+                  {unpairedPlayers
+                    .filter(ep => ep.player_id !== playerAId)
+                    .map(ep => (
+                      <option key={ep.player_id} value={ep.player_id}>{playerName(ep)}</option>
+                    ))}
+                </select>
+              </div>
+            </div>
+            <div className="flex items-end gap-3">
+              <div>
+                <label className="block text-xs font-medium text-gray-600 mb-1">Match #</label>
+                <input
+                  type="number"
+                  min="1"
+                  className="input w-24"
+                  value={matchNumber}
+                  onChange={e => setMatchNumber(parseInt(e.target.value, 10) || 1)}
+                />
+              </div>
+              <Button onClick={addPairing} loading={saving} disabled={!playerAId || !playerBId}>
+                Add Pairing
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+      {unpairedPlayers.length < 2 && pairings.length > 0 && (
+        <p className="text-sm text-gray-400 text-center">All players have been paired.</p>
+      )}
+    </div>
+  )
+}
+
 function TabGroups({ event, eventPlayers, onUpdated }) {
   const ungrouped = eventPlayers.filter(ep => !ep.group_number)
   const maxGroup  = Math.max(0, ...eventPlayers.map(ep => ep.group_number ?? 0))
