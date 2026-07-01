@@ -25,7 +25,7 @@ export default function Home() {
         // Admins see all active/upcoming events
         const { data } = await supabase
           .from('events')
-          .select('id, name, event_number, event_date, status, league:leagues(slug)')
+          .select('id, name, slug, event_number, event_date, status, league:leagues(slug)')
           .in('status', ['active', 'upcoming'])
           .order('event_date', { ascending: true })
           .limit(10)
@@ -42,7 +42,7 @@ export default function Home() {
         if (playerId) {
           const { data: entries } = await supabase
             .from('event_players')
-            .select('event_id, events(id, name, event_number, event_date, status, league:leagues(slug))')
+            .select('event_id, events(id, name, slug, event_number, event_date, status, league:leagues(slug))')
             .eq('player_id', playerId)
           const active = (entries ?? [])
             .map(e => e.events)
@@ -149,7 +149,7 @@ export default function Home() {
                   {events.map(ev => (
                     <Link
                       key={ev.id}
-                      to={`/leagues/${ev.league?.slug}/events/${ev.event_number}/scorecard`}
+                      to={`/${ev.league?.slug}/${ev.slug}/scorecard`}
                       className="flex items-center justify-between px-4 py-3 rounded-xl border border-gray-100 hover:border-fairway-200 hover:bg-fairway-50 transition-colors group"
                     >
                       <div>
