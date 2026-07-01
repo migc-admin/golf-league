@@ -1,120 +1,149 @@
 /**
  * Season Standings
- * Cumulative earnings per player per category across all events in the league.
- * Skins excluded per spec.
+ * Computed live from scores + payout engine across all completed events.
+ * No dependency on season_earnings table.
  */
 
 import { useEffect, useState } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
-import Card, { CardHeader } from '../components/ui/Card'
-import { FlightBadge } from '../components/ui/Badge'
+import Card from '../components/ui/Card'
 import { computeLeaderboards } from '../lib/engines/scoring'
+import { computeAllSkins } from '../lib/engines/skins'
+import { computePayouts } from '../lib/engines/payouts'
 import { computeTGLEventResults, computeTGLSeasonStandings } from '../lib/engines/tgl'
 
 export default function Standings() {
   const { leagueSlug } = useParams()
-  const [league,         setLeague]         = useState(null)
-  const [standings,      setStandings]      = useState([])
-  const [categories,     setCategories]     = useState([])
-  const [events,         setEvents]         = useState([])
-  const [tglStandings,   setTglStandings]   = useState([])
-  const [loading,        setLoading]        = useState(true)
-  const [view,           setView]           = useState('summary')  // 'summary' | 'breakdown' | 'tgl'
+  const [league,       setLeague]       = useState(null)
+  const [events,       setEvents]       = useState([])
+  const [standings,    setStandings]    = useState([])   // earnings: [{ player, totalEarnings, eventsPlayed, byEvent }]
+  const [tglStandings, setTglStandings] = useState([])   // tgl: [{ team, seasonPoints, rank }]
+  const [tglEventRows, setTglEventRows] = useState([])   // per-event TGL detail [{ event, teamResults }]
+  const [loading,      setLoading]      = useState(true)
+  const [view,         setView]         = useState('earnings')
 
   useEffect(() => {
     async function load() {
       const { data: lg } = await supabase.from('leagues').select('*').eq('slug', leagueSlug).single()
       if (!lg) { setLoading(false); return }
-      const leagueId = lg.id
+      setLeague(lg)
 
+      // Load all completed events with course data
+      const { data: evs } = await supabase
+        .from('events')
+        .select('*, course:courses(*)')
+        .eq('league_id', lg.id)
+        .eq('status', 'complete')
+        .order('event_number')
+
+      setEvents(evs ?? [])
+      if (!evs?.length) { setLoading(false); return }
+
+      const eventIds = evs.map(e => e.id)
+
+      // Bulk load all data for completed events
       const [
-        { data: earnings },
-        { data: evs },
+        { data: allEPs },
+        { data: allScores },
+        { data: allSideGames },
         { data: tglT },
-        { data: tglM },
+        { data: tglSels },
       ] = await Promise.all([
-        supabase.from('season_earnings')
-          .select('*, player:players(*)')
-          .eq('league_id', leagueId)
-          .not('category', 'ilike', 'skins%'),  // exclude skins per spec
-        supabase.from('events')
-          .select('id, event_number, event_date, status, course:courses(*)')
-          .eq('league_id', leagueId)
-          .eq('status', 'complete')
-          .order('event_number'),
-        supabase.from('tgl_teams').select('*').eq('league_id', leagueId).order('name'),
-        supabase.from('tgl_team_members').select('*, player:players(first_name,last_name)'),
+        supabase.from('event_players').select('*, player:players(*)').in('event_id', eventIds),
+        supabase.from('scores').select('*').in('event_id', eventIds),
+        supabase.from('side_games').select('*, winner:players(first_name,last_name)').in('event_id', eventIds),
+        supabase.from('tgl_teams').select('*').eq('league_id', lg.id).order('name'),
+        supabase.from('tgl_event_selections').select('*').in('event_id', eventIds),
       ])
 
-      setLeague(lg)
-      setEvents(evs ?? [])
-
-      // Build earnings standings
-      const playerMap   = {}  // playerId → { player, totalEarnings, eventCount, byCategory }
-      const catSet      = new Set()
-
-      for (const e of (earnings ?? [])) {
-        const pid = e.player_id
-        if (!playerMap[pid]) {
-          playerMap[pid] = {
-            player:         e.player,
-            totalEarnings:  0,
-            eventIds:       new Set(),
-            byCategory:     {},
-          }
-        }
-        playerMap[pid].totalEarnings += e.amount
-        playerMap[pid].eventIds.add(e.event_id)
-        playerMap[pid].byCategory[e.category] = (playerMap[pid].byCategory[e.category] ?? 0) + e.amount
-        catSet.add(e.category)
+      // Load TGL team members
+      let tglMembers = []
+      if (tglT?.length) {
+        const { data: m } = await supabase
+          .from('tgl_team_members')
+          .select('*, player:players(first_name,last_name)')
+          .in('team_id', tglT.map(t => t.id))
+        tglMembers = m ?? []
       }
 
-      const sorted = Object.values(playerMap)
-        .map(p => ({ ...p, eventsPlayed: p.eventIds.size }))
-        .sort((a, b) => b.totalEarnings - a.totalEarnings)
+      // ── Earnings standings ──────────────────────────────────────────
+      const playerEarnings = {}  // playerId → { player, totalEarnings, eventsPlayed, byEvent: {} }
 
-      setStandings(sorted)
-      setCategories([...catSet].sort())
-      setLoading(false)
+      for (const ev of evs) {
+        const course = ev.course
+        if (!course) continue
+        const eps       = (allEPs      ?? []).filter(ep => ep.event_id === ev.id)
+        const scores    = (allScores   ?? []).filter(s  => s.event_id  === ev.id)
+        const sideGames = (allSideGames ?? []).filter(sg => sg.event_id === ev.id)
+        if (!eps.length) continue
 
-      // Build TGL season standings (non-blocking — runs after page is visible)
-      try {
-        if ((tglT ?? []).length > 0 && (evs ?? []).length > 0) {
-          const teams   = tglT ?? []
-          const members = tglM ?? []
-
-          const eventIds = (evs ?? []).map(e => e.id)
-          const [{ data: allEPs }, { data: allSc }, { data: allSel }] = await Promise.all([
-            supabase.from('event_players').select('*, player:players(first_name,last_name)').in('event_id', eventIds),
-            supabase.from('scores').select('*').in('event_id', eventIds),
-            supabase.from('tgl_event_selections').select('*').in('event_id', eventIds),
-          ])
-
-          const eventResultsByEventId = {}
-          for (const ev of (evs ?? [])) {
-            const course = ev.course
-            if (!course?.stroke_index || !course?.par_per_hole) continue
-            const eps    = (allEPs ?? []).filter(ep => ep.event_id === ev.id)
-            const scores = (allSc  ?? []).filter(s  => s.event_id  === ev.id)
-            const sels   = (allSel ?? []).filter(s  => s.event_id  === ev.id)
-            if (!eps.length || !scores.length) continue
-            try {
-              const lb = computeLeaderboards(eps, scores, course)
-              const ranked = lb.net?.ranked ?? lb.gross?.ranked ?? []
-              if (!ranked.length) continue
-              const epMap = Object.fromEntries(eps.map(ep => [ep.player_id, ep]))
-              const rankedWithPlayer = ranked.map(r => ({ ...r, player: epMap[r.player_id]?.player ?? null }))
-              eventResultsByEventId[ev.id] = computeTGLEventResults(rankedWithPlayer, sels, teams, members)
-            } catch { /* skip event */ }
-          }
-
-          setTglStandings(computeTGLSeasonStandings(eventResultsByEventId, teams))
+        const nonGuest     = eps.filter(ep => !ep.is_guest)
+        const flightCounts = {
+          A: nonGuest.filter(ep => ep.flight === 'A').length,
+          B: nonGuest.filter(ep => ep.flight === 'B').length,
         }
-      } catch { /* TGL load failed silently — don't break earnings standings */ }
+
+        try {
+          const leaderboards = computeLeaderboards(nonGuest, scores, course)
+          const skinsResults = computeAllSkins(nonGuest, scores, course.stroke_index)
+          const { byPlayer } = computePayouts(ev, nonGuest.length, leaderboards, sideGames, skinsResults, flightCounts)
+
+          for (const { playerId, total } of byPlayer) {
+            const ep = eps.find(e => e.player_id === playerId)
+            if (!playerEarnings[playerId]) {
+              playerEarnings[playerId] = {
+                player: ep?.player ?? null,
+                totalEarnings: 0,
+                eventsPlayed: 0,
+                byEvent: {},
+              }
+            }
+            playerEarnings[playerId].totalEarnings += total
+            playerEarnings[playerId].eventsPlayed  += 1
+            playerEarnings[playerId].byEvent[ev.id] = total
+          }
+        } catch { /* skip event if engine errors */ }
+      }
+
+      const sorted = Object.values(playerEarnings).sort((a, b) => b.totalEarnings - a.totalEarnings)
+      setStandings(sorted)
+
+      // ── TGL standings ───────────────────────────────────────────────
+      if (tglT?.length) {
+        const teams = tglT
+        const eventResultsByEventId = {}
+        const eventRows = []
+
+        for (const ev of evs) {
+          const course = ev.course
+          if (!course?.stroke_index || !course?.par_per_hole) continue
+          const eps   = (allEPs    ?? []).filter(ep => ep.event_id === ev.id)
+          const scs   = (allScores ?? []).filter(s  => s.event_id  === ev.id)
+          const sels  = (tglSels  ?? []).filter(s  => s.event_id  === ev.id)
+          if (!eps.length || !scs.length || !sels.length) continue
+          try {
+            const lb     = computeLeaderboards(eps, scs, course)
+            const ranked = lb.net?.ranked ?? lb.gross?.ranked ?? []
+            if (!ranked.length) continue
+            const epMap = Object.fromEntries(eps.map(ep => [ep.player_id, ep]))
+            const rankedWithPlayer = ranked.map(r => ({ ...r, player: epMap[r.player_id]?.player ?? null }))
+            const result = computeTGLEventResults(rankedWithPlayer, sels, teams, tglMembers)
+            eventResultsByEventId[ev.id] = result
+            eventRows.push({ event: ev, teamResults: result.teamResults })
+          } catch { /* skip */ }
+        }
+
+        setTglStandings(computeTGLSeasonStandings(eventResultsByEventId, teams))
+        setTglEventRows(eventRows)
+      }
+
+      setLoading(false)
     }
     load()
   }, [leagueSlug])
+
+  const views = ['earnings', ...(tglStandings.length > 0 ? ['tgl'] : [])]
 
   if (loading) return (
     <div className="min-h-screen bg-gray-50 flex items-center justify-center">
@@ -127,7 +156,6 @@ export default function Standings() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* Header */}
       <div className="bg-fairway-700 text-white shadow-lg">
         <div className="max-w-4xl mx-auto px-4 py-4">
           <Link to="/admin" className="text-fairway-300 text-xs hover:text-white">← Home</Link>
@@ -140,87 +168,118 @@ export default function Standings() {
 
       <div className="max-w-4xl mx-auto px-4 py-5 space-y-4">
         {/* View toggle */}
-        <div className="flex gap-2 flex-wrap">
-          {['summary', 'breakdown', ...(tglStandings.length > 0 ? ['tgl'] : [])].map(v => (
-            <button
-              key={v}
-              onClick={() => setView(v)}
-              className={`px-4 py-2 rounded-lg text-sm font-semibold capitalize transition-colors ${
-                view === v ? 'bg-fairway-700 text-white' : 'bg-white text-gray-600 border border-gray-200 hover:border-gray-300'
-              }`}
-            >
-              {v === 'tgl' ? 'TGL Teams' : v}
-            </button>
-          ))}
-        </div>
+        {views.length > 1 && (
+          <div className="flex gap-2 flex-wrap">
+            {views.map(v => (
+              <button
+                key={v}
+                onClick={() => setView(v)}
+                className={`px-4 py-2 rounded-lg text-sm font-semibold transition-colors ${
+                  view === v ? 'bg-fairway-700 text-white' : 'bg-white text-gray-600 border border-gray-200 hover:border-gray-300'
+                }`}
+              >
+                {v === 'earnings' ? 'Earnings' : 'TGL Teams'}
+              </button>
+            ))}
+          </div>
+        )}
 
         {view === 'tgl' ? (
-          <TGLStandingsTable standings={tglStandings} events={events} />
+          <TGLStandingsTable standings={tglStandings} eventRows={tglEventRows} events={events} />
         ) : standings.length === 0 ? (
           <Card className="text-center py-12">
             <div className="text-4xl mb-3">🏆</div>
-            <p className="text-gray-500 font-medium">No earnings recorded yet</p>
-            <p className="text-sm text-gray-400 mt-1">Earnings are recorded when events are closed and payouts are calculated.</p>
+            <p className="text-gray-500 font-medium">No earnings data yet</p>
+            <p className="text-sm text-gray-400 mt-1">Earnings are calculated from completed events with payout configurations.</p>
           </Card>
-        ) : view === 'summary' ? (
-          <SummaryTable standings={standings} />
         ) : (
-          <BreakdownTable standings={standings} categories={categories} />
+          <EarningsTable standings={standings} events={events} />
         )}
       </div>
     </div>
   )
 }
 
-function SummaryTable({ standings }) {
+function EarningsTable({ standings, events }) {
   const medals = ['🥇', '🥈', '🥉']
+  const [showBreakdown, setShowBreakdown] = useState(false)
+
   return (
-    <Card className="overflow-hidden p-0">
-      <table className="w-full text-sm">
-        <thead>
-          <tr className="bg-gray-50 text-left text-xs font-semibold text-gray-500 border-b">
-            <th className="px-5 py-3">Rank</th>
-            <th className="px-4 py-3">Player</th>
-            <th className="px-4 py-3 text-center">Events</th>
-            <th className="px-4 py-3 text-right">Total Earnings</th>
-          </tr>
-        </thead>
-        <tbody className="divide-y divide-gray-100">
-          {standings.map((s, i) => (
-            <tr key={s.player?.id} className={i < 3 ? 'bg-yellow-50/50' : ''}>
-              <td className="px-5 py-3 text-base">{medals[i] ?? `${i+1}`}</td>
-              <td className="px-4 py-3 font-medium text-gray-900">
-                {s.player?.last_name}, {s.player?.first_name}
-              </td>
-              <td className="px-4 py-3 text-center text-gray-500">{s.eventsPlayed}</td>
-              <td className="px-4 py-3 text-right font-bold text-fairway-700">
-                ${s.totalEarnings.toFixed(2)}
-              </td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </Card>
+    <div className="space-y-3">
+      <div className="flex justify-end">
+        <button
+          onClick={() => setShowBreakdown(v => !v)}
+          className="text-xs text-fairway-700 hover:underline font-medium"
+        >
+          {showBreakdown ? 'Hide event breakdown' : 'Show event breakdown'}
+        </button>
+      </div>
+
+      <Card className="overflow-hidden p-0">
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm min-w-max">
+            <thead>
+              <tr className="bg-gray-50 text-left text-xs font-semibold text-gray-500 border-b">
+                <th className="px-5 py-3 sticky left-0 bg-gray-50 z-10">Rank</th>
+                <th className="px-4 py-3 sticky left-12 bg-gray-50 z-10">Player</th>
+                <th className="px-4 py-3 text-center">Events</th>
+                {showBreakdown && events.map(ev => (
+                  <th key={ev.id} className="px-3 py-3 text-right whitespace-nowrap">
+                    #{ev.event_number}
+                  </th>
+                ))}
+                <th className="px-4 py-3 text-right">Total</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-100">
+              {standings.map((s, i) => (
+                <tr key={s.player?.id ?? i} className={i < 3 ? 'bg-yellow-50/50' : ''}>
+                  <td className="px-5 py-3 text-base sticky left-0 bg-inherit z-10">{medals[i] ?? i + 1}</td>
+                  <td className="px-4 py-3 font-medium text-gray-900 sticky left-12 bg-inherit z-10 whitespace-nowrap">
+                    {s.player?.last_name}, {s.player?.first_name}
+                  </td>
+                  <td className="px-4 py-3 text-center text-gray-500">{s.eventsPlayed}</td>
+                  {showBreakdown && events.map(ev => (
+                    <td key={ev.id} className="px-3 py-3 text-right text-gray-600">
+                      {s.byEvent[ev.id] ? `$${s.byEvent[ev.id].toFixed(2)}` : '—'}
+                    </td>
+                  ))}
+                  <td className="px-4 py-3 text-right font-bold text-fairway-700">
+                    ${s.totalEarnings.toFixed(2)}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </Card>
+    </div>
   )
 }
 
-function TGLStandingsTable({ standings, events }) {
+function TGLStandingsTable({ standings, eventRows, events }) {
   const medals = ['🥇', '🥈', '🥉']
+  const [expandedEvent, setExpandedEvent] = useState(null)
+
   return (
     <div className="space-y-4">
+      {/* Season totals */}
       <Card className="overflow-hidden p-0">
+        <div className="bg-gray-50 px-5 py-3 border-b border-gray-100">
+          <span className="text-xs font-semibold text-gray-500 uppercase tracking-widest">Season Totals</span>
+        </div>
         <table className="w-full text-sm">
           <thead>
-            <tr className="bg-gray-50 text-left text-xs font-semibold text-gray-500 border-b">
-              <th className="px-5 py-3">Rank</th>
-              <th className="px-4 py-3">Team</th>
-              <th className="px-4 py-3 text-right">Season Points</th>
+            <tr className="text-left text-xs font-semibold text-gray-500 border-b border-gray-100">
+              <th className="px-5 py-2">Rank</th>
+              <th className="px-4 py-2">Team</th>
+              <th className="px-4 py-2 text-right">Points</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-100">
             {standings.map((s, i) => (
               <tr key={s.team.id} className={i < 3 ? 'bg-yellow-50/50' : ''}>
-                <td className="px-5 py-3 text-base">{medals[i] ?? `${i+1}`}</td>
+                <td className="px-5 py-3 text-base">{medals[i] ?? i + 1}</td>
                 <td className="px-4 py-3">
                   <div className="flex items-center gap-2">
                     <span className="w-3 h-3 rounded-full" style={{ backgroundColor: s.team.color }} />
@@ -235,63 +294,62 @@ function TGLStandingsTable({ standings, events }) {
           </tbody>
         </table>
       </Card>
+
+      {/* Per-event breakdown */}
+      {eventRows.length > 0 && (
+        <div className="space-y-2">
+          <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-widest px-1">Event Results</h3>
+          {eventRows.map(({ event: ev, teamResults }) => (
+            <Card key={ev.id} className="overflow-hidden p-0">
+              <button
+                className="w-full flex items-center justify-between px-4 py-3 hover:bg-gray-50 transition-colors text-left"
+                onClick={() => setExpandedEvent(expandedEvent === ev.id ? null : ev.id)}
+              >
+                <span className="font-medium text-gray-800 text-sm">
+                  Event #{ev.event_number}{ev.name ? ` — ${ev.name}` : ''} · {ev.course?.name}
+                </span>
+                <span className="text-gray-400 text-xs">{expandedEvent === ev.id ? '▲' : '▼'}</span>
+              </button>
+
+              {expandedEvent === ev.id && (
+                <table className="w-full text-sm border-t border-gray-100">
+                  <thead>
+                    <tr className="text-left text-xs font-semibold text-gray-500 bg-gray-50 border-b border-gray-100">
+                      <th className="px-4 py-2">Team</th>
+                      <th className="px-4 py-2">Players</th>
+                      <th className="px-4 py-2 text-right">Pts</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-100">
+                    {teamResults.map(tr => (
+                      <tr key={tr.team.id}>
+                        <td className="px-4 py-2.5">
+                          <div className="flex items-center gap-2">
+                            <span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: tr.team.color }} />
+                            <span className="font-medium text-gray-800">{tr.team.name}</span>
+                          </div>
+                        </td>
+                        <td className="px-4 py-2.5 text-xs text-gray-500">
+                          {tr.selectedPlayers.map(p =>
+                            `${p.name} (#${p.rank ?? '?'}, ${p.points % 1 === 0 ? p.points : p.points.toFixed(1)}pts)`
+                          ).join(' · ') || '—'}
+                        </td>
+                        <td className="px-4 py-2.5 text-right font-bold text-gray-900">
+                          {tr.teamPoints % 1 === 0 ? tr.teamPoints : tr.teamPoints.toFixed(1)}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              )}
+            </Card>
+          ))}
+        </div>
+      )}
+
       <p className="text-xs text-gray-400 text-center">
-        Points: field size − finishing position + 1 per event · ties split combined places equally
+        Points: field size − finishing position + 1 · ties split combined places equally
       </p>
-    </div>
-  )
-}
-
-function BreakdownTable({ standings, categories }) {
-  // Format category label
-  function catLabel(cat) {
-    const map = {
-      '18_net_a_1st': '18H A 1st',  '18_net_a_2nd': '18H A 2nd', '18_net_a_3rd': '18H A 3rd',
-      '18_net_b_1st': '18H B 1st',  '18_net_b_2nd': '18H B 2nd', '18_net_b_3rd': '18H B 3rd',
-      'f9_a_1st': 'F9 A 1st',       'f9_a_2nd': 'F9 A 2nd',
-      'f9_b_1st': 'F9 B 1st',       'f9_b_2nd': 'F9 B 2nd',
-      'b9_a_1st': 'B9 A 1st',       'b9_a_2nd': 'B9 A 2nd',
-      'b9_b_1st': 'B9 B 1st',       'b9_b_2nd': 'B9 B 2nd',
-      'low_putts': 'Putts',          'long_drive': 'Drive',
-    }
-    if (cat.startsWith('ctp_')) return `CTP #${cat.replace('ctp_', '')}`
-    return map[cat] ?? cat
-  }
-
-  return (
-    <div className="overflow-x-auto">
-      <Card className="overflow-hidden p-0 min-w-max">
-        <table className="text-sm">
-          <thead>
-            <tr className="bg-gray-50 text-left text-xs font-semibold text-gray-500 border-b">
-              <th className="px-5 py-3 sticky left-0 bg-gray-50 z-10">Player</th>
-              <th className="px-3 py-3 text-right">Total</th>
-              <th className="px-3 py-3 text-center">Evts</th>
-              {categories.map(cat => (
-                <th key={cat} className="px-3 py-3 text-right whitespace-nowrap">{catLabel(cat)}</th>
-              ))}
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-gray-100">
-            {standings.map((s, i) => (
-              <tr key={s.player?.id} className={i % 2 === 0 ? '' : 'bg-gray-50/50'}>
-                <td className="px-5 py-2.5 font-medium text-gray-900 sticky left-0 bg-white z-10 whitespace-nowrap">
-                  {s.player?.last_name}, {s.player?.first_name}
-                </td>
-                <td className="px-3 py-2.5 text-right font-bold text-fairway-700">
-                  ${s.totalEarnings.toFixed(2)}
-                </td>
-                <td className="px-3 py-2.5 text-center text-gray-500">{s.eventsPlayed}</td>
-                {categories.map(cat => (
-                  <td key={cat} className="px-3 py-2.5 text-right text-gray-600">
-                    {s.byCategory[cat] ? `$${s.byCategory[cat].toFixed(2)}` : '—'}
-                  </td>
-                ))}
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </Card>
     </div>
   )
 }

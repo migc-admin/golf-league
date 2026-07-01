@@ -12,11 +12,12 @@ import { computeLeaderboards, computeStableford } from '../lib/engines/scoring'
 import { computeAllSkins } from '../lib/engines/skins'
 import { computeMatchPoints } from '../lib/engines/matchPoints'
 import { computePayouts, CATEGORY_LABELS, ctpLabel } from '../lib/engines/payouts'
+import { computeTGLEventResults } from '../lib/engines/tgl'
 import { FlightBadge, StatusBadge } from '../components/ui/Badge'
 
-const ALL_TABS = ['18-Hole', 'Front 9', 'Back 9', 'Stableford', 'Match Points', 'Low Putts', 'Skins', 'Payouts']
+const ALL_TABS = ['18-Hole', 'Front 9', 'Back 9', 'Stableford', 'Match Points', 'Low Putts', 'Skins', 'Payouts', 'TGL']
 
-function visibleTabs(event) {
+function visibleTabs(event, hasTGL = false) {
   if (!event) return ALL_TABS
   const formats  = event.formats ?? (event.format ? [event.format] : ['net_stroke'])
   const sideOpts = event.side_game_options ?? []
@@ -29,6 +30,7 @@ function visibleTabs(event) {
     if (tab === 'Match Points')  return formats.includes('match_points') || formats.includes('ryder_cup')
     if (tab === 'Low Putts')     return sideOpts.includes('low_putts')
     if (tab === 'Skins')         return sideOpts.some(s => s.startsWith('skins_'))
+    if (tab === 'TGL')           return hasTGL
     return false
   })
 }
@@ -54,12 +56,15 @@ export default function Leaderboard() {
   const [sideGames,    setSideGames]    = useState([])
   const [course,       setCourse]       = useState(null)
   const [loading,      setLoading]      = useState(true)
-  const [activeTab,    setActiveTab]    = useState('18-Hole')
-  const [activeFlight, setActiveFlight] = useState('A')
+  const [activeTab,     setActiveTab]     = useState('18-Hole')
+  const [activeFlight,  setActiveFlight]  = useState('A')
   const [matchPairings, setMatchPairings] = useState([])
+  const [tglTeams,      setTglTeams]      = useState([])
+  const [tglMembers,    setTglMembers]    = useState([])
+  const [tglSelections, setTglSelections] = useState([])
 
   const subRef = useRef(null)
-  const tabs   = event ? visibleTabs(event) : ALL_TABS
+  const tabs   = event ? visibleTabs(event, tglTeams.length > 0 && tglSelections.length > 0) : ALL_TABS
 
   async function loadScores(evId) {
     const { data } = await supabase.from('scores').select('*').eq('event_id', evId)
@@ -95,6 +100,19 @@ export default function Leaderboard() {
       await loadScores(eventId)
       setLoading(false)
 
+      // Load TGL data non-blocking
+      const leagueId = ev.league_id ?? league.id
+      const { data: tglT } = await supabase.from('tgl_teams').select('*').eq('league_id', leagueId).order('name')
+      if (tglT?.length) {
+        const [{ data: tglM }, { data: tglS }] = await Promise.all([
+          supabase.from('tgl_team_members').select('*, player:players(first_name,last_name)').in('team_id', tglT.map(t => t.id)),
+          supabase.from('tgl_event_selections').select('*, player:players(first_name,last_name)').eq('event_id', eventId),
+        ])
+        setTglTeams(tglT)
+        setTglMembers(tglM ?? [])
+        setTglSelections(tglS ?? [])
+      }
+
       // Auto-switch to Payouts tab if event is complete, else first visible tab
       const tvs = visibleTabs(ev)
       setActiveTab(ev.status === 'complete' ? 'Payouts' : (tvs[0] ?? 'Payouts'))
@@ -128,6 +146,17 @@ export default function Leaderboard() {
   const skinsResults    = course ? computeAllSkins(eventPlayers, allScores, course.stroke_index)     : null
   const stablefordData  = course ? computeStableford(eventPlayers, allScores, course)                : null
   const matchData       = course ? computeMatchPoints(eventPlayers, allScores, course, matchPairings) : null
+
+  const tglData = (() => {
+    if (!leaderboards || !tglTeams.length || !tglSelections.length) return null
+    try {
+      const ranked = leaderboards.net?.ranked ?? leaderboards.gross?.ranked ?? []
+      if (!ranked.length) return null
+      const epMap = Object.fromEntries(eventPlayers.map(ep => [ep.player_id, ep]))
+      const rankedWithPlayer = ranked.map(r => ({ ...r, player: epMap[r.player_id]?.player ?? null }))
+      return computeTGLEventResults(rankedWithPlayer, tglSelections, tglTeams, tglMembers)
+    } catch { return null }
+  })()
 
   const playerMap  = Object.fromEntries(eventPlayers.map(ep => [ep.player_id, ep.player]))
   const hasFlights = eventPlayers.some(ep => !ep.is_guest && (ep.flight === 'A' || ep.flight === 'B'))
@@ -287,6 +316,9 @@ export default function Leaderboard() {
             skinsResults={skinsResults}
             playerMap={playerMap}
           />
+        )}
+        {activeTab === 'TGL' && (
+          <TGLBoard tglData={tglData} />
         )}
       </div>
     </div>
@@ -959,6 +991,62 @@ function PlayerScorecardModal({ player, allScores, course, onClose }) {
           </div>
         </div>
       </div>
+    </div>
+  )
+}
+
+// ─── TGL Board ────────────────────────────────────────────────────────────────
+function TGLBoard({ tglData }) {
+  if (!tglData) {
+    return (
+      <div className="text-center py-12 text-gray-400">
+        <p className="font-medium">No TGL data yet</p>
+        <p className="text-sm mt-1">Assign team selections in the admin TGL tab, then scores will appear here.</p>
+      </div>
+    )
+  }
+
+  const { teamResults, playerPoints } = tglData
+
+  return (
+    <div className="space-y-4">
+      {/* Team scores */}
+      <div className="space-y-2">
+        {teamResults.map((tr, i) => (
+          <div
+            key={tr.team.id}
+            className="rounded-xl overflow-hidden border border-gray-200"
+            style={{ borderLeftWidth: 4, borderLeftColor: tr.team.color }}
+          >
+            <div className="flex items-center justify-between px-4 py-3 bg-white">
+              <div className="flex items-center gap-3">
+                <span className="text-lg font-bold text-gray-400 w-6">#{tr.rank}</span>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: tr.team.color }} />
+                    <span className="font-bold text-gray-900">{tr.team.name}</span>
+                  </div>
+                  <div className="text-xs text-gray-500 mt-0.5 pl-4">
+                    {tr.selectedPlayers.length === 0
+                      ? 'No players selected'
+                      : tr.selectedPlayers.map(p => `${p.name} (#${p.rank ?? '?'})`).join(' · ')}
+                  </div>
+                </div>
+              </div>
+              <div className="text-right">
+                <div className="text-xl font-bold text-fairway-700">
+                  {tr.teamPoints % 1 === 0 ? tr.teamPoints : tr.teamPoints.toFixed(1)}
+                </div>
+                <div className="text-xs text-gray-400">pts</div>
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      <p className="text-xs text-gray-400 text-center pt-1">
+        Points: field size − finishing position + 1 · ties split equally
+      </p>
     </div>
   )
 }
