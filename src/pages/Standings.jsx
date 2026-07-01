@@ -61,6 +61,17 @@ export default function Standings() {
 
       const lockedEventIds = new Set((tglLocks ?? []).map(l => l.event_id))
 
+      // DEBUG — remove after diagnosing
+      console.log('[TGL debug]', {
+        completedEvents: evs?.length,
+        eventIds,
+        tglTeams: tglT?.length,
+        tglSels: tglSels?.length,
+        tglLocks: tglLocks?.length,
+        lockedEventIds: [...(new Set((tglLocks ?? []).map(l => l.event_id)))],
+        sampleEvent: evs?.[0] ? { id: evs[0].id, courseKeys: Object.keys(evs[0].course ?? {}) } : null,
+      })
+
       // Load TGL team members
       let tglMembers = []
       if (tglT?.length) {
