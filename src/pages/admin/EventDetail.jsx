@@ -2756,19 +2756,35 @@ function TGLManager({ event, eventPlayers, allScores, course, tglTeams, tglMembe
                   <div className="space-y-1">
                     {members.map(m => {
                       const isSelected = selected.some(s => s.player_id === m.player_id)
-                      const onAnotherTeam = !isSelected && tglSelections.some(s => s.player_id === m.player_id && s.team_id !== team.id)
+                      const conflictSel = !isSelected ? tglSelections.find(s => s.player_id === m.player_id && s.team_id !== team.id) : null
+                      const conflictTeam = conflictSel ? tglTeams.find(t => t.id === conflictSel.team_id) : null
+                      const onAnotherTeam = !!conflictSel
                       return (
-                        <label key={m.player_id} className={`flex items-center gap-2 text-sm cursor-pointer rounded px-2 py-1 ${onAnotherTeam ? 'opacity-40' : 'hover:bg-gray-50'}`}>
+                        <div key={m.player_id} className={`flex items-center gap-2 text-sm rounded px-2 py-1 ${onAnotherTeam ? 'bg-amber-50' : 'hover:bg-gray-50'}`}>
                           <input
                             type="checkbox"
                             checked={isSelected}
-                            disabled={onAnotherTeam || (!isSelected && selected.length >= 2)}
+                            disabled={!isSelected && selected.length >= 2 && !onAnotherTeam}
                             onChange={() => toggleEventSelection(team.id, m.player_id)}
-                            className="rounded text-green-600"
+                            className="rounded text-green-600 cursor-pointer"
                           />
-                          <span className={isSelected ? 'font-medium text-gray-900' : 'text-gray-600'}>
+                          <span className={isSelected ? 'font-medium text-gray-900' : onAnotherTeam ? 'text-amber-800' : 'text-gray-600'}>
                             {m.player?.first_name} {m.player?.last_name}
                           </span>
+                          {onAnotherTeam && (
+                            <span className="ml-auto text-xs text-amber-600 font-medium">
+                              on {conflictTeam?.name ?? 'another team'} —{' '}
+                              <button
+                                className="underline hover:text-amber-800"
+                                onClick={async () => {
+                                  await supabase.from('tgl_event_selections').delete().eq('id', conflictSel.id)
+                                  onUpdated()
+                                }}
+                              >
+                                remove
+                              </button>
+                            </span>
+                          )}
                           {isSelected && eventResults && (() => {
                             const pp = eventResults.playerPoints?.[m.player_id]
                             return pp != null ? (
@@ -2777,7 +2793,7 @@ function TGLManager({ event, eventPlayers, allScores, course, tglTeams, tglMembe
                               </span>
                             ) : null
                           })()}
-                        </label>
+                        </div>
                       )
                     })}
                   </div>
