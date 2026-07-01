@@ -2684,8 +2684,9 @@ function TGLManager({ event, eventPlayers, allScores, course, tglTeams, tglMembe
     if (existing) {
       await supabase.from('tgl_event_selections').delete().eq('id', existing.id)
     } else {
-      // Check limit: max 2 per team per event
-      const teamCount = tglSelections.filter(s => s.team_id === teamId).length
+      // Check limit: max 2 per team per event (only count members on the team roster)
+      const teamMemberIds = new Set(tglMembers.filter(m => m.team_id === teamId).map(m => m.player_id))
+      const teamCount = tglSelections.filter(s => s.team_id === teamId && teamMemberIds.has(s.player_id)).length
       if (teamCount >= 2) { toast.error('Max 2 players per team per event'); return }
       // Check player not already on another team for this event
       const conflict = tglSelections.find(s => s.player_id === playerId && s.team_id !== teamId)
@@ -2718,7 +2719,8 @@ function TGLManager({ event, eventPlayers, allScores, course, tglTeams, tglMembe
       <div className="grid gap-4 sm:grid-cols-2">
         {tglTeams.map(team => {
           const members = tglMembers.filter(m => m.team_id === team.id)
-          const selected = tglSelections.filter(s => s.team_id === team.id)
+          const memberIds = new Set(members.map(m => m.player_id))
+          const selected = tglSelections.filter(s => s.team_id === team.id && memberIds.has(s.player_id))
           const eventPoints = eventResults?.teamResults?.find(r => r.team.id === team.id)?.teamPoints ?? null
 
           return (
