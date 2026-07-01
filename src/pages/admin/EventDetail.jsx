@@ -5,6 +5,7 @@ import toast from 'react-hot-toast'
 import { computePayouts, DEFAULT_PAYOUT_CONFIG, CATEGORY_LABELS, ctpLabel, activePayoutKeys } from '../../lib/engines/payouts'
 import { computeLeaderboards } from '../../lib/engines/scoring'
 import { computeAllSkins } from '../../lib/engines/skins'
+import { computeTGLEventResults } from '../../lib/engines/tgl'
 import Card, { CardHeader } from '../../components/ui/Card'
 import { ExportScorecardsButton } from '../../components/ScorecardExport'
 import Button from '../../components/ui/Button'
@@ -13,7 +14,7 @@ import Input, { Select } from '../../components/ui/Input'
 import Badge, { FlightBadge, StatusBadge } from '../../components/ui/Badge'
 
 // Collapsed from 7 → 4 tabs: Players = Registrations + Players & Flights; Payout = Config + Side Games + Summary
-const ALL_ADMIN_TABS = ['Overview', 'Players', 'Groups', 'Payout']
+const ALL_ADMIN_TABS = ['Overview', 'Players', 'Groups', 'Payout', 'TGL']
 
 
 export default function EventDetail() {
@@ -25,9 +26,12 @@ export default function EventDetail() {
   const [course,       setCourse]       = useState(null)
   const [leagues,      setLeagues]      = useState([])
   const [allPlayers,   setAllPlayers]   = useState([])
-  const [conflicts,    setConflicts]    = useState([])
-  const [loading,      setLoading]      = useState(true)
-  const [activeTab,    setActiveTab]    = useState('Overview')
+  const [conflicts,      setConflicts]      = useState([])
+  const [tglTeams,       setTglTeams]       = useState([])
+  const [tglMembers,     setTglMembers]     = useState([])
+  const [tglSelections,  setTglSelections]  = useState([])
+  const [loading,        setLoading]        = useState(true)
+  const [activeTab,      setActiveTab]      = useState('Overview')
 
   const load = useCallback(async () => {
     const { data: league } = await supabase.from('leagues').select('id').eq('slug', leagueSlug).single()
@@ -62,6 +66,28 @@ export default function EventDetail() {
     setCourse(ev?.course ?? null)
     setAllPlayers(allP ?? [])
     setLoading(false)
+
+    // Load TGL data after main load so any error here doesn't block the page
+    const leagueId = ev?.league_id
+    if (leagueId) {
+      const { data: tglT } = await supabase
+        .from('tgl_teams').select('*').eq('league_id', leagueId).order('name')
+      setTglTeams(tglT ?? [])
+
+      if (tglT?.length) {
+        const teamIds = tglT.map(t => t.id)
+        const [{ data: members }, { data: sels }] = await Promise.all([
+          supabase.from('tgl_team_members')
+            .select('*, player:players(first_name,last_name)')
+            .in('team_id', teamIds),
+          supabase.from('tgl_event_selections')
+            .select('*, player:players(first_name,last_name)')
+            .eq('event_id', id),
+        ])
+        setTglMembers(members ?? [])
+        setTglSelections(sels ?? [])
+      }
+    }
   }, [leagueSlug, eventSlug])
 
   useEffect(() => { load() }, [load])
@@ -169,6 +195,19 @@ export default function EventDetail() {
             <TabPayoutSummary event={event} eventPlayers={eventPlayers} allScores={allScores} sideGames={sideGames} course={course} />
           </div>
         </div>
+      )}
+
+      {activeTab === 'TGL' && (
+        <TGLManager
+          event={event}
+          eventPlayers={eventPlayers}
+          allScores={allScores}
+          course={course}
+          tglTeams={tglTeams}
+          tglMembers={tglMembers}
+          tglSelections={tglSelections}
+          onUpdated={load}
+        />
       )}
     </div>
   )
@@ -2586,4 +2625,288 @@ const FORMAT_LABELS = {
   stableford:   'Stableford',
   match_points: 'Match Play Points',
   ryder_cup:    'Ryder Cup',
+}
+
+// ─── TGL Manager ─────────────────────────────────────────────────────────────
+// Manage TGL teams for this league and select 2 players per team for this event.
+
+function TGLManager({ event, eventPlayers, allScores, course, tglTeams, tglMembers, tglSelections, onUpdated }) {
+  const [showTeamModal,  setShowTeamModal]  = useState(false)
+  const [showMemberModal,setShowMemberModal]= useState(false)
+  const [selectedTeam,   setSelectedTeam]   = useState(null)
+  const [newTeamName,    setNewTeamName]    = useState('')
+  const [newTeamColor,   setNewTeamColor]   = useState('#16a34a')
+  const [saving,         setSaving]         = useState(false)
+
+  // Compute event results if scores exist
+  const eventResults = (() => {
+    if (!course || !allScores.length || !tglTeams.length) return null
+    try {
+      const lb = computeLeaderboards(eventPlayers, allScores, course)
+      const ranked = lb.net?.ranked ?? lb.gross?.ranked ?? []
+      if (!ranked.length) return null
+      // Attach player info to ranked entries
+      const epMap = Object.fromEntries(eventPlayers.map(ep => [ep.player_id, ep]))
+      const rankedWithPlayer = ranked.map(r => ({
+        ...r,
+        player: epMap[r.player_id]?.player ?? null,
+      }))
+      return computeTGLEventResults(rankedWithPlayer, tglSelections, tglTeams, tglMembers)
+    } catch {
+      return null
+    }
+  })()
+
+  async function createTeam() {
+    if (!newTeamName.trim()) return
+    setSaving(true)
+    const { error } = await supabase.from('tgl_teams').insert({
+      league_id: event.league_id,
+      name: newTeamName.trim(),
+      color: newTeamColor,
+    })
+    setSaving(false)
+    if (error) { toast.error(error.message); return }
+    setNewTeamName('')
+    setShowTeamModal(false)
+    onUpdated()
+  }
+
+  async function deleteTeam(teamId) {
+    if (!confirm('Delete this team and all its members?')) return
+    await supabase.from('tgl_teams').delete().eq('id', teamId)
+    onUpdated()
+  }
+
+  // Select / deselect a player for an event slot on a team
+  async function toggleEventSelection(teamId, playerId) {
+    const existing = tglSelections.find(s => s.team_id === teamId && s.player_id === playerId)
+    if (existing) {
+      await supabase.from('tgl_event_selections').delete().eq('id', existing.id)
+    } else {
+      // Check limit: max 2 per team per event
+      const teamCount = tglSelections.filter(s => s.team_id === teamId).length
+      if (teamCount >= 2) { toast.error('Max 2 players per team per event'); return }
+      // Check player not already on another team for this event
+      const conflict = tglSelections.find(s => s.player_id === playerId && s.team_id !== teamId)
+      if (conflict) { toast.error('Player already selected for another team this event'); return }
+      await supabase.from('tgl_event_selections').insert({
+        event_id: event.id,
+        team_id: teamId,
+        player_id: playerId,
+      })
+    }
+    onUpdated()
+  }
+
+  return (
+    <div className="space-y-6">
+      {/* Teams header */}
+      <div className="flex items-center justify-between">
+        <div>
+          <h3 className="text-sm font-semibold text-gray-800">TGL Teams</h3>
+          <p className="text-xs text-gray-500 mt-0.5">Season-long teams. Select 2 players per team for this event.</p>
+        </div>
+        <Button size="sm" onClick={() => setShowTeamModal(true)}>+ New Team</Button>
+      </div>
+
+      {tglTeams.length === 0 && (
+        <p className="text-sm text-gray-400 italic">No teams yet. Create up to 4 teams for this league.</p>
+      )}
+
+      {/* Team cards */}
+      <div className="grid gap-4 sm:grid-cols-2">
+        {tglTeams.map(team => {
+          const members = tglMembers.filter(m => m.team_id === team.id)
+          const selected = tglSelections.filter(s => s.team_id === team.id)
+          const eventPoints = eventResults?.teamResults?.find(r => r.team.id === team.id)?.teamPoints ?? null
+
+          return (
+            <div key={team.id} className="border border-gray-200 rounded-xl overflow-hidden">
+              {/* Team header bar */}
+              <div className="flex items-center justify-between px-4 py-3" style={{ backgroundColor: team.color + '22', borderBottom: `3px solid ${team.color}` }}>
+                <div className="flex items-center gap-2">
+                  <span className="w-3 h-3 rounded-full inline-block" style={{ backgroundColor: team.color }} />
+                  <span className="font-semibold text-gray-900 text-sm">{team.name}</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  {eventPoints !== null && (
+                    <span className="text-xs font-medium text-gray-600 bg-white rounded-full px-2 py-0.5 border">
+                      {eventPoints % 1 === 0 ? eventPoints : eventPoints.toFixed(1)} pts
+                    </span>
+                  )}
+                  <button
+                    onClick={() => { setSelectedTeam(team); setShowMemberModal(true) }}
+                    className="text-xs text-blue-600 hover:text-blue-800 font-medium"
+                  >
+                    Roster
+                  </button>
+                  <button onClick={() => deleteTeam(team.id)} className="text-xs text-red-500 hover:text-red-700">✕</button>
+                </div>
+              </div>
+
+              {/* Event selections */}
+              <div className="p-3">
+                <p className="text-xs font-medium text-gray-500 mb-2">Playing this event ({selected.length}/2):</p>
+                {members.length === 0 ? (
+                  <p className="text-xs text-gray-400 italic">No roster members yet.</p>
+                ) : (
+                  <div className="space-y-1">
+                    {members.map(m => {
+                      const isSelected = selected.some(s => s.player_id === m.player_id)
+                      const onAnotherTeam = !isSelected && tglSelections.some(s => s.player_id === m.player_id && s.team_id !== team.id)
+                      return (
+                        <label key={m.player_id} className={`flex items-center gap-2 text-sm cursor-pointer rounded px-2 py-1 ${onAnotherTeam ? 'opacity-40' : 'hover:bg-gray-50'}`}>
+                          <input
+                            type="checkbox"
+                            checked={isSelected}
+                            disabled={onAnotherTeam || (!isSelected && selected.length >= 2)}
+                            onChange={() => toggleEventSelection(team.id, m.player_id)}
+                            className="rounded text-green-600"
+                          />
+                          <span className={isSelected ? 'font-medium text-gray-900' : 'text-gray-600'}>
+                            {m.player?.first_name} {m.player?.last_name}
+                          </span>
+                          {isSelected && eventResults && (() => {
+                            const pp = eventResults.playerPoints?.[m.player_id]
+                            return pp != null ? (
+                              <span className="ml-auto text-xs text-gray-400">
+                                {pp % 1 === 0 ? pp : pp.toFixed(1)} pts
+                              </span>
+                            ) : null
+                          })()}
+                        </label>
+                      )
+                    })}
+                  </div>
+                )}
+              </div>
+            </div>
+          )
+        })}
+      </div>
+
+      {/* Event results summary */}
+      {eventResults && (
+        <div className="border border-gray-200 rounded-xl overflow-hidden">
+          <div className="bg-gray-50 px-4 py-2 border-b border-gray-200">
+            <span className="text-xs font-semibold text-gray-500 uppercase tracking-widest">Event TGL Scores</span>
+          </div>
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="text-xs text-gray-500 border-b border-gray-100">
+                <th className="text-left px-4 py-2">Rank</th>
+                <th className="text-left px-4 py-2">Team</th>
+                <th className="text-left px-4 py-2">Players</th>
+                <th className="text-right px-4 py-2">Pts</th>
+              </tr>
+            </thead>
+            <tbody>
+              {eventResults.teamResults.map(tr => (
+                <tr key={tr.team.id} className="border-b border-gray-50 last:border-0">
+                  <td className="px-4 py-2 font-semibold text-gray-700">#{tr.rank}</td>
+                  <td className="px-4 py-2">
+                    <div className="flex items-center gap-2">
+                      <span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: tr.team.color }} />
+                      <span className="font-medium">{tr.team.name}</span>
+                    </div>
+                  </td>
+                  <td className="px-4 py-2 text-gray-600 text-xs">
+                    {tr.selectedPlayers.map(p => `${p.name} (${p.points % 1 === 0 ? p.points : p.points.toFixed(1)})`).join(', ') || '—'}
+                  </td>
+                  <td className="px-4 py-2 text-right font-bold text-gray-900">
+                    {tr.teamPoints % 1 === 0 ? tr.teamPoints : tr.teamPoints.toFixed(1)}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      {/* New Team Modal */}
+      {showTeamModal && (
+        <Modal title="New TGL Team" onClose={() => setShowTeamModal(false)}>
+          <div className="space-y-4">
+            <Input
+              label="Team Name"
+              value={newTeamName}
+              onChange={e => setNewTeamName(e.target.value)}
+              placeholder="e.g. Just the Tips"
+            />
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Team Color</label>
+              <input
+                type="color"
+                value={newTeamColor}
+                onChange={e => setNewTeamColor(e.target.value)}
+                className="h-10 w-20 rounded cursor-pointer border border-gray-300"
+              />
+            </div>
+            <div className="flex justify-end gap-2 pt-2">
+              <Button variant="secondary" onClick={() => setShowTeamModal(false)}>Cancel</Button>
+              <Button onClick={createTeam} disabled={saving || !newTeamName.trim()}>
+                {saving ? 'Saving…' : 'Create Team'}
+              </Button>
+            </div>
+          </div>
+        </Modal>
+      )}
+
+      {/* Roster Management Modal */}
+      {showMemberModal && selectedTeam && (
+        <TGLRosterModal
+          team={selectedTeam}
+          tglMembers={tglMembers.filter(m => m.team_id === selectedTeam.id)}
+          allEventPlayers={eventPlayers}
+          onClose={() => { setShowMemberModal(false); setSelectedTeam(null) }}
+          onUpdated={onUpdated}
+        />
+      )}
+    </div>
+  )
+}
+
+function TGLRosterModal({ team, tglMembers, allEventPlayers, onClose, onUpdated }) {
+  const memberIds = new Set(tglMembers.map(m => m.player_id))
+
+  async function toggleMember(playerId) {
+    if (memberIds.has(playerId)) {
+      const member = tglMembers.find(m => m.player_id === playerId)
+      await supabase.from('tgl_team_members').delete().eq('id', member.id)
+    } else {
+      await supabase.from('tgl_team_members').insert({ team_id: team.id, player_id: playerId })
+    }
+    onUpdated()
+  }
+
+  return (
+    <Modal title={`${team.name} — Roster`} onClose={onClose}>
+      <div className="space-y-1 max-h-80 overflow-y-auto">
+        {allEventPlayers.length === 0 && (
+          <p className="text-sm text-gray-400 italic">No players registered for this event yet.</p>
+        )}
+        {allEventPlayers.map(ep => {
+          const isMember = memberIds.has(ep.player_id)
+          return (
+            <label key={ep.player_id} className="flex items-center gap-3 py-2 px-2 rounded hover:bg-gray-50 cursor-pointer text-sm">
+              <input
+                type="checkbox"
+                checked={isMember}
+                onChange={() => toggleMember(ep.player_id)}
+                className="rounded text-green-600"
+              />
+              <span className={isMember ? 'font-medium text-gray-900' : 'text-gray-600'}>
+                {ep.player?.first_name} {ep.player?.last_name}
+              </span>
+              <span className="ml-auto text-xs text-gray-400">{ep.flight ? `Flight ${ep.flight}` : ''}</span>
+            </label>
+          )
+        })}
+      </div>
+      <div className="flex justify-end pt-4">
+        <Button onClick={onClose}>Done</Button>
+      </div>
+    </Modal>
+  )
 }

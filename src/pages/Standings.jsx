@@ -9,15 +9,18 @@ import { useParams, Link } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import Card, { CardHeader } from '../components/ui/Card'
 import { FlightBadge } from '../components/ui/Badge'
+import { computeLeaderboards } from '../lib/engines/scoring'
+import { computeTGLEventResults, computeTGLSeasonStandings } from '../lib/engines/tgl'
 
 export default function Standings() {
   const { leagueSlug } = useParams()
-  const [league,    setLeague]    = useState(null)
-  const [standings, setStandings] = useState([])
-  const [categories, setCategories] = useState([])
-  const [events,    setEvents]    = useState([])
-  const [loading,   setLoading]   = useState(true)
-  const [view,      setView]      = useState('summary')  // 'summary' | 'breakdown'
+  const [league,         setLeague]         = useState(null)
+  const [standings,      setStandings]      = useState([])
+  const [categories,     setCategories]     = useState([])
+  const [events,         setEvents]         = useState([])
+  const [tglStandings,   setTglStandings]   = useState([])
+  const [loading,        setLoading]        = useState(true)
+  const [view,           setView]           = useState('summary')  // 'summary' | 'breakdown' | 'tgl'
 
   useEffect(() => {
     async function load() {
@@ -28,23 +31,26 @@ export default function Standings() {
       const [
         { data: earnings },
         { data: evs },
+        { data: tglT },
+        { data: tglM },
       ] = await Promise.all([
         supabase.from('season_earnings')
           .select('*, player:players(*)')
           .eq('league_id', leagueId)
           .not('category', 'ilike', 'skins%'),  // exclude skins per spec
         supabase.from('events')
-          .select('id, event_number, event_date, status')
+          .select('id, event_number, event_date, status, course:courses(*)')
           .eq('league_id', leagueId)
           .eq('status', 'complete')
           .order('event_number'),
+        supabase.from('tgl_teams').select('*').eq('league_id', leagueId).order('name'),
+        supabase.from('tgl_team_members').select('*, player:players(first_name,last_name)'),
       ])
 
       setLeague(lg)
       setEvents(evs ?? [])
 
-
-      // Build standings
+      // Build earnings standings
       const playerMap   = {}  // playerId → { player, totalEarnings, eventCount, byCategory }
       const catSet      = new Set()
 
@@ -71,6 +77,41 @@ export default function Standings() {
       setStandings(sorted)
       setCategories([...catSet].sort())
       setLoading(false)
+
+      // Build TGL season standings (non-blocking — runs after page is visible)
+      try {
+        if ((tglT ?? []).length > 0 && (evs ?? []).length > 0) {
+          const teams   = tglT ?? []
+          const members = tglM ?? []
+
+          const eventIds = (evs ?? []).map(e => e.id)
+          const [{ data: allEPs }, { data: allSc }, { data: allSel }] = await Promise.all([
+            supabase.from('event_players').select('*, player:players(first_name,last_name)').in('event_id', eventIds),
+            supabase.from('scores').select('*').in('event_id', eventIds),
+            supabase.from('tgl_event_selections').select('*').in('event_id', eventIds),
+          ])
+
+          const eventResultsByEventId = {}
+          for (const ev of (evs ?? [])) {
+            const course = ev.course
+            if (!course?.stroke_index || !course?.par_per_hole) continue
+            const eps    = (allEPs ?? []).filter(ep => ep.event_id === ev.id)
+            const scores = (allSc  ?? []).filter(s  => s.event_id  === ev.id)
+            const sels   = (allSel ?? []).filter(s  => s.event_id  === ev.id)
+            if (!eps.length || !scores.length) continue
+            try {
+              const lb = computeLeaderboards(eps, scores, course)
+              const ranked = lb.net?.ranked ?? lb.gross?.ranked ?? []
+              if (!ranked.length) continue
+              const epMap = Object.fromEntries(eps.map(ep => [ep.player_id, ep]))
+              const rankedWithPlayer = ranked.map(r => ({ ...r, player: epMap[r.player_id]?.player ?? null }))
+              eventResultsByEventId[ev.id] = computeTGLEventResults(rankedWithPlayer, sels, teams, members)
+            } catch { /* skip event */ }
+          }
+
+          setTglStandings(computeTGLSeasonStandings(eventResultsByEventId, teams))
+        }
+      } catch { /* TGL load failed silently — don't break earnings standings */ }
     }
     load()
   }, [leagueSlug])
@@ -99,8 +140,8 @@ export default function Standings() {
 
       <div className="max-w-4xl mx-auto px-4 py-5 space-y-4">
         {/* View toggle */}
-        <div className="flex gap-2">
-          {['summary', 'breakdown'].map(v => (
+        <div className="flex gap-2 flex-wrap">
+          {['summary', 'breakdown', ...(tglStandings.length > 0 ? ['tgl'] : [])].map(v => (
             <button
               key={v}
               onClick={() => setView(v)}
@@ -108,12 +149,14 @@ export default function Standings() {
                 view === v ? 'bg-fairway-700 text-white' : 'bg-white text-gray-600 border border-gray-200 hover:border-gray-300'
               }`}
             >
-              {v}
+              {v === 'tgl' ? 'TGL Teams' : v}
             </button>
           ))}
         </div>
 
-        {standings.length === 0 ? (
+        {view === 'tgl' ? (
+          <TGLStandingsTable standings={tglStandings} events={events} />
+        ) : standings.length === 0 ? (
           <Card className="text-center py-12">
             <div className="text-4xl mb-3">🏆</div>
             <p className="text-gray-500 font-medium">No earnings recorded yet</p>
@@ -158,6 +201,44 @@ function SummaryTable({ standings }) {
         </tbody>
       </table>
     </Card>
+  )
+}
+
+function TGLStandingsTable({ standings, events }) {
+  const medals = ['🥇', '🥈', '🥉']
+  return (
+    <div className="space-y-4">
+      <Card className="overflow-hidden p-0">
+        <table className="w-full text-sm">
+          <thead>
+            <tr className="bg-gray-50 text-left text-xs font-semibold text-gray-500 border-b">
+              <th className="px-5 py-3">Rank</th>
+              <th className="px-4 py-3">Team</th>
+              <th className="px-4 py-3 text-right">Season Points</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-gray-100">
+            {standings.map((s, i) => (
+              <tr key={s.team.id} className={i < 3 ? 'bg-yellow-50/50' : ''}>
+                <td className="px-5 py-3 text-base">{medals[i] ?? `${i+1}`}</td>
+                <td className="px-4 py-3">
+                  <div className="flex items-center gap-2">
+                    <span className="w-3 h-3 rounded-full" style={{ backgroundColor: s.team.color }} />
+                    <span className="font-semibold text-gray-900">{s.team.name}</span>
+                  </div>
+                </td>
+                <td className="px-4 py-3 text-right font-bold text-fairway-700">
+                  {s.seasonPoints % 1 === 0 ? s.seasonPoints : s.seasonPoints.toFixed(1)}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </Card>
+      <p className="text-xs text-gray-400 text-center">
+        Points: field size − finishing position + 1 per event · ties split combined places equally
+      </p>
+    </div>
   )
 }
 
