@@ -62,6 +62,7 @@ export default function Leaderboard() {
   const [tglTeams,      setTglTeams]      = useState([])
   const [tglMembers,    setTglMembers]    = useState([])
   const [tglSelections, setTglSelections] = useState([])
+  const [tglLocked,     setTglLocked]     = useState(false)
 
   const subRef = useRef(null)
   const tabs   = event ? visibleTabs(event, tglTeams.length > 0 && tglSelections.length > 0) : ALL_TABS
@@ -104,13 +105,15 @@ export default function Leaderboard() {
       const leagueId = ev.league_id ?? league.id
       const { data: tglT } = await supabase.from('tgl_teams').select('*').eq('league_id', leagueId).order('name')
       if (tglT?.length) {
-        const [{ data: tglM }, { data: tglS }] = await Promise.all([
+        const [{ data: tglM }, { data: tglS }, { data: tglLock }] = await Promise.all([
           supabase.from('tgl_team_members').select('*, player:players(first_name,last_name)').in('team_id', tglT.map(t => t.id)),
           supabase.from('tgl_event_selections').select('*, player:players(first_name,last_name)').eq('event_id', eventId),
+          supabase.from('tgl_event_locks').select('id').eq('event_id', eventId).maybeSingle(),
         ])
         setTglTeams(tglT)
         setTglMembers(tglM ?? [])
         setTglSelections(tglS ?? [])
+        setTglLocked(!!tglLock)
       }
 
       // Auto-switch to Payouts tab if event is complete, else first visible tab
@@ -318,7 +321,7 @@ export default function Leaderboard() {
           />
         )}
         {activeTab === 'TGL' && (
-          <TGLBoard tglData={tglData} />
+          <TGLBoard tglData={tglData} locked={tglLocked} />
         )}
       </div>
     </div>
@@ -996,7 +999,7 @@ function PlayerScorecardModal({ player, allScores, course, onClose }) {
 }
 
 // ─── TGL Board ────────────────────────────────────────────────────────────────
-function TGLBoard({ tglData }) {
+function TGLBoard({ tglData, locked }) {
   if (!tglData) {
     return (
       <div className="text-center py-12 text-gray-400">
@@ -1010,6 +1013,11 @@ function TGLBoard({ tglData }) {
 
   return (
     <div className="space-y-4">
+      {!locked && (
+        <div className="bg-amber-50 border border-amber-200 rounded-lg px-4 py-2 text-xs text-amber-700 font-medium">
+          ⚠ Selections not yet submitted — results may change until admin locks this event.
+        </div>
+      )}
       {/* Team scores */}
       <div className="space-y-2">
         {teamResults.map((tr, i) => (

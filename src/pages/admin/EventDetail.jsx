@@ -30,6 +30,7 @@ export default function EventDetail() {
   const [tglTeams,       setTglTeams]       = useState([])
   const [tglMembers,     setTglMembers]     = useState([])
   const [tglSelections,  setTglSelections]  = useState([])
+  const [tglLocked,      setTglLocked]      = useState(false)
   const [loading,        setLoading]        = useState(true)
   const [activeTab,      setActiveTab]      = useState('Overview')
 
@@ -76,16 +77,21 @@ export default function EventDetail() {
 
       if (tglT?.length) {
         const teamIds = tglT.map(t => t.id)
-        const [{ data: members }, { data: sels }] = await Promise.all([
+        const [{ data: members }, { data: sels }, { data: lock }] = await Promise.all([
           supabase.from('tgl_team_members')
             .select('*, player:players(first_name,last_name)')
             .in('team_id', teamIds),
           supabase.from('tgl_event_selections')
             .select('*, player:players(first_name,last_name)')
             .eq('event_id', id),
+          supabase.from('tgl_event_locks')
+            .select('id')
+            .eq('event_id', id)
+            .maybeSingle(),
         ])
         setTglMembers(members ?? [])
         setTglSelections(sels ?? [])
+        setTglLocked(!!lock)
       }
     }
   }, [leagueSlug, eventSlug])
@@ -206,6 +212,7 @@ export default function EventDetail() {
           tglTeams={tglTeams}
           tglMembers={tglMembers}
           tglSelections={tglSelections}
+          tglLocked={tglLocked}
           onUpdated={load}
         />
       )}
@@ -2630,13 +2637,25 @@ const FORMAT_LABELS = {
 // ─── TGL Manager ─────────────────────────────────────────────────────────────
 // Manage TGL teams for this league and select 2 players per team for this event.
 
-function TGLManager({ event, eventPlayers, allScores, course, tglTeams, tglMembers, tglSelections, onUpdated }) {
+function TGLManager({ event, eventPlayers, allScores, course, tglTeams, tglMembers, tglSelections, tglLocked, onUpdated }) {
   const [showTeamModal,  setShowTeamModal]  = useState(false)
   const [showMemberModal,setShowMemberModal]= useState(false)
   const [selectedTeam,   setSelectedTeam]   = useState(null)
   const [newTeamName,    setNewTeamName]    = useState('')
   const [newTeamColor,   setNewTeamColor]   = useState('#16a34a')
   const [saving,         setSaving]         = useState(false)
+
+  async function lockSelections() {
+    await supabase.from('tgl_event_locks').insert({ event_id: event.id })
+    onUpdated()
+    toast.success('TGL selections locked for this event')
+  }
+
+  async function unlockSelections() {
+    await supabase.from('tgl_event_locks').delete().eq('event_id', event.id)
+    onUpdated()
+    toast.success('TGL selections unlocked')
+  }
 
   // Compute event results if scores exist
   const eventResults = (() => {
@@ -2703,12 +2722,32 @@ function TGLManager({ event, eventPlayers, allScores, course, tglTeams, tglMembe
   return (
     <div className="space-y-6">
       {/* Teams header */}
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between gap-4">
         <div>
-          <h3 className="text-sm font-semibold text-gray-800">TGL Teams</h3>
-          <p className="text-xs text-gray-500 mt-0.5">Season-long teams. Select 2 players per team for this event.</p>
+          <div className="flex items-center gap-2">
+            <h3 className="text-sm font-semibold text-gray-800">TGL Teams</h3>
+            {tglLocked && (
+              <span className="text-xs bg-green-100 text-green-700 font-semibold px-2 py-0.5 rounded-full">
+                🔒 Locked
+              </span>
+            )}
+          </div>
+          <p className="text-xs text-gray-500 mt-0.5">
+            {tglLocked
+              ? 'Selections are locked. Unlock to make changes.'
+              : 'Select 2 players per team for this event, then submit to lock.'}
+          </p>
         </div>
-        <Button size="sm" onClick={() => setShowTeamModal(true)}>+ New Team</Button>
+        <div className="flex gap-2 shrink-0">
+          {!tglLocked && <Button size="sm" variant="secondary" onClick={() => setShowTeamModal(true)}>+ New Team</Button>}
+          {tglLocked ? (
+            <Button size="sm" variant="secondary" onClick={unlockSelections}>Unlock</Button>
+          ) : (
+            <Button size="sm" onClick={lockSelections} disabled={tglSelections.length === 0}>
+              Submit Selections
+            </Button>
+          )}
+        </div>
       </div>
 
       {tglTeams.length === 0 && (
@@ -2737,13 +2776,17 @@ function TGLManager({ event, eventPlayers, allScores, course, tglTeams, tglMembe
                       {eventPoints % 1 === 0 ? eventPoints : eventPoints.toFixed(1)} pts
                     </span>
                   )}
-                  <button
-                    onClick={() => { setSelectedTeam(team); setShowMemberModal(true) }}
-                    className="text-xs text-blue-600 hover:text-blue-800 font-medium"
-                  >
-                    Roster
-                  </button>
-                  <button onClick={() => deleteTeam(team.id)} className="text-xs text-red-500 hover:text-red-700">✕</button>
+                  {!tglLocked && (
+                    <button
+                      onClick={() => { setSelectedTeam(team); setShowMemberModal(true) }}
+                      className="text-xs text-blue-600 hover:text-blue-800 font-medium"
+                    >
+                      Roster
+                    </button>
+                  )}
+                  {!tglLocked && (
+                    <button onClick={() => deleteTeam(team.id)} className="text-xs text-red-500 hover:text-red-700">✕</button>
+                  )}
                 </div>
               </div>
 
@@ -2764,8 +2807,8 @@ function TGLManager({ event, eventPlayers, allScores, course, tglTeams, tglMembe
                           <input
                             type="checkbox"
                             checked={isSelected}
-                            disabled={!isSelected && selected.length >= 2 && !onAnotherTeam}
-                            onChange={() => toggleEventSelection(team.id, m.player_id)}
+                            disabled={tglLocked || (!isSelected && selected.length >= 2 && !onAnotherTeam)}
+                            onChange={() => !tglLocked && toggleEventSelection(team.id, m.player_id)}
                             className="rounded text-green-600 cursor-pointer"
                           />
                           <span className={isSelected ? 'font-medium text-gray-900' : onAnotherTeam ? 'text-amber-800' : 'text-gray-600'}>
