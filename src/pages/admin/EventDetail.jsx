@@ -2826,7 +2826,7 @@ function TGLManager({ event, eventPlayers, allScores, course, tglTeams, tglMembe
 
       {/* New Team Modal */}
       {showTeamModal && (
-        <Modal title="New TGL Team" onClose={() => setShowTeamModal(false)}>
+        <Modal open={showTeamModal} title="New TGL Team" onClose={() => setShowTeamModal(false)}>
           <div className="space-y-4">
             <Input
               label="Team Name"
@@ -2881,7 +2881,7 @@ function TGLRosterModal({ team, tglMembers, allEventPlayers, onClose, onUpdated 
   }
 
   return (
-    <Modal title={`${team.name} — Roster`} onClose={onClose}>
+    <Modal open={true} title={`${team.name} — Roster`} onClose={onClose}>
       <div className="space-y-1 max-h-80 overflow-y-auto">
         {allEventPlayers.length === 0 && (
           <p className="text-sm text-gray-400 italic">No players registered for this event yet.</p>
