@@ -31,8 +31,8 @@ export default function App() {
           <Route path="leagues"       element={<Leagues />} />
           <Route path="courses"       element={<Courses />} />
           <Route path="players"       element={<Players />} />
-          <Route path="leagues/:leagueSlug/events/:eventNumber" element={<EventDetail />} />
           <Route path="import"        element={<Import />} />
+          <Route path=":leagueSlug/:eventSlug" element={<EventDetail />} />
         </Route>
 
         {/* Join via access code — no auth required */}
@@ -40,19 +40,18 @@ export default function App() {
 
         {/* Scorecard — public for specific eventId (shareable link), auth required for /me */}
         <Route path="/scorecard/me" element={<ProtectedRoute><Scorecard /></ProtectedRoute>} />
-        <Route path="/leagues/:leagueSlug/events/:eventNumber/scorecard" element={<Scorecard />} />
 
         {/* Public event registration — no auth required */}
         <Route path="/register/:eventId" element={<Register />} />
 
-        {/* Public schedule — no auth required, shareable with players */}
-        <Route path="/leagues/:leagueSlug/events/:eventNumber/schedule" element={<Schedule />} />
-
-        {/* Leaderboard & Standings — public, shareable links */}
-        <Route path="/leagues/:leagueSlug/events/:eventNumber/leaderboard" element={<Leaderboard />} />
-        <Route path="/leagues/:leagueSlug/standings" element={<Standings />} />
-
         <Route path="/" element={<Navigate to="/home" replace />} />
+
+        {/* Generic slug-based routes — must be LAST to avoid conflicts */}
+        <Route path="/:leagueSlug/standings" element={<Standings />} />
+        <Route path="/:leagueSlug/:eventSlug/leaderboard" element={<Leaderboard />} />
+        <Route path="/:leagueSlug/:eventSlug/schedule" element={<Schedule />} />
+        <Route path="/:leagueSlug/:eventSlug/scorecard" element={<Scorecard />} />
+
         <Route path="*" element={<Navigate to="/home" replace />} />
       </Routes>
     </AuthProvider>

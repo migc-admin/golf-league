@@ -17,7 +17,7 @@ const ALL_ADMIN_TABS = ['Overview', 'Players', 'Groups', 'Payout']
 
 
 export default function EventDetail() {
-  const { leagueSlug, eventNumber } = useParams()
+  const { leagueSlug, eventSlug } = useParams()
   const [event,        setEvent]        = useState(null)
   const [eventPlayers, setEventPlayers] = useState([])
   const [allScores,    setAllScores]    = useState([])
@@ -33,7 +33,7 @@ export default function EventDetail() {
     const { data: league } = await supabase.from('leagues').select('id').eq('slug', leagueSlug).single()
     if (!league) { setLoading(false); return }
 
-    const { data: evBase } = await supabase.from('events').select('id').eq('league_id', league.id).eq('event_number', parseInt(eventNumber, 10)).single()
+    const { data: evBase } = await supabase.from('events').select('id').eq('league_id', league.id).eq('slug', eventSlug).single()
     if (!evBase) { setLoading(false); return }
 
     const id = evBase.id
@@ -62,7 +62,7 @@ export default function EventDetail() {
     setCourse(ev?.course ?? null)
     setAllPlayers(allP ?? [])
     setLoading(false)
-  }, [leagueSlug, eventNumber])
+  }, [leagueSlug, eventSlug])
 
   useEffect(() => { load() }, [load])
 
@@ -94,10 +94,10 @@ export default function EventDetail() {
           </p>
         </div>
         <div className="flex gap-2 shrink-0 flex-wrap justify-end">
-          <Link to={`/leagues/${event.league?.slug}/events/${event.event_number}/schedule`} className="btn-secondary btn-sm btn">
+          <Link to={`/${event.league?.slug}/${event.slug}/schedule`} className="btn-secondary btn-sm btn">
             Pairings ↗
           </Link>
-          <Link to={`/leagues/${event.league?.slug}/events/${event.event_number}/leaderboard`} className="btn-secondary btn-sm btn">
+          <Link to={`/${event.league?.slug}/${event.slug}/leaderboard`} className="btn-secondary btn-sm btn">
             Leaderboard ↗
           </Link>
           <EventStatusControl event={event} onUpdated={load} />
@@ -237,7 +237,7 @@ function TabOverview({ event, eventPlayers, allScores, course, conflicts, onUpda
   const flightB = nonGuests.filter(e => e.flight === 'B').length
 
   // Scorecard link shown when event is active
-  const scorecardUrl = `${window.location.origin}/leagues/${event.league?.slug}/events/${event.event_number}/scorecard`
+  const scorecardUrl = `${window.location.origin}/${event.league?.slug}/${event.slug}/scorecard`
 
   return (
     <div className="grid sm:grid-cols-2 gap-4">
@@ -2282,7 +2282,7 @@ function AccessCodeSection({ event, eventPlayers, onUpdated }) {
   // group_codes stored as { "1": "ABC123", "2": "XYZ789" }
   const [groupCodes, setGroupCodes] = useState(event.group_codes ?? {})
   const [saving,     setSaving]     = useState(false)
-  const scorecardUrl = `${window.location.origin}/leagues/${event.league?.slug}/events/${event.event_number}/scorecard`
+  const scorecardUrl = `${window.location.origin}/${event.league?.slug}/${event.slug}/scorecard`
 
   // Unique sorted group numbers from event players
   const groupNums = [...new Set(

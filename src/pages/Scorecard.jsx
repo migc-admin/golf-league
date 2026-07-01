@@ -37,7 +37,7 @@ import { getStrokesOnHole } from '../lib/engines/scoring'
 import toast from 'react-hot-toast'
 
 export default function Scorecard() {
-  const { leagueSlug, eventNumber } = useParams()
+  const { leagueSlug, eventSlug } = useParams()
   const { user, profile, loading: authLoading, isAdmin, signOut } = useAuth()
   const navigate = useNavigate()
   const homeLink = isAdmin ? '/admin' : '/home'
@@ -74,12 +74,12 @@ export default function Scorecard() {
     if (authLoading || profile === undefined) return
 
     async function load() {
-      // Resolve the event UUID from leagueSlug + eventNumber params
+      // Resolve the event UUID from leagueSlug + eventSlug params
       let evId = null
-      if (leagueSlug && eventNumber) {
+      if (leagueSlug && eventSlug) {
         const { data: lg } = await supabase.from('leagues').select('id').eq('slug', leagueSlug).single()
         if (lg) {
-          const { data: ev } = await supabase.from('events').select('id').eq('league_id', lg.id).eq('event_number', parseInt(eventNumber, 10)).single()
+          const { data: ev } = await supabase.from('events').select('id').eq('league_id', lg.id).eq('slug', eventSlug).single()
           evId = ev?.id ?? null
         }
         if (!evId) { setError('Event not found.'); setLoading(false); return }
@@ -124,7 +124,7 @@ export default function Scorecard() {
 
       const { data: ev } = await supabase
         .from('events')
-        .select('*, course:courses(*), league:leagues(name)')
+        .select('*, course:courses(*), league:leagues(name, slug)')
         .eq('id', evId)
         .single()
 
@@ -245,7 +245,7 @@ export default function Scorecard() {
     }
 
     load()
-  }, [leagueSlug, eventNumber, user, profile, authLoading, isAdmin, loadTrigger])
+  }, [leagueSlug, eventSlug, user, profile, authLoading, isAdmin, loadTrigger])
 
   function getScore(playerId, hole) {
     return scores[playerId]?.[hole] ?? { gross: '', putts: '' }
@@ -409,7 +409,7 @@ export default function Scorecard() {
               </button>
             )}
             <Link
-              to={`/leagues/${event.league?.slug}/events/${event.event_number}/leaderboard`}
+              to={`/${event.league?.slug}/${event.slug}/leaderboard`}
               state={{ from: 'scorecard', scorecardEventId: event.id }}
               className="text-fairway-200 text-xs hover:text-white border border-fairway-500 rounded px-2 py-1"
             >
@@ -785,7 +785,7 @@ function TraditionalScorecard({ event, course, groupPlayers, scores, isComplete,
           </div>
           <div className="flex items-center gap-2">
             <Link
-              to={`/leagues/${event.league?.slug}/events/${event.event_number}/leaderboard`}
+              to={`/${event.league?.slug}/${event.slug}/leaderboard`}
               state={{ from: 'scorecard', scorecardEventId: event.id }}
               className="text-fairway-200 text-xs hover:text-white border border-fairway-500 rounded px-2 py-1"
             >

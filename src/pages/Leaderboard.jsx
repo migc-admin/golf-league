@@ -41,7 +41,7 @@ const FORMAT_LABELS = {
 }
 
 export default function Leaderboard() {
-  const { leagueSlug, eventNumber } = useParams()
+  const { leagueSlug, eventSlug } = useParams()
   const navigate = useNavigate()
   const location = useLocation()
   const { user, isAdmin } = useAuth()
@@ -75,7 +75,7 @@ export default function Leaderboard() {
         .from('events')
         .select('*, course:courses(*), league:leagues(name, slug)')
         .eq('league_id', league.id)
-        .eq('event_number', parseInt(eventNumber, 10))
+        .eq('slug', eventSlug)
         .single()
       if (!ev) { setLoading(false); return }
 
@@ -115,7 +115,7 @@ export default function Leaderboard() {
     return () => {
       if (subRef.current) supabase.removeChannel(subRef.current)
     }
-  }, [leagueSlug, eventNumber])
+  }, [leagueSlug, eventSlug])
 
   if (loading) return <LeaderboardSkeleton />
   if (!event)  return (
@@ -164,7 +164,7 @@ export default function Leaderboard() {
           </div>
           <div className="flex flex-col items-end gap-1.5">
             <StatusBadge status={event.status} />
-            <Link to={`/leagues/${event.league?.slug}/events/${event.event_number}/schedule`} className="text-xs text-fairway-300 hover:text-white">
+            <Link to={`/${event.league?.slug}/${event.slug}/schedule`} className="text-xs text-fairway-300 hover:text-white">
               Pairings ↗
             </Link>
           </div>
