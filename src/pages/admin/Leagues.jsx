@@ -17,6 +17,8 @@ export default function Leagues() {
   const [editingLeague, setEditingLeague] = useState(null)
   const [eventModal, setEventModal] = useState(false)
   const [eventLeague, setEventLeague] = useState(null)
+  const [tglModal, setTglModal] = useState(false)
+  const [tglLeague, setTglLeague] = useState(null)
 
   async function load() {
     const { data } = await supabase
@@ -35,6 +37,7 @@ export default function Leagues() {
   function openCreateLeague()  { setEditingLeague(null); setLeagueModal(true) }
   function openEditLeague(l)   { setEditingLeague(l);    setLeagueModal(true) }
   function openCreateEvent(l)  { setEventLeague(l);      setEventModal(true)  }
+  function openTGL(l)          { setTglLeague(l);        setTglModal(true)    }
 
   async function handleDeleteLeague(id) {
     if (!confirm('Delete this league? All events and earnings will be deleted.')) return
@@ -77,6 +80,7 @@ export default function Leagues() {
                   </div>
                   <div className="flex items-center gap-2">
                     <Link to={`/${league.slug}/standings`} className="btn btn-secondary btn-sm">Standings</Link>
+                    <Button size="sm" variant="secondary" onClick={() => openTGL(league)}>TGL Teams</Button>
                     <Button size="sm" onClick={() => openCreateEvent(league)}>+ Event</Button>
                     <Button size="sm" variant="secondary" onClick={() => openEditLeague(league)}>Edit</Button>
                     <Button size="sm" variant="danger" onClick={() => handleDeleteLeague(league.id)}>Delete</Button>
@@ -133,6 +137,13 @@ export default function Leagues() {
         league={eventLeague}
         onSaved={() => { setEventModal(false); load() }}
       />
+      {tglModal && tglLeague && (
+        <TGLTeamsModal
+          open={tglModal}
+          onClose={() => { setTglModal(false); setTglLeague(null) }}
+          league={tglLeague}
+        />
+      )}
     </div>
   )
 }
@@ -386,6 +397,141 @@ function EventModal({ open, onClose, league, onSaved }) {
           <Button type="submit" loading={saving}>Create Event</Button>
         </div>
       </form>
+    </Modal>
+  )
+}
+
+// ─── TGL Teams Modal ─────────────────────────────────────────────────────────
+function TGLTeamsModal({ open, onClose, league }) {
+  const [teams,       setTeams]       = useState([])
+  const [members,     setMembers]     = useState([])
+  const [allPlayers,  setAllPlayers]  = useState([])
+  const [newName,     setNewName]     = useState('')
+  const [newColor,    setNewColor]    = useState('#16a34a')
+  const [rosterTeam,  setRosterTeam]  = useState(null)
+  const [saving,      setSaving]      = useState(false)
+
+  async function load() {
+    const [{ data: t }, { data: p }] = await Promise.all([
+      supabase.from('tgl_teams').select('*').eq('league_id', league.id).order('name'),
+      supabase.from('players').select('id, first_name, last_name').order('last_name'),
+    ])
+    setTeams(t ?? [])
+    setAllPlayers(p ?? [])
+    if (t?.length) {
+      const { data: m } = await supabase
+        .from('tgl_team_members')
+        .select('*, player:players(id, first_name, last_name)')
+        .in('team_id', t.map(x => x.id))
+      setMembers(m ?? [])
+    }
+  }
+
+  useEffect(() => { if (open) load() }, [open])
+
+  async function createTeam() {
+    if (!newName.trim()) return
+    setSaving(true)
+    const { error } = await supabase.from('tgl_teams').insert({ league_id: league.id, name: newName.trim(), color: newColor })
+    setSaving(false)
+    if (error) { toast.error(error.message); return }
+    setNewName('')
+    setNewColor('#16a34a')
+    load()
+  }
+
+  async function deleteTeam(id) {
+    if (!confirm('Delete this team and remove all its members?')) return
+    await supabase.from('tgl_teams').delete().eq('id', id)
+    load()
+  }
+
+  async function toggleMember(teamId, playerId) {
+    const existing = members.find(m => m.team_id === teamId && m.player_id === playerId)
+    if (existing) {
+      await supabase.from('tgl_team_members').delete().eq('id', existing.id)
+    } else {
+      await supabase.from('tgl_team_members').insert({ team_id: teamId, player_id: playerId })
+    }
+    load()
+  }
+
+  const teamMemberIds = (teamId) => new Set(members.filter(m => m.team_id === teamId).map(m => m.player_id))
+
+  return (
+    <Modal open={open} onClose={onClose} title={`TGL Teams — ${league.name}`} maxWidth="max-w-2xl">
+      <div className="space-y-5">
+        {/* Create new team */}
+        <div className="flex gap-2 items-end">
+          <div className="flex-1">
+            <Input label="New Team Name" value={newName} onChange={e => setNewName(e.target.value)} placeholder="e.g. Just the Tips" />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Color</label>
+            <input type="color" value={newColor} onChange={e => setNewColor(e.target.value)} className="h-9 w-14 rounded border border-gray-300 cursor-pointer" />
+          </div>
+          <Button onClick={createTeam} disabled={saving || !newName.trim()}>Add Team</Button>
+        </div>
+
+        {teams.length === 0 && (
+          <p className="text-sm text-gray-400 italic text-center py-4">No teams yet. Add up to 4 teams above.</p>
+        )}
+
+        {/* Team list */}
+        <div className="space-y-3">
+          {teams.map(team => {
+            const mIds = teamMemberIds(team.id)
+            const teamMembers = members.filter(m => m.team_id === team.id)
+            const expanded = rosterTeam === team.id
+
+            return (
+              <div key={team.id} className="border border-gray-200 rounded-xl overflow-hidden">
+                <div className="flex items-center justify-between px-4 py-3" style={{ borderLeft: `4px solid ${team.color}` }}>
+                  <div className="flex items-center gap-2">
+                    <span className="w-3 h-3 rounded-full" style={{ backgroundColor: team.color }} />
+                    <span className="font-semibold text-gray-900">{team.name}</span>
+                    <span className="text-xs text-gray-400">({teamMembers.length} members)</span>
+                  </div>
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => setRosterTeam(expanded ? null : team.id)}
+                      className="text-xs text-blue-600 hover:text-blue-800 font-medium"
+                    >
+                      {expanded ? 'Hide Roster' : 'Edit Roster'}
+                    </button>
+                    <button onClick={() => deleteTeam(team.id)} className="text-xs text-red-500 hover:text-red-700">Delete</button>
+                  </div>
+                </div>
+
+                {expanded && (
+                  <div className="px-4 py-3 border-t border-gray-100 bg-gray-50">
+                    <p className="text-xs font-medium text-gray-500 mb-2">Select season roster members:</p>
+                    <div className="grid grid-cols-2 gap-1 max-h-48 overflow-y-auto">
+                      {allPlayers.map(p => (
+                        <label key={p.id} className="flex items-center gap-2 py-1 px-2 rounded hover:bg-white cursor-pointer text-sm">
+                          <input
+                            type="checkbox"
+                            checked={mIds.has(p.id)}
+                            onChange={() => toggleMember(team.id, p.id)}
+                            className="rounded text-green-600 accent-green-600"
+                          />
+                          <span className={mIds.has(p.id) ? 'font-medium text-gray-900' : 'text-gray-600'}>
+                            {p.last_name}, {p.first_name}
+                          </span>
+                        </label>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            )
+          })}
+        </div>
+
+        <div className="flex justify-end pt-2">
+          <Button onClick={onClose}>Done</Button>
+        </div>
+      </div>
     </Modal>
   )
 }
