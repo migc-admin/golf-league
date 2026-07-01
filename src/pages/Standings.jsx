@@ -49,13 +49,17 @@ export default function Standings() {
         { data: allSideGames },
         { data: tglT },
         { data: tglSels },
+        { data: tglLocks },
       ] = await Promise.all([
         supabase.from('event_players').select('*, player:players(*)').in('event_id', eventIds),
         supabase.from('scores').select('*').in('event_id', eventIds),
         supabase.from('side_games').select('*, winner:players(first_name,last_name)').in('event_id', eventIds),
         supabase.from('tgl_teams').select('*').eq('league_id', lg.id).order('name'),
         supabase.from('tgl_event_selections').select('*').in('event_id', eventIds),
+        supabase.from('tgl_event_locks').select('event_id').in('event_id', eventIds),
       ])
+
+      const lockedEventIds = new Set((tglLocks ?? []).map(l => l.event_id))
 
       // Load TGL team members
       let tglMembers = []
@@ -116,6 +120,7 @@ export default function Standings() {
         const eventRows = []
 
         for (const ev of evs) {
+          if (!lockedEventIds.has(ev.id)) continue  // only count locked events
           const course = ev.course
           if (!course?.stroke_index || !course?.par_per_hole) continue
           const eps   = (allEPs    ?? []).filter(ep => ep.event_id === ev.id)
