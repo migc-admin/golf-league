@@ -812,8 +812,8 @@ function ImportRoster() {
         </div>
         <ul className="mt-3 text-xs text-gray-500 space-y-1 list-disc list-inside">
           <li><strong>first_name</strong> and <strong>last_name</strong> are required</li>
-          <li><strong>handicap_index</strong> — USGA index (e.g. 14.2). Used to auto-calculate course handicap if not provided.</li>
-          <li><strong>course_handicap</strong> — if provided, this value is used directly (overrides auto-calc). Use this for adjusted handicaps.</li>
+          <li><strong>handicap_index</strong> — USGA index (e.g. 14.2). Used to auto-calculate course handicap if <code>course_handicap</code> is not provided.</li>
+          <li><strong>course_handicap</strong> — optional. If provided, used directly (e.g. after win deductions). If blank, auto-calculated from slope/rating/par.</li>
           <li><strong>flight</strong> — A or B (optional)</li>
           <li>Players matched by first + last name are reused — no duplicates created</li>
           <li>New players not found in the system are added to the roster automatically</li>
