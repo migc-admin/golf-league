@@ -156,11 +156,11 @@ function PreviewTable({ headers, rows, statusKey = '_status', messageKey = '_mes
 }
 
 // ─── Tab 1: Import Players ─────────────────────────────────────────
-const PLAYERS_TEMPLATE = `first_name,last_name,email,handicap_index,flight,role
-Tony,Alvarez,tony@example.com,5.2,A,player
-Dave,Kowalski,dave@example.com,11.1,A,player
-Bob,Nguyen,bob@example.com,15.3,B,player
-Sarah,Okonkwo,sarah@example.com,18.7,B,admin`
+const PLAYERS_TEMPLATE = `first_name,last_name,email,handicap_index,course_handicap,flight,role
+Tony,Alvarez,tony@example.com,5.2,6,A,player
+Dave,Kowalski,dave@example.com,11.1,13,A,player
+Bob,Nguyen,bob@example.com,15.3,,B,player
+Sarah,Okonkwo,sarah@example.com,18.7,22,B,admin`
 
 function ImportPlayers() {
   const [rows,      setRows]      = useState([])
@@ -197,13 +197,15 @@ function ImportPlayers() {
     }
 
     for (let i = 0; i < updated.length; i++) {
-      const row    = updated[i]
-      const first  = row['first_name']?.trim()
-      const last   = row['last_name']?.trim()
-      const email  = row['email']?.trim() || null
-      const hi     = parseFloat(row['handicap_index'])
-      const flight = row['flight']?.trim().toUpperCase() || null
-      const role   = row['role']?.trim().toLowerCase() || 'player'
+      const row     = updated[i]
+      const first   = row['first_name']?.trim()
+      const last    = row['last_name']?.trim()
+      const email   = row['email']?.trim() || null
+      const hi      = parseFloat(row['handicap_index'])
+      const chRaw   = row['course_handicap']?.trim()
+      const chManual = chRaw !== '' && chRaw != null ? parseInt(chRaw, 10) : null
+      const flight  = row['flight']?.trim().toUpperCase() || null
+      const role    = row['role']?.trim().toLowerCase() || 'player'
 
       if (!first || !last) {
         updated[i] = { ...row, _status: 'error', _message: 'Missing name' }
@@ -261,8 +263,9 @@ function ImportPlayers() {
           .from('event_players').select('id').eq('event_id', eventId).eq('player_id', playerId).single()
 
         if (!alreadyOn) {
-          let course_handicap = null
-          if (eventCourse && !isNaN(hi)) {
+          // Use provided course_handicap if present; otherwise auto-calc from slope/rating/par
+          let course_handicap = chManual
+          if (course_handicap === null && eventCourse && !isNaN(hi)) {
             const { slope, rating, par } = eventCourse
             course_handicap = Math.round((hi * slope / 113) + (rating - par))
           }
@@ -311,15 +314,16 @@ function ImportPlayers() {
         />
         <div className="bg-gray-900 rounded-lg px-4 py-3 text-xs text-gray-300 font-mono overflow-x-auto">
           <div className="text-gray-500 mb-1"># players_template.csv</div>
-          <div>first_name,last_name,email,handicap_index,flight,role</div>
-          <div className="text-gray-500">Tony,Alvarez,tony@example.com,5.2,A,player</div>
-          <div className="text-gray-500">Dave,Kowalski,dave@example.com,11.1,A,admin</div>
-          <div className="text-gray-500">Bob,Nguyen,bob@example.com,15.3,B,player</div>
+          <div>first_name,last_name,email,handicap_index,course_handicap,flight,role</div>
+          <div className="text-gray-500">Tony,Alvarez,tony@example.com,5.2,6,A,player</div>
+          <div className="text-gray-500">Dave,Kowalski,dave@example.com,11.1,13,A,admin</div>
+          <div className="text-gray-500">Bob,Nguyen,bob@example.com,15.3,,B,player</div>
         </div>
         <ul className="mt-3 text-xs text-gray-500 space-y-1 list-disc list-inside">
           <li><strong>first_name</strong> and <strong>last_name</strong> are required</li>
           <li><strong>email</strong> is optional — used for matching first, then falls back to first+last name match. No duplicate profiles are created either way.</li>
-          <li><strong>handicap_index</strong> — used for course handicap if also enrolling in an event</li>
+          <li><strong>handicap_index</strong> — USGA index (e.g. 14.2). Used to auto-calculate course handicap if <code>course_handicap</code> is not provided.</li>
+          <li><strong>course_handicap</strong> — optional. If provided, used directly (e.g. after win deductions). If blank, auto-calculated from slope/rating/par.</li>
           <li><strong>flight</strong> — A or B. Only applied when enrolling in an event (optional).</li>
           <li><strong>role</strong> — <code>player</code> (default), <code>admin</code>, or <code>scorekeeper</code></li>
           <li>Players already in the system (matched by email or name) are reused — not duplicated. They are still enrolled in the selected event if one is chosen.</li>
