@@ -1126,7 +1126,7 @@ function AddPlayerModal({ open, onClose, eventId, available, course, useFlights,
                           onChange={e => setField(p.id, 'flight', e.target.value)}
                           className="input py-1 text-xs w-28 shrink-0 bg-white"
                         >
-                          <option value="">Flight?</option>
+                          <option value="">Not Assigned</option>
                           <option value="A">Flight A</option>
                           <option value="B">Flight B</option>
                           <option value="guest">Guest Player</option>
