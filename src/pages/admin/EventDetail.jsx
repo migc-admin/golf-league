@@ -350,7 +350,7 @@ function TabOverview({ event, eventPlayers, allScores, course, conflicts, onUpda
             <CardHeader title="Scoring Access" subtitle="Share with players to enter scores" />
             <AccessCodeSection event={event} eventPlayers={eventPlayers} onUpdated={onUpdated} orgSlug={orgSlug} />
             <div className="mt-3 pt-3 border-t border-gray-100">
-              <ExportScorecardsButton event={event} eventPlayers={eventPlayers} course={course} orgName={orgName} />
+              <ExportScorecardsButton event={event} eventPlayers={eventPlayers} course={course} orgName={event.league?.name ?? orgName} />
             </div>
           </Card>
         )}
