@@ -1,4 +1,12 @@
 {
+  "redirects": [
+    { "source": "/admin/migc-league/:eventSlug", "destination": "/admin/migc/migc-league/:eventSlug", "permanent": true },
+    { "source": "/admin/migc-league",            "destination": "/admin/migc/migc-league",             "permanent": true },
+    { "source": "/migc-league/:eventSlug/leaderboard", "destination": "/migc/migc-league/:eventSlug/leaderboard", "permanent": true },
+    { "source": "/migc-league/:eventSlug/scorecard",   "destination": "/migc/migc-league/:eventSlug/scorecard",   "permanent": true },
+    { "source": "/migc-league/:eventSlug/schedule",    "destination": "/migc/migc-league/:eventSlug/schedule",    "permanent": true },
+    { "source": "/migc-league/standings",              "destination": "/migc/migc-league/standings",              "permanent": true }
+  ],
   "rewrites": [{ "source": "/(.*)", "destination": "/index.html" }],
   "headers": [
     {
