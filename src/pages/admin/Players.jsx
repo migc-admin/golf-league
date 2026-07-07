@@ -179,7 +179,6 @@ export default function Players() {
                         className="input py-1 text-xs w-36 bg-white"
                       >
                         <option value="admin">Admin</option>
-                        <option value="scorekeeper">Scorekeeper</option>
                         <option value="none">None</option>
                       </select>
                     </div>
@@ -214,12 +213,12 @@ export default function Players() {
 function CreateLoginModal({ open, onClose, players, onSaved }) {
   const [email,    setEmail]    = useState('')
   const [password, setPassword] = useState('')
-  const [role,     setRole]     = useState('scorekeeper')
+  const [role,     setRole]     = useState('none')
   const [fullName, setFullName] = useState('')
   const [saving,   setSaving]   = useState(false)
 
   useEffect(() => {
-    if (!open) { setEmail(''); setPassword(''); setRole('scorekeeper'); setFullName('') }
+    if (!open) { setEmail(''); setPassword(''); setRole('none'); setFullName('') }
   }, [open])
 
   // Auto-fill name from matching player email
@@ -302,7 +301,6 @@ function CreateLoginModal({ open, onClose, players, onSaved }) {
         <div>
           <label className="label">Role</label>
           <select value={role} onChange={e => setRole(e.target.value)} className="input bg-white">
-            <option value="scorekeeper">Scorekeeper</option>
             <option value="admin">Admin</option>
             <option value="none">None (view only)</option>
           </select>
@@ -393,10 +391,9 @@ function PlayerModal({ open, onClose, editing, orgId, onSaved }) {
           <select value={form.intended_role} onChange={e => setField('intended_role', e.target.value)} className="input bg-white">
             <option value="player">Player</option>
             <option value="admin">Admin</option>
-            <option value="scorekeeper">Scorekeeper</option>
           </select>
           <p className="text-xs text-gray-400 mt-1">
-            Admin and Scorekeeper roles are applied immediately if a matching email account exists.
+            Admin role is applied immediately if a matching email account exists.
           </p>
         </div>
         <div className="flex justify-end gap-3 pt-2">
