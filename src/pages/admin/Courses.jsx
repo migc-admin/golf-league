@@ -225,6 +225,14 @@ function CourseModal({ open, onClose, editing, orgId, onSaved }) {
   async function handleSave(e) {
     e.preventDefault()
     setSaving(true)
+    let resolvedOrgId = orgId
+    if (!resolvedOrgId) {
+      const { data: { user } } = await supabase.auth.getUser()
+      if (user) {
+        const { data: profile } = await supabase.from('profiles').select('org_id').eq('id', user.id).single()
+        resolvedOrgId = profile?.org_id ?? null
+      }
+    }
 
     const totalPar = holes.reduce((a, h) => a + parseInt(h.par, 10), 0)
 
@@ -254,7 +262,7 @@ function CourseModal({ open, onClose, editing, orgId, onSaved }) {
 
     const { error } = editing
       ? await supabase.from('courses').update(payload).eq('id', editing.id)
-      : await supabase.from('courses').insert({ ...payload, org_id: orgId })
+      : await supabase.from('courses').insert({ ...payload, org_id: resolvedOrgId })
 
     setSaving(false)
     if (error) toast.error(error.message)

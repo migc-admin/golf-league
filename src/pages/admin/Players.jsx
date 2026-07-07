@@ -342,6 +342,14 @@ function PlayerModal({ open, onClose, editing, orgId, onSaved }) {
   async function handleSave(e) {
     e.preventDefault()
     setSaving(true)
+    let resolvedOrgId = orgId
+    if (!resolvedOrgId) {
+      const { data: { user } } = await supabase.auth.getUser()
+      if (user) {
+        const { data: profile } = await supabase.from('profiles').select('org_id').eq('id', user.id).single()
+        resolvedOrgId = profile?.org_id ?? null
+      }
+    }
     const payload = {
       first_name:    form.first_name.trim(),
       last_name:     form.last_name.trim(),
@@ -351,7 +359,7 @@ function PlayerModal({ open, onClose, editing, orgId, onSaved }) {
     }
     const { error } = editing
       ? await supabase.from('players').update(payload).eq('id', editing.id)
-      : await supabase.from('players').insert({ ...payload, org_id: orgId })
+      : await supabase.from('players').insert({ ...payload, org_id: resolvedOrgId })
 
     // If an email is provided and role is not 'player', update the matching profile immediately
     if (!error && payload.email && payload.intended_role !== 'player') {

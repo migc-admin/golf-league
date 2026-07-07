@@ -15,6 +15,7 @@ export default function Leagues() {
   const { user } = useAuth()
   const [leagues,      setLeagues]      = useState([])
   const [orgSlug,      setOrgSlug]      = useState(null)
+  const [orgId,        setOrgId]        = useState(null)
   const [loading,      setLoading]      = useState(true)
   const [leagueModal,  setLeagueModal]  = useState(false)
   const [editingLeague,setEditingLeague]= useState(null)
@@ -43,8 +44,9 @@ export default function Leagues() {
         .from('profiles').select('org_id').eq('id', user.id).single()
       if (profile?.org_id) {
         const { data: org } = await supabase
-          .from('organizations').select('slug').eq('id', profile.org_id).single()
+          .from('organizations').select('id, slug').eq('id', profile.org_id).single()
         if (org?.slug) setOrgSlug(org.slug)
+        if (org?.id)   setOrgId(org.id)
       }
     }
     fetchOrgSlug()
@@ -145,6 +147,7 @@ export default function Leagues() {
         open={leagueModal}
         onClose={() => setLeagueModal(false)}
         editing={editingLeague}
+        orgId={orgId}
         onSaved={() => { setLeagueModal(false); load() }}
       />
       <EventModal
@@ -164,7 +167,7 @@ export default function Leagues() {
   )
 }
 
-function LeagueModal({ open, onClose, editing, onSaved }) {
+function LeagueModal({ open, onClose, editing, orgId, onSaved }) {
   const [name, setName] = useState('')
   const [year, setYear] = useState(CURRENT_YEAR)
   const [saving, setSaving] = useState(false)
@@ -178,9 +181,17 @@ function LeagueModal({ open, onClose, editing, onSaved }) {
     e.preventDefault()
     if (!name.trim()) return
     setSaving(true)
+    let resolvedOrgId = orgId
+    if (!resolvedOrgId) {
+      const { data: { user } } = await supabase.auth.getUser()
+      if (user) {
+        const { data: profile } = await supabase.from('profiles').select('org_id').eq('id', user.id).single()
+        resolvedOrgId = profile?.org_id ?? null
+      }
+    }
     const { error } = editing
       ? await supabase.from('leagues').update({ name: name.trim(), season_year: +year }).eq('id', editing.id)
-      : await supabase.from('leagues').insert({ name: name.trim(), season_year: +year })
+      : await supabase.from('leagues').insert({ name: name.trim(), season_year: +year, org_id: resolvedOrgId })
     setSaving(false)
     if (error) toast.error(error.message)
     else { toast.success(editing ? 'League updated' : 'League created'); onSaved() }
