@@ -1,5 +1,6 @@
 import { createContext, useContext, useEffect, useState } from 'react'
 import { supabase } from './supabase'
+import { hasFeature } from './features'
 
 const OrgContext = createContext(null)
 
@@ -10,7 +11,7 @@ export function OrgProvider({ orgSlug, children }) {
     if (!orgSlug) return
     supabase
       .from('organizations')
-      .select('id, name, slug, logo_url')
+      .select('id, name, slug, logo_url, tier')
       .eq('slug', orgSlug)
       .single()
       .then(({ data }) => { if (data) setOrg(data) })
@@ -21,4 +22,10 @@ export function OrgProvider({ orgSlug, children }) {
 
 export function useOrg() {
   return useContext(OrgContext)
+}
+
+export function useFeatures() {
+  const org = useContext(OrgContext)
+  const tier = org?.tier ?? 'free'
+  return (feature) => hasFeature(tier, feature)
 }

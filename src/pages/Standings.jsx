@@ -7,6 +7,7 @@
 import { useEffect, useState } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
+import { useFeatures } from '../lib/OrgContext'
 import Card from '../components/ui/Card'
 import { computeLeaderboards } from '../lib/engines/scoring'
 import { computeAllSkins } from '../lib/engines/skins'
@@ -15,6 +16,7 @@ import { computeTGLEventResults, computeTGLSeasonStandings } from '../lib/engine
 
 export default function Standings() {
   const { orgSlug, leagueSlug } = useParams()
+  const hasFeature = useFeatures()
   const [league,       setLeague]       = useState(null)
   const [events,       setEvents]       = useState([])
   const [standings,    setStandings]    = useState([])   // earnings: [{ player, totalEarnings, eventsPlayed, byEvent }]
@@ -149,7 +151,7 @@ export default function Standings() {
     load()
   }, [leagueSlug])
 
-  const views = ['earnings', ...(tglStandings.length > 0 ? ['tgl'] : [])]
+  const views = ['earnings', ...(hasFeature('tgl') && tglStandings.length > 0 ? ['tgl'] : [])]
 
   if (loading) return (
     <div className="min-h-screen bg-gray-50 flex items-center justify-center">

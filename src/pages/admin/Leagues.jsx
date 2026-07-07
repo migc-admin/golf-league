@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../hooks/useAuth'
+import { useFeatures } from '../../lib/OrgContext'
 import toast from 'react-hot-toast'
 import Card, { CardHeader } from '../../components/ui/Card'
 import Button from '../../components/ui/Button'
@@ -14,6 +15,7 @@ const CURRENT_YEAR = new Date().getFullYear()
 
 export default function Leagues() {
   const { user } = useAuth()
+  const hasFeature = useFeatures()
   const [leagues,      setLeagues]      = useState([])
   const [orgSlug,      setOrgSlug]      = useState(null)
   const [orgId,        setOrgId]        = useState(null)
@@ -114,7 +116,13 @@ export default function Leagues() {
                   </div>
                   <div className="flex items-center gap-2">
                     <Link to={`/${orgSlug}/${league.slug}/standings`} className="btn btn-secondary btn-sm">Standings</Link>
-                    <Button size="sm" variant="secondary" onClick={() => openTGL(league)}>TGL Teams</Button>
+                    {hasFeature('tgl') ? (
+                      <Button size="sm" variant="secondary" onClick={() => { setTglLeague(league); setTglModal(true) }}>
+                        TGL Teams
+                      </Button>
+                    ) : (
+                      <span className="text-xs text-gray-400 border border-gray-200 rounded px-2 py-1">TGL — Pro</span>
+                    )}
                     <Button size="sm" onClick={() => openCreateEvent(league)}>+ Event</Button>
                     <Button size="sm" variant="secondary" onClick={() => openEditLeague(league)}>Edit</Button>
                     <Button size="sm" variant="danger" onClick={() => handleDeleteLeague(league.id)}>Delete</Button>

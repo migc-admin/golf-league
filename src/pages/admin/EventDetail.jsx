@@ -8,7 +8,7 @@ import { computeAllSkins } from '../../lib/engines/skins'
 import { computeTGLEventResults } from '../../lib/engines/tgl'
 import Card, { CardHeader } from '../../components/ui/Card'
 import { ExportScorecardsButton } from '../../components/ScorecardExport'
-import { useOrg } from '../../lib/OrgContext'
+import { useOrg, useFeatures } from '../../lib/OrgContext'
 import Button from '../../components/ui/Button'
 import Modal from '../../components/ui/Modal'
 import Input, { Select } from '../../components/ui/Input'
@@ -22,6 +22,7 @@ const ALL_ADMIN_TABS = ['Overview', 'Players', 'Groups', 'Payout', 'TGL']
 export default function EventDetail() {
   const { orgSlug, leagueSlug, eventSlug } = useParams()
   const org = useOrg()
+  const hasFeature = useFeatures()
   const [event,        setEvent]        = useState(null)
   const [eventPlayers, setEventPlayers] = useState([])
   const [allScores,    setAllScores]    = useState([])
@@ -155,7 +156,10 @@ export default function EventDetail() {
       {/* Tabs */}
       <div className="border-b border-gray-200">
         <nav className="-mb-px flex gap-1 overflow-x-auto">
-          {ALL_ADMIN_TABS.map(tab => (
+          {ALL_ADMIN_TABS.filter(tab => {
+            if (tab === 'TGL') return hasFeature('tgl') && tglTeams.length > 0
+            return true
+          }).map(tab => (
             <button
               key={tab}
               onClick={() => setActiveTab(tab)}

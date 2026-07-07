@@ -4,9 +4,12 @@ import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../hooks/useAuth'
 import Card from '../../components/ui/Card'
 import { StatusBadge } from '../../components/ui/Badge'
+import { useOrg } from '../../lib/OrgContext'
+import TierBadge from '../../components/ui/TierBadge'
 
 export default function Dashboard() {
   const { user } = useAuth()
+  const org = useOrg()
   const [stats,    setStats]    = useState(null)
   const [events,   setEvents]   = useState([])
   const [orgSlug,  setOrgSlug]  = useState(null)
@@ -65,9 +68,17 @@ export default function Dashboard() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold text-gray-900">Home</h1>
-        <p className="text-gray-500 text-sm mt-1">League administration overview</p>
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-bold text-gray-900">Home</h1>
+          <p className="text-gray-500 text-sm mt-1">League administration overview</p>
+        </div>
+        {org && (
+          <div className="flex items-center gap-2 text-sm text-gray-500">
+            <span>Plan:</span>
+            <TierBadge tier={org.tier ?? 'free'} />
+          </div>
+        )}
       </div>
 
       {/* #7: Stats strip */}

@@ -14,6 +14,7 @@ import { computeMatchPoints } from '../lib/engines/matchPoints'
 import { computePayouts, CATEGORY_LABELS, ctpLabel } from '../lib/engines/payouts'
 import { computeTGLEventResults } from '../lib/engines/tgl'
 import { FlightBadge, StatusBadge } from '../components/ui/Badge'
+import { useFeatures } from '../lib/OrgContext'
 
 const ALL_TABS = ['18-Hole', 'Front 9', 'Back 9', 'Stableford', 'Match Points', 'Low Putts', 'Skins', 'Payouts', 'TGL']
 
@@ -47,6 +48,7 @@ export default function Leaderboard() {
   const navigate = useNavigate()
   const location = useLocation()
   const { user, isAdmin } = useAuth()
+  const hasFeature = useFeatures()
   const homeLink = isAdmin ? '/admin' : user ? '/home' : null
   const fromScorecard = location.state?.from === 'scorecard'
   const scorecardEventId = location.state?.scorecardEventId ?? null
@@ -65,7 +67,7 @@ export default function Leaderboard() {
   const [tglLocked,     setTglLocked]     = useState(false)
 
   const subRef = useRef(null)
-  const tabs   = event ? visibleTabs(event, tglTeams.length > 0 && tglSelections.length > 0) : ALL_TABS
+  const tabs   = event ? visibleTabs(event, hasFeature('tgl') && tglTeams.length > 0 && tglSelections.length > 0) : ALL_TABS
 
   async function loadScores(evId) {
     const { data } = await supabase.from('scores').select('*').eq('event_id', evId)
