@@ -171,7 +171,7 @@ export default function EventDetail() {
 
       {/* Tab content */}
       {activeTab === 'Overview' && (
-        <TabOverview event={event} eventPlayers={eventPlayers} allScores={allScores} course={course} conflicts={conflicts} onUpdated={load} leagues={leagues} />
+        <TabOverview event={event} eventPlayers={eventPlayers} allScores={allScores} course={course} conflicts={conflicts} onUpdated={load} leagues={leagues} orgName={org?.name} orgSlug={orgSlug} />
       )}
 
       {activeTab === 'Players' && (
@@ -288,7 +288,7 @@ function exportScoresCSV(event, eventPlayers, allScores, course) {
 }
 
 // ─── Tab: Overview ────────────────────────────────────────────────
-function TabOverview({ event, eventPlayers, allScores, course, conflicts, onUpdated }) {
+function TabOverview({ event, eventPlayers, allScores, course, conflicts, onUpdated, orgName, orgSlug }) {
   const [editModal,   setEditModal]   = useState(false)
   const [deleteModal, setDeleteModal] = useState(false)
   const [scoreEditor, setScoreEditor] = useState(false)
@@ -299,7 +299,7 @@ function TabOverview({ event, eventPlayers, allScores, course, conflicts, onUpda
   const flightB = nonGuests.filter(e => e.flight === 'B').length
 
   // Scorecard link shown when event is active
-  const scorecardUrl = `${window.location.origin}/${event.league?.slug}/${event.slug}/scorecard`
+  const scorecardUrl = `${window.location.origin}/${orgSlug}/${event.league?.slug}/${event.slug}/scorecard`
 
   return (
     <div className="grid sm:grid-cols-2 gap-4">
@@ -348,9 +348,9 @@ function TabOverview({ event, eventPlayers, allScores, course, conflicts, onUpda
         {event.status === 'active' && (
           <Card>
             <CardHeader title="Scoring Access" subtitle="Share with players to enter scores" />
-            <AccessCodeSection event={event} eventPlayers={eventPlayers} onUpdated={onUpdated} />
+            <AccessCodeSection event={event} eventPlayers={eventPlayers} onUpdated={onUpdated} orgSlug={orgSlug} />
             <div className="mt-3 pt-3 border-t border-gray-100">
-              <ExportScorecardsButton event={event} eventPlayers={eventPlayers} course={course} orgName={org?.name} />
+              <ExportScorecardsButton event={event} eventPlayers={eventPlayers} course={course} orgName={orgName} />
             </div>
           </Card>
         )}
@@ -2340,11 +2340,11 @@ function Row({ label, value }) {
 
 // ─── Access Code Section ───────────────────────────────────────────
 // ─── Per-Group Code Section ────────────────────────────────────────
-function AccessCodeSection({ event, eventPlayers, onUpdated }) {
+function AccessCodeSection({ event, eventPlayers, onUpdated, orgSlug }) {
   // group_codes stored as { "1": "ABC123", "2": "XYZ789" }
   const [groupCodes, setGroupCodes] = useState(event.group_codes ?? {})
   const [saving,     setSaving]     = useState(false)
-  const scorecardUrl = `${window.location.origin}/${event.league?.slug}/${event.slug}/scorecard`
+  const scorecardUrl = `${window.location.origin}/${orgSlug}/${event.league?.slug}/${event.slug}/scorecard`
 
   // Unique sorted group numbers from event players
   const groupNums = [...new Set(
