@@ -10,6 +10,7 @@
 
 import { useEffect, useState } from 'react'
 import { supabase } from '../../lib/supabase'
+import { useAuth } from '../../hooks/useAuth'
 import Card, { CardHeader } from '../../components/ui/Card'
 import Button from '../../components/ui/Button'
 import toast from 'react-hot-toast'
@@ -163,12 +164,14 @@ Bob,Nguyen,bob@example.com,15.3,,B,player
 Sarah,Okonkwo,sarah@example.com,18.7,22,B,admin`
 
 function ImportPlayers() {
+  const { user } = useAuth()
   const [rows,      setRows]      = useState([])
   const [headers,   setHeaders]   = useState([])
   const [importing, setImporting] = useState(false)
   const [done,      setDone]      = useState(false)
   const [events,    setEvents]    = useState([])
   const [eventId,   setEventId]   = useState('')
+  const [orgId,     setOrgId]     = useState(null)
 
   useEffect(() => {
     supabase
@@ -176,7 +179,13 @@ function ImportPlayers() {
       .select('id, event_number, event_date, status, league:leagues(name), course:courses(name, slope, rating, par)')
       .order('event_date', { ascending: false })
       .then(({ data }) => setEvents(data ?? []))
-  }, [])
+    async function fetchOrgId() {
+      if (!user) return
+      const { data: profile } = await supabase.from('profiles').select('org_id').eq('id', user.id).single()
+      if (profile?.org_id) setOrgId(profile.org_id)
+    }
+    fetchOrgId()
+  }, [user])
 
   function handleFile(text) {
     setDone(false)
@@ -239,7 +248,7 @@ function ImportPlayers() {
 
       // 3. Create new player only if no match found
       if (!playerId) {
-        const payload = { first_name: first, last_name: last, intended_role: role }
+        const payload = { first_name: first, last_name: last, intended_role: role, org_id: orgId }
         if (email) payload.email = email
 
         const { data: newP, error } = await supabase.from('players').insert(payload).select('id').single()
@@ -422,11 +431,22 @@ Torrey Pines South,Middle,130,72.1,17,5,485,4
 Torrey Pines South,Middle,130,72.1,18,4,425,8`
 
 function ImportCourse() {
+  const { user } = useAuth()
   const [rows,      setRows]      = useState([])
   const [headers,   setHeaders]   = useState([])
   const [importing, setImporting] = useState(false)
   const [done,      setDone]      = useState(false)
   const [preview,   setPreview]   = useState(null) // assembled course object
+  const [orgId,     setOrgId]     = useState(null)
+
+  useEffect(() => {
+    async function fetchOrgId() {
+      if (!user) return
+      const { data: profile } = await supabase.from('profiles').select('org_id').eq('id', user.id).single()
+      if (profile?.org_id) setOrgId(profile.org_id)
+    }
+    fetchOrgId()
+  }, [user])
 
   function handleFile(text) {
     setDone(false)
@@ -519,7 +539,7 @@ function ImportCourse() {
       return
     }
 
-    const { error } = await supabase.from('courses').insert(preview)
+    const { error } = await supabase.from('courses').insert({ ...preview, org_id: orgId })
     setImporting(false)
 
     if (error) {

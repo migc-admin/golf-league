@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { supabase } from '../../lib/supabase'
+import { useAuth } from '../../hooks/useAuth'
 import toast from 'react-hot-toast'
 import Card, { CardHeader } from '../../components/ui/Card'
 import Button from '../../components/ui/Button'
@@ -10,6 +11,7 @@ import Badge from '../../components/ui/Badge'
 const TABS = ['Roster', 'User Accounts']
 
 export default function Players() {
+  const { user } = useAuth()
   const [players,  setPlayers]  = useState([])
   const [profiles, setProfiles] = useState([])
   const [search,   setSearch]   = useState('')
@@ -18,6 +20,7 @@ export default function Players() {
   const [editing,     setEditing]     = useState(null)
   const [loginModal,  setLoginModal]  = useState(false)
   const [activeTab,   setActiveTab]   = useState('Roster')
+  const [orgId,       setOrgId]       = useState(null)
 
   async function load() {
     const [{ data: p }, { data: pr }] = await Promise.all([
@@ -29,7 +32,15 @@ export default function Players() {
     setLoading(false)
   }
 
-  useEffect(() => { load() }, [])
+  useEffect(() => {
+    load()
+    async function fetchOrgId() {
+      if (!user) return
+      const { data: profile } = await supabase.from('profiles').select('org_id').eq('id', user.id).single()
+      if (profile?.org_id) setOrgId(profile.org_id)
+    }
+    fetchOrgId()
+  }, [user])
 
   const filtered = players.filter(p =>
     `${p.first_name} ${p.last_name} ${p.email ?? ''}`.toLowerCase()
@@ -187,6 +198,7 @@ export default function Players() {
         open={modal}
         onClose={() => setModal(false)}
         editing={editing}
+        orgId={orgId}
         onSaved={() => { setModal(false); load() }}
       />
       <CreateLoginModal
@@ -310,7 +322,7 @@ function RoleBadge({ role }) {
   return <Badge variant="gray">No Role</Badge>
 }
 
-function PlayerModal({ open, onClose, editing, onSaved }) {
+function PlayerModal({ open, onClose, editing, orgId, onSaved }) {
   const [form,   setForm]   = useState({ first_name: '', last_name: '', email: '', ghin_number: '', intended_role: 'player' })
   const [saving, setSaving] = useState(false)
 
@@ -339,7 +351,7 @@ function PlayerModal({ open, onClose, editing, onSaved }) {
     }
     const { error } = editing
       ? await supabase.from('players').update(payload).eq('id', editing.id)
-      : await supabase.from('players').insert(payload)
+      : await supabase.from('players').insert({ ...payload, org_id: orgId })
 
     // If an email is provided and role is not 'player', update the matching profile immediately
     if (!error && payload.email && payload.intended_role !== 'player') {

@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { supabase } from '../../lib/supabase'
+import { useAuth } from '../../hooks/useAuth'
 import toast from 'react-hot-toast'
 import Card, { CardHeader } from '../../components/ui/Card'
 import Button from '../../components/ui/Button'
@@ -26,10 +27,12 @@ function emptyHoles(numTees = 3) {
 }
 
 export default function Courses() {
+  const { user } = useAuth()
   const [courses, setCourses] = useState([])
   const [loading, setLoading] = useState(true)
   const [modal,   setModal]   = useState(false)
   const [editing, setEditing] = useState(null)
+  const [orgId,   setOrgId]   = useState(null)
 
   async function load() {
     const { data } = await supabase
@@ -40,7 +43,15 @@ export default function Courses() {
     setLoading(false)
   }
 
-  useEffect(() => { load() }, [])
+  useEffect(() => {
+    load()
+    async function fetchOrgId() {
+      if (!user) return
+      const { data: profile } = await supabase.from('profiles').select('org_id').eq('id', user.id).single()
+      if (profile?.org_id) setOrgId(profile.org_id)
+    }
+    fetchOrgId()
+  }, [user])
 
   async function handleDelete(id) {
     if (!confirm('Delete this course?')) return
@@ -99,13 +110,14 @@ export default function Courses() {
         open={modal}
         onClose={() => setModal(false)}
         editing={editing}
+        orgId={orgId}
         onSaved={() => { setModal(false); load() }}
       />
     </div>
   )
 }
 
-function CourseModal({ open, onClose, editing, onSaved }) {
+function CourseModal({ open, onClose, editing, orgId, onSaved }) {
   const [name,    setName]    = useState('')
   const [tees,    setTees]    = useState(DEFAULT_TEES)
   const [holes,   setHoles]   = useState(() => emptyHoles(3))
@@ -242,7 +254,7 @@ function CourseModal({ open, onClose, editing, onSaved }) {
 
     const { error } = editing
       ? await supabase.from('courses').update(payload).eq('id', editing.id)
-      : await supabase.from('courses').insert(payload)
+      : await supabase.from('courses').insert({ ...payload, org_id: orgId })
 
     setSaving(false)
     if (error) toast.error(error.message)
