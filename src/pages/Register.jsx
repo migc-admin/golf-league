@@ -15,7 +15,6 @@ import { useParams, Link } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 
 const GOLD = '#D4AF37'
-const DEFAULT_VENMO = 'SD-Mulligans-Golf'
 
 function VenmoButton({ handle, amount, note }) {
   const encoded = encodeURIComponent(note)
@@ -103,7 +102,7 @@ export default function Register() {
 
         {/* Header */}
         <div className="text-center mb-8">
-          <img src="/logo.png" alt="Mulligan's Island Golf Club"
+          <img src="/logo.png" alt="Golf League Logo"
             className="w-20 h-20 rounded-full object-cover mx-auto mb-3 shadow-xl" />
           <h1 className="text-white font-bold text-2xl" style={{ fontFamily: "'Playfair Display', serif" }}>
             Event Registration
@@ -235,10 +234,10 @@ export default function Register() {
               </p>
             </div>
 
-            {(event.venmo_handle || DEFAULT_VENMO) ? (
+            {event.venmo_handle ? (
               <div className="space-y-3">
                 <VenmoButton
-                  handle={event.venmo_handle ?? DEFAULT_VENMO}
+                  handle={event.venmo_handle}
                   amount={Number(event.tournament_fee || event.entry_fee || 0).toFixed(2)}
                   note={`${eventLabel} – ${firstName} ${lastName}`}
                 />

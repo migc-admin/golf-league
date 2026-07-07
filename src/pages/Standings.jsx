@@ -14,7 +14,7 @@ import { computePayouts } from '../lib/engines/payouts'
 import { computeTGLEventResults, computeTGLSeasonStandings } from '../lib/engines/tgl'
 
 export default function Standings() {
-  const { leagueSlug } = useParams()
+  const { orgSlug, leagueSlug } = useParams()
   const [league,       setLeague]       = useState(null)
   const [events,       setEvents]       = useState([])
   const [standings,    setStandings]    = useState([])   // earnings: [{ player, totalEarnings, eventsPlayed, byEvent }]

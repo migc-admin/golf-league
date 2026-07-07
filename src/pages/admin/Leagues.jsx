@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { supabase } from '../../lib/supabase'
+import { useAuth } from '../../hooks/useAuth'
 import toast from 'react-hot-toast'
 import Card, { CardHeader } from '../../components/ui/Card'
 import Button from '../../components/ui/Button'
@@ -11,14 +12,16 @@ import { StatusBadge } from '../../components/ui/Badge'
 const CURRENT_YEAR = new Date().getFullYear()
 
 export default function Leagues() {
-  const [leagues, setLeagues] = useState([])
-  const [loading, setLoading] = useState(true)
-  const [leagueModal, setLeagueModal] = useState(false)
-  const [editingLeague, setEditingLeague] = useState(null)
-  const [eventModal, setEventModal] = useState(false)
-  const [eventLeague, setEventLeague] = useState(null)
-  const [tglModal, setTglModal] = useState(false)
-  const [tglLeague, setTglLeague] = useState(null)
+  const { user } = useAuth()
+  const [leagues,      setLeagues]      = useState([])
+  const [orgSlug,      setOrgSlug]      = useState(null)
+  const [loading,      setLoading]      = useState(true)
+  const [leagueModal,  setLeagueModal]  = useState(false)
+  const [editingLeague,setEditingLeague]= useState(null)
+  const [eventModal,   setEventModal]   = useState(false)
+  const [eventLeague,  setEventLeague]  = useState(null)
+  const [tglModal,     setTglModal]     = useState(false)
+  const [tglLeague,    setTglLeague]    = useState(null)
 
   async function load() {
     const { data } = await supabase
@@ -32,7 +35,20 @@ export default function Leagues() {
     setLoading(false)
   }
 
-  useEffect(() => { load() }, [])
+  useEffect(() => {
+    load()
+    async function fetchOrgSlug() {
+      if (!user) return
+      const { data: profile } = await supabase
+        .from('profiles').select('org_id').eq('id', user.id).single()
+      if (profile?.org_id) {
+        const { data: org } = await supabase
+          .from('organizations').select('slug').eq('id', profile.org_id).single()
+        if (org?.slug) setOrgSlug(org.slug)
+      }
+    }
+    fetchOrgSlug()
+  }, [user])
 
   function openCreateLeague()  { setEditingLeague(null); setLeagueModal(true) }
   function openEditLeague(l)   { setEditingLeague(l);    setLeagueModal(true) }
@@ -79,7 +95,7 @@ export default function Leagues() {
                     <div className="text-xs text-gray-500 mt-0.5">Season {league.season_year} · {events.length} event{events.length !== 1 ? 's' : ''}</div>
                   </div>
                   <div className="flex items-center gap-2">
-                    <Link to={`/${league.slug}/standings`} className="btn btn-secondary btn-sm">Standings</Link>
+                    <Link to={`/${orgSlug}/${league.slug}/standings`} className="btn btn-secondary btn-sm">Standings</Link>
                     <Button size="sm" variant="secondary" onClick={() => openTGL(league)}>TGL Teams</Button>
                     <Button size="sm" onClick={() => openCreateEvent(league)}>+ Event</Button>
                     <Button size="sm" variant="secondary" onClick={() => openEditLeague(league)}>Edit</Button>
@@ -97,7 +113,7 @@ export default function Leagues() {
                     {events.map(ev => (
                       <Link
                         key={ev.id}
-                        to={`/admin/${league.slug}/${ev.slug}`}
+                        to={`/admin/${orgSlug}/${league.slug}/${ev.slug}`}
                         className="flex items-center justify-between px-5 py-3 hover:bg-gray-50 transition-colors"
                       >
                         <div>
@@ -107,7 +123,7 @@ export default function Leagues() {
                         </div>
                         <div className="flex items-center gap-3">
                           <Link
-                            to={`/${league.slug}/${ev.slug}/leaderboard`}
+                            to={`/${orgSlug}/${league.slug}/${ev.slug}/leaderboard`}
                             onClick={e => e.stopPropagation()}
                             className="text-xs text-fairway-700 hover:underline"
                           >

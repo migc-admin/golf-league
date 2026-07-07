@@ -43,7 +43,7 @@ const FORMAT_LABELS = {
 }
 
 export default function Leaderboard() {
-  const { leagueSlug, eventSlug } = useParams()
+  const { orgSlug, leagueSlug, eventSlug } = useParams()
   const navigate = useNavigate()
   const location = useLocation()
   const { user, isAdmin } = useAuth()
@@ -196,7 +196,7 @@ export default function Leaderboard() {
           </div>
           <div className="flex flex-col items-end gap-1.5">
             <StatusBadge status={event.status} />
-            <Link to={`/${event.league?.slug}/${event.slug}/schedule`} className="text-xs text-fairway-300 hover:text-white">
+            <Link to={`/${orgSlug}/${event.league?.slug}/${event.slug}/schedule`} className="text-xs text-fairway-300 hover:text-white">
               Pairings ↗
             </Link>
           </div>

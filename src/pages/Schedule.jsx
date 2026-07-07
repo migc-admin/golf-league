@@ -25,7 +25,7 @@ const FORMAT_DESCRIPTIONS = {
 }
 
 export default function Schedule() {
-  const { leagueSlug, eventSlug } = useParams()
+  const { orgSlug, leagueSlug, eventSlug } = useParams()
   const navigate = useNavigate()
   const [event,        setEvent]        = useState(null)
   const [eventPlayers, setEventPlayers] = useState([])
@@ -162,7 +162,7 @@ export default function Schedule() {
       {event.status !== 'upcoming' && (
         <div className="max-w-xl mx-auto px-4 pt-4">
           <Link
-            to={`/${event.league?.slug}/${event.slug}/leaderboard`}
+            to={`/${orgSlug}/${event.league?.slug}/${event.slug}/leaderboard`}
             className="flex items-center justify-between bg-fairway-700 text-white rounded-xl px-4 py-3 shadow-sm hover:bg-fairway-800 transition-colors"
           >
             <div className="flex items-center gap-3">

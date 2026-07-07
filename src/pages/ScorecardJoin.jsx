@@ -115,7 +115,7 @@ export default function ScorecardJoin() {
       <div className="w-full max-w-sm">
         {/* Logo + title */}
         <div className="text-center mb-8">
-          <img src="/logo.png" alt="Mulligan's Island Golf Club" className="w-20 h-20 rounded-full object-cover mx-auto mb-3 shadow-xl" />
+          <img src="/logo.png" alt="Club Logo" className="w-20 h-20 rounded-full object-cover mx-auto mb-3 shadow-xl" />
           <h1 className="text-white font-bold text-2xl" style={{ fontFamily: "'Playfair Display', serif" }}>
             {event.name ?? `Event #${event.event_number}`}
           </h1>

@@ -1,7 +1,13 @@
-import { Routes, Route, Navigate } from 'react-router-dom'
+import { Routes, Route, Navigate, useParams } from 'react-router-dom'
 import { AuthProvider } from './hooks/useAuth'
 import ProtectedRoute from './components/ProtectedRoute'
 import AdminRoute     from './components/AdminRoute'
+import { OrgProvider } from './lib/OrgContext'
+
+function OrgRouteWrapper({ children }) {
+  const { orgSlug } = useParams()
+  return <OrgProvider orgSlug={orgSlug}>{children}</OrgProvider>
+}
 
 import Login          from './pages/Login'
 import Home           from './pages/Home'
@@ -32,7 +38,8 @@ export default function App() {
           <Route path="courses"       element={<Courses />} />
           <Route path="players"       element={<Players />} />
           <Route path="import"        element={<Import />} />
-          <Route path=":leagueSlug/:eventSlug" element={<EventDetail />} />
+          <Route path=":orgSlug/:leagueSlug"            element={<OrgRouteWrapper><Leagues /></OrgRouteWrapper>} />
+          <Route path=":orgSlug/:leagueSlug/:eventSlug" element={<OrgRouteWrapper><EventDetail /></OrgRouteWrapper>} />
         </Route>
 
         {/* Join via access code — no auth required */}
@@ -47,10 +54,10 @@ export default function App() {
         <Route path="/" element={<Navigate to="/home" replace />} />
 
         {/* Generic slug-based routes — must be LAST to avoid conflicts */}
-        <Route path="/:leagueSlug/standings" element={<Standings />} />
-        <Route path="/:leagueSlug/:eventSlug/leaderboard" element={<Leaderboard />} />
-        <Route path="/:leagueSlug/:eventSlug/schedule" element={<Schedule />} />
-        <Route path="/:leagueSlug/:eventSlug/scorecard" element={<Scorecard />} />
+        <Route path="/:orgSlug/:leagueSlug/standings" element={<OrgRouteWrapper><Standings /></OrgRouteWrapper>} />
+        <Route path="/:orgSlug/:leagueSlug/:eventSlug/leaderboard" element={<OrgRouteWrapper><Leaderboard /></OrgRouteWrapper>} />
+        <Route path="/:orgSlug/:leagueSlug/:eventSlug/schedule" element={<OrgRouteWrapper><Schedule /></OrgRouteWrapper>} />
+        <Route path="/:orgSlug/:leagueSlug/:eventSlug/scorecard" element={<OrgRouteWrapper><Scorecard /></OrgRouteWrapper>} />
 
         <Route path="*" element={<Navigate to="/home" replace />} />
       </Routes>

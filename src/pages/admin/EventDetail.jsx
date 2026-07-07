@@ -8,6 +8,7 @@ import { computeAllSkins } from '../../lib/engines/skins'
 import { computeTGLEventResults } from '../../lib/engines/tgl'
 import Card, { CardHeader } from '../../components/ui/Card'
 import { ExportScorecardsButton } from '../../components/ScorecardExport'
+import { useOrg } from '../../lib/OrgContext'
 import Button from '../../components/ui/Button'
 import Modal from '../../components/ui/Modal'
 import Input, { Select } from '../../components/ui/Input'
@@ -18,7 +19,8 @@ const ALL_ADMIN_TABS = ['Overview', 'Players', 'Groups', 'Payout', 'TGL']
 
 
 export default function EventDetail() {
-  const { leagueSlug, eventSlug } = useParams()
+  const { orgSlug, leagueSlug, eventSlug } = useParams()
+  const org = useOrg()
   const [event,        setEvent]        = useState(null)
   const [eventPlayers, setEventPlayers] = useState([])
   const [allScores,    setAllScores]    = useState([])
@@ -126,10 +128,10 @@ export default function EventDetail() {
           </p>
         </div>
         <div className="flex gap-2 shrink-0 flex-wrap justify-end">
-          <Link to={`/${event.league?.slug}/${event.slug}/schedule`} className="btn-secondary btn-sm btn">
+          <Link to={`/${orgSlug}/${event.league?.slug}/${event.slug}/schedule`} className="btn-secondary btn-sm btn">
             Pairings ↗
           </Link>
-          <Link to={`/${event.league?.slug}/${event.slug}/leaderboard`} className="btn-secondary btn-sm btn">
+          <Link to={`/${orgSlug}/${event.league?.slug}/${event.slug}/leaderboard`} className="btn-secondary btn-sm btn">
             Leaderboard ↗
           </Link>
           <EventStatusControl event={event} onUpdated={load} />
@@ -334,7 +336,7 @@ function TabOverview({ event, eventPlayers, allScores, course, conflicts, onUpda
             <CardHeader title="Scoring Access" subtitle="Share with players to enter scores" />
             <AccessCodeSection event={event} eventPlayers={eventPlayers} onUpdated={onUpdated} />
             <div className="mt-3 pt-3 border-t border-gray-100">
-              <ExportScorecardsButton event={event} eventPlayers={eventPlayers} course={course} />
+              <ExportScorecardsButton event={event} eventPlayers={eventPlayers} course={course} orgName={org?.name} />
             </div>
           </Card>
         )}

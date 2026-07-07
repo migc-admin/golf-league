@@ -31,7 +31,7 @@ const GRAY_BG   = '#f5f5f3'
 const BORDER    = '#c0c0c0'
 
 // ─── Export Button ────────────────────────────────────────────────
-export function ExportScorecardsButton({ event, eventPlayers, course }) {
+export function ExportScorecardsButton({ event, eventPlayers, course, orgName }) {
   const [exporting, setExporting] = useState(false)
   const containerRef = useRef(null)
 
@@ -68,7 +68,7 @@ export function ExportScorecardsButton({ event, eventPlayers, course }) {
           .sort((a, b) => a - b)
         const longDriveHole = event.long_drive_hole ?? null
 
-        const pageEl = buildPage({ event, course, groupNum: g, players, code, qrDataUrl, ctpHoles, longDriveHole })
+        const pageEl = buildPage({ event, course, groupNum: g, players, code, qrDataUrl, ctpHoles, longDriveHole, orgName })
         node.appendChild(pageEl)
 
         // Wait for images to load
@@ -141,7 +141,7 @@ export function ExportScorecardsButton({ event, eventPlayers, course }) {
 }
 
 // ─── Page: two cards stacked ──────────────────────────────────────
-function buildPage({ event, course, groupNum, players, code, qrDataUrl, ctpHoles, longDriveHole }) {
+function buildPage({ event, course, groupNum, players, code, qrDataUrl, ctpHoles, longDriveHole, orgName }) {
   const page = el('div', {
     width: PAGE_W + 'px', height: PAGE_H + 'px',
     background: '#ffffff',
@@ -151,14 +151,14 @@ function buildPage({ event, course, groupNum, players, code, qrDataUrl, ctpHoles
     boxSizing: 'border-box',
     fontFamily: 'Arial, Helvetica, sans-serif',
   })
-  const opts = { event, course, groupNum, players, code, qrDataUrl, ctpHoles, longDriveHole }
+  const opts = { event, course, groupNum, players, code, qrDataUrl, ctpHoles, longDriveHole, orgName }
   page.appendChild(buildCard(opts))
   page.appendChild(buildCard(opts))
   return page
 }
 
 // ─── Card ─────────────────────────────────────────────────────────
-function buildCard({ event, course, groupNum, players, code, qrDataUrl, ctpHoles, longDriveHole }) {
+function buildCard({ event, course, groupNum, players, code, qrDataUrl, ctpHoles, longDriveHole, orgName }) {
   const parPerHole  = course.par_per_hole  ?? []
   const strokeIndex = course.stroke_index  ?? []
   const courseTees  = course.tees          ?? []
@@ -213,7 +213,7 @@ function buildCard({ event, course, groupNum, players, code, qrDataUrl, ctpHoles
 
   // Left: club / event text (course name appears once, on the date line)
   const hLeft = el('div', { flex: '1' })
-  hLeft.appendChild(txt("Mulligan's Island Golf Club", {
+  hLeft.appendChild(txt(orgName ?? 'Golf League', {
     display: 'block', color: GOLD,
     fontSize: '13px', fontWeight: '700', letterSpacing: '0.02em',
   }))

@@ -2,10 +2,13 @@ import { useEffect, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useAuth } from '../hooks/useAuth'
 import { supabase } from '../lib/supabase'
+import { useOrg } from '../lib/OrgContext'
 
 export default function Home() {
   const { user, profile, signOut, loading, profileLoading } = useAuth()
   const navigate = useNavigate()
+  const org = useOrg()
+  const orgName = org?.name ?? 'Golf League'
   const [events, setEvents]     = useState([])
   const [fetching, setFetching] = useState(true)
 
@@ -85,8 +88,8 @@ export default function Home() {
       {/* Header */}
       <header className="flex items-center justify-between px-5 py-4 max-w-2xl mx-auto w-full">
         <div className="flex items-center gap-2.5">
-          <img src="/logo.png" alt="Mulligan's Island Golf Club" className="w-9 h-9 rounded-full object-cover" />
-          <span className="text-white font-bold" style={{ fontFamily: "'Playfair Display', serif", fontSize: '1.05rem' }}>Mulligan's Island Golf Club</span>
+          <img src="/logo.png" alt={orgName} className="w-9 h-9 rounded-full object-cover" />
+          <span className="text-white font-bold" style={{ fontFamily: "'Playfair Display', serif", fontSize: '1.05rem' }}>{orgName}</span>
         </div>
         <button
           onClick={handleSignOut}

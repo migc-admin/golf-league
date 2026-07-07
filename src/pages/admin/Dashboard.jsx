@@ -1,13 +1,16 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { supabase } from '../../lib/supabase'
+import { useAuth } from '../../hooks/useAuth'
 import Card from '../../components/ui/Card'
 import { StatusBadge } from '../../components/ui/Badge'
 
 export default function Dashboard() {
-  const [stats,  setStats]  = useState(null)
-  const [events, setEvents] = useState([])
-  const [loading, setLoading] = useState(true)
+  const { user } = useAuth()
+  const [stats,    setStats]    = useState(null)
+  const [events,   setEvents]   = useState([])
+  const [orgSlug,  setOrgSlug]  = useState(null)
+  const [loading,  setLoading]  = useState(true)
 
   useEffect(() => {
     async function load() {
@@ -31,10 +34,22 @@ export default function Dashboard() {
 
       setStats({ leagues: leagueCount, players: playerCount, courses: courseCount, events: eventCount })
       setEvents(recentEvents ?? [])
+
+      // Fetch orgSlug for route building
+      if (user) {
+        const { data: profile } = await supabase
+          .from('profiles').select('org_id').eq('id', user.id).single()
+        if (profile?.org_id) {
+          const { data: org } = await supabase
+            .from('organizations').select('slug').eq('id', profile.org_id).single()
+          if (org?.slug) setOrgSlug(org.slug)
+        }
+      }
+
       setLoading(false)
     }
     load()
-  }, [])
+  }, [user])
 
   if (loading) return <DashboardSkeleton />
 
@@ -73,7 +88,7 @@ export default function Dashboard() {
             Active
           </h2>
           <div className="space-y-3">
-            {activeEvents.map(ev => <HeroEventCard key={ev.id} event={ev} />)}
+            {activeEvents.map(ev => <HeroEventCard key={ev.id} event={ev} orgSlug={orgSlug} />)}
           </div>
         </div>
       )}
@@ -83,7 +98,7 @@ export default function Dashboard() {
         <div>
           <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-widest mb-3">Upcoming</h2>
           <div className="grid gap-3 sm:grid-cols-2">
-            {upcomingEvents.map(ev => <EventCard key={ev.id} event={ev} />)}
+            {upcomingEvents.map(ev => <EventCard key={ev.id} event={ev} orgSlug={orgSlug} />)}
           </div>
         </div>
       )}
@@ -97,7 +112,7 @@ export default function Dashboard() {
               {completedEvents.map(ev => (
                 <Link
                   key={ev.id}
-                  to={`/admin/${ev.league?.slug}/${ev.slug}`}
+                  to={`/admin/${orgSlug}/${ev.league?.slug}/${ev.slug}`}
                   className="flex items-center justify-between px-5 py-3.5 hover:bg-gray-50 transition-colors cursor-pointer"
                 >
                   <div>
@@ -142,7 +157,7 @@ function StatStrip({ label, value, to, highlight }) {
 }
 
 // #6: Hero card for active events
-function HeroEventCard({ event: ev }) {
+function HeroEventCard({ event: ev, orgSlug }) {
   const playerCount = ev.event_players?.[0]?.count ?? 0
   const pot = playerCount && ev.entry_fee ? (playerCount * ev.entry_fee).toLocaleString('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }) : null
 
@@ -176,19 +191,19 @@ function HeroEventCard({ event: ev }) {
         </div>
         <div className="flex items-center gap-3 mt-4 pt-4 border-t border-gray-100">
           <Link
-            to={`/admin/${ev.league?.slug}/${ev.slug}`}
+            to={`/admin/${orgSlug}/${ev.league?.slug}/${ev.slug}`}
             className="btn btn-primary btn-sm"
           >
             Manage Event
           </Link>
           <Link
-            to={`/${ev.league?.slug}/${ev.slug}/leaderboard`}
+            to={`/${orgSlug}/${ev.league?.slug}/${ev.slug}/leaderboard`}
             className="btn btn-secondary btn-sm"
           >
             Leaderboard
           </Link>
           <Link
-            to={`/${ev.league?.slug}/${ev.slug}/schedule`}
+            to={`/${orgSlug}/${ev.league?.slug}/${ev.slug}/schedule`}
             className="text-xs text-gray-500 font-medium hover:underline ml-1"
           >
             Pairings →
@@ -199,9 +214,9 @@ function HeroEventCard({ event: ev }) {
   )
 }
 
-function EventCard({ event: ev }) {
+function EventCard({ event: ev, orgSlug }) {
   return (
-    <Link to={`/admin/${ev.league?.slug}/${ev.slug}`} className="block card border border-gray-200 p-4 hover:shadow-md transition-shadow cursor-pointer">
+    <Link to={`/admin/${orgSlug}/${ev.league?.slug}/${ev.slug}`} className="block card border border-gray-200 p-4 hover:shadow-md transition-shadow cursor-pointer">
       <div className="flex items-start justify-between">
         <div>
           <div className="font-semibold text-gray-900 text-sm">

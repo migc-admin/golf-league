@@ -37,7 +37,7 @@ import { getStrokesOnHole } from '../lib/engines/scoring'
 import toast from 'react-hot-toast'
 
 export default function Scorecard() {
-  const { leagueSlug, eventSlug } = useParams()
+  const { orgSlug, leagueSlug, eventSlug } = useParams()
   const { user, profile, loading: authLoading, isAdmin, signOut } = useAuth()
   const navigate = useNavigate()
   const homeLink = isAdmin ? '/admin' : '/home'
@@ -409,7 +409,7 @@ export default function Scorecard() {
               </button>
             )}
             <Link
-              to={`/${event.league?.slug}/${event.slug}/leaderboard`}
+              to={`/${orgSlug ?? event.org_slug}/${event.league?.slug}/${event.slug}/leaderboard`}
               state={{ from: 'scorecard', scorecardEventId: event.id }}
               className="text-fairway-200 text-xs hover:text-white border border-fairway-500 rounded px-2 py-1"
             >
@@ -785,7 +785,7 @@ function TraditionalScorecard({ event, course, groupPlayers, scores, isComplete,
           </div>
           <div className="flex items-center gap-2">
             <Link
-              to={`/${event.league?.slug}/${event.slug}/leaderboard`}
+              to={`/${orgSlug ?? event.org_slug}/${event.league?.slug}/${event.slug}/leaderboard`}
               state={{ from: 'scorecard', scorecardEventId: event.id }}
               className="text-fairway-200 text-xs hover:text-white border border-fairway-500 rounded px-2 py-1"
             >
@@ -1012,7 +1012,7 @@ function GuestCodeEntry({ eventId, onSuccess }) {
     <div className="min-h-screen flex flex-col items-center justify-center p-4" style={{ background: 'linear-gradient(150deg,#0b2318 0%,#1B4332 45%,#1f5c3e 100%)' }}>
       <div className="w-full max-w-xs">
         <div className="text-center mb-8">
-          <img src="/logo.png" alt="Mulligan's Island Golf Club" className="w-20 h-20 rounded-full object-cover mx-auto mb-3 shadow-xl" />
+          <img src="/logo.png" alt="Club Logo" className="w-20 h-20 rounded-full object-cover mx-auto mb-3 shadow-xl" />
           <h1 className="text-white font-bold text-xl" style={{ fontFamily: "'Playfair Display', serif" }}>{eventLabel}</h1>
           {eventInfo && <p className="text-white/50 text-sm mt-0.5">{eventInfo.course?.name}</p>}
           <div className="mx-auto mt-2" style={{ width: 40, height: 2, background: '#D4AF37' }} />
