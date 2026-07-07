@@ -61,16 +61,6 @@ export default function Standings() {
 
       const lockedEventIds = new Set((tglLocks ?? []).map(l => l.event_id))
 
-      // DEBUG — remove after diagnosing
-      console.log('[TGL debug]', {
-        completedEvents: evs?.length,
-        eventIds,
-        tglTeams: tglT?.length,
-        tglSels: tglSels?.length,
-        tglLocks: tglLocks?.length,
-        lockedEventIds: [...(new Set((tglLocks ?? []).map(l => l.event_id)))],
-        sampleEvent: evs?.[0] ? { id: evs[0].id, courseKeys: Object.keys(evs[0].course ?? {}) } : null,
-      })
 
       // Load TGL team members
       let tglMembers = []
@@ -131,19 +121,17 @@ export default function Standings() {
         const eventRows = []
 
         for (const ev of evs) {
-          if (!lockedEventIds.has(ev.id)) { console.log('[TGL] skipped - not locked', ev.id); continue }
+          if (!lockedEventIds.has(ev.id)) continue
           const course = ev.course
-          if (!course?.stroke_index || !course?.par_per_hole) { console.log('[TGL] skipped - missing course arrays', { stroke_index: !!course?.stroke_index, par_per_hole: !!course?.par_per_hole }); continue }
+          if (!course?.stroke_index || !course?.par_per_hole) continue
           const eps   = (allEPs    ?? []).filter(ep => ep.event_id === ev.id)
           const scs   = (allScores ?? []).filter(s  => s.event_id  === ev.id)
           const sels  = (tglSels  ?? []).filter(s  => s.event_id  === ev.id)
-          console.log('[TGL] event data', { eps: eps.length, scs: scs.length, sels: sels.length, tglMembers: tglMembers.length })
-          if (!eps.length || !scs.length || !sels.length) { console.log('[TGL] skipped - missing data'); continue }
+          if (!eps.length || !scs.length || !sels.length) continue
           try {
             const lb     = computeLeaderboards(eps, scs, course)
-            const ranked = lb.net?.ranked ?? lb.gross?.ranked ?? []
-            console.log('[TGL] ranked', ranked.length, 'lb keys', Object.keys(lb))
-            if (!ranked.length) { console.log('[TGL] skipped - no ranked players'); continue }
+            const ranked = [...(lb.full?.A ?? []), ...(lb.full?.B ?? [])]
+            if (!ranked.length) continue
             const epMap = Object.fromEntries(eps.map(ep => [ep.player_id, ep]))
             const rankedWithPlayer = ranked.map(r => ({ ...r, player: epMap[r.player_id]?.player ?? null }))
             const result = computeTGLEventResults(rankedWithPlayer, sels, teams, tglMembers)
