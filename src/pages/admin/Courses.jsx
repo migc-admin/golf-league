@@ -6,6 +6,7 @@ import Card, { CardHeader } from '../../components/ui/Card'
 import Button from '../../components/ui/Button'
 import Modal from '../../components/ui/Modal'
 import Input from '../../components/ui/Input'
+import ImageUpload from '../../components/ui/ImageUpload'
 
 const DEFAULT_SI = [1,3,5,7,9,11,13,15,17,2,4,6,8,10,12,14,16,18]
 
@@ -33,11 +34,12 @@ export default function Courses() {
   const [modal,   setModal]   = useState(false)
   const [editing, setEditing] = useState(null)
   const [orgId,   setOrgId]   = useState(null)
+  const [orgSlug, setOrgSlug] = useState(null)
 
   async function load() {
     const { data } = await supabase
       .from('courses')
-      .select('id, name, slope, rating, par, tees, created_at')
+      .select('id, name, slope, rating, par, tees, photo_url, created_at')
       .order('name')
     setCourses(data ?? [])
     setLoading(false)
@@ -48,7 +50,11 @@ export default function Courses() {
     async function fetchOrgId() {
       if (!user) return
       const { data: profile } = await supabase.from('profiles').select('org_id').eq('id', user.id).single()
-      if (profile?.org_id) setOrgId(profile.org_id)
+      if (profile?.org_id) {
+        setOrgId(profile.org_id)
+        const { data: org } = await supabase.from('organizations').select('id, slug').eq('id', profile.org_id).single()
+        if (org?.slug) setOrgSlug(org.slug)
+      }
     }
     fetchOrgId()
   }, [user])
@@ -86,14 +92,19 @@ export default function Courses() {
             const tees = c.tees ?? []
             return (
               <Card key={c.id} className="flex items-center justify-between">
-                <div>
-                  <div className="font-semibold text-gray-900">{c.name}</div>
-                  <div className="text-sm text-gray-500">
-                    Par {c.par}
-                    {tees.length > 0
-                      ? ` · ${tees.map(t => `${t.name} (${t.slope}/${t.rating})`).join(' · ')}`
-                      : ` · Slope ${c.slope} · Rating ${c.rating}`
-                    }
+                <div className="flex items-center gap-3">
+                  {c.photo_url && (
+                    <img src={c.photo_url} alt={c.name} className="w-14 h-14 rounded-lg object-cover shrink-0" />
+                  )}
+                  <div>
+                    <div className="font-semibold text-gray-900">{c.name}</div>
+                    <div className="text-sm text-gray-500">
+                      Par {c.par}
+                      {tees.length > 0
+                        ? ` · ${tees.map(t => `${t.name} (${t.slope}/${t.rating})`).join(' · ')}`
+                        : ` · Slope ${c.slope} · Rating ${c.rating}`
+                      }
+                    </div>
                   </div>
                 </div>
                 <div className="flex gap-2">
@@ -111,17 +122,19 @@ export default function Courses() {
         onClose={() => setModal(false)}
         editing={editing}
         orgId={orgId}
+        orgSlug={orgSlug}
         onSaved={() => { setModal(false); load() }}
       />
     </div>
   )
 }
 
-function CourseModal({ open, onClose, editing, orgId, onSaved }) {
-  const [name,    setName]    = useState('')
-  const [tees,    setTees]    = useState(DEFAULT_TEES)
-  const [holes,   setHoles]   = useState(() => emptyHoles(3))
-  const [saving,  setSaving]  = useState(false)
+function CourseModal({ open, onClose, editing, orgId, orgSlug, onSaved }) {
+  const [name,     setName]     = useState('')
+  const [tees,     setTees]     = useState(DEFAULT_TEES)
+  const [holes,    setHoles]    = useState(() => emptyHoles(3))
+  const [photoUrl, setPhotoUrl] = useState('')
+  const [saving,   setSaving]   = useState(false)
   const [activeTeeIdx, setActiveTeeIdx] = useState(0)  // which tee to preview yardage for
 
   useEffect(() => {
@@ -131,6 +144,7 @@ function CourseModal({ open, onClose, editing, orgId, onSaved }) {
         .then(({ data }) => {
           if (!data) return
           setName(data.name)
+          setPhotoUrl(data.photo_url ?? '')
 
           // If course has tees data, use it. Otherwise migrate legacy slope/rating/yardage
           let teesData = data.tees ?? []
@@ -166,6 +180,7 @@ function CourseModal({ open, onClose, editing, orgId, onSaved }) {
         })
     } else {
       setName('')
+      setPhotoUrl('')
       setTees(DEFAULT_TEES.map(t => ({ ...t })))
       setHoles(emptyHoles(3))
       setActiveTeeIdx(0)
@@ -258,6 +273,7 @@ function CourseModal({ open, onClose, editing, orgId, onSaved }) {
       yardage:      primary.yardage,
       stroke_index: holes.map(h => parseInt(h.stroke_index, 10)),
       tees:         teesWithYardage,
+      photo_url:    photoUrl || null,
     }
 
     const { error } = editing
@@ -275,6 +291,13 @@ function CourseModal({ open, onClose, editing, orgId, onSaved }) {
   return (
     <Modal open={open} onClose={onClose} title={editing ? 'Edit Course' : 'New Course'} maxWidth="max-w-5xl">
       <form onSubmit={handleSave} className="space-y-6">
+        <ImageUpload
+          path={`orgs/${orgSlug}/courses/${Date.now()}`}
+          currentUrl={photoUrl || null}
+          onUploaded={url => setPhotoUrl(url)}
+          label="Course Photo (optional)"
+        />
+
         {/* Course name */}
         <Input
           label="Course Name"

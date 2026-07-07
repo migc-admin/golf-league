@@ -8,6 +8,7 @@ import Button from '../../components/ui/Button'
 import Modal from '../../components/ui/Modal'
 import Input, { Select } from '../../components/ui/Input'
 import { StatusBadge } from '../../components/ui/Badge'
+import ImageUpload from '../../components/ui/ImageUpload'
 
 const CURRENT_YEAR = new Date().getFullYear()
 
@@ -16,6 +17,7 @@ export default function Leagues() {
   const [leagues,      setLeagues]      = useState([])
   const [orgSlug,      setOrgSlug]      = useState(null)
   const [orgId,        setOrgId]        = useState(null)
+  const [orgLogoUrl,   setOrgLogoUrl]   = useState(null)
   const [loading,      setLoading]      = useState(true)
   const [leagueModal,  setLeagueModal]  = useState(false)
   const [editingLeague,setEditingLeague]= useState(null)
@@ -44,9 +46,10 @@ export default function Leagues() {
         .from('profiles').select('org_id').eq('id', user.id).single()
       if (profile?.org_id) {
         const { data: org } = await supabase
-          .from('organizations').select('id, slug').eq('id', profile.org_id).single()
-        if (org?.slug) setOrgSlug(org.slug)
-        if (org?.id)   setOrgId(org.id)
+          .from('organizations').select('id, slug, logo_url').eq('id', profile.org_id).single()
+        if (org?.slug)     setOrgSlug(org.slug)
+        if (org?.id)       setOrgId(org.id)
+        if (org?.logo_url) setOrgLogoUrl(org.logo_url)
       }
     }
     fetchOrgSlug()
@@ -72,6 +75,19 @@ export default function Leagues() {
           <p className="text-sm text-gray-500 mt-0.5">Manage leagues and their events</p>
         </div>
         <Button onClick={openCreateLeague}>+ New League</Button>
+      </div>
+
+      <div className="flex items-center gap-4 mb-2">
+        <ImageUpload
+          shape="circle"
+          path={`orgs/${orgSlug}/logo`}
+          currentUrl={orgLogoUrl}
+          onUploaded={async (url) => {
+            setOrgLogoUrl(url)
+            await supabase.from('organizations').update({ logo_url: url }).eq('id', orgId)
+          }}
+          label="Org Logo"
+        />
       </div>
 
       {loading ? (
@@ -148,6 +164,7 @@ export default function Leagues() {
         onClose={() => setLeagueModal(false)}
         editing={editingLeague}
         orgId={orgId}
+        orgSlug={orgSlug}
         onSaved={() => { setLeagueModal(false); load() }}
       />
       <EventModal
@@ -167,14 +184,15 @@ export default function Leagues() {
   )
 }
 
-function LeagueModal({ open, onClose, editing, orgId, onSaved }) {
-  const [name, setName] = useState('')
-  const [year, setYear] = useState(CURRENT_YEAR)
-  const [saving, setSaving] = useState(false)
+function LeagueModal({ open, onClose, editing, orgId, orgSlug, onSaved }) {
+  const [name,    setName]    = useState('')
+  const [year,    setYear]    = useState(CURRENT_YEAR)
+  const [logoUrl, setLogoUrl] = useState('')
+  const [saving,  setSaving]  = useState(false)
 
   useEffect(() => {
-    if (editing) { setName(editing.name); setYear(editing.season_year) }
-    else         { setName('');           setYear(CURRENT_YEAR) }
+    if (editing) { setName(editing.name); setYear(editing.season_year); setLogoUrl(editing.logo_url ?? '') }
+    else         { setName('');           setYear(CURRENT_YEAR);        setLogoUrl('') }
   }, [editing, open])
 
   async function handleSave(e) {
@@ -190,8 +208,8 @@ function LeagueModal({ open, onClose, editing, orgId, onSaved }) {
       }
     }
     const { error } = editing
-      ? await supabase.from('leagues').update({ name: name.trim(), season_year: +year }).eq('id', editing.id)
-      : await supabase.from('leagues').insert({ name: name.trim(), season_year: +year, org_id: resolvedOrgId })
+      ? await supabase.from('leagues').update({ name: name.trim(), season_year: +year, logo_url: logoUrl || null }).eq('id', editing.id)
+      : await supabase.from('leagues').insert({ name: name.trim(), season_year: +year, org_id: resolvedOrgId, logo_url: logoUrl || null })
     setSaving(false)
     if (error) toast.error(error.message)
     else { toast.success(editing ? 'League updated' : 'League created'); onSaved() }
@@ -201,6 +219,13 @@ function LeagueModal({ open, onClose, editing, orgId, onSaved }) {
   return (
     <Modal open={open} onClose={onClose} title={editing ? 'Edit League' : 'New League'}>
       <form onSubmit={handleSave} className="space-y-4">
+        <ImageUpload
+          shape="rect"
+          path={`orgs/${orgSlug}/leagues/${Date.now()}`}
+          currentUrl={logoUrl || null}
+          onUploaded={url => setLogoUrl(url)}
+          label="League Logo (optional)"
+        />
         <Input label="League Name" value={name} onChange={e => setName(e.target.value)} placeholder="Tuesday Evening League" required />
         <Select label="Season Year" value={year} onChange={e => setYear(e.target.value)}>
           {years.map(y => <option key={y} value={y}>{y}</option>)}

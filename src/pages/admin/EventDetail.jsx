@@ -13,6 +13,7 @@ import Button from '../../components/ui/Button'
 import Modal from '../../components/ui/Modal'
 import Input, { Select } from '../../components/ui/Input'
 import Badge, { FlightBadge, StatusBadge } from '../../components/ui/Badge'
+import ImageUpload from '../../components/ui/ImageUpload'
 
 // Collapsed from 7 → 4 tabs: Players = Registrations + Players & Flights; Payout = Config + Side Games + Summary
 const ALL_ADMIN_TABS = ['Overview', 'Players', 'Groups', 'Payout', 'TGL']
@@ -136,6 +137,19 @@ export default function EventDetail() {
           </Link>
           <EventStatusControl event={event} onUpdated={load} />
         </div>
+      </div>
+
+      {/* Event photo */}
+      <div className="mt-4">
+        <ImageUpload
+          path={`orgs/${orgSlug ?? 'org'}/events/${event.id}/photo`}
+          currentUrl={event.photo_url ?? null}
+          onUploaded={async (url) => {
+            await supabase.from('events').update({ photo_url: url }).eq('id', event.id)
+            setEvent(ev => ({ ...ev, photo_url: url }))
+          }}
+          label="Event Photo"
+        />
       </div>
 
       {/* Tabs */}

@@ -224,6 +224,12 @@ export default function Leaderboard() {
         </div>
       </div>
 
+      {event.course?.photo_url && (
+        <div className="w-full h-40 overflow-hidden">
+          <img src={event.course.photo_url} alt={event.course.name} className="w-full h-full object-cover opacity-80" />
+        </div>
+      )}
+
       {/* Flight toggle — only shown when flights are in use */}
       {hasFlights && !['Low Putts', 'Skins', 'Match Points', 'Payouts'].includes(activeTab) && (
         <div className="max-w-2xl mx-auto px-4 pt-4 flex gap-2">
