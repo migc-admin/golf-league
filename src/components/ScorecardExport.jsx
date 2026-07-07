@@ -213,7 +213,7 @@ function buildCard({ event, course, groupNum, players, code, qrDataUrl, ctpHoles
 
   // Left: club / event text (course name appears once, on the date line)
   const hLeft = el('div', { flex: '1' })
-  hLeft.appendChild(txt(orgName ?? 'Golf League', {
+  hLeft.appendChild(txt(orgName ?? 'Scorify Golf', {
     display: 'block', color: GOLD,
     fontSize: '13px', fontWeight: '700', letterSpacing: '0.02em',
   }))

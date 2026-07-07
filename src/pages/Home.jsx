@@ -8,7 +8,7 @@ export default function Home() {
   const { user, profile, signOut, loading, profileLoading } = useAuth()
   const navigate = useNavigate()
   const org = useOrg()
-  const orgName = org?.name ?? 'Golf League'
+  const orgName = org?.name ?? 'Scorify Golf'
   const [events, setEvents]     = useState([])
   const [fetching, setFetching] = useState(true)
 

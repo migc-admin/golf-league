@@ -16,7 +16,7 @@ export default function Layout({ children }) {
   const navigate = useNavigate()
   const [menuOpen, setMenuOpen] = useState(false)
   const org = useOrg()
-  const orgName = org?.name ?? 'Golf League'
+  const orgName = org?.name ?? 'Scorify Golf'
 
   async function handleSignOut() {
     await signOut()
@@ -25,11 +25,11 @@ export default function Layout({ children }) {
 
   return (
     <div className="min-h-screen flex flex-col" style={{ background: '#EEF1EC' }}>
-      {/* Top nav — MIGC gradient + gold border */}
+      {/* Top nav */}
       <header className="sticky top-0 z-40 shadow-lg" style={{ background: 'linear-gradient(150deg,#0b2318 0%,#1B4332 45%,#1f5c3e 100%)', borderBottom: '3px solid #cba72f' }}>
         <div className="max-w-7xl mx-auto px-4 flex items-center justify-between h-14">
           <Link to="/admin" className="flex items-center gap-2.5 tracking-tight">
-            <img src={org?.logo_url ?? '/logo.png'} alt={orgName} className="w-9 h-9 rounded-full object-cover" />
+            <img src={org?.logo_url ?? '/logo.png'} alt={orgName} className="w-9 h-9 object-contain" />
             <span className="hidden sm:inline font-bold text-white" style={{ fontFamily: "'Manrope', 'DM Sans', sans-serif", fontSize: '1.15rem', letterSpacing: '-0.01em' }}>
               {orgName}
             </span>
