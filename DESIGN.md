@@ -1,170 +1,146 @@
 ---
-name: Augusta Modern
+name: Quiet Editorial
 colors:
-  surface: '#f9f9f7'
-  surface-dim: '#dadad8'
-  surface-bright: '#f9f9f7'
+  surface: '#fbfaf8'
+  surface-dim: '#f4f3f0'
   surface-container-lowest: '#ffffff'
-  surface-container-low: '#f4f4f2'
-  surface-container: '#eeeeec'
-  surface-container-high: '#e8e8e6'
-  surface-container-highest: '#e2e3e1'
-  on-surface: '#1a1c1b'
-  on-surface-variant: '#414944'
-  inverse-surface: '#2f3130'
-  inverse-on-surface: '#f1f1ef'
-  outline: '#717974'
-  outline-variant: '#c0c8c3'
-  surface-tint: '#3b6756'
-  primary: '#00261a'
+  surface-container-low: '#fbfaf8'
+  surface-container: '#f4f3f0'
+  surface-container-high: '#eceae5'
+  surface-container-highest: '#e3e1dc'
+  on-surface: '#1d1d1f'
+  on-surface-variant: '#86868b'
+  inverse-surface: '#1d1d1f'
+  inverse-on-surface: '#fbfaf8'
+  outline: '#a8a8a4'
+  outline-variant: '#ebe9e4'
+  primary: '#1B4332'
   on-primary: '#ffffff'
-  primary-container: '#0f3d2e'
-  on-primary-container: '#7ba894'
-  inverse-primary: '#a2d1bb'
-  secondary: '#775a19'
+  primary-container: '#eaf1ec'
+  on-primary-container: '#1B4332'
+  secondary: '#1d1d1f'
   on-secondary: '#ffffff'
-  secondary-container: '#fed488'
-  on-secondary-container: '#785a1a'
-  tertiary: '#072600'
-  on-tertiary: '#ffffff'
-  tertiary-container: '#1c3d0e'
-  on-tertiary-container: '#82a96e'
+  secondary-container: '#eceae5'
+  on-secondary-container: '#1d1d1f'
+  warning: '#8a6d1a'
+  warning-container: '#f4f1e4'
   error: '#ba1a1a'
-  on-error: '#ffffff'
   error-container: '#ffdad6'
-  on-error-container: '#93000a'
-  primary-fixed: '#beedd7'
-  primary-fixed-dim: '#a2d1bb'
-  on-primary-fixed: '#002116'
-  on-primary-fixed-variant: '#234f3f'
-  secondary-fixed: '#ffdea5'
-  secondary-fixed-dim: '#e9c176'
-  on-secondary-fixed: '#261900'
-  on-secondary-fixed-variant: '#5d4201'
-  tertiary-fixed: '#c5efad'
-  tertiary-fixed-dim: '#a9d293'
-  on-tertiary-fixed: '#062100'
-  on-tertiary-fixed-variant: '#2d4f1e'
-  background: '#f9f9f7'
-  on-background: '#1a1c1b'
-  surface-variant: '#e2e3e1'
+  background: '#fbfaf8'
+  on-background: '#1d1d1f'
 typography:
   display-lg:
-    fontFamily: Manrope
-    fontSize: 48px
+    fontFamily: 'Schibsted Grotesk'
+    fontSize: 36px
     fontWeight: '700'
-    lineHeight: 56px
-    letterSpacing: -0.02em
-  headline-lg:
-    fontFamily: Manrope
-    fontSize: 32px
-    fontWeight: '600'
     lineHeight: 40px
-    letterSpacing: -0.01em
-  headline-md:
-    fontFamily: Manrope
+    letterSpacing: -0.03em
+  headline-lg:
+    fontFamily: 'Schibsted Grotesk'
     fontSize: 24px
-    fontWeight: '600'
-    lineHeight: 32px
+    fontWeight: '700'
+    lineHeight: 30px
+    letterSpacing: -0.02em
+  headline-md:
+    fontFamily: 'Schibsted Grotesk'
+    fontSize: 19px
+    fontWeight: '700'
+    lineHeight: 26px
+    letterSpacing: -0.015em
   body-lg:
-    fontFamily: Hanken Grotesk
-    fontSize: 18px
-    fontWeight: '400'
-    lineHeight: 28px
+    fontFamily: 'Schibsted Grotesk'
+    fontSize: 15.5px
+    fontWeight: '500'
+    lineHeight: 22px
   body-md:
-    fontFamily: Hanken Grotesk
-    fontSize: 16px
-    fontWeight: '400'
-    lineHeight: 24px
-  label-md:
-    fontFamily: Hanken Grotesk
+    fontFamily: 'Schibsted Grotesk'
     fontSize: 14px
-    fontWeight: '600'
+    fontWeight: '500'
     lineHeight: 20px
-    letterSpacing: 0.05em
-  headline-lg-mobile:
-    fontFamily: Manrope
-    fontSize: 28px
+  label-md:
+    fontFamily: 'Schibsted Grotesk'
+    fontSize: 12px
     fontWeight: '600'
-    lineHeight: 36px
+    lineHeight: 16px
+    letterSpacing: 0.02em
+  numeral-display:
+    fontFamily: 'Schibsted Grotesk'
+    fontSize: 56px
+    fontWeight: '700'
+    lineHeight: 1
+    letterSpacing: -0.04em
 rounded:
-  sm: 0.25rem
-  DEFAULT: 0.5rem
-  md: 0.75rem
-  lg: 1rem
+  sm: 0.5rem
+  DEFAULT: 0.875rem
+  md: 1rem
+  lg: 1.25rem
   xl: 1.5rem
   full: 9999px
 spacing:
   base: 8px
-  container-max: 1280px
+  container-max: 1120px
   gutter: 24px
-  margin-mobile: 16px
+  margin-mobile: 22px
   margin-desktop: 40px
 ---
 
 ## Brand & Style
 
-This design system is built for an elite golf league experience, blending the heritage of the sport with a high-performance digital aesthetic. The personality is **exclusive, methodical, and premium**, targeting competitive players and organizers who value precision.
+"Quiet Editorial" is a calm, restrained design language for an elite golf league platform, opening from an internal admin tool into a product real leagues and groups will use. The personality is **calm, precise, effortless** — inspired by Apple, Titleist, Nike, BMW: generous whitespace, one confident accent color, and typography that does the work instead of decoration. No gold, no gradients-as-decoration, no busy iconography. Every screen should feel like it belongs to a single, deliberate system.
 
-The visual style follows a **Modern Corporate** direction with **Minimalist** influences. It prioritizes clarity through generous white space and a structured information hierarchy. The interface avoids unnecessary clutter, utilizing subtle depth and high-end typography to establish an atmosphere of a private clubhouse. Every interaction should feel intentional and refined, evoking the quiet confidence of a well-manicured fairway.
+This replaces the previous "Augusta Modern" system (deep forest green + muted gold, Manrope/Hanken Grotesk, heavy card borders). Keep the sport's heritage in tone and copy, not in ornament.
 
 ## Colors
 
-The palette is anchored by a deep **Forest Green**, providing a stable and authoritative foundation. This is complemented by **Muted Gold** accents, used sparingly for primary actions and status indicators to signal exclusivity and achievement.
+One neutral surface family (warm off-white "Bone", not pure white) and **one accent** — deep Forest Green (`#1B4332`) — used sparingly for the single primary action per screen, live/active indicators, and score-under-par numerals. Everything else is ink (`#1d1d1f`) on Bone. No secondary gold/brass accent — status uses two muted tints only: a green tint for "active" and a warm tan tint for "upcoming"/attention. Never introduce a third hue.
 
-- **Primary (Forest Green):** Used for navigation, primary headers, and core brand elements.
-- **Secondary (Muted Gold):** Reserved for high-value interactions, gold-standard achievements, and decorative accents that require a premium touch.
-- **Background (Soft Bone):** An off-white neutral base that reduces eye strain and provides a warmer, more sophisticated feel than pure white.
-- **Status Tones:** Functional colors (success, warning, error) are desaturated to maintain the professional, understated aesthetic.
+- **Primary (Forest Green `#1B4332`):** the one primary button per screen, "live" dot, score-under-par color, active nav state.
+- **Ink (`#1d1d1f`):** all headline and body text, the one dark/inverse surface (buttons on light backgrounds sometimes flip to ink instead of green — see Components).
+- **Bone (`#fbfaf8` / `#f4f3f0`):** background and card surfaces. Cards are barely differentiated from background — separation comes from a 1px hairline (`#ebe9e4`), not shadows or borders-as-accent.
+- **Status tints:** Active = `#eaf1ec` bg / `#1B4332` text. Upcoming = `#f4f1e4` bg / `#8a6d1a` text. Never saturate these further.
 
 ## Typography
 
-The typography system uses a pairing of high-end sans-serifs to achieve a technical yet approachable look. **Manrope** is used for headlines to provide a balanced, geometric structure that feels modern and architectural. **Hanken Grotesk** is utilized for body text and labels for its exceptional legibility and sharp, contemporary details.
+**Schibsted Grotesk** for everything — headlines, body, labels, numerals. One family, weight and size carry the hierarchy (this is the biggest structural change from the old two-family Manrope/Hanken Grotesk pairing). Numerals (hole number, scores) get their own oversized treatment: `font-variant-numeric: tabular-nums`, tight negative letter-spacing, using the same family at max weight.
 
-- **Scale:** High contrast between display titles and body copy to facilitate quick scanning of scorecards and league tables.
-- **Rhythm:** Generous line-heights are maintained to ensure the interface feels airy and unhurried.
-- **Labels:** Small caps or increased letter-spacing should be applied to labels to distinguish them from interactive text.
+- **Scale:** Big jump from label (12px) to display (36px+) so scorecards and standings scan instantly.
+- **Rhythm:** Generous line-height on body text; tight, confident line-height on display numerals.
+- **Labels:** 12px, 600 weight, 0.02em tracking — sparingly capitalized, never full small-caps blocks.
 
 ## Layout & Spacing
 
-The layout philosophy follows a **Fixed Grid** system for desktop to maintain a premium "editorial" feel, transitioning to a flexible fluid model for mobile devices.
-
-- **Grid:** A 12-column grid is used for desktop (1280px max-width) to align complex data sets like leaderboards and schedules. 
-- **Rhythm:** An 8px linear scale governs all spacing.
-- **Safe Areas:** Large internal paddings within cards (minimum 32px on desktop) are essential to prevent the data-heavy content from feeling crowded.
-- **Mobile:** Elements stack vertically, with margins reduced to 16px. Touch targets for scorecard entry must be a minimum of 44px height.
+- **Grid:** 1120px max-width container on desktop (narrower than the old 1280px — editorial, not dashboard-dense).
+- **Rhythm:** 8px base scale.
+- **Cards:** 20–24px radius (up from 8–16px) — softer, calmer geometry. Interior padding 22–24px minimum.
+- **Mobile margins:** 22px (not 16px) — more breathing room is core to this direction.
+- **Touch targets:** scorecard number inputs and nav buttons minimum 48×48px, always circular or 14px-radius squares.
 
 ## Elevation & Depth
 
-Hierarchy is established through **Tonal Layering** and **Ambient Shadows**. Surfaces are kept flat, with depth used only to indicate interactivity or modal prominence.
-
-- **Surfaces:** The primary background uses the neutral Bone color. Secondary containers (cards) use pure white to "lift" content.
-- **Shadows:** Use extremely soft, high-diffusion shadows (e.g., `box-shadow: 0 4px 20px rgba(15, 61, 46, 0.05)`). The shadow color should be tinted with the Forest Green primary to ensure it feels integrated into the environment.
-- **Outlines:** Use subtle 1px borders in a light grey-green (`#E1E5E0`) for structural definition without the weight of heavy shadows.
+Almost flat. Depth comes from **hairline borders** (`1px solid #ebe9e4`) first; shadow is reserved for genuinely floating elements — a sign-in card over a gradient background, a modal. When used, shadows are large-radius and very soft: `0 6px 24px rgba(0,0,0,.05)` for resting cards, `0 20px 60px rgba(0,0,0,.35)` only for a card floating over a dark/gradient hero. No colored/tinted shadows, no top-border accent stripes on cards (that was the old gold-accent pattern — drop it entirely).
 
 ## Shapes
 
-The shape language is **Rounded**, strike a balance between athletic energy and professional structure. 
-
-- **Containers:** Cards and primary containers use a 1rem (16px) radius to soften the layout.
-- **Interactive Elements:** Buttons and input fields use a 0.5rem (8px) radius.
-- **Accents:** Circular shapes are reserved exclusively for player avatars and "hole" status indicators, mimicking the geometry of a golf ball.
+Rounder than before: **pill shapes** (`border-radius: 999px`) for every button and status chip; **20–24px radius** for cards; **14px radius** for the fixed-size scorecard number input squares. Circles reserved for avatars and the live-status dot.
 
 ## Components
 
 ### Buttons
-- **Primary:** Forest Green background with White text. High-contrast, bold, and authoritative.
-- **Secondary:** Transparent with a Forest Green 1px border.
-- **Action:** Muted Gold background with Forest Green text, used for "Join" or "Win" actions.
+- **Primary:** Ink (`#1d1d1f`) or Forest Green pill, white text, no border, no active-state scale/shadow tricks — a simple background change on press is enough.
+- **Secondary:** Bone-container pill (`#eceae5`) background, ink text, no border.
+- One primary action per screen max — everything else is secondary.
 
 ### Cards
-Cards are the primary vehicle for league information. They must feature a subtle top-border accent in Muted Gold for "Featured" or "Active" leagues. Interior padding should be generous (24px - 32px).
+Bone or white surface, 1px hairline border, 20–24px radius, soft shadow only if floating. No top-accent stripe. Status shown as a pill chip in the card's top-right, not a border color.
 
-### Inputs & Selects
-Inputs should use the Hanken Grotesk font with a subtle light-gray border. On focus, the border transitions to Forest Green with a soft glow.
+### Inputs (scorecard number entry)
+54×54px, white fill, 1.5px hairline border (`#d6d4cf`), 14px radius, 24px bold numeral centered. Empty state: dashed border, centered middle-dot placeholder, muted color — never a gray box.
 
 ### Data Tables (Leaderboards)
-Tables must be clean and borderless. Use zebra-striping with a very faint green-tinted background for even rows. The "Position" column (e.g., 1st, 2nd) should use Manrope Semi-Bold.
+Fully borderless except a single hairline between rows. Faint green-tinted zebra striping (`rgba(27,67,50,.025)`) on alternating rows only — much lighter than before. Position numbers bold, no colored badge. Score-under-par numerals colored Forest Green; over-par stays ink (not red) — reserve red only for true errors/conflicts.
 
 ### Chips & Badges
-Small, pill-shaped indicators for status (e.g., "Active", "Complete", "Handicap"). Use low-saturation background tints with high-saturation text of the same hue.
+Pill-shaped, two tints only (Active / Upcoming per Colors above). No third accent color, no icon inside the chip.
+
+### Progress / Hole Navigator
+A row of 6px dots (not numbered circles) — filled ink/green for completed and current, hairline-outline for current, pale for remaining. Replaces the old scrollable numbered-circle hole tracker; simpler and calmer at a glance.
