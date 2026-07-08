@@ -779,19 +779,42 @@ function TraditionalScorecard({ event, course, groupPlayers, scores, isComplete,
 
   const anyPutts = trackPutts && playerData.some(p => p.hasPutts)
 
-  // Color for a cell by netVsPar
-  function cellBg(netVsPar) {
-    if (netVsPar == null) return 'bg-transparent text-ink-muted'
-    if (netVsPar <= -2)   return 'font-black'   // eagle+ — inline style below
-    if (netVsPar === -1)  return 'font-bold'    // birdie — inline style below
-    if (netVsPar === 0)   return 'text-ink border border-gray-200'
-    if (netVsPar === 1)   return 'bg-red-100 text-red-800 font-bold'
-    return 'bg-red-600 text-white font-bold'
-  }
-  function cellStyle(netVsPar) {
-    if (netVsPar <= -2) return { background: '#fef08a', color: '#713f12' }   // eagle+
-    if (netVsPar === -1) return { background: '#eaf1ec', color: '#1B4332' }  // birdie — green tint
-    return {}
+  function ScoreCell({ g, netVsPar }) {
+    const size = 32
+    const num = <text x="16" y="21" textAnchor="middle" fontSize="12" fontWeight="700" fill="#1d1d1f">{g}</text>
+
+    if (netVsPar == null) return (
+      <svg width={size} height={size}><text x="16" y="21" textAnchor="middle" fontSize="12" fill="#c7c7cc">—</text></svg>
+    )
+    if (netVsPar <= -2) return (  // Eagle or better — double circle
+      <svg width={size} height={size}>
+        <circle cx="16" cy="16" r="14" fill="none" stroke="#1d1d1f" strokeWidth="1.5"/>
+        <circle cx="16" cy="16" r="10" fill="none" stroke="#1d1d1f" strokeWidth="1.5"/>
+        {num}
+      </svg>
+    )
+    if (netVsPar === -1) return (  // Birdie — single circle
+      <svg width={size} height={size}>
+        <circle cx="16" cy="16" r="13" fill="none" stroke="#1d1d1f" strokeWidth="1.5"/>
+        {num}
+      </svg>
+    )
+    if (netVsPar === 0) return (  // Par — plain
+      <svg width={size} height={size}>{num}</svg>
+    )
+    if (netVsPar === 1) return (  // Bogey — single square
+      <svg width={size} height={size}>
+        <rect x="2" y="2" width="28" height="28" rx="2" fill="none" stroke="#1d1d1f" strokeWidth="1.5"/>
+        {num}
+      </svg>
+    )
+    return (  // Double bogey+ — double square
+      <svg width={size} height={size}>
+        <rect x="2" y="2" width="28" height="28" rx="2" fill="none" stroke="#1d1d1f" strokeWidth="1.5"/>
+        <rect x="6" y="6" width="20" height="20" rx="1" fill="none" stroke="#1d1d1f" strokeWidth="1.5"/>
+        {num}
+      </svg>
+    )
   }
 
   const frontPar = pars.slice(0, 9).reduce((a, b) => a + b, 0)
@@ -862,20 +885,14 @@ function TraditionalScorecard({ event, course, groupPlayers, scores, isComplete,
                       const c = cells[i]
                       return (
                         <td key={ep.player_id} className="text-center px-1 py-1">
-                          {c.g != null ? (
-                            <div className="flex flex-col items-center gap-0.5">
-                              <span className={`inline-flex items-center justify-center w-9 h-9 rounded-lg text-sm font-bold ${cellBg(c.netVsPar)}`} style={cellStyle(c.netVsPar)}>
-                                {c.g}
+                          <div className="flex flex-col items-center gap-0.5">
+                            <ScoreCell g={c.g} netVsPar={c.g != null ? c.netVsPar : null} />
+                            {anyPutts && c.g != null && (
+                              <span className="text-xs text-gray-400 leading-none">
+                                {c.putts != null ? `${c.putts}p` : ''}
                               </span>
-                              {anyPutts && (
-                                <span className="text-xs text-gray-400 leading-none">
-                                  {c.putts != null ? `${c.putts}p` : ''}
-                                </span>
-                              )}
-                            </div>
-                          ) : (
-                            <span className="text-gray-200 text-sm">—</span>
-                          )}
+                            )}
+                          </div>
                         </td>
                       )
                     })}
@@ -913,20 +930,14 @@ function TraditionalScorecard({ event, course, groupPlayers, scores, isComplete,
                       const c = cells[i + 9]
                       return (
                         <td key={ep.player_id} className="text-center px-1 py-1">
-                          {c.g != null ? (
-                            <div className="flex flex-col items-center gap-0.5">
-                              <span className={`inline-flex items-center justify-center w-9 h-9 rounded-lg text-sm font-bold ${cellBg(c.netVsPar)}`} style={cellStyle(c.netVsPar)}>
-                                {c.g}
+                          <div className="flex flex-col items-center gap-0.5">
+                            <ScoreCell g={c.g} netVsPar={c.g != null ? c.netVsPar : null} />
+                            {anyPutts && c.g != null && (
+                              <span className="text-xs text-gray-400 leading-none">
+                                {c.putts != null ? `${c.putts}p` : ''}
                               </span>
-                              {anyPutts && (
-                                <span className="text-xs text-gray-400 leading-none">
-                                  {c.putts != null ? `${c.putts}p` : ''}
-                                </span>
-                              )}
-                            </div>
-                          ) : (
-                            <span className="text-gray-200 text-sm">—</span>
-                          )}
+                            )}
+                          </div>
                         </td>
                       )
                     })}
@@ -961,14 +972,29 @@ function TraditionalScorecard({ event, course, groupPlayers, scores, isComplete,
         </div>
 
         {/* Legend */}
-        <div className="mt-3 flex flex-wrap gap-2 text-xs justify-center text-ink-muted">
-          <span className="flex items-center gap-1"><span className="inline-flex items-center justify-center w-6 h-6 rounded font-black text-xs" style={{ background: '#fef08a', color: '#713f12' }}>E</span> Eagle+</span>
-          <span className="flex items-center gap-1"><span className="inline-flex items-center justify-center w-6 h-6 rounded font-bold text-xs" style={{ background: '#eaf1ec', color: '#1B4332' }}>B</span> Birdie</span>
-          <span className="flex items-center gap-1"><span className="inline-flex items-center justify-center w-6 h-6 rounded border font-bold text-xs text-ink" style={{ borderColor: '#ebe9e4' }}>P</span> Par</span>
-          <span className="flex items-center gap-1"><span className="inline-flex items-center justify-center w-6 h-6 rounded bg-red-100 text-red-800 font-bold text-xs">+1</span> Bogey</span>
-          <span className="flex items-center gap-1"><span className="inline-flex items-center justify-center w-6 h-6 rounded bg-red-600 text-white font-bold text-xs">+2</span> Double+</span>
+        <div className="mt-3 flex flex-wrap gap-3 text-xs justify-center text-ink-muted items-center">
+          <span className="flex items-center gap-1">
+            <svg width="20" height="20"><circle cx="10" cy="10" r="9" fill="none" stroke="#1d1d1f" strokeWidth="1.5"/><circle cx="10" cy="10" r="6" fill="none" stroke="#1d1d1f" strokeWidth="1.5"/></svg>
+            Eagle+
+          </span>
+          <span className="flex items-center gap-1">
+            <svg width="20" height="20"><circle cx="10" cy="10" r="9" fill="none" stroke="#1d1d1f" strokeWidth="1.5"/></svg>
+            Birdie
+          </span>
+          <span className="flex items-center gap-1">
+            <svg width="20" height="20"><text x="10" y="15" textAnchor="middle" fontSize="11" fontWeight="700" fill="#1d1d1f">4</text></svg>
+            Par
+          </span>
+          <span className="flex items-center gap-1">
+            <svg width="20" height="20"><rect x="1" y="1" width="18" height="18" rx="2" fill="none" stroke="#1d1d1f" strokeWidth="1.5"/></svg>
+            Bogey
+          </span>
+          <span className="flex items-center gap-1">
+            <svg width="20" height="20"><rect x="1" y="1" width="18" height="18" rx="2" fill="none" stroke="#1d1d1f" strokeWidth="1.5"/><rect x="4" y="4" width="12" height="12" rx="1" fill="none" stroke="#1d1d1f" strokeWidth="1.5"/></svg>
+            Double+
+          </span>
         </div>
-        <p className="text-center text-xs text-ink-muted mt-1">Colors based on net score vs par</p>
+        <p className="text-center text-xs text-ink-muted mt-1">Net score vs par</p>
       </div>
     </div>
   )
