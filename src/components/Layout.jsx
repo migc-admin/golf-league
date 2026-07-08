@@ -4,11 +4,11 @@ import { useAuth } from '../hooks/useAuth'
 import { useOrg } from '../lib/OrgContext'
 
 const navItems = [
-  { to: '/admin',         label: 'Home',  icon: HomeIcon,    end: true },
-  { to: '/admin/leagues', label: 'Leagues',    icon: TrophyIcon },
-  { to: '/admin/courses', label: 'Courses',    icon: FlagIcon },
-  { to: '/admin/players', label: 'Players',    icon: UsersIcon },
-  { to: '/admin/import',  label: 'Import',     icon: UploadIcon },
+  { to: '/admin',         label: 'Home',    icon: HomeIcon,   end: true },
+  { to: '/admin/leagues', label: 'Leagues', icon: TrophyIcon },
+  { to: '/admin/courses', label: 'Courses', icon: FlagIcon },
+  { to: '/admin/players', label: 'Players', icon: UsersIcon },
+  { to: '/admin/import',  label: 'Import',  icon: UploadIcon },
 ]
 
 export default function Layout({ children }) {
@@ -24,59 +24,60 @@ export default function Layout({ children }) {
   }
 
   return (
-    <div className="min-h-screen flex flex-col" style={{ background: '#EEF1EC' }}>
-      {/* Top nav */}
-      <header className="sticky top-0 z-40 shadow-lg" style={{ background: 'linear-gradient(150deg,#0b2318 0%,#1B4332 45%,#1f5c3e 100%)', borderBottom: '3px solid #cba72f' }}>
-        <div className="max-w-7xl mx-auto px-4 flex items-center justify-between h-14">
-          <Link to="/admin" className="flex items-center gap-2.5 tracking-tight">
-            <img src={org?.logo_url ?? '/logo.png'} alt={orgName} className="w-9 h-9 object-contain" />
-            <span className="hidden sm:inline font-bold text-white" style={{ fontFamily: "'Manrope', 'DM Sans', sans-serif", fontSize: '1.15rem', letterSpacing: '-0.01em' }}>
+    <div className="min-h-screen flex flex-col" style={{ background: '#fbfaf8' }}>
+      {/* Top nav — flat bone header, no gradient, no gold border */}
+      <header className="sticky top-0 z-40" style={{ background: '#ffffff', borderBottom: '1px solid #ebe9e4' }}>
+        <div className="max-w-container mx-auto px-6 flex items-center justify-between h-14">
+
+          {/* Brand */}
+          <Link to="/admin" className="flex items-center gap-2.5">
+            <img src={org?.logo_url ?? '/logo.png'} alt={orgName} className="w-8 h-8 object-contain" />
+            <span className="hidden sm:inline font-bold text-ink" style={{ fontSize: '1rem', letterSpacing: '-0.02em' }}>
               {orgName}
             </span>
           </Link>
 
           {/* Desktop nav */}
-          <nav className="hidden md:flex items-center gap-0.5">
+          <nav className="hidden md:flex items-center gap-1">
             {navItems.map(({ to, label, icon: Icon, end }) => (
               <NavLink
                 key={to}
                 to={to}
                 end={end}
                 className={({ isActive }) =>
-                  `flex items-center gap-1.5 px-3 py-2 text-xs font-semibold uppercase tracking-wider transition-colors ${
+                  `flex items-center gap-1.5 px-3 py-1.5 text-sm font-semibold transition-colors rounded-full ${
                     isActive
-                      ? 'text-gold-400 border-b-2 border-gold-400'
-                      : 'text-white/70 hover:text-white hover:bg-white/10 rounded'
+                      ? 'bg-status-active-bg text-status-active-text'
+                      : 'text-ink-muted hover:text-ink hover:bg-surface-high'
                   }`
                 }
-                style={({ isActive }) => isActive ? { color: '#D4AF37', borderBottomColor: '#D4AF37' } : {}}
               >
-                <Icon className="w-4 h-4" />
+                <Icon className="w-3.5 h-3.5" />
                 {label}
               </NavLink>
             ))}
           </nav>
 
-          <div className="flex items-center gap-2">
-            <span className="text-xs hidden sm:block" style={{ color: 'rgba(255,255,255,0.5)' }}>
+          {/* Right side */}
+          <div className="flex items-center gap-3">
+            <span className="text-xs hidden sm:block text-ink-muted">
               {profile?.full_name}
             </span>
             <button
               onClick={handleSignOut}
-              className="text-xs font-semibold uppercase tracking-wider px-3 py-1.5 transition-colors hover:bg-white/10 rounded"
-              style={{ color: 'rgba(255,255,255,0.75)', letterSpacing: '0.08em' }}
+              className="text-xs font-semibold px-3 py-1.5 rounded-full transition-colors text-ink-muted hover:text-ink hover:bg-surface-high"
             >
               Sign out
             </button>
 
             {/* Mobile hamburger */}
             <button
-              className="md:hidden p-2 rounded hover:bg-white/10"
+              className="md:hidden p-2 rounded-full hover:bg-surface-high transition-colors"
               onClick={() => setMenuOpen(v => !v)}
               aria-label={menuOpen ? 'Close navigation menu' : 'Open navigation menu'}
               aria-expanded={menuOpen}
             >
-              <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <svg className="w-5 h-5 text-ink" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 {menuOpen
                   ? <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
                   : <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
@@ -88,7 +89,7 @@ export default function Layout({ children }) {
 
         {/* Mobile menu */}
         {menuOpen && (
-          <nav className="md:hidden px-4 py-2 flex flex-col gap-1" style={{ borderTop: '1px solid rgba(255,255,255,0.1)' }}>
+          <nav className="md:hidden px-4 py-3 flex flex-col gap-1" style={{ borderTop: '1px solid #ebe9e4', background: '#ffffff' }}>
             {navItems.map(({ to, label, icon: Icon, end }) => (
               <NavLink
                 key={to}
@@ -96,11 +97,12 @@ export default function Layout({ children }) {
                 end={end}
                 onClick={() => setMenuOpen(false)}
                 className={({ isActive }) =>
-                  `flex items-center gap-2 px-3 py-2.5 text-sm font-semibold uppercase tracking-wider transition-colors rounded ${
-                    isActive ? 'bg-white/20' : 'hover:bg-white/10'
+                  `flex items-center gap-2 px-3 py-2.5 text-sm font-semibold rounded-full transition-colors ${
+                    isActive
+                      ? 'bg-status-active-bg text-status-active-text'
+                      : 'text-ink-muted hover:text-ink hover:bg-surface-high'
                   }`
                 }
-                style={({ isActive }) => ({ color: isActive ? '#D4AF37' : 'rgba(255,255,255,0.75)' })}
               >
                 <Icon className="w-4 h-4" />
                 {label}
@@ -111,14 +113,14 @@ export default function Layout({ children }) {
       </header>
 
       {/* Main content */}
-      <main className="flex-1 max-w-7xl w-full mx-auto px-4 py-6">
+      <main className="flex-1 max-w-container w-full mx-auto px-6 py-6">
         {children}
       </main>
     </div>
   )
 }
 
-// Inline icon components (no extra dep)
+// Inline icon components
 function HomeIcon({ className }) {
   return (
     <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24">

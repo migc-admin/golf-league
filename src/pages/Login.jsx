@@ -12,7 +12,6 @@ export default function Login() {
   const [password, setPassword] = useState('')
   const [loading,  setLoading]  = useState(false)
 
-  // Wait until profile is resolved before redirecting — prevents race where isAdmin is false
   if (user && !profileLoading) {
     return <Navigate to={from} replace />
   }
@@ -23,7 +22,6 @@ export default function Login() {
     setLoading(true)
     try {
       await signIn(email, password)
-      // redirect handled by Navigate above on re-render
     } catch (err) {
       toast.error(err.message ?? 'Sign-in failed')
     } finally {
@@ -32,18 +30,26 @@ export default function Login() {
   }
 
   return (
-    <div className="min-h-screen flex flex-col items-center justify-center p-4" style={{ background: 'linear-gradient(150deg,#0b2318 0%,#1B4332 45%,#1f5c3e 100%)' }}>
+    <div className="min-h-screen flex flex-col items-center justify-center p-6" style={{ background: '#fbfaf8' }}>
       <div className="w-full max-w-sm">
-        {/* Logo */}
-        <div className="text-center mb-8">
-          <img src="/logo.png" alt="Scorify Golf" className="w-28 h-28 object-contain mx-auto mb-2" />
-          <h1 className="text-white mb-1" style={{ fontFamily: "'Playfair Display', serif", fontSize: '2rem', fontWeight: 700 }}>Scorify Golf</h1>
-          <div className="mx-auto mb-2" style={{ width: 60, height: 2, background: '#D4AF37' }} />
-          <p className="text-sm mt-1" style={{ color: 'rgba(255,255,255,0.55)' }}>Sign in to continue</p>
+
+        {/* Logo + wordmark */}
+        <div className="text-center mb-10">
+          <img src="/logo.png" alt="Scorify Golf" className="w-16 h-16 object-contain mx-auto mb-4" />
+          <h1 className="text-ink font-bold mb-1" style={{ fontSize: '1.5rem', letterSpacing: '-0.03em' }}>
+            Scorify Golf
+          </h1>
+          <p className="text-sm text-ink-muted">Sign in to continue</p>
         </div>
 
-        {/* Card */}
-        <div className="bg-white rounded-2xl shadow-2xl p-6">
+        {/* Card — floats slightly over bone background */}
+        <div style={{
+          background: '#ffffff',
+          borderRadius: '1.5rem',
+          border: '1px solid #ebe9e4',
+          boxShadow: '0 20px 60px rgba(0,0,0,.08)',
+          padding: '32px 28px',
+        }}>
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
               <label className="label">Email</label>
@@ -84,12 +90,12 @@ export default function Login() {
                   </svg>
                   Signing in…
                 </span>
-              ) : 'Sign In'}
+              ) : 'Sign in'}
             </button>
           </form>
         </div>
 
-        <p className="text-center text-xs mt-6" style={{ color: 'rgba(255,255,255,0.35)' }}>
+        <p className="text-center text-xs mt-6 text-ink-muted">
           Contact your league admin for access.
         </p>
       </div>

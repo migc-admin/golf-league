@@ -1,18 +1,17 @@
-// Change 2: Generalized status chip variants
-// Pattern: pill-shaped, low-saturation tint bg + high-saturation same-hue text
+// Design system: two status tints only (active green / upcoming tan). No gold.
 const variants = {
-  // Status chips
-  active:   'bg-fairway-100 text-fairway-700',
-  upcoming: 'bg-gold-100 text-gold-600',
-  complete: 'bg-gray-100 text-gray-500',
-  // Colour chips (legacy + extras)
-  green:    'bg-fairway-100 text-fairway-800',
-  blue:     'bg-blue-100 text-blue-800',
-  yellow:   'bg-yellow-100 text-yellow-800',
-  red:      'bg-red-100 text-red-800',
-  gray:     'bg-gray-100 text-gray-700',
-  purple:   'bg-purple-100 text-purple-800',
-  orange:   'bg-orange-100 text-orange-800',
+  // Status chips — DESIGN.md tints
+  active:   'bg-status-active-bg   text-status-active-text',
+  upcoming: 'bg-status-upcoming-bg text-status-upcoming-text',
+  complete: 'bg-surface-high text-ink-muted',
+  // General purpose
+  green:    'bg-status-active-bg text-status-active-text',
+  blue:     'bg-blue-50 text-blue-700',
+  yellow:   'bg-status-upcoming-bg text-status-upcoming-text',
+  red:      'bg-red-50 text-red-700',
+  gray:     'bg-surface-high text-ink-muted',
+  purple:   'bg-purple-50 text-purple-700',
+  orange:   'bg-orange-50 text-orange-700',
 }
 
 export default function Badge({ children, variant = 'gray', className = '' }) {
@@ -34,25 +33,25 @@ export function FlightBadge({ flight }) {
 export function StatusBadge({ status }) {
   const map = {
     upcoming: { variant: 'upcoming', label: 'Upcoming' },
-    active:   { variant: 'active',   label: 'Active' },
+    active:   { variant: 'active',   label: 'Live' },
     complete: { variant: 'complete', label: 'Complete' },
   }
   const { variant, label } = map[status] ?? { variant: 'gray', label: status }
   return <Badge variant={variant}>{label}</Badge>
 }
 
-// Change 2: Score chip — under par = red, even/over = default text
+// Score chip — under par = Forest Green, even/over = ink
 export function ScoreBadge({ score, par }) {
   const diff = score - par
   if (diff < 0) {
     return (
-      <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold bg-red-50 text-[#BA1A1A]">
+      <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold bg-status-active-bg text-status-active-text">
         {score}
       </span>
     )
   }
   return (
-    <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold bg-gray-100 text-gray-700">
+    <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold bg-surface-high text-ink-muted">
       {score}
     </span>
   )

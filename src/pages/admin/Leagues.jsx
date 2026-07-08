@@ -70,16 +70,16 @@ export default function Leagues() {
   }
 
   return (
-    <div className="space-y-5">
+    <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Leagues</h1>
-          <p className="text-sm text-gray-500 mt-0.5">Manage leagues and their events</p>
+          <h1 className="text-2xl font-bold text-ink" style={{ letterSpacing: '-0.03em' }}>Leagues</h1>
+          <p className="text-sm text-ink-muted mt-0.5">Manage leagues and their events</p>
         </div>
         <Button onClick={openCreateLeague}>+ New League</Button>
       </div>
 
-      <div className="flex items-center gap-4 mb-2">
+      <div className="flex items-center gap-4">
         <ImageUpload
           shape="circle"
           path={`orgs/${orgSlug}/logo`}
@@ -94,12 +94,12 @@ export default function Leagues() {
 
       {loading ? (
         <div className="space-y-4 animate-pulse">
-          {[0,1].map(i => <div key={i} className="h-40 bg-gray-200 rounded-xl" />)}
+          {[0,1].map(i => <div key={i} className="h-40 rounded-xl" style={{ background: '#eceae5' }} />)}
         </div>
       ) : leagues.length === 0 ? (
-        <Card className="text-center py-12">
+        <Card className="text-center py-16">
           <div className="text-4xl mb-3">🏌️</div>
-          <p className="text-gray-500 font-medium">No leagues yet</p>
+          <p className="text-ink-muted font-medium">No leagues yet</p>
           <Button className="mt-4" onClick={openCreateLeague}>Create First League</Button>
         </Card>
       ) : (
@@ -107,21 +107,21 @@ export default function Leagues() {
           {leagues.map(league => {
             const events = [...(league.events ?? [])].sort((a,b) => b.event_number - a.event_number)
             return (
-              <Card key={league.id} className="overflow-hidden p-0">
+              <div key={league.id} className="card overflow-hidden p-0">
                 {/* League header */}
-                <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
+                <div className="flex items-center justify-between px-5 py-4" style={{ borderBottom: '1px solid #ebe9e4' }}>
                   <div>
-                    <div className="font-bold text-gray-900 text-base">{league.name}</div>
-                    <div className="text-xs text-gray-500 mt-0.5">Season {league.season_year} · {events.length} event{events.length !== 1 ? 's' : ''}</div>
+                    <div className="font-bold text-ink text-base" style={{ letterSpacing: '-0.01em' }}>{league.name}</div>
+                    <div className="text-xs text-ink-muted mt-0.5">Season {league.season_year} · {events.length} event{events.length !== 1 ? 's' : ''}</div>
                   </div>
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-2 flex-wrap justify-end">
                     <Link to={`/${orgSlug}/${league.slug}/standings`} className="btn btn-secondary btn-sm">Standings</Link>
                     {hasFeature('tgl') ? (
                       <Button size="sm" variant="secondary" onClick={() => { setTglLeague(league); setTglModal(true) }}>
                         TGL Teams
                       </Button>
                     ) : (
-                      <span className="text-xs text-gray-400 border border-gray-200 rounded px-2 py-1">TGL — Pro</span>
+                      <span className="text-xs text-ink-muted rounded-full px-3 py-1" style={{ background: '#eceae5' }}>TGL — Pro</span>
                     )}
                     <Button size="sm" onClick={() => openCreateEvent(league)}>+ Event</Button>
                     <Button size="sm" variant="secondary" onClick={() => openEditLeague(league)}>Edit</Button>
@@ -131,29 +131,32 @@ export default function Leagues() {
 
                 {/* Events list */}
                 {events.length === 0 ? (
-                  <div className="px-5 py-4 text-sm text-gray-400">
-                    No events yet. <button onClick={() => openCreateEvent(league)} className="text-fairway-700 hover:underline font-medium">Add first event →</button>
+                  <div className="px-5 py-5 text-sm text-ink-muted">
+                    No events yet. <button onClick={() => openCreateEvent(league)} className="text-fairway-700 hover:underline font-semibold">Add first event →</button>
                   </div>
                 ) : (
-                  <div className="divide-y divide-gray-100">
+                  <div>
                     {events.map(ev => (
                       <Link
                         key={ev.id}
                         to={`/admin/${orgSlug}/${league.slug}/${ev.slug}`}
-                        className="flex items-center justify-between px-5 py-3 hover:bg-gray-50 transition-colors"
+                        className="flex items-center justify-between px-5 py-3 transition-colors"
+                        style={{ borderBottom: '1px solid #ebe9e4' }}
+                        onMouseEnter={e => e.currentTarget.style.background = '#f4f3f0'}
+                        onMouseLeave={e => e.currentTarget.style.background = ''}
                       >
-                        <div>
-                          <span className="text-sm font-medium text-gray-900">Event #{ev.event_number}</span>
-                          <span className="text-xs text-gray-500 ml-3">{ev.course?.name}</span>
-                          <span className="text-xs text-gray-400 ml-3">{formatDate(ev.event_date)}</span>
+                        <div className="flex items-center gap-3">
+                          <span className="text-sm font-semibold text-ink">Event #{ev.event_number}</span>
+                          {ev.course?.name && <span className="text-xs text-ink-muted">{ev.course.name}</span>}
+                          <span className="text-xs text-ink-muted">{formatDate(ev.event_date)}</span>
                         </div>
                         <div className="flex items-center gap-3">
                           <Link
                             to={`/${orgSlug}/${league.slug}/${ev.slug}/leaderboard`}
                             onClick={e => e.stopPropagation()}
-                            className="text-xs text-fairway-700 hover:underline"
+                            className="text-xs font-semibold text-fairway-700 hover:underline"
                           >
-                            Leaderboard
+                            Leaderboard ↗
                           </Link>
                           <StatusBadge status={ev.status} />
                         </div>
@@ -161,7 +164,7 @@ export default function Leagues() {
                     ))}
                   </div>
                 )}
-              </Card>
+              </div>
             )
           })}
         </div>

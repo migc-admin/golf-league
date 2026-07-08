@@ -13,17 +13,16 @@
   }
 
   body {
-    font-family: 'DM Sans', sans-serif;
-    background: #EEF1EC;
-    color: #212529;
+    font-family: 'Schibsted Grotesk', sans-serif;
+    background: #fbfaf8;
+    color: #1d1d1f;
     -webkit-font-smoothing: antialiased;
   }
 
-  /* Change 1: Manrope replaces Playfair Display for headings */
   h1, h2, h3 {
-    font-family: 'Manrope', 'DM Sans', sans-serif;
+    font-family: 'Schibsted Grotesk', sans-serif;
     font-weight: 700;
-    letter-spacing: -0.015em;
+    letter-spacing: -0.02em;
   }
 
   input[type='number']::-webkit-inner-spin-button,
@@ -38,129 +37,112 @@
 }
 
 @layer components {
+
+  /* ── Buttons — pill shape, one primary per screen ── */
   .btn {
     @apply inline-flex items-center justify-center font-semibold transition-all duration-150 focus:outline-none focus:ring-2 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed;
-    border-radius: 4px;
-    letter-spacing: 0.03em;
+    border-radius: 9999px;
+    letter-spacing: 0.01em;
   }
 
   .btn-primary {
-    @apply btn bg-augusta-600 text-white hover:bg-augusta-700 focus:ring-gold-400 active:scale-95;
+    @apply btn bg-ink text-white hover:bg-ink-muted focus:ring-ink active:opacity-80;
+    background: #1d1d1f;
   }
 
   .btn-secondary {
-    @apply btn bg-white text-gray-700 border border-gray-300 hover:bg-gray-50 focus:ring-gray-400 active:scale-95;
+    @apply btn text-ink focus:ring-surface-outline active:opacity-80;
+    background: #eceae5;
+    color: #1d1d1f;
   }
 
   .btn-danger {
-    @apply btn bg-red-600 text-white hover:bg-red-700 focus:ring-red-500 active:scale-95;
+    @apply btn bg-red-600 text-white hover:bg-red-700 focus:ring-red-500 active:opacity-80;
   }
 
-  .btn-sm {
-    @apply px-3 py-1.5 text-sm;
-  }
+  .btn-sm  { @apply px-3.5 py-1.5 text-sm; }
+  .btn-md  { @apply px-4 py-2 text-sm; }
+  .btn-lg  { @apply px-6 py-3 text-base; }
 
-  .btn-md {
-    @apply px-4 py-2 text-sm;
-  }
-
-  .btn-lg {
-    @apply px-6 py-3 text-base;
-  }
-
-  /* Change 4: green-tinted shadow, keep gold top-border + white bg */
+  /* ── Cards — hairline border, no gold stripe, soft shadow ── */
   .card {
-    background: #fff;
-    border-radius: 8px;
-    box-shadow: 0 4px 20px rgba(15, 61, 46, 0.05);
-    border: 1px solid #dee2e6;
-    border-top: 3px solid #cba72f;
+    background: #ffffff;
+    border-radius: 1.25rem;
+    box-shadow: 0 6px 24px rgba(0,0,0,.05);
+    border: 1px solid #ebe9e4;
   }
 
+  /* ── Inputs ── */
   .input {
     @apply block w-full px-3 py-2 text-sm transition-colors;
-    border: 1px solid #ced4da;
-    border-radius: 4px;
+    border: 1px solid #d6d4cf;
+    border-radius: 0.875rem;
     background: #fff;
-    color: #212529;
-    font-family: 'DM Sans', sans-serif;
+    color: #1d1d1f;
+    font-family: 'Schibsted Grotesk', sans-serif;
   }
   .input:focus {
     outline: none;
-    border-color: #2D6A4F;
-    box-shadow: 0 0 0 2px rgba(45,106,79,0.15);
+    border-color: #1B4332;
+    box-shadow: 0 0 0 2px rgba(27,67,50,0.12);
   }
 
+  /* ── Labels ── */
   .label {
-    @apply block text-sm font-medium mb-1;
-    color: #495057;
-    font-size: 0.69rem;
-    text-transform: uppercase;
-    letter-spacing: 0.08em;
+    @apply block font-semibold mb-1;
+    color: #86868b;
+    font-size: 0.75rem;
+    letter-spacing: 0.02em;
   }
 
-  /* Tabs — gold underline active */
+  /* ── Tabs — ink underline, no gold ── */
   .tab-active {
-    color: #1B4332;
-    border-bottom: 3px solid #cba72f;
+    color: #1d1d1f;
+    border-bottom: 2px solid #1d1d1f;
     font-weight: 600;
     font-size: 0.8rem;
-    text-transform: uppercase;
-    letter-spacing: 0.08em;
+    letter-spacing: 0.01em;
     cursor: pointer;
   }
 
   .tab-inactive {
-    color: #6c757d;
-    border-bottom: 3px solid transparent;
+    color: #86868b;
+    border-bottom: 2px solid transparent;
     font-size: 0.8rem;
-    text-transform: uppercase;
-    letter-spacing: 0.08em;
+    letter-spacing: 0.01em;
     cursor: pointer;
   }
   .tab-inactive:hover {
-    color: #2D6A4F;
+    color: #1d1d1f;
   }
 
-  /* Change 1: section-heading now uses Manrope */
+  /* ── Section heading ── */
   .section-heading {
-    font-family: 'Manrope', 'DM Sans', sans-serif;
-    font-size: 1.2rem;
+    font-family: 'Schibsted Grotesk', sans-serif;
+    font-size: 1.1rem;
     font-weight: 700;
-    letter-spacing: -0.015em;
-    color: #1B4332;
+    letter-spacing: -0.02em;
+    color: #1d1d1f;
   }
 
-  /* Gold badge — used for rank/flight labels */
-  .badge-gold {
-    background: #cba72f;
-    color: #241a00;
-    font-size: 0.63rem;
-    font-weight: 700;
-    text-transform: uppercase;
-    letter-spacing: 0.1em;
-    padding: 3px 9px;
-    border-radius: 2px;
-  }
-
-  /* Change 3: Leaderboard table zebra striping — borderless rows */
+  /* ── Leaderboard table — borderless, lighter zebra ── */
   .lb-table {
     width: 100%;
     border-collapse: collapse;
   }
   .lb-table thead th {
-    font-family: 'Manrope', 'DM Sans', sans-serif;
+    font-family: 'Schibsted Grotesk', sans-serif;
     font-weight: 600;
     font-size: 0.7rem;
-    text-transform: uppercase;
-    letter-spacing: 0.07em;
-    color: #2D6A4F;
+    letter-spacing: 0.02em;
+    color: #86868b;
     padding: 8px 12px;
-    border-bottom: 1px solid #dee2e6;
+    border-bottom: 1px solid #ebe9e4;
     background: transparent;
+    text-transform: none;
   }
   .lb-table tbody tr:nth-child(even) {
-    background: rgba(27, 67, 50, 0.035);
+    background: rgba(27, 67, 50, 0.025);
   }
   .lb-table tbody tr:nth-child(odd) {
     background: transparent;
@@ -168,26 +150,28 @@
   .lb-table tbody td {
     padding: 10px 12px;
     border: none;
+    border-bottom: 1px solid #ebe9e4;
     font-size: 0.875rem;
-    color: #212529;
+    color: #1d1d1f;
   }
   .lb-table .col-rank {
-    font-family: 'Manrope', 'DM Sans', sans-serif;
-    font-weight: 600;
-    color: #1B4332;
+    font-family: 'Schibsted Grotesk', sans-serif;
+    font-weight: 700;
+    color: #1d1d1f;
     width: 2.5rem;
   }
-  .lb-score-under { color: #BA1A1A; font-weight: 600; }
-  .lb-score-even  { color: #212529; }
-  .lb-score-over  { color: #212529; }
+  /* Under par = Forest Green, over par = ink (not red) */
+  .lb-score-under { color: #1B4332; font-weight: 600; }
+  .lb-score-even  { color: #1d1d1f; }
+  .lb-score-over  { color: #1d1d1f; }
 
-  /* Change 5: List-row card treatment */
+  /* ── Row card — no gold left-border ── */
   .row-card {
     background: #fff;
-    border-radius: 8px;
-    border: 1px solid #dee2e6;
-    box-shadow: 0 4px 20px rgba(15, 61, 46, 0.05);
-    padding: 24px;
+    border-radius: 1.25rem;
+    border: 1px solid #ebe9e4;
+    box-shadow: 0 6px 24px rgba(0,0,0,.05);
+    padding: 20px 22px;
     position: relative;
     overflow: hidden;
     display: flex;
@@ -195,25 +179,25 @@
     gap: 16px;
   }
   .row-card-featured {
-    border-left: 3px solid #cba72f;
+    border-color: #1B4332;
   }
   .row-card-avatar {
     width: 44px;
     height: 44px;
     border-radius: 50%;
-    background: #dceee6;
+    background: #eaf1ec;
     color: #1B4332;
     display: flex;
     align-items: center;
     justify-content: center;
-    font-family: 'Manrope', sans-serif;
+    font-family: 'Schibsted Grotesk', sans-serif;
     font-weight: 700;
     font-size: 0.875rem;
     flex-shrink: 0;
   }
   .row-card-chevron {
     margin-left: auto;
-    color: #adb5bd;
+    color: #a8a8a4;
     flex-shrink: 0;
   }
 }
