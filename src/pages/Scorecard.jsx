@@ -344,10 +344,10 @@ export default function Scorecard() {
   }
 
   if (error) return (
-    <div className="min-h-screen bg-fairway-800 flex flex-col items-center justify-center p-6 text-center">
+    <div className="min-h-screen flex flex-col items-center justify-center p-6 text-center" style={{ background: '#fbfaf8' }}>
       <div className="text-5xl mb-4">⛳</div>
-      <p className="text-white font-semibold text-lg">{error}</p>
-      <Link to="/login" className="mt-6 bg-white/10 hover:bg-white/20 text-white text-sm font-medium px-5 py-2.5 rounded-xl transition-colors">
+      <p className="text-ink font-semibold text-lg">{error}</p>
+      <Link to="/login" className="mt-6 btn btn-secondary btn-md">
         Sign In
       </Link>
     </div>
@@ -383,27 +383,27 @@ export default function Scorecard() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 flex flex-col">
+    <div className="min-h-screen flex flex-col" style={{ background: '#fbfaf8' }}>
       {/* Header */}
-      <div className="bg-fairway-700 text-white sticky top-0 z-20 shadow-lg">
+      <div className="sticky top-0 z-20" style={{ background: '#ffffff', borderBottom: '1px solid #ebe9e4' }}>
         <div className="px-4 py-3 flex items-center justify-between">
           <div>
-            <div className="font-bold text-base leading-tight">{event.course?.name ?? course.name}</div>
-            <div className="text-xs text-fairway-200 mt-0.5">
+            <div className="font-bold text-base text-ink leading-tight">{event.course?.name ?? course.name}</div>
+            <div className="text-xs text-ink-muted mt-0.5">
               {event.league?.name} · Event #{event.event_number}
             </div>
           </div>
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2">
             {pendingCount > 0 && (
-              <div className="flex items-center gap-1 bg-yellow-500/20 rounded-full px-2.5 py-1">
-                <div className={`w-1.5 h-1.5 rounded-full ${syncing ? 'bg-yellow-300 animate-pulse' : 'bg-yellow-400'}`} />
-                <span className="text-xs text-yellow-200">{pendingCount} pending</span>
+              <div className="flex items-center gap-1 rounded-full px-2.5 py-1" style={{ background: '#fef9c3' }}>
+                <div className={`w-1.5 h-1.5 rounded-full ${syncing ? 'bg-yellow-400 animate-pulse' : 'bg-yellow-500'}`} />
+                <span className="text-xs text-yellow-700">{pendingCount} pending</span>
               </div>
             )}
             {holesEntered > 0 && (
               <button
                 onClick={() => setShowScorecard(true)}
-                className="text-fairway-200 text-xs hover:text-white border border-fairway-500 rounded px-2 py-1"
+                className="text-xs font-semibold px-3 py-1.5 rounded-full transition-colors text-ink-muted hover:text-ink hover:bg-surface-high"
               >
                 {holesEntered === 18 ? 'Scorecard' : `Progress (${holesEntered})`}
               </button>
@@ -411,13 +411,13 @@ export default function Scorecard() {
             <Link
               to={`/${orgSlug ?? event.org_slug}/${event.league?.slug}/${event.slug}/leaderboard`}
               state={{ from: 'scorecard', scorecardEventId: event.id }}
-              className="text-fairway-200 text-xs hover:text-white border border-fairway-500 rounded px-2 py-1"
+              className="text-xs font-semibold px-3 py-1.5 rounded-full transition-colors text-ink-muted hover:text-ink hover:bg-surface-high"
             >
               Leaderboard
             </Link>
-            {homeLink && <Link to={homeLink} className="text-fairway-200 text-xs hover:text-white">⛳</Link>}
+            {homeLink && <Link to={homeLink} className="text-xs text-ink-muted hover:text-ink px-2">⛳</Link>}
             {user && (
-              <button onClick={handleSignOut} className="text-fairway-200 text-xs hover:text-white border border-fairway-500 rounded px-2 py-1">
+              <button onClick={handleSignOut} className="text-xs font-semibold px-3 py-1.5 rounded-full transition-colors text-ink-muted hover:text-ink hover:bg-surface-high">
                 Sign out
               </button>
             )}
@@ -425,18 +425,18 @@ export default function Scorecard() {
         </div>
 
         {isComplete && (
-          <div className="px-4 py-2 bg-yellow-600/80 text-yellow-100 text-xs text-center font-medium">
+          <div className="px-4 py-2 text-xs text-center font-medium" style={{ background: '#fef3c7', color: '#92400e' }}>
             Event is complete — editing scores will update official results
           </div>
         )}
         {!canEdit && !isComplete && (
-          <div className="px-4 py-2 bg-gray-800/80 text-gray-200 text-xs text-center font-medium">
+          <div className="px-4 py-2 text-xs text-center font-medium" style={{ background: '#f4f3f0', color: '#86868b' }}>
             View only — you are not the assigned scorekeeper for this group
           </div>
         )}
 
-        {/* Hole navigator */}
-        <div className="px-4 pb-3 flex gap-1 overflow-x-auto scrollbar-hide">
+        {/* Hole navigator — dot chips */}
+        <div className="px-4 pb-3 flex gap-1.5 overflow-x-auto scrollbar-hide">
           {Array.from({ length: 18 }, (_, i) => i + 1).map(h => {
             const saved   = holeSaved(h)
             const dirty   = dirtyHoles.has(h)
@@ -445,40 +445,43 @@ export default function Scorecard() {
               <button
                 key={h}
                 onClick={() => handleHoleNav(h)}
-                className={`shrink-0 w-8 h-8 rounded-full text-xs font-bold transition-all ${
-                  current ? 'bg-white text-fairway-700 shadow-lg scale-110'
-                  : dirty  ? 'bg-yellow-400 text-yellow-900'
-                  : saved  ? 'bg-fairway-500 text-white'
-                  :          'bg-fairway-800 text-fairway-400'
-                }`}
-              >
-                {h}
-              </button>
+                title={`Hole ${h}`}
+                className="shrink-0 transition-all"
+                style={{
+                  width: current ? 28 : 20,
+                  height: 20,
+                  borderRadius: 9999,
+                  background: current ? '#1d1d1f'
+                    : dirty   ? '#fbbf24'
+                    : saved   ? '#1B4332'
+                    :            '#eceae5',
+                }}
+              />
             )
           })}
         </div>
       </div>
 
       {/* Hole info bar */}
-      <div className="bg-white border-b border-gray-200 px-4 py-3 flex items-center gap-6">
+      <div className="px-4 py-3 flex items-center gap-6" style={{ background: '#ffffff', borderBottom: '1px solid #ebe9e4' }}>
         <div className="text-center">
-          <div className="text-2xl font-black text-fairway-700">{hole < 10 ? `0${hole}` : hole}</div>
-          <div className="text-xs text-gray-400 font-medium">HOLE</div>
+          <div className="text-2xl font-black text-ink">{hole < 10 ? `0${hole}` : hole}</div>
+          <div className="text-xs text-ink-muted font-medium" style={{ letterSpacing: '0.04em' }}>HOLE</div>
         </div>
-        <div className="w-px h-10 bg-gray-200" />
+        <div className="w-px h-10" style={{ background: '#ebe9e4' }} />
         <div className="text-center">
-          <div className="text-xl font-bold text-gray-800">{par}</div>
-          <div className="text-xs text-gray-400">PAR</div>
-        </div>
-        <div className="text-center">
-          <div className="text-xl font-bold text-gray-800">{yd}</div>
-          <div className="text-xs text-gray-400">YDS</div>
+          <div className="text-xl font-bold text-ink">{par}</div>
+          <div className="text-xs text-ink-muted" style={{ letterSpacing: '0.04em' }}>PAR</div>
         </div>
         <div className="text-center">
-          <div className="text-xl font-bold text-gray-800">{si}</div>
-          <div className="text-xs text-gray-400">S.I.</div>
+          <div className="text-xl font-bold text-ink">{yd}</div>
+          <div className="text-xs text-ink-muted" style={{ letterSpacing: '0.04em' }}>YDS</div>
         </div>
-        <div className="ml-auto text-xs text-gray-400">{holesEntered}/18 done</div>
+        <div className="text-center">
+          <div className="text-xl font-bold text-ink">{si}</div>
+          <div className="text-xs text-ink-muted" style={{ letterSpacing: '0.04em' }}>S.I.</div>
+        </div>
+        <div className="ml-auto text-xs text-ink-muted">{holesEntered}/18 done</div>
       </div>
 
       {/* Player score cards */}
@@ -526,24 +529,25 @@ export default function Scorecard() {
       )}
 
       {/* Bottom action bar */}
-      <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 p-4 safe-bottom">
+      <div className="fixed bottom-0 left-0 right-0 p-4 safe-bottom" style={{ background: '#ffffff', borderTop: '1px solid #ebe9e4' }}>
         {isDirty && (
-          <p className="text-center text-xs text-yellow-600 font-medium mb-2">
-            ⚠ Unsaved scores on this hole — save before continuing
+          <p className="text-center text-xs font-medium mb-2" style={{ color: '#92400e' }}>
+            ⚠ Unsaved scores on this hole
           </p>
         )}
         <div className="flex items-center gap-3 max-w-lg mx-auto">
           <button
             disabled={hole <= 1}
             onClick={() => handleHoleNav(Math.max(1, hole - 1))}
-            className="flex-none w-12 h-12 rounded-full border-2 border-gray-200 text-gray-600 font-bold disabled:opacity-30 hover:border-gray-300 active:scale-95 transition-all"
+            className="btn btn-secondary flex-none disabled:opacity-30 active:scale-95"
+            style={{ width: 48, height: 48, padding: 0 }}
           >
             ←
           </button>
           <button
             onClick={saveHole}
             disabled={saving || !canEdit}
-            className="flex-1 h-12 bg-fairway-700 text-white font-bold rounded-xl disabled:opacity-50 hover:bg-fairway-800 active:scale-95 transition-all shadow-lg shadow-fairway-700/30"
+            className="btn btn-primary btn-lg flex-1 disabled:opacity-50 active:scale-95"
           >
             {saving ? (
               <span className="flex items-center justify-center gap-2">
@@ -560,7 +564,8 @@ export default function Scorecard() {
           <button
             disabled={hole >= 18}
             onClick={() => handleHoleNav(Math.min(18, hole + 1))}
-            className="flex-none w-12 h-12 rounded-full border-2 border-gray-200 text-gray-600 font-bold disabled:opacity-30 hover:border-gray-300 active:scale-95 transition-all"
+            className="btn btn-secondary flex-none disabled:opacity-30 active:scale-95"
+            style={{ width: 48, height: 48, padding: 0 }}
           >
             →
           </button>
@@ -598,12 +603,9 @@ function PlayerScoreCard({ ep, hole, par, si, score, allHoleScores, courseStroke
   const grossVal = score.gross !== '' && score.gross != null ? parseInt(score.gross, 10) : null
   const net = grossVal != null && !isNaN(grossVal) ? grossVal - strokes : null
   const netVsPar = net != null ? net - par : null
-  const netColor = netVsPar == null ? 'text-gray-300'
-    : netVsPar <= -2 ? 'text-yellow-600 font-black'
-    : netVsPar === -1 ? 'text-red-600'
-    : netVsPar === 0  ? 'text-gray-700'
-    : netVsPar === 1  ? 'text-blue-600'
-    : 'text-blue-800'
+  const netColor = netVsPar == null ? 'text-ink-muted'
+    : netVsPar < 0  ? 'text-status-active-text'
+    : 'text-ink'
 
   const grossDisplay = score.gross !== '' && score.gross != null ? String(score.gross) : ''
   const puttsDisplay = score.putts !== '' && score.putts != null ? String(score.putts) : ''
@@ -614,40 +616,40 @@ function PlayerScoreCard({ ep, hole, par, si, score, allHoleScores, courseStroke
     : 'No holes entered'
 
   return (
-    <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+    <div className="card overflow-hidden p-0">
       {/* Player header row */}
       <div className="flex items-center justify-between px-4 py-3">
         <div className="flex-1 min-w-0 pr-4">
           <div className="flex items-center gap-2 flex-wrap">
-            <span className="font-bold text-gray-900">
+            <span className="font-bold text-ink">
               {ep.player?.first_name} {ep.player?.last_name}
             </span>
             {ep.flight && (
-              <span className={`text-xs font-bold px-1.5 py-0.5 rounded ${ep.flight === 'A' ? 'bg-blue-100 text-blue-700' : 'bg-purple-100 text-purple-700'}`}>
+              <span className={`text-xs font-bold px-1.5 py-0.5 rounded-full ${ep.flight === 'A' ? 'bg-blue-50 text-blue-700' : 'bg-purple-50 text-purple-700'}`}>
                 {ep.flight}
               </span>
             )}
             {strokes > 0 && (
-              <span className="inline-flex items-center bg-fairway-100 text-fairway-800 text-xs font-bold px-1.5 py-0.5 rounded-full" title={`Receives ${strokes} stroke${strokes > 1 ? 's' : ''}`}>
+              <span className="inline-flex items-center text-xs font-bold px-1.5 py-0.5 rounded-full" style={{ background: '#eaf1ec', color: '#1B4332' }} title={`Receives ${strokes} stroke${strokes > 1 ? 's' : ''}`}>
                 {'●'.repeat(Math.min(strokes, 3))} {strokes} stroke{strokes > 1 ? 's' : ''}
               </span>
             )}
           </div>
-          <div className="text-xs text-gray-400 mt-0.5">{runningLabel}</div>
+          <div className="text-xs text-ink-muted mt-0.5">{runningLabel}</div>
         </div>
 
-        {/* Score input — large tap target */}
+        {/* Score input — 54px tap target */}
         <div className="flex items-center gap-3">
           {net != null && (
             <div className="text-right">
-              <div className="text-xs text-gray-400 leading-none mb-0.5">Net</div>
+              <div className="text-xs text-ink-muted leading-none mb-0.5">Net</div>
               <div className={`text-xl font-black leading-none ${netColor}`}>
                 {netVsPar === 0 ? 'E' : `${netVsPar > 0 ? '+' : ''}${netVsPar}`}
               </div>
             </div>
           )}
           <div className="flex flex-col items-center gap-0.5">
-            <span className="text-xs text-gray-400 font-medium uppercase tracking-wide">Score</span>
+            <span className="text-xs text-ink-muted font-medium" style={{ letterSpacing: '0.04em' }}>SCORE</span>
             <input
               ref={grossRef}
               type="number"
@@ -677,8 +679,13 @@ function PlayerScoreCard({ ep, hole, par, si, score, allHoleScores, courseStroke
               min={1}
               max={20}
               data-player-gross
-              className="w-16 h-16 text-center text-3xl font-black border-2 border-fairway-700 rounded-xl focus:border-fairway-500 focus:ring-2 focus:ring-fairway-200 outline-none bg-white"
-              style={{ WebkitAppearance: 'none', MozAppearance: 'textfield' }}
+              className="text-center text-3xl font-black outline-none bg-white"
+              style={{
+                width: 54, height: 54,
+                borderRadius: 14,
+                border: grossDisplay ? '1px solid #d6d4cf' : '1.5px dashed #d6d4cf',
+                WebkitAppearance: 'none', MozAppearance: 'textfield',
+              }}
             />
           </div>
         </div>
@@ -686,9 +693,9 @@ function PlayerScoreCard({ ep, hole, par, si, score, allHoleScores, courseStroke
 
       {/* Putts row */}
       {trackPutts && (
-        <div className="flex items-center justify-between px-4 py-2 bg-gray-50 border-t border-gray-100">
+        <div className="flex items-center justify-between px-4 py-2" style={{ borderTop: '1px solid #ebe9e4', background: '#fbfaf8' }}>
           <div>
-            <span className="text-xs text-gray-500 font-medium">Putts on this hole</span>
+            <span className="text-xs text-ink-muted font-medium">Putts on this hole</span>
             {grossVal != null && score.putts !== '' && score.putts != null && parseInt(score.putts, 10) > grossVal && (
               <div className="text-xs text-red-600 font-semibold mt-0.5">⚠ Putts exceed score</div>
             )}
@@ -712,12 +719,15 @@ function PlayerScoreCard({ ep, hole, par, si, score, allHoleScores, courseStroke
             placeholder="0"
             min={0}
             max={10}
-            className={`w-14 h-11 text-center text-xl font-bold border-2 rounded-lg focus:ring-2 outline-none bg-white ${
-              grossVal != null && score.putts !== '' && score.putts != null && parseInt(score.putts, 10) > grossVal
-                ? 'border-red-400 focus:border-red-500 focus:ring-red-200'
-                : 'border-gray-300 focus:border-fairway-500 focus:ring-fairway-200'
-            }`}
-            style={{ WebkitAppearance: 'none', MozAppearance: 'textfield' }}
+            className="text-center text-xl font-bold outline-none bg-white"
+            style={{
+              width: 44, height: 40,
+              borderRadius: 10,
+              border: grossVal != null && score.putts !== '' && score.putts != null && parseInt(score.putts, 10) > grossVal
+                ? '1.5px solid #f87171'
+                : '1px solid #d6d4cf',
+              WebkitAppearance: 'none', MozAppearance: 'textfield',
+            }}
           />
         </div>
       )}
@@ -763,37 +773,42 @@ function TraditionalScorecard({ event, course, groupPlayers, scores, isComplete,
 
   // Color for a cell by netVsPar
   function cellBg(netVsPar) {
-    if (netVsPar == null) return 'bg-transparent text-gray-300'
-    if (netVsPar <= -2)   return 'bg-yellow-400 text-yellow-900 font-black'  // eagle+
-    if (netVsPar === -1)  return 'bg-green-200 text-green-900 font-bold'     // birdie
-    if (netVsPar === 0)   return 'bg-white text-gray-700 border border-gray-200'  // par
-    if (netVsPar === 1)   return 'bg-red-200 text-red-900 font-bold'         // bogey
-    return 'bg-red-700 text-white font-bold'                                 // double+
+    if (netVsPar == null) return 'bg-transparent text-ink-muted'
+    if (netVsPar <= -2)   return 'font-black'   // eagle+ — inline style below
+    if (netVsPar === -1)  return 'font-bold'    // birdie — inline style below
+    if (netVsPar === 0)   return 'text-ink border border-gray-200'
+    if (netVsPar === 1)   return 'bg-red-100 text-red-800 font-bold'
+    return 'bg-red-600 text-white font-bold'
+  }
+  function cellStyle(netVsPar) {
+    if (netVsPar <= -2) return { background: '#fef08a', color: '#713f12' }   // eagle+
+    if (netVsPar === -1) return { background: '#eaf1ec', color: '#1B4332' }  // birdie — green tint
+    return {}
   }
 
   const frontPar = pars.slice(0, 9).reduce((a, b) => a + b, 0)
   const backPar  = pars.slice(9).reduce((a, b) => a + b, 0)
 
   return (
-    <div className="min-h-screen flex flex-col" style={{ background: '#f5f3ef' }}>
+    <div className="min-h-screen flex flex-col" style={{ background: '#fbfaf8' }}>
       {/* Header */}
-      <div className="bg-fairway-700 text-white sticky top-0 z-20 shadow-lg">
+      <div className="sticky top-0 z-20" style={{ background: '#ffffff', borderBottom: '1px solid #ebe9e4' }}>
         <div className="px-4 py-3 flex items-center justify-between">
           <div>
-            <div className="font-bold text-base">{event.course?.name ?? course.name}</div>
-            <div className="text-xs text-fairway-200">{event.league?.name} · {event.name ?? `Event #${event.event_number}`}</div>
+            <div className="font-bold text-base text-ink">{event.course?.name ?? course.name}</div>
+            <div className="text-xs text-ink-muted">{event.league?.name} · {event.name ?? `Event #${event.event_number}`}</div>
           </div>
           <div className="flex items-center gap-2">
             <Link
               to={`/${orgSlug ?? event.org_slug}/${event.league?.slug}/${event.slug}/leaderboard`}
               state={{ from: 'scorecard', scorecardEventId: event.id }}
-              className="text-fairway-200 text-xs hover:text-white border border-fairway-500 rounded px-2 py-1"
+              className="text-xs font-semibold px-3 py-1.5 rounded-full transition-colors text-ink-muted hover:text-ink hover:bg-surface-high"
             >
               Leaderboard
             </Link>
-            {homeLink && <Link to={homeLink} className="text-fairway-200 text-xs hover:text-white">⛳</Link>}
+            {homeLink && <Link to={homeLink} className="text-xs text-ink-muted hover:text-ink px-2">⛳</Link>}
             {onSignOut && (
-              <button onClick={onSignOut} className="text-fairway-200 text-xs hover:text-white border border-fairway-500 rounded px-2 py-1">
+              <button onClick={onSignOut} className="text-xs font-semibold px-3 py-1.5 rounded-full transition-colors text-ink-muted hover:text-ink hover:bg-surface-high">
                 Sign out
               </button>
             )}
@@ -802,7 +817,7 @@ function TraditionalScorecard({ event, course, groupPlayers, scores, isComplete,
         <div className="px-4 pb-3">
           <button
             onClick={onEdit}
-            className="text-xs bg-white/10 hover:bg-white/20 text-white px-3 py-1.5 rounded-lg transition-colors"
+            className="btn btn-secondary btn-sm"
           >
             ← {isComplete ? 'Edit Scores' : 'Back to Entry'}
           </button>
@@ -815,9 +830,9 @@ function TraditionalScorecard({ event, course, groupPlayers, scores, isComplete,
           <table className="w-full text-sm border-collapse">
             <thead>
               {/* Player name header row */}
-              <tr className="bg-fairway-800 text-white">
-                <th className="text-left px-3 py-2.5 text-xs font-semibold w-16 text-fairway-300">HOLE</th>
-                <th className="text-center px-2 py-2.5 text-xs font-semibold w-10 text-fairway-300">PAR</th>
+              <tr style={{ background: '#1d1d1f', color: '#ffffff' }}>
+                <th className="text-left px-3 py-2.5 text-xs font-semibold w-16" style={{ color: '#86868b' }}>HOLE</th>
+                <th className="text-center px-2 py-2.5 text-xs font-semibold w-10" style={{ color: '#86868b' }}>PAR</th>
                 {playerData.map(({ ep, name, ch }) => (
                   <th key={ep.player_id} className="text-center px-2 py-2.5">
                     <div className="font-bold text-white text-sm">{name}</div>
@@ -832,7 +847,7 @@ function TraditionalScorecard({ event, course, groupPlayers, scores, isComplete,
                 const h = i + 1
                 const p = pars[i]
                 return (
-                  <tr key={h} className={i % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
+                  <tr key={h} style={{ background: i % 2 === 0 ? '#ffffff' : 'rgba(27,67,50,0.025)' }}>
                     <td className="px-3 py-2 text-xs font-bold text-gray-500">{h}</td>
                     <td className="text-center px-2 py-2 text-xs text-gray-400 font-medium">{p}</td>
                     {playerData.map(({ ep, cells }) => {
@@ -841,7 +856,7 @@ function TraditionalScorecard({ event, course, groupPlayers, scores, isComplete,
                         <td key={ep.player_id} className="text-center px-1 py-1">
                           {c.g != null ? (
                             <div className="flex flex-col items-center gap-0.5">
-                              <span className={`inline-flex items-center justify-center w-9 h-9 rounded-lg text-sm font-bold ${cellBg(c.netVsPar)}`}>
+                              <span className={`inline-flex items-center justify-center w-9 h-9 rounded-lg text-sm font-bold ${cellBg(c.netVsPar)}`} style={cellStyle(c.netVsPar)}>
                                 {c.g}
                               </span>
                               {anyPutts && (
@@ -860,20 +875,20 @@ function TraditionalScorecard({ event, course, groupPlayers, scores, isComplete,
                 )
               })}
               {/* Front nine total */}
-              <tr className="bg-fairway-700 text-white">
+              <tr style={{ background: '#1d1d1f', color: '#ffffff' }}>
                 <td className="px-3 py-2 text-xs font-bold">OUT</td>
                 <td className="text-center px-2 py-2 text-xs font-bold">{frontPar}</td>
                 {playerData.map(({ ep, frontGross, frontPutts, hasPutts }) => (
                   <td key={ep.player_id} className="text-center px-2 py-2 text-sm">
                     <div className="font-black">{frontGross || '—'}</div>
-                    {anyPutts && hasPutts && <div className="text-xs text-fairway-300">{frontPutts}p</div>}
+                    {anyPutts && hasPutts && <div className="text-xs" style={{ color: '#86868b' }}>{frontPutts}p</div>}
                   </td>
                 ))}
               </tr>
 
               {/* Back nine divider label */}
               <tr>
-                <td colSpan={2 + playerData.length} className="text-center py-2 text-xs font-bold tracking-widest text-gray-400 border-t-2 border-dashed border-gray-200 bg-gray-50">
+                <td colSpan={2 + playerData.length} className="text-center py-2 text-xs font-bold tracking-widest text-ink-muted" style={{ borderTop: '2px dashed #ebe9e4', background: '#f4f3f0' }}>
                   — BACK NINE —
                 </td>
               </tr>
@@ -883,7 +898,7 @@ function TraditionalScorecard({ event, course, groupPlayers, scores, isComplete,
                 const h = i + 10
                 const p = pars[i + 9]
                 return (
-                  <tr key={h} className={i % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
+                  <tr key={h} style={{ background: i % 2 === 0 ? '#ffffff' : 'rgba(27,67,50,0.025)' }}>
                     <td className="px-3 py-2 text-xs font-bold text-gray-500">{h}</td>
                     <td className="text-center px-2 py-2 text-xs text-gray-400 font-medium">{p}</td>
                     {playerData.map(({ ep, cells }) => {
@@ -892,7 +907,7 @@ function TraditionalScorecard({ event, course, groupPlayers, scores, isComplete,
                         <td key={ep.player_id} className="text-center px-1 py-1">
                           {c.g != null ? (
                             <div className="flex flex-col items-center gap-0.5">
-                              <span className={`inline-flex items-center justify-center w-9 h-9 rounded-lg text-sm font-bold ${cellBg(c.netVsPar)}`}>
+                              <span className={`inline-flex items-center justify-center w-9 h-9 rounded-lg text-sm font-bold ${cellBg(c.netVsPar)}`} style={cellStyle(c.netVsPar)}>
                                 {c.g}
                               </span>
                               {anyPutts && (
@@ -911,25 +926,25 @@ function TraditionalScorecard({ event, course, groupPlayers, scores, isComplete,
                 )
               })}
               {/* Back nine total */}
-              <tr className="bg-fairway-700 text-white">
+              <tr style={{ background: '#1d1d1f', color: '#ffffff' }}>
                 <td className="px-3 py-2 text-xs font-bold">IN</td>
                 <td className="text-center px-2 py-2 text-xs font-bold">{backPar}</td>
                 {playerData.map(({ ep, backGross, backPutts, hasPutts }) => (
                   <td key={ep.player_id} className="text-center px-2 py-2 text-sm">
                     <div className="font-black">{backGross || '—'}</div>
-                    {anyPutts && hasPutts && <div className="text-xs text-fairway-300">{backPutts}p</div>}
+                    {anyPutts && hasPutts && <div className="text-xs" style={{ color: '#86868b' }}>{backPutts}p</div>}
                   </td>
                 ))}
               </tr>
               {/* Grand total */}
-              <tr className="bg-fairway-900 text-white">
+              <tr style={{ background: '#1B4332', color: '#ffffff' }}>
                 <td className="px-3 py-2.5 text-sm font-black">TOTAL</td>
                 <td className="text-center px-2 py-2.5 text-sm font-bold">{frontPar + backPar}</td>
                 {playerData.map(({ ep, totalGross, totalNet, totalPutts, hasPutts }) => (
                   <td key={ep.player_id} className="text-center px-2 py-2.5">
                     <div className="font-black text-base leading-none">{totalGross || '—'}</div>
-                    {totalNet > 0 && <div className="text-fairway-300 text-xs mt-0.5">Net {totalNet}</div>}
-                    {anyPutts && hasPutts && <div className="text-fairway-400 text-xs mt-0.5">{totalPutts} putts</div>}
+                    {totalNet > 0 && <div className="text-xs mt-0.5" style={{ color: 'rgba(255,255,255,0.6)' }}>Net {totalNet}</div>}
+                    {anyPutts && hasPutts && <div className="text-xs mt-0.5" style={{ color: 'rgba(255,255,255,0.5)' }}>{totalPutts} putts</div>}
                   </td>
                 ))}
               </tr>
@@ -938,14 +953,14 @@ function TraditionalScorecard({ event, course, groupPlayers, scores, isComplete,
         </div>
 
         {/* Legend */}
-        <div className="mt-3 flex flex-wrap gap-2 text-xs justify-center">
-          <span className="flex items-center gap-1"><span className="inline-flex items-center justify-center w-6 h-6 rounded bg-yellow-400 text-yellow-900 font-black text-xs">E</span> Eagle+</span>
-          <span className="flex items-center gap-1"><span className="inline-flex items-center justify-center w-6 h-6 rounded bg-green-200 text-green-900 font-bold text-xs">B</span> Birdie</span>
-          <span className="flex items-center gap-1"><span className="inline-flex items-center justify-center w-6 h-6 rounded border border-gray-300 text-gray-700 font-bold text-xs">P</span> Par</span>
-          <span className="flex items-center gap-1"><span className="inline-flex items-center justify-center w-6 h-6 rounded bg-red-200 text-red-900 font-bold text-xs">+1</span> Bogey</span>
-          <span className="flex items-center gap-1"><span className="inline-flex items-center justify-center w-6 h-6 rounded bg-red-700 text-white font-bold text-xs">+2</span> Double+</span>
+        <div className="mt-3 flex flex-wrap gap-2 text-xs justify-center text-ink-muted">
+          <span className="flex items-center gap-1"><span className="inline-flex items-center justify-center w-6 h-6 rounded font-black text-xs" style={{ background: '#fef08a', color: '#713f12' }}>E</span> Eagle+</span>
+          <span className="flex items-center gap-1"><span className="inline-flex items-center justify-center w-6 h-6 rounded font-bold text-xs" style={{ background: '#eaf1ec', color: '#1B4332' }}>B</span> Birdie</span>
+          <span className="flex items-center gap-1"><span className="inline-flex items-center justify-center w-6 h-6 rounded border font-bold text-xs text-ink" style={{ borderColor: '#ebe9e4' }}>P</span> Par</span>
+          <span className="flex items-center gap-1"><span className="inline-flex items-center justify-center w-6 h-6 rounded bg-red-100 text-red-800 font-bold text-xs">+1</span> Bogey</span>
+          <span className="flex items-center gap-1"><span className="inline-flex items-center justify-center w-6 h-6 rounded bg-red-600 text-white font-bold text-xs">+2</span> Double+</span>
         </div>
-        <p className="text-center text-xs text-gray-400 mt-1">Colors based on net score vs par</p>
+        <p className="text-center text-xs text-ink-muted mt-1">Colors based on net score vs par</p>
       </div>
     </div>
   )
@@ -1102,11 +1117,11 @@ function GuestCodeEntry({ eventId, onSuccess }) {
 
 function ScorecardSkeleton() {
   return (
-    <div className="min-h-screen bg-gray-50">
-      <div className="h-24 bg-fairway-700 animate-pulse" />
-      <div className="h-16 bg-white border-b animate-pulse" />
+    <div className="min-h-screen" style={{ background: '#fbfaf8' }}>
+      <div className="h-24 animate-pulse" style={{ background: '#eceae5' }} />
+      <div className="h-16 border-b animate-pulse" style={{ background: '#ffffff', borderColor: '#ebe9e4' }} />
       <div className="p-4 space-y-3">
-        {[0,1,2,3].map(i => <div key={i} className="h-28 bg-gray-200 rounded-xl animate-pulse" />)}
+        {[0,1,2,3].map(i => <div key={i} className="h-28 rounded-xl animate-pulse" style={{ background: '#eceae5' }} />)}
       </div>
     </div>
   )
