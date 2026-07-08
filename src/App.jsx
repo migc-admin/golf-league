@@ -13,6 +13,7 @@ import Login          from './pages/Login'
 import Home           from './pages/Home'
 import Dashboard      from './pages/admin/Dashboard'
 import Leagues        from './pages/admin/Leagues'
+import LeagueDetail   from './pages/admin/LeagueDetail'
 import Courses        from './pages/admin/Courses'
 import Players        from './pages/admin/Players'
 import EventDetail    from './pages/admin/EventDetail'
@@ -34,7 +35,8 @@ export default function App() {
         {/* Admin (requires admin role) */}
         <Route path="/admin" element={<AdminRoute />}>
           <Route index                element={<Dashboard />} />
-          <Route path="leagues"       element={<Leagues />} />
+          <Route path="leagues"                    element={<Leagues />} />
+          <Route path="leagues/:leagueSlug"       element={<LeagueDetail />} />
           <Route path="courses"       element={<Courses />} />
           <Route path="players"       element={<Players />} />
           <Route path="import"        element={<Import />} />

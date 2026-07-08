@@ -130,10 +130,10 @@ export default function EventDetail() {
           </p>
         </div>
         <div className="flex gap-2 shrink-0 flex-wrap justify-end">
-          <Link to={`/${orgSlug}/${event.league?.slug}/${event.slug}/schedule`} className="btn-secondary btn-sm btn">
+          <Link to={`/${orgSlug}/${event.league?.slug}/${event.slug}/schedule?eid=${event.id}`} className="btn-secondary btn-sm btn">
             Pairings ↗
           </Link>
-          <Link to={`/${orgSlug}/${event.league?.slug}/${event.slug}/leaderboard`} className="btn-secondary btn-sm btn">
+          <Link to={`/${orgSlug}/${event.league?.slug}/${event.slug}/leaderboard?eid=${event.id}`} className="btn-secondary btn-sm btn">
             Leaderboard ↗
           </Link>
           <EventStatusControl event={event} onUpdated={load} />

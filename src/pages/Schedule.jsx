@@ -7,7 +7,7 @@
  */
 
 import { useEffect, useState } from 'react'
-import { useParams, Link, useNavigate } from 'react-router-dom'
+import { useParams, Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 
 const FORMAT_LABELS = {
@@ -27,6 +27,8 @@ const FORMAT_DESCRIPTIONS = {
 export default function Schedule() {
   const { orgSlug, leagueSlug, eventSlug } = useParams()
   const navigate = useNavigate()
+  const [searchParams] = useSearchParams()
+  const directEventId = searchParams.get('eid')
   const [event,        setEvent]        = useState(null)
   const [eventPlayers, setEventPlayers] = useState([])
   const [loading,      setLoading]      = useState(true)
@@ -34,34 +36,51 @@ export default function Schedule() {
 
   useEffect(() => {
     async function load() {
-      const { data: league } = await supabase.from('leagues').select('id, name, slug').eq('slug', leagueSlug).single()
-      if (!league) { setError('Event not found.'); setLoading(false); return }
+      try {
+        let ev = null
 
-      const { data: ev } = await supabase
-        .from('events')
-        .select('*, course:courses(name), league:leagues(name, season_year, slug)')
-        .eq('league_id', league.id)
-        .eq('slug', eventSlug)
-        .single()
+        if (directEventId) {
+          const { data } = await supabase
+            .from('events')
+            .select('*, course:courses(name), league:leagues(name, season_year, slug)')
+            .eq('id', directEventId)
+            .single()
+          ev = data
+        } else {
+          const { data: league } = await supabase.from('leagues').select('id, name, slug').eq('slug', leagueSlug).single()
+          if (!league) { setError('Event not found.'); setLoading(false); return }
+          const { data } = await supabase
+            .from('events')
+            .select('*, course:courses(name), league:leagues(name, season_year, slug)')
+            .eq('league_id', league.id)
+            .eq('slug', eventSlug)
+            .single()
+          ev = data
+        }
 
-      if (!ev) { setError('Event not found.'); setLoading(false); return }
+        if (!ev) { setError('Event not found.'); setLoading(false); return }
 
-      const eventId = ev.id
+        const eventId = ev.id
 
-      const { data: eps } = await supabase
-        .from('event_players')
-        .select('*, player:players(first_name, last_name)')
-        .eq('event_id', eventId)
-        .order('group_number')
-        .order('flight')
-        .order('adjusted_handicap_index')
+        const { data: eps } = await supabase
+          .from('event_players')
+          .select('*, player:players(first_name, last_name)')
+          .eq('event_id', eventId)
+          .order('group_number')
+          .order('flight')
+          .order('adjusted_handicap_index')
 
-      setEvent(ev)
-      setEventPlayers(eps ?? [])
-      setLoading(false)
+        setEvent(ev)
+        setEventPlayers(eps ?? [])
+        setLoading(false)
+      } catch (err) {
+        console.error('Schedule load error:', err)
+        setError('Unable to load pairings.')
+        setLoading(false)
+      }
     }
     load()
-  }, [leagueSlug, eventSlug])
+  }, [directEventId, leagueSlug, eventSlug])
 
   if (loading) return <ScheduleSkeleton />
 
@@ -162,7 +181,7 @@ export default function Schedule() {
       {event.status !== 'upcoming' && (
         <div className="max-w-xl mx-auto px-4 pt-4">
           <Link
-            to={`/${orgSlug}/${event.league?.slug}/${event.slug}/leaderboard`}
+            to={`/${orgSlug}/${event.league?.slug}/${event.slug}/leaderboard?eid=${event.id}`}
             className="flex items-center justify-between bg-fairway-700 text-white rounded-xl px-4 py-3 shadow-sm hover:bg-fairway-800 transition-colors"
           >
             <div className="flex items-center gap-3">

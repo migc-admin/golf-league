@@ -359,9 +359,12 @@ export default function Scorecard() {
 
   if (!event || !course) return null
 
+  const parPerHole    = course.par_per_hole    ?? Array(18).fill(4)
+  const strokeIndex   = course.stroke_index    ?? Array(18).fill(0)
+
   const hole       = currentHole
-  const par        = course.par_per_hole[hole - 1]
-  const si         = course.stroke_index[hole - 1]
+  const par        = parPerHole[hole - 1]
+  const si         = strokeIndex[hole - 1]
   const yd         = course.yardage?.[hole - 1] ?? '—'
   const trackPutts = !event.side_game_options?.length || event.side_game_options.includes('track_putts')
   const holesEntered = groupPlayers.length > 0
@@ -413,7 +416,7 @@ export default function Scorecard() {
               </button>
             )}
             <Link
-              to={`/${orgSlug ?? event.org_slug}/${event.league?.slug}/${event.slug}/leaderboard`}
+              to={`/${orgSlug ?? event.org_slug}/${event.league?.slug}/${event.slug}/leaderboard?eid=${event.id}`}
               state={{ from: 'scorecard', scorecardEventId: event.id }}
               className="text-xs font-semibold px-3 py-1.5 rounded-full transition-colors text-ink-muted hover:text-ink hover:bg-surface-high"
             >
@@ -505,7 +508,7 @@ export default function Scorecard() {
             si={si}
             score={getScore(ep.player_id, hole)}
             allHoleScores={scores[ep.player_id] ?? {}}
-            courseStrokeIndexes={course.stroke_index}
+            courseStrokeIndexes={strokeIndex}
             trackPutts={trackPutts}
             onChange={(field, val) => updateScore(ep.player_id, hole, field, val)}
             onGrossDone={() => {
@@ -741,8 +744,8 @@ function PlayerScoreCard({ ep, hole, par, si, score, allHoleScores, courseStroke
 
 // ─── Traditional Scorecard View (vertical: holes=rows, players=cols) ──
 function TraditionalScorecard({ event, course, groupPlayers, scores, isComplete, canEdit, onEdit, homeLink, onSignOut, trackPutts }) {
-  const pars  = course.par_per_hole
-  const sis   = course.stroke_index
+  const pars  = course.par_per_hole ?? Array(18).fill(4)
+  const sis   = course.stroke_index ?? Array(18).fill(0)
 
   // Build per-player totals
   const playerData = groupPlayers.map(ep => {
@@ -804,7 +807,7 @@ function TraditionalScorecard({ event, course, groupPlayers, scores, isComplete,
           </div>
           <div className="flex items-center gap-2">
             <Link
-              to={`/${orgSlug ?? event.org_slug}/${event.league?.slug}/${event.slug}/leaderboard`}
+              to={`/${orgSlug ?? event.org_slug}/${event.league?.slug}/${event.slug}/leaderboard?eid=${event.id}`}
               state={{ from: 'scorecard', scorecardEventId: event.id }}
               className="text-xs font-semibold px-3 py-1.5 rounded-full transition-colors text-ink-muted hover:text-ink hover:bg-surface-high"
             >

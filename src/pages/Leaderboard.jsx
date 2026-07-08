@@ -5,7 +5,7 @@
  */
 
 import { useEffect, useState, useRef } from 'react'
-import { useParams, Link, useNavigate, useLocation } from 'react-router-dom'
+import { useParams, Link, useNavigate, useLocation, useSearchParams } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../hooks/useAuth'
 import { computeLeaderboards, computeStableford } from '../lib/engines/scoring'
@@ -47,6 +47,8 @@ export default function Leaderboard() {
   const { orgSlug, leagueSlug, eventSlug } = useParams()
   const navigate = useNavigate()
   const location = useLocation()
+  const [searchParams] = useSearchParams()
+  const directEventId = searchParams.get('eid')
   const { user, isAdmin } = useAuth()
   const hasFeature = useFeatures()
   const homeLink = isAdmin ? '/admin' : user ? '/home' : null
@@ -76,15 +78,27 @@ export default function Leaderboard() {
 
   useEffect(() => {
     async function init() {
-      const { data: league } = await supabase.from('leagues').select('id, name, slug').eq('slug', leagueSlug).single()
-      if (!league) { setLoading(false); return }
+      let ev = null
 
-      const { data: ev } = await supabase
-        .from('events')
-        .select('*, course:courses(*), league:leagues(name, slug)')
-        .eq('league_id', league.id)
-        .eq('slug', eventSlug)
-        .single()
+      if (directEventId) {
+        const { data } = await supabase
+          .from('events')
+          .select('*, course:courses(*), league:leagues(name, slug)')
+          .eq('id', directEventId)
+          .single()
+        ev = data
+      } else {
+        const { data: league } = await supabase.from('leagues').select('id, name, slug').eq('slug', leagueSlug).single()
+        if (!league) { setLoading(false); return }
+        const { data } = await supabase
+          .from('events')
+          .select('*, course:courses(*), league:leagues(name, slug)')
+          .eq('league_id', league.id)
+          .eq('slug', eventSlug)
+          .single()
+        ev = data
+      }
+
       if (!ev) { setLoading(false); return }
 
       const eventId = ev.id
@@ -104,7 +118,7 @@ export default function Leaderboard() {
       setLoading(false)
 
       // Load TGL data non-blocking
-      const leagueId = ev.league_id ?? league.id
+      const leagueId = ev.league_id
       const { data: tglT } = await supabase.from('tgl_teams').select('*').eq('league_id', leagueId).order('name')
       if (tglT?.length) {
         const [{ data: tglM }, { data: tglS }, { data: tglLock }] = await Promise.all([
