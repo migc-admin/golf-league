@@ -154,8 +154,8 @@ export default function Standings() {
   const views = ['earnings', ...(hasFeature('tgl') && tglStandings.length > 0 ? ['tgl'] : [])]
 
   if (loading) return (
-    <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-      <svg className="animate-spin h-8 w-8 text-fairway-600" fill="none" viewBox="0 0 24 24">
+    <div className="min-h-screen flex items-center justify-center" style={{ background: '#fbfaf8' }}>
+      <svg className="animate-spin h-8 w-8 text-status-active-text" fill="none" viewBox="0 0 24 24">
         <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
         <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/>
       </svg>
@@ -163,12 +163,12 @@ export default function Standings() {
   )
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <div className="bg-fairway-700 text-white shadow-lg">
+    <div className="min-h-screen" style={{ background: '#fbfaf8' }}>
+      <div className="sticky top-0 z-10" style={{ background: '#ffffff', borderBottom: '1px solid #ebe9e4' }}>
         <div className="max-w-4xl mx-auto px-4 py-4">
-          <Link to="/admin" className="text-fairway-300 text-xs hover:text-white">← Home</Link>
-          <h1 className="text-xl font-bold mt-1">Season Standings</h1>
-          <p className="text-fairway-200 text-sm">
+          <Link to="/admin" className="text-ink-muted text-xs hover:text-ink font-medium">← Home</Link>
+          <h1 className="text-xl font-bold text-ink mt-1" style={{ letterSpacing: '-0.02em' }}>Season Standings</h1>
+          <p className="text-ink-muted text-sm">
             {league?.name} · {league?.season_year} · {events.length} event{events.length !== 1 ? 's' : ''} complete
           </p>
         </div>
@@ -182,8 +182,8 @@ export default function Standings() {
               <button
                 key={v}
                 onClick={() => setView(v)}
-                className={`px-4 py-2 rounded-lg text-sm font-semibold transition-colors ${
-                  view === v ? 'bg-fairway-700 text-white' : 'bg-white text-gray-600 border border-gray-200 hover:border-gray-300'
+                className={`px-4 py-2 rounded-full text-sm font-semibold transition-colors ${
+                  view === v ? 'bg-ink text-white' : 'text-ink-muted hover:text-ink hover:bg-surface-high'
                 }`}
               >
                 {v === 'earnings' ? 'Earnings' : 'TGL Teams'}
@@ -217,7 +217,7 @@ function EarningsTable({ standings, events }) {
       <div className="flex justify-end">
         <button
           onClick={() => setShowBreakdown(v => !v)}
-          className="text-xs text-fairway-700 hover:underline font-medium"
+          className="text-xs text-status-active-text hover:underline font-medium"
         >
           {showBreakdown ? 'Hide event breakdown' : 'Show event breakdown'}
         </button>
@@ -227,9 +227,9 @@ function EarningsTable({ standings, events }) {
         <div className="overflow-x-auto">
           <table className="w-full text-sm min-w-max">
             <thead>
-              <tr className="bg-gray-50 text-left text-xs font-semibold text-gray-500 border-b">
-                <th className="px-5 py-3 sticky left-0 bg-gray-50 z-10">Rank</th>
-                <th className="px-4 py-3 sticky left-12 bg-gray-50 z-10">Player</th>
+              <tr className="text-left text-xs font-semibold text-ink-muted" style={{ background: '#f4f3f0', borderBottom: '1px solid #ebe9e4' }}>
+                <th className="px-5 py-3 sticky left-0 z-10" style={{ background: '#f4f3f0' }}>Rank</th>
+                <th className="px-4 py-3 sticky left-12 z-10" style={{ background: '#f4f3f0' }}>Player</th>
                 <th className="px-4 py-3 text-center">Events</th>
                 {showBreakdown && events.map(ev => (
                   <th key={ev.id} className="px-3 py-3 text-right whitespace-nowrap">
@@ -239,20 +239,20 @@ function EarningsTable({ standings, events }) {
                 <th className="px-4 py-3 text-right">Total</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-gray-100">
+            <tbody>
               {standings.map((s, i) => (
-                <tr key={s.player?.id ?? i} className={i < 3 ? 'bg-yellow-50/50' : ''}>
+                <tr key={s.player?.id ?? i} style={{ borderBottom: '1px solid #ebe9e4', background: i % 2 === 1 ? 'rgba(27,67,50,0.025)' : '#ffffff' }}>
                   <td className="px-5 py-3 text-base sticky left-0 bg-inherit z-10">{medals[i] ?? i + 1}</td>
-                  <td className="px-4 py-3 font-medium text-gray-900 sticky left-12 bg-inherit z-10 whitespace-nowrap">
+                  <td className="px-4 py-3 font-medium text-ink sticky left-12 bg-inherit z-10 whitespace-nowrap">
                     {s.player?.last_name}, {s.player?.first_name}
                   </td>
-                  <td className="px-4 py-3 text-center text-gray-500">{s.eventsPlayed}</td>
+                  <td className="px-4 py-3 text-center text-ink-muted">{s.eventsPlayed}</td>
                   {showBreakdown && events.map(ev => (
-                    <td key={ev.id} className="px-3 py-3 text-right text-gray-600">
+                    <td key={ev.id} className="px-3 py-3 text-right text-ink-muted">
                       {s.byEvent[ev.id] ? `$${s.byEvent[ev.id].toFixed(2)}` : '—'}
                     </td>
                   ))}
-                  <td className="px-4 py-3 text-right font-bold text-fairway-700">
+                  <td className="px-4 py-3 text-right font-bold text-status-active-text">
                     ${s.totalEarnings.toFixed(2)}
                   </td>
                 </tr>
@@ -273,28 +273,28 @@ function TGLStandingsTable({ standings, eventRows, events }) {
     <div className="space-y-4">
       {/* Season totals */}
       <Card className="overflow-hidden p-0">
-        <div className="bg-gray-50 px-5 py-3 border-b border-gray-100">
-          <span className="text-xs font-semibold text-gray-500 uppercase tracking-widest">Season Totals</span>
+        <div className="px-5 py-3" style={{ background: '#f4f3f0', borderBottom: '1px solid #ebe9e4' }}>
+          <span className="text-xs font-semibold text-ink-muted uppercase tracking-widest">Season Totals</span>
         </div>
         <table className="w-full text-sm">
           <thead>
-            <tr className="text-left text-xs font-semibold text-gray-500 border-b border-gray-100">
+            <tr className="text-left text-xs font-semibold text-ink-muted" style={{ borderBottom: '1px solid #ebe9e4' }}>
               <th className="px-5 py-2">Rank</th>
               <th className="px-4 py-2">Team</th>
               <th className="px-4 py-2 text-right">Points</th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-gray-100">
+          <tbody>
             {standings.map((s, i) => (
-              <tr key={s.team.id} className={i < 3 ? 'bg-yellow-50/50' : ''}>
+              <tr key={s.team.id} style={{ borderBottom: '1px solid #ebe9e4', background: i % 2 === 1 ? 'rgba(27,67,50,0.025)' : '#ffffff' }}>
                 <td className="px-5 py-3 text-base">{medals[i] ?? i + 1}</td>
                 <td className="px-4 py-3">
                   <div className="flex items-center gap-2">
                     <span className="w-3 h-3 rounded-full" style={{ backgroundColor: s.team.color }} />
-                    <span className="font-semibold text-gray-900">{s.team.name}</span>
+                    <span className="font-semibold text-ink">{s.team.name}</span>
                   </div>
                 </td>
-                <td className="px-4 py-3 text-right font-bold text-fairway-700">
+                <td className="px-4 py-3 text-right font-bold text-status-active-text">
                   {s.seasonPoints % 1 === 0 ? s.seasonPoints : s.seasonPoints.toFixed(1)}
                 </td>
               </tr>
@@ -306,43 +306,45 @@ function TGLStandingsTable({ standings, eventRows, events }) {
       {/* Per-event breakdown */}
       {eventRows.length > 0 && (
         <div className="space-y-2">
-          <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-widest px-1">Event Results</h3>
+          <h3 className="text-xs font-semibold text-ink-muted uppercase tracking-widest px-1">Event Results</h3>
           {eventRows.map(({ event: ev, teamResults }) => (
             <Card key={ev.id} className="overflow-hidden p-0">
               <button
-                className="w-full flex items-center justify-between px-4 py-3 hover:bg-gray-50 transition-colors text-left"
+                className="w-full flex items-center justify-between px-4 py-3 transition-colors text-left"
                 onClick={() => setExpandedEvent(expandedEvent === ev.id ? null : ev.id)}
+                onMouseEnter={e => e.currentTarget.style.background = '#f4f3f0'}
+                onMouseLeave={e => e.currentTarget.style.background = ''}
               >
-                <span className="font-medium text-gray-800 text-sm">
+                <span className="font-medium text-ink text-sm">
                   Event #{ev.event_number}{ev.name ? ` — ${ev.name}` : ''} · {ev.course?.name}
                 </span>
-                <span className="text-gray-400 text-xs">{expandedEvent === ev.id ? '▲' : '▼'}</span>
+                <span className="text-ink-muted text-xs">{expandedEvent === ev.id ? '▲' : '▼'}</span>
               </button>
 
               {expandedEvent === ev.id && (
-                <table className="w-full text-sm border-t border-gray-100">
+                <table className="w-full text-sm" style={{ borderTop: '1px solid #ebe9e4' }}>
                   <thead>
-                    <tr className="text-left text-xs font-semibold text-gray-500 bg-gray-50 border-b border-gray-100">
+                    <tr className="text-left text-xs font-semibold text-ink-muted" style={{ background: '#f4f3f0', borderBottom: '1px solid #ebe9e4' }}>
                       <th className="px-4 py-2">Team</th>
                       <th className="px-4 py-2">Players</th>
                       <th className="px-4 py-2 text-right">Pts</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-gray-100">
+                  <tbody>
                     {teamResults.map(tr => (
-                      <tr key={tr.team.id}>
+                      <tr key={tr.team.id} style={{ borderBottom: '1px solid #ebe9e4' }}>
                         <td className="px-4 py-2.5">
                           <div className="flex items-center gap-2">
                             <span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: tr.team.color }} />
-                            <span className="font-medium text-gray-800">{tr.team.name}</span>
+                            <span className="font-medium text-ink">{tr.team.name}</span>
                           </div>
                         </td>
-                        <td className="px-4 py-2.5 text-xs text-gray-500">
+                        <td className="px-4 py-2.5 text-xs text-ink-muted">
                           {tr.selectedPlayers.map(p =>
                             `${p.name} (#${p.rank ?? '?'}, ${p.points % 1 === 0 ? p.points : p.points.toFixed(1)}pts)`
                           ).join(' · ') || '—'}
                         </td>
-                        <td className="px-4 py-2.5 text-right font-bold text-gray-900">
+                        <td className="px-4 py-2.5 text-right font-bold text-ink">
                           {tr.teamPoints % 1 === 0 ? tr.teamPoints : tr.teamPoints.toFixed(1)}
                         </td>
                       </tr>
@@ -355,7 +357,7 @@ function TGLStandingsTable({ standings, eventRows, events }) {
         </div>
       )}
 
-      <p className="text-xs text-gray-400 text-center">
+      <p className="text-xs text-ink-muted text-center">
         Points: field size − finishing position + 1 · ties split combined places equally
       </p>
     </div>

@@ -142,8 +142,8 @@ export default function Leaderboard() {
 
   if (loading) return <LeaderboardSkeleton />
   if (!event)  return (
-    <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-      <p className="text-gray-400">Event not found.</p>
+    <div className="min-h-screen flex items-center justify-center" style={{ background: '#fbfaf8' }}>
+      <p className="text-ink-muted">Event not found.</p>
     </div>
   )
 
@@ -167,17 +167,17 @@ export default function Leaderboard() {
   const hasFlights = eventPlayers.some(ep => !ep.is_guest && (ep.flight === 'A' || ep.flight === 'B'))
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen" style={{ background: '#fbfaf8' }}>
       {/* Back nav */}
-      <div className="bg-fairway-900 text-white px-4 py-2 flex items-center justify-between">
+      <div className="px-4 py-2 flex items-center justify-between" style={{ background: '#fbfaf8' }}>
         <button
           onClick={() => navigate(-1)}
-          className="flex items-center gap-1.5 text-fairway-300 hover:text-white text-sm transition-colors"
+          className="flex items-center gap-1.5 text-ink-muted hover:text-ink text-sm transition-colors font-medium"
         >
           ← {fromScorecard ? 'Back to Scoring' : 'Back'}
         </button>
         {homeLink && (
-          <Link to={homeLink} className="text-fairway-300 hover:text-white text-sm transition-colors flex items-center gap-1">
+          <Link to={homeLink} className="text-ink-muted hover:text-ink text-sm transition-colors flex items-center gap-1 font-medium">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"/></svg>
             Home
           </Link>
@@ -185,27 +185,27 @@ export default function Leaderboard() {
       </div>
 
       {/* Header */}
-      <div className="bg-fairway-700 text-white shadow-lg sticky top-0 z-20">
+      <div className="sticky top-0 z-20" style={{ background: '#ffffff', borderBottom: '1px solid #ebe9e4' }}>
         <div className="max-w-2xl mx-auto px-4 py-3 flex items-center justify-between">
           <div>
-            <div className="font-bold text-base">{event.course?.name}</div>
-            <div className="text-xs text-fairway-200 mt-0.5">
+            <div className="font-bold text-base text-ink">{event.course?.name}</div>
+            <div className="text-xs text-ink-muted mt-0.5">
               {event.league?.name} · Event #{event.event_number} · {formatDate(event.event_date)}
             </div>
             {event.format && event.format !== 'net_stroke' && (
-              <div className="text-xs text-fairway-300 mt-0.5">{FORMAT_LABELS[event.format] ?? event.format}</div>
+              <div className="text-xs text-ink-muted mt-0.5">{FORMAT_LABELS[event.format] ?? event.format}</div>
             )}
           </div>
           <div className="flex flex-col items-end gap-1.5">
             <StatusBadge status={event.status} />
-            <Link to={`/${orgSlug}/${event.league?.slug}/${event.slug}/schedule`} className="text-xs text-fairway-300 hover:text-white">
+            <Link to={`/${orgSlug}/${event.league?.slug}/${event.slug}/schedule`} className="text-xs text-ink-muted hover:text-ink">
               Pairings ↗
             </Link>
           </div>
         </div>
 
         {/* Tabs — pill style */}
-        <div className="max-w-2xl mx-auto border-t border-fairway-600/50">
+        <div className="max-w-2xl mx-auto" style={{ borderTop: '1px solid #ebe9e4' }}>
           <div className="flex overflow-x-auto px-3 py-2 gap-1">
             {tabs.map(tab => (
               <button
@@ -215,8 +215,8 @@ export default function Leaderboard() {
                 aria-pressed={activeTab === tab}
                 className={`flex-none px-3.5 py-1.5 text-xs font-semibold transition-colors whitespace-nowrap cursor-pointer rounded-full ${
                   activeTab === tab
-                    ? 'bg-white text-fairway-900'
-                    : 'text-fairway-200 hover:text-white hover:bg-white/10'
+                    ? 'bg-status-active-bg text-status-active-text'
+                    : 'text-ink-muted hover:text-ink hover:bg-surface-high'
                 }`}
               >
                 {tab}
@@ -244,9 +244,9 @@ export default function Leaderboard() {
               className={`px-4 py-1.5 rounded-full text-sm font-semibold transition-colors cursor-pointer ${
                 activeFlight === f
                   ? f === 'A'
-                    ? 'bg-blue-600 text-white'
-                    : 'bg-purple-600 text-white'
-                  : 'bg-white text-gray-500 border border-gray-200 hover:border-gray-300'
+                    ? 'bg-blue-50 text-blue-700'
+                    : 'bg-purple-50 text-purple-700'
+                  : 'text-ink-muted hover:text-ink hover:bg-surface-high'
               }`}
             >
               Flight {f}
@@ -362,7 +362,7 @@ function NetLeaderboard({ complete, inProgress, flight, vsParKey = 'netVsPar', g
 
   function scoreColor(p) {
     const vs = p[vsParKey]
-    return vs < 0 ? 'text-[#BA1A1A] font-bold' : vs === 0 ? 'text-gray-700' : 'text-gray-500'
+    return vs < 0 ? 'text-status-active-text font-bold' : vs === 0 ? 'text-ink' : 'text-ink-muted'
   }
 
   // Merge all players and sort by score — lowest net score wins regardless of holes played
@@ -384,9 +384,9 @@ function NetLeaderboard({ complete, inProgress, flight, vsParKey = 'netVsPar', g
   })
 
   return (
-    <div className="rounded-xl overflow-hidden border border-gray-200 shadow-[0_4px_20px_rgba(27,67,50,0.08)]">
+    <div className="card overflow-hidden p-0">
       {/* Table header */}
-      <div className="grid grid-cols-[2.5rem_1fr_3.5rem_3rem] bg-[#012d1d] text-white/80 text-[10px] font-bold uppercase tracking-widest px-4 py-2.5">
+      <div className="grid grid-cols-[2.5rem_1fr_3.5rem_3rem] text-[10px] font-bold uppercase tracking-widest px-4 py-2.5" style={{ background: '#f4f3f0', color: '#86868b' }}>
         <span>Pos</span>
         <span>Player</span>
         <span className="text-right">Score</span>
@@ -402,21 +402,28 @@ function NetLeaderboard({ complete, inProgress, flight, vsParKey = 'netVsPar', g
           <div
             key={p.player_id}
             onClick={() => course && setScorecardPlayer(p)}
-            className={`grid grid-cols-[2.5rem_1fr_3.5rem_3rem] items-center px-4 py-3 border-b border-gray-100 last:border-0 cursor-pointer hover:bg-fairway-50 transition-colors ${i % 2 === 1 ? 'bg-[rgba(27,67,50,0.025)]' : 'bg-white'} ${isFirst ? 'border-l-2 border-l-[#cba72f]' : ''}`}
+            className="grid grid-cols-[2.5rem_1fr_3.5rem_3rem] items-center px-4 py-3 cursor-pointer transition-colors"
+            style={{
+              background: i % 2 === 1 ? 'rgba(27,67,50,0.025)' : '#ffffff',
+              borderBottom: '1px solid #ebe9e4',
+              borderLeft: isFirst ? '3px solid #1B4332' : undefined,
+            }}
+            onMouseEnter={e => e.currentTarget.style.background = '#f4f3f0'}
+            onMouseLeave={e => e.currentTarget.style.background = i % 2 === 1 ? 'rgba(27,67,50,0.025)' : '#ffffff'}
           >
-            <span className="text-sm font-semibold text-gray-500 tabular-nums">{p.mergedRankLabel}</span>
+            <span className="text-sm font-semibold text-ink-muted tabular-nums">{p.mergedRankLabel}</span>
             <div>
-              <div className="font-semibold text-sm text-gray-900 leading-tight">
+              <div className="font-semibold text-sm text-ink leading-tight">
                 {p.player?.last_name}, {p.player?.first_name}
               </div>
-              <div className="text-[10px] text-gray-400 mt-0.5">
+              <div className="text-[10px] text-ink-muted mt-0.5">
                 CH {p[handicapKey] ?? p.course_handicap} · Gross {p[grossKey] ?? '—'}
               </div>
             </div>
             <span className={`text-sm tabular-nums text-right ${scoreColor(p)}`}>
               {scoreDisplay(p)}
             </span>
-            <span className="text-xs text-gray-400 text-right tabular-nums">
+            <span className="text-xs text-ink-muted text-right tabular-nums">
               {p.finished && holesThru === maxHoles ? 'F' : holesThru || '—'}
             </span>
           </div>
@@ -452,8 +459,8 @@ function PuttLeaderboard({ data, playerMap, allScores = [], course = null }) {
   })
 
   return (
-    <div className="rounded-xl overflow-hidden border border-gray-200 shadow-[0_4px_20px_rgba(27,67,50,0.08)]">
-      <div className="grid grid-cols-[2.5rem_1fr_3.5rem] bg-[#012d1d] text-white/80 text-[10px] font-bold uppercase tracking-widest px-4 py-2.5">
+    <div className="card overflow-hidden p-0">
+      <div className="grid grid-cols-[2.5rem_1fr_3.5rem] text-[10px] font-bold uppercase tracking-widest px-4 py-2.5" style={{ background: '#f4f3f0', color: '#86868b' }}>
         <span>Pos</span>
         <span>Player</span>
         <span className="text-right">Putts</span>
@@ -461,13 +468,20 @@ function PuttLeaderboard({ data, playerMap, allScores = [], course = null }) {
       {ranked.map((p, i) => (
         <div key={p.player_id}
           onClick={() => course && setScorecardPlayer(p)}
-          className={`grid grid-cols-[2.5rem_1fr_3.5rem] items-center px-4 py-3 border-b border-gray-100 last:border-0 cursor-pointer hover:bg-fairway-50 transition-colors ${i % 2 === 1 ? 'bg-[rgba(27,67,50,0.025)]' : 'bg-white'} ${p.rank === 1 ? 'border-l-2 border-l-[#cba72f]' : ''}`}
+          className="grid grid-cols-[2.5rem_1fr_3.5rem] items-center px-4 py-3 cursor-pointer transition-colors"
+          style={{
+            background: i % 2 === 1 ? 'rgba(27,67,50,0.025)' : '#ffffff',
+            borderBottom: '1px solid #ebe9e4',
+            borderLeft: p.rank === 1 ? '3px solid #1B4332' : undefined,
+          }}
+          onMouseEnter={e => e.currentTarget.style.background = '#f4f3f0'}
+          onMouseLeave={e => e.currentTarget.style.background = i % 2 === 1 ? 'rgba(27,67,50,0.025)' : '#ffffff'}
         >
-          <span className="text-sm font-semibold text-gray-500 tabular-nums">{p.rankLabel}</span>
-          <div className="font-medium text-sm text-gray-900">
+          <span className="text-sm font-semibold text-ink-muted tabular-nums">{p.rankLabel}</span>
+          <div className="font-medium text-sm text-ink">
             {p.player?.last_name}, {p.player?.first_name}
           </div>
-          <span className="text-sm font-black tabular-nums text-fairway-700 text-right">{p.totalPutts}</span>
+          <span className="text-sm font-black tabular-nums text-status-active-text text-right">{p.totalPutts}</span>
         </div>
       ))}
       {scorecardPlayer && course && (
@@ -517,22 +531,22 @@ function SkinsBoard({ skinsResults, playerMap }) {
 
       {/* Player skin totals */}
       {totalSkins > 0 && (
-        <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
-          <div className="px-4 py-3 border-b bg-gray-50">
-            <h3 className="font-semibold text-sm text-gray-800">Skins Won — Flight {flight}</h3>
+        <div className="card overflow-hidden p-0">
+          <div className="px-4 py-3" style={{ borderBottom: '1px solid #ebe9e4', background: '#f4f3f0' }}>
+            <h3 className="font-semibold text-sm text-ink">Skins Won — Flight {flight}</h3>
           </div>
-          <div className="divide-y divide-gray-100">
+          <div>
             {Object.entries(result.playerSkins)
               .filter(([, c]) => c > 0)
               .sort(([, a], [, b]) => b - a)
               .map(([pid, count]) => {
                 const p = playerMap[pid]
                 return (
-                  <div key={pid} className="flex items-center justify-between px-4 py-3">
-                    <span className="font-medium text-sm text-gray-900">
+                  <div key={pid} className="flex items-center justify-between px-4 py-3" style={{ borderBottom: '1px solid #ebe9e4' }}>
+                    <span className="font-medium text-sm text-ink">
                       {p ? `${p.last_name}, ${p.first_name}` : pid}
                     </span>
-                    <span className="font-black text-fairway-700 text-lg">{count} skin{count !== 1 ? 's' : ''}</span>
+                    <span className="font-black text-status-active-text text-lg">{count} skin{count !== 1 ? 's' : ''}</span>
                   </div>
                 )
               })
@@ -542,28 +556,28 @@ function SkinsBoard({ skinsResults, playerMap }) {
       )}
 
       {/* Hole-by-hole */}
-      <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
-        <div className="px-4 py-3 border-b bg-gray-50">
-          <h3 className="font-semibold text-sm text-gray-800">Hole-by-Hole Skins</h3>
+      <div className="card overflow-hidden p-0">
+        <div className="px-4 py-3" style={{ borderBottom: '1px solid #ebe9e4', background: '#f4f3f0' }}>
+          <h3 className="font-semibold text-sm text-ink">Hole-by-Hole Skins</h3>
         </div>
-        <div className="divide-y divide-gray-100">
+        <div>
           {result.holes.map(h => {
             if (h.incomplete) return null
             const winner = h.winner ? playerMap[h.winner] : null
             return (
-              <div key={h.hole} className="flex items-center gap-3 px-4 py-2.5">
-                <span className="w-8 text-sm font-semibold text-gray-500">#{h.hole}</span>
+              <div key={h.hole} className="flex items-center gap-3 px-4 py-2.5" style={{ borderBottom: '1px solid #ebe9e4' }}>
+                <span className="w-8 text-sm font-semibold text-ink-muted">#{h.hole}</span>
                 {h.tied && !h.winner && (
-                  <span className="text-xs text-orange-500 font-medium">
+                  <span className="text-xs text-orange-600 font-medium">
                     Tied — {h.carryoverIn + 1} skin{h.carryoverIn + 1 !== 1 ? 's' : ''} carried
                   </span>
                 )}
                 {h.winner && (
                   <>
-                    <span className="text-xs text-fairway-700 font-semibold">
+                    <span className="text-xs text-status-active-text font-semibold">
                       {winner ? `${winner.last_name}, ${winner.first_name}` : h.winner}
                     </span>
-                    <span className="ml-auto text-xs font-bold text-gray-600">
+                    <span className="ml-auto text-xs font-bold text-ink-muted">
                       {h.skinsWon} skin{h.skinsWon !== 1 ? 's' : ''}
                       {h.carryoverIn > 0 && <span className="text-orange-500"> (+{h.carryoverIn} carry)</span>}
                       {h.wraparound > 0 && <span className="text-purple-500"> (+{h.wraparound} wraparound)</span>}
@@ -592,30 +606,35 @@ function StablefordLeaderboard({ data, activeFlight }) {
 
   return (
     <div className="space-y-3">
-      <div className="rounded-xl overflow-hidden border border-gray-200 shadow-[0_4px_20px_rgba(27,67,50,0.08)]">
-        <div className="grid grid-cols-[2.5rem_1fr_3.5rem] bg-[#012d1d] text-white/80 text-[10px] font-bold uppercase tracking-widest px-4 py-2.5">
+      <div className="card overflow-hidden p-0">
+        <div className="grid grid-cols-[2.5rem_1fr_3.5rem] text-[10px] font-bold uppercase tracking-widest px-4 py-2.5" style={{ background: '#f4f3f0', color: '#86868b' }}>
           <span>Pos</span>
           <span>Player</span>
           <span className="text-right">Pts</span>
         </div>
         {list.map((p, i) => (
           <div key={p.player_id}
-            className={`grid grid-cols-[2.5rem_1fr_3.5rem] items-center px-4 py-3 border-b border-gray-100 last:border-0 ${i % 2 === 1 ? 'bg-[rgba(27,67,50,0.025)]' : 'bg-white'} ${i === 0 ? 'border-l-2 border-l-[#cba72f]' : ''}`}
+            className="grid grid-cols-[2.5rem_1fr_3.5rem] items-center px-4 py-3"
+            style={{
+              background: i % 2 === 1 ? 'rgba(27,67,50,0.025)' : '#ffffff',
+              borderBottom: '1px solid #ebe9e4',
+              borderLeft: i === 0 ? '3px solid #1B4332' : undefined,
+            }}
           >
-            <span className="text-sm font-semibold text-gray-500 tabular-nums">{i + 1}</span>
+            <span className="text-sm font-semibold text-ink-muted tabular-nums">{i + 1}</span>
             <div>
-              <div className="font-semibold text-sm text-gray-900 leading-tight">
+              <div className="font-semibold text-sm text-ink leading-tight">
                 {p.player?.last_name}, {p.player?.first_name}
               </div>
-              <div className="text-[10px] text-gray-400 mt-0.5">
+              <div className="text-[10px] text-ink-muted mt-0.5">
                 CH {p.course_handicap} · {p.holesPlayed} holes
               </div>
             </div>
-            <span className="text-sm font-black tabular-nums text-fairway-700 text-right">{p.totalPoints}</span>
+            <span className="text-sm font-black tabular-nums text-status-active-text text-right">{p.totalPoints}</span>
           </div>
         ))}
       </div>
-      <p className="text-xs text-center text-gray-400">Eagle=4 · Birdie=3 · Par=2 · Bogey=1 · DBL+=0 (net)</p>
+      <p className="text-xs text-center text-ink-muted">Eagle=4 · Birdie=3 · Par=2 · Bogey=1 · DBL+=0 (net)</p>
     </div>
   )
 }
@@ -803,68 +822,68 @@ function PayoutsBoard({ event, eventPlayers, leaderboards, sideGames, skinsResul
   return (
     <div className="space-y-4">
       {/* Summary banner */}
-      <div className="bg-fairway-700 rounded-xl p-4 text-white flex items-center justify-between">
+      <div className="card p-4 flex items-center justify-between" style={{ background: '#1d1d1f', border: 'none', color: '#ffffff' }}>
         <div>
-          <div className="text-xs text-fairway-300 font-medium">Total Pot</div>
+          <div className="text-xs font-medium" style={{ color: '#86868b' }}>Total Pot</div>
           <div className="text-3xl font-black">${totalPot.toFixed(2)}</div>
-          <div className="text-xs text-fairway-300 mt-0.5">{eventPlayers.length} players × ${event.entry_fee}</div>
+          <div className="text-xs mt-0.5" style={{ color: '#86868b' }}>{eventPlayers.length} players × ${event.entry_fee}</div>
         </div>
         <div className="text-right">
-          <div className="text-xs text-fairway-300 font-medium">Allocated</div>
+          <div className="text-xs font-medium" style={{ color: '#86868b' }}>Allocated</div>
           <div className="text-2xl font-bold">${totalAllocated.toFixed(2)}</div>
         </div>
       </div>
 
       {/* By category (games played) */}
-      <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
-        <div className="px-4 py-3 border-b bg-gray-50">
-          <h3 className="font-semibold text-sm text-gray-800">Games Played</h3>
+      <div className="card overflow-hidden p-0">
+        <div className="px-4 py-3" style={{ borderBottom: '1px solid #ebe9e4', background: '#f4f3f0' }}>
+          <h3 className="font-semibold text-sm text-ink">Games Played</h3>
         </div>
-        <div className="divide-y divide-gray-100">
+        <div>
           {sortedCategories.map(cat => {
             const winners = (cat.playerIds ?? (cat.playerId ? [cat.playerId] : []))
               .map(pid => playerMap[pid])
               .filter(Boolean)
             return (
-              <div key={cat.key} className="flex items-center justify-between px-4 py-2.5">
+              <div key={cat.key} className="flex items-center justify-between px-4 py-2.5" style={{ borderBottom: '1px solid #ebe9e4' }}>
                 <div>
-                  <div className="text-sm text-gray-700">{cat.label}</div>
-                  <div className="text-xs text-gray-400">
+                  <div className="text-sm text-ink">{cat.label}</div>
+                  <div className="text-xs text-ink-muted">
                     {winners.length > 0
                       ? winners.map(p => `${p.last_name}, ${p.first_name}`).join(' · ')
                       : '— Unresolved'}
                   </div>
                 </div>
-                <span className="font-bold text-gray-900">${cat.amount.toFixed(2)}</span>
+                <span className="font-bold text-ink">${cat.amount.toFixed(2)}</span>
               </div>
             )
           })}
           {sortedCategories.length === 0 && (
-            <p className="px-4 py-4 text-sm text-gray-400">No payouts resolved yet.</p>
+            <p className="px-4 py-4 text-sm text-ink-muted">No payouts resolved yet.</p>
           )}
         </div>
       </div>
 
       {/* By player */}
       {byPlayer.length > 0 && (
-        <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
-          <div className="px-4 py-3 border-b bg-gray-50">
-            <h3 className="font-semibold text-sm text-gray-800">Payouts by Player</h3>
+        <div className="card overflow-hidden p-0">
+          <div className="px-4 py-3" style={{ borderBottom: '1px solid #ebe9e4', background: '#f4f3f0' }}>
+            <h3 className="font-semibold text-sm text-ink">Payouts by Player</h3>
           </div>
-          <div className="divide-y divide-gray-100">
+          <div>
             {byPlayer.map(({ playerId, total, items }) => {
               const p = playerMap[playerId]
               return (
-                <div key={playerId} className="px-4 py-3">
+                <div key={playerId} className="px-4 py-3" style={{ borderBottom: '1px solid #ebe9e4' }}>
                   <div className="flex items-center justify-between">
-                    <span className="font-semibold text-gray-900">
+                    <span className="font-semibold text-ink">
                       {p ? `${p.last_name}, ${p.first_name}` : '—'}
                     </span>
-                    <span className="font-black text-fairway-700 text-lg">${total.toFixed(2)}</span>
+                    <span className="font-black text-status-active-text text-lg">${total.toFixed(2)}</span>
                   </div>
                   <div className="mt-1 space-y-0.5">
                     {items.map((item, i) => (
-                      <div key={i} className="flex justify-between text-xs text-gray-500">
+                      <div key={i} className="flex justify-between text-xs text-ink-muted">
                         <span>{item.category}</span>
                         <span>${item.amount.toFixed(2)}</span>
                       </div>
@@ -899,12 +918,10 @@ function PlayerScorecardModal({ player, allScores, course, onClose }) {
   })
 
   function netColor(netVsPar) {
-    if (netVsPar == null) return 'text-gray-300'
-    if (netVsPar <= -2)   return 'text-yellow-600 font-black'
-    if (netVsPar === -1)  return 'text-[#BA1A1A] font-bold'
-    if (netVsPar === 0)   return 'text-gray-700'
-    if (netVsPar === 1)   return 'text-gray-400'
-    return 'text-gray-400'
+    if (netVsPar == null) return 'text-ink-muted'
+    if (netVsPar < 0)    return 'text-status-active-text font-bold'
+    if (netVsPar === 0)  return 'text-ink'
+    return 'text-ink-muted'
   }
 
   const frontHoles = holes.slice(0, 9)
@@ -927,16 +944,16 @@ function PlayerScorecardModal({ player, allScores, course, onClose }) {
         onClick={e => e.stopPropagation()}
       >
         {/* Header */}
-        <div className="bg-[#012d1d] text-white px-5 py-4 flex items-center justify-between rounded-t-2xl flex-shrink-0">
+        <div className="px-5 py-4 flex items-center justify-between rounded-t-2xl flex-shrink-0" style={{ background: '#1d1d1f', color: '#ffffff' }}>
           <div>
             <div className="font-bold text-base leading-tight">{name}</div>
-            <div className="text-xs text-white/60 mt-0.5">CH {ch} · {course.name}</div>
+            <div className="text-xs mt-0.5" style={{ color: '#86868b' }}>CH {ch} · {course.name}</div>
           </div>
           <div className="flex items-center gap-3">
-            <div className={`text-2xl font-black tabular-nums ${totalVsPar < 0 ? 'text-[#BA1A1A]' : totalVsPar === 0 ? 'text-white' : 'text-white/60'}`}>
+            <div className={`text-2xl font-black tabular-nums ${totalVsPar < 0 ? 'text-status-active-text' : 'text-white'}`}>
               {vsParDisplay}
             </div>
-            <button onClick={onClose} className="w-8 h-8 flex items-center justify-center rounded-full bg-white/10 hover:bg-white/20 transition-colors">
+            <button onClick={onClose} className="w-8 h-8 flex items-center justify-center rounded-full transition-colors" style={{ background: 'rgba(255,255,255,0.1)' }}>
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><path d="M18 6L6 18M6 6l12 12"/></svg>
             </button>
           </div>
@@ -983,20 +1000,20 @@ function PlayerScorecardModal({ player, allScores, course, onClose }) {
         </div>
 
         {/* Overall totals footer */}
-        <div className="flex items-center justify-between px-5 py-3 border-t border-gray-200 bg-gray-50 rounded-b-2xl flex-shrink-0">
+        <div className="flex items-center justify-between px-5 py-3 rounded-b-2xl flex-shrink-0" style={{ borderTop: '1px solid #ebe9e4', background: '#f4f3f0' }}>
           <div className="grid grid-cols-2 gap-6 text-center">
             <div>
-              <div className="text-[10px] text-gray-400 uppercase tracking-wide font-bold">Gross</div>
-              <div className="text-lg font-black text-gray-800 tabular-nums">{frontGross + backGross || '—'}</div>
+              <div className="text-[10px] text-ink-muted uppercase tracking-wide font-bold">Gross</div>
+              <div className="text-lg font-black text-ink tabular-nums">{frontGross + backGross || '—'}</div>
             </div>
             <div>
-              <div className="text-[10px] text-gray-400 uppercase tracking-wide font-bold">Net</div>
-              <div className="text-lg font-black text-gray-800 tabular-nums">{frontNet + backNet || '—'}</div>
+              <div className="text-[10px] text-ink-muted uppercase tracking-wide font-bold">Net</div>
+              <div className="text-lg font-black text-ink tabular-nums">{frontNet + backNet || '—'}</div>
             </div>
           </div>
           <div className="text-right">
-            <div className="text-[10px] text-gray-400 uppercase tracking-wide font-bold mb-0.5">Net vs Par</div>
-            <div className={`text-3xl font-black tabular-nums ${totalVsPar < 0 ? 'text-[#BA1A1A]' : totalVsPar === 0 ? 'text-gray-700' : 'text-gray-500'}`}>
+            <div className="text-[10px] text-ink-muted uppercase tracking-wide font-bold mb-0.5">Net vs Par</div>
+            <div className={`text-3xl font-black tabular-nums ${totalVsPar < 0 ? 'text-status-active-text' : 'text-ink'}`}>
               {vsParDisplay}
             </div>
           </div>
@@ -1050,10 +1067,10 @@ function TGLBoard({ tglData, locked }) {
                 </div>
               </div>
               <div className="text-right">
-                <div className="text-xl font-bold text-fairway-700">
+                <div className="text-xl font-bold text-status-active-text">
                   {tr.teamPoints % 1 === 0 ? tr.teamPoints : tr.teamPoints.toFixed(1)}
                 </div>
-                <div className="text-xs text-gray-400">pts</div>
+                <div className="text-xs text-ink-muted">pts</div>
               </div>
             </div>
           </div>
@@ -1069,10 +1086,10 @@ function TGLBoard({ tglData, locked }) {
 
 function LeaderboardSkeleton() {
   return (
-    <div className="min-h-screen bg-gray-50">
-      <div className="h-24 bg-fairway-700 animate-pulse" />
+    <div className="min-h-screen" style={{ background: '#fbfaf8' }}>
+      <div className="h-24 animate-pulse" style={{ background: '#eceae5' }} />
       <div className="max-w-2xl mx-auto px-4 py-4 space-y-3">
-        {[0,1,2,3].map(i => <div key={i} className="h-16 bg-gray-200 rounded-xl animate-pulse" />)}
+        {[0,1,2,3].map(i => <div key={i} className="h-16 rounded-xl animate-pulse" style={{ background: '#eceae5' }} />)}
       </div>
     </div>
   )
