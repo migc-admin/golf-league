@@ -1,7 +1,6 @@
-import { useEffect, useState, useRef } from 'react'
+import { useEffect, useState } from 'react'
 import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../hooks/useAuth'
-import { searchCourses, fetchCourseById, mapApiCourseToForm } from '../../lib/golfCourseApi'
 import toast from 'react-hot-toast'
 import Card, { CardHeader } from '../../components/ui/Card'
 import Button from '../../components/ui/Button'
@@ -136,23 +135,10 @@ function CourseModal({ open, onClose, editing, orgId, orgSlug, onSaved }) {
   const [holes,    setHoles]    = useState(() => emptyHoles(3))
   const [photoUrl, setPhotoUrl] = useState('')
   const [saving,   setSaving]   = useState(false)
-  const [activeTeeIdx, setActiveTeeIdx] = useState(0)
-
-  // Course lookup state
-  const [searchQuery,   setSearchQuery]   = useState('')
-  const [searchResults, setSearchResults] = useState([])
-  const [searching,     setSearching]     = useState(false)
-  const [importing,     setImporting]     = useState(false)
-  const [showResults,   setShowResults]   = useState(false)
-  const searchRef = useRef(null)
+  const [activeTeeIdx, setActiveTeeIdx] = useState(0)  // which tee to preview yardage for
 
   useEffect(() => {
     if (!open) return
-    // Reset search state on open
-    setSearchQuery('')
-    setSearchResults([])
-    setShowResults(false)
-
     if (editing) {
       supabase.from('courses').select('*').eq('id', editing.id).single()
         .then(({ data }) => {
@@ -251,46 +237,6 @@ function CourseModal({ open, onClose, editing, orgId, orgSlug, onSaved }) {
     if (activeTeeIdx >= i && activeTeeIdx > 0) setActiveTeeIdx(activeTeeIdx - 1)
   }
 
-  async function handleSearch(e) {
-    e.preventDefault()
-    if (!searchQuery.trim()) return
-    setSearching(true)
-    setShowResults(false)
-    try {
-      const results = await searchCourses(searchQuery)
-      setSearchResults(results)
-      setShowResults(true)
-      if (!results.length) toast('No courses found — try a different search term')
-    } catch (err) {
-      toast.error(`Course search failed: ${err.message}`)
-    } finally {
-      setSearching(false)
-    }
-  }
-
-  async function handleImport(courseId) {
-    setImporting(true)
-    setShowResults(false)
-    try {
-      const apiCourse = await fetchCourseById(courseId)
-      const mapped = mapApiCourseToForm(apiCourse)
-      if (!mapped) {
-        toast.error('This course is missing hole-by-hole data in the API — enter manually.')
-        return
-      }
-      setName(mapped.name)
-      setTees(mapped.tees)
-      setHoles(mapped.holes)
-      setActiveTeeIdx(0)
-      setSearchQuery('')
-      toast.success(`Imported ${mapped.tees.length} tee set${mapped.tees.length !== 1 ? 's' : ''} — review and save`)
-    } catch (err) {
-      toast.error(`Import failed: ${err.message}`)
-    } finally {
-      setImporting(false)
-    }
-  }
-
   async function handleSave(e) {
     e.preventDefault()
     setSaving(true)
@@ -345,84 +291,6 @@ function CourseModal({ open, onClose, editing, orgId, orgSlug, onSaved }) {
   return (
     <Modal open={open} onClose={onClose} title={editing ? 'Edit Course' : 'New Course'} maxWidth="max-w-5xl">
       <form onSubmit={handleSave} className="space-y-6">
-
-        {/* ── Course Lookup ── */}
-        {!editing && (
-          <div>
-            <label className="label">Look Up Course (optional)</label>
-            <div className="flex gap-2">
-              <input
-                ref={searchRef}
-                type="text"
-                value={searchQuery}
-                onChange={e => { setSearchQuery(e.target.value); setShowResults(false) }}
-                onKeyDown={e => e.key === 'Enter' && handleSearch(e)}
-                placeholder="Pebble Beach, Augusta National…"
-                className="input flex-1"
-              />
-              <button
-                type="button"
-                onClick={handleSearch}
-                disabled={searching || !searchQuery.trim()}
-                className="btn btn-secondary btn-md disabled:opacity-50 shrink-0"
-              >
-                {searching ? (
-                  <span className="flex items-center gap-1.5">
-                    <svg className="animate-spin h-3.5 w-3.5" fill="none" viewBox="0 0 24 24">
-                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
-                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/>
-                    </svg>
-                    Searching…
-                  </span>
-                ) : 'Search'}
-              </button>
-            </div>
-            <p className="text-xs text-ink-muted mt-1">
-              Search the GolfCourseAPI to auto-fill tee sets, slope/rating, par, and yardages.
-            </p>
-
-            {/* Search results */}
-            {showResults && searchResults.length > 0 && (
-              <div className="mt-2 card overflow-hidden p-0 max-h-64 overflow-y-auto">
-                {searchResults.map(c => (
-                  <button
-                    key={c.id}
-                    type="button"
-                    disabled={importing}
-                    onClick={() => handleImport(c.id)}
-                    className="w-full text-left px-4 py-3 transition-colors flex items-center justify-between gap-3"
-                    style={{ borderBottom: '1px solid #ebe9e4' }}
-                    onMouseEnter={e => e.currentTarget.style.background = '#f4f3f0'}
-                    onMouseLeave={e => e.currentTarget.style.background = ''}
-                  >
-                    <div>
-                      <div className="font-semibold text-sm text-ink">
-                        {c.club_name}
-                        {c.course_name && c.course_name !== c.club_name && (
-                          <span className="font-normal text-ink-muted"> — {c.course_name}</span>
-                        )}
-                      </div>
-                      {c.location && (
-                        <div className="text-xs text-ink-muted mt-0.5">
-                          {[c.location.city, c.location.state, c.location.country].filter(Boolean).join(', ')}
-                        </div>
-                      )}
-                    </div>
-                    {importing ? (
-                      <svg className="animate-spin h-4 w-4 text-ink-muted shrink-0" fill="none" viewBox="0 0 24 24">
-                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
-                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/>
-                      </svg>
-                    ) : (
-                      <span className="text-xs font-semibold text-status-active-text shrink-0">Import →</span>
-                    )}
-                  </button>
-                ))}
-              </div>
-            )}
-          </div>
-        )}
-
         <ImageUpload
           path={`orgs/${orgSlug}/courses/${Date.now()}`}
           currentUrl={photoUrl || null}
