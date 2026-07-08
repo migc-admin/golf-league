@@ -29,7 +29,7 @@ function writeGuestSession(data) {
 function clearGuestSession() { localStorage.removeItem(GUEST_KEY) }
 
 import { useEffect, useState, useCallback, useRef } from 'react'
-import { useParams, Link, useNavigate } from 'react-router-dom'
+import { useParams, Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../hooks/useAuth'
 import { useOfflineQueue } from '../hooks/useOfflineQueue'
@@ -38,6 +38,8 @@ import toast from 'react-hot-toast'
 
 export default function Scorecard() {
   const { orgSlug, leagueSlug, eventSlug } = useParams()
+  const [searchParams] = useSearchParams()
+  const directEventId = searchParams.get('eid')   // guests bypass slug lookup via ?eid=UUID
   const { user, profile, loading: authLoading, isAdmin, signOut } = useAuth()
   const navigate = useNavigate()
   const homeLink = isAdmin ? '/admin' : '/home'
@@ -74,9 +76,11 @@ export default function Scorecard() {
     if (authLoading || profile === undefined) return
 
     async function load() {
-      // Resolve the event UUID from leagueSlug + eventSlug params
+      // Resolve the event UUID — prefer ?eid= param (guest links bypass RLS slug lookup)
       let evId = null
-      if (leagueSlug && eventSlug) {
+      if (directEventId) {
+        evId = directEventId
+      } else if (leagueSlug && eventSlug) {
         const { data: lg } = await supabase.from('leagues').select('id').eq('slug', leagueSlug).single()
         if (lg) {
           const { data: ev } = await supabase.from('events').select('id').eq('league_id', lg.id).eq('slug', eventSlug).single()

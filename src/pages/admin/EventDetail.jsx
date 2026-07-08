@@ -303,7 +303,7 @@ function TabOverview({ event, eventPlayers, allScores, course, conflicts, onUpda
   const flightB = nonGuests.filter(e => e.flight === 'B').length
 
   // Scorecard link shown when event is active
-  const scorecardUrl = `${window.location.origin}/${orgSlug}/${event.league?.slug}/${event.slug}/scorecard`
+  const scorecardUrl = `${window.location.origin}/${orgSlug}/${event.league?.slug}/${event.slug}/scorecard?eid=${event.id}`
 
   return (
     <div className="grid sm:grid-cols-2 gap-4">
@@ -2348,7 +2348,7 @@ function AccessCodeSection({ event, eventPlayers, onUpdated, orgSlug }) {
   // group_codes stored as { "1": "ABC123", "2": "XYZ789" }
   const [groupCodes, setGroupCodes] = useState(event.group_codes ?? {})
   const [saving,     setSaving]     = useState(false)
-  const scorecardUrl = `${window.location.origin}/${orgSlug}/${event.league?.slug}/${event.slug}/scorecard`
+  const scorecardUrl = `${window.location.origin}/${orgSlug}/${event.league?.slug}/${event.slug}/scorecard?eid=${event.id}`
 
   // Unique sorted group numbers from event players
   const groupNums = [...new Set(
