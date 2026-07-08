@@ -385,6 +385,7 @@ export default function Scorecard() {
         onEdit={() => setShowScorecard(false)}
         homeLink={homeLink}
         onSignOut={user ? handleSignOut : null}
+        orgSlug={orgSlug}
       />
     )
   }
@@ -743,7 +744,7 @@ function PlayerScoreCard({ ep, hole, par, si, score, allHoleScores, courseStroke
 }
 
 // ─── Traditional Scorecard View (vertical: holes=rows, players=cols) ──
-function TraditionalScorecard({ event, course, groupPlayers, scores, isComplete, canEdit, onEdit, homeLink, onSignOut, trackPutts }) {
+function TraditionalScorecard({ event, course, groupPlayers, scores, isComplete, canEdit, onEdit, homeLink, onSignOut, trackPutts, orgSlug }) {
   const pars  = course.par_per_hole ?? Array(18).fill(4)
   const sis   = course.stroke_index ?? Array(18).fill(0)
 
