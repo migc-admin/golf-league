@@ -42,6 +42,7 @@ export default function EventPage() {
 
   useEffect(() => {
     async function load() {
+      try {
       let ev = null
 
       if (directEventId) {
@@ -71,13 +72,16 @@ export default function EventPage() {
         .from('event_players')
         .select('*, player:players(first_name, last_name)', { count: 'exact' })
         .eq('event_id', ev.id)
-        .eq('is_guest', false)
         .order('group_number')
         .order('flight')
         .order('adjusted_handicap_index')
       setEventPlayers(eps ?? [])
       setPlayerCount(count ?? 0)
       setLoading(false)
+      } catch (err) {
+        console.error('EventPage load error:', err)
+        setLoading(false)
+      }
     }
     load()
   }, [directEventId, leagueSlug, eventSlug])
