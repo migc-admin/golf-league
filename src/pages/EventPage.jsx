@@ -48,7 +48,7 @@ export default function EventPage() {
       if (directEventId) {
         const { data } = await supabase
           .from('events')
-          .select('*, course:courses(name, city, state), league:leagues(name, season_year, slug, logo_url)')
+          .select('*, course:courses(name), league:leagues(name, season_year, slug, logo_url)')
           .eq('id', directEventId)
           .single()
         ev = data
@@ -58,7 +58,7 @@ export default function EventPage() {
         if (!league) { setLoading(false); return }
         const { data } = await supabase
           .from('events')
-          .select('*, course:courses(name, city, state), league:leagues(name, season_year, slug, logo_url)')
+          .select('*, course:courses(name), league:leagues(name, season_year, slug, logo_url)')
           .eq('league_id', league.id)
           .eq('slug', eventSlug)
           .single()
@@ -172,9 +172,6 @@ export default function EventPage() {
 
               <DetailRow icon="⛳" label="Course">
                 <span className="font-semibold text-ink">{event.course?.name ?? '—'}</span>
-                {(event.course?.city || event.course?.state) && (
-                  <span className="text-ink-muted ml-2">· {[event.course.city, event.course.state].filter(Boolean).join(', ')}</span>
-                )}
               </DetailRow>
 
               {formats.length > 0 && (
