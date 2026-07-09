@@ -130,9 +130,9 @@ export default function EventDetail() {
           </p>
         </div>
         <div className="flex gap-2 shrink-0 flex-wrap justify-end">
-          <Link to={`/${orgSlug}/${event.league?.slug}/${event.slug}/event?eid=${event.id}`} className="btn-secondary btn-sm btn">
+          <a href={`/${orgSlug}/${event.league?.slug}/${event.slug}/event?eid=${event.id}`} target="_blank" rel="noopener noreferrer" className="btn-secondary btn-sm btn">
             Event Page ↗
-          </Link>
+          </a>
           <Link to={`/${orgSlug}/${event.league?.slug}/${event.slug}/schedule?eid=${event.id}`} className="btn-secondary btn-sm btn">
             Pairings ↗
           </Link>
