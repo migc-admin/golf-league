@@ -143,18 +143,6 @@ export default function EventDetail() {
         </div>
       </div>
 
-      {/* Event photo */}
-      <div className="mt-4">
-        <ImageUpload
-          path={`orgs/${orgSlug ?? 'org'}/events/${event.id}/photo`}
-          currentUrl={event.photo_url ?? null}
-          onUploaded={async (url) => {
-            await supabase.from('events').update({ photo_url: url }).eq('id', event.id)
-            setEvent(ev => ({ ...ev, photo_url: url }))
-          }}
-          label="Event Photo"
-        />
-      </div>
 
       {/* Tabs */}
       <div className="border-b border-gray-200">
