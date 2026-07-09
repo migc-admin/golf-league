@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Link, useParams, useNavigate } from 'react-router-dom'
 import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../hooks/useAuth'
@@ -28,13 +28,40 @@ export default function LeagueDetail() {
   const [eventModal,   setEventModal]   = useState(false)
   const [tglModal,     setTglModal]     = useState(false)
 
+  const dragItem = useRef(null)
+  const dragOver = useRef(null)
+
   async function load(slug, leagueId) {
     const { data: evData } = await supabase
       .from('events')
-      .select('id, event_number, name, slug, event_date, status, course:courses(name)')
+      .select('id, event_number, name, slug, event_date, status, display_order, course:courses(name)')
       .eq('league_id', leagueId)
-      .order('event_number', { ascending: false })
+      .order('display_order', { ascending: true, nullsFirst: false })
     setEvents(evData ?? [])
+  }
+
+  function handleDragStart(i) {
+    dragItem.current = i
+  }
+
+  function handleDragEnter(i) {
+    dragOver.current = i
+    if (dragItem.current === i) return
+    const reordered = [...events]
+    const [moved] = reordered.splice(dragItem.current, 1)
+    reordered.splice(i, 0, moved)
+    dragItem.current = i
+    setEvents(reordered)
+  }
+
+  async function handleDragEnd() {
+    dragItem.current = null
+    dragOver.current = null
+    await Promise.all(
+      events.map((ev, i) =>
+        supabase.from('events').update({ display_order: i }).eq('id', ev.id)
+      )
+    )
   }
 
   useEffect(() => {
@@ -134,33 +161,51 @@ export default function LeagueDetail() {
           </div>
         ) : (
           <div>
-            {events.map(ev => (
-              <Link
+            {events.map((ev, i) => (
+              <div
                 key={ev.id}
-                to={`/admin/${orgSlug}/${league.slug}/${ev.slug}`}
-                className="flex items-center justify-between px-5 py-3 transition-colors"
-                style={{ borderBottom: '1px solid #ebe9e4' }}
-                onMouseEnter={e => e.currentTarget.style.background = '#f4f3f0'}
-                onMouseLeave={e => e.currentTarget.style.background = ''}
+                draggable
+                onDragStart={() => handleDragStart(i)}
+                onDragEnter={() => handleDragEnter(i)}
+                onDragEnd={handleDragEnd}
+                onDragOver={e => e.preventDefault()}
+                className="flex items-center gap-2 transition-colors"
+                style={{ borderBottom: i < events.length - 1 ? '1px solid #ebe9e4' : 'none' }}
               >
-                <div className="flex items-center gap-3">
-                  <span className="text-sm font-semibold text-ink">
-                    {ev.name ? ev.name : `Event #${ev.event_number}`}
-                  </span>
-                  {ev.course?.name && <span className="text-xs text-ink-muted">{ev.course.name}</span>}
-                  <span className="text-xs text-ink-muted">{formatDate(ev.event_date)}</span>
+                {/* Drag handle */}
+                <div className="pl-3 py-4 cursor-grab active:cursor-grabbing text-ink-muted flex-shrink-0" style={{ touchAction: 'none' }}>
+                  <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
+                    <rect x="3" y="3" width="10" height="1.5" rx="0.75"/>
+                    <rect x="3" y="7.25" width="10" height="1.5" rx="0.75"/>
+                    <rect x="3" y="11.5" width="10" height="1.5" rx="0.75"/>
+                  </svg>
                 </div>
-                <div className="flex items-center gap-3">
-                  <Link
-                    to={`/${orgSlug}/${league.slug}/${ev.slug}/leaderboard?eid=${ev.id}`}
-                    onClick={e => e.stopPropagation()}
-                    className="text-xs font-semibold text-fairway-700 hover:underline"
-                  >
-                    Leaderboard ↗
-                  </Link>
-                  <StatusBadge status={ev.status} />
-                </div>
-              </Link>
+                {/* Clickable row */}
+                <Link
+                  to={`/admin/${orgSlug}/${league.slug}/${ev.slug}`}
+                  className="flex flex-1 items-center justify-between pr-5 py-3 min-w-0"
+                  onMouseEnter={e => e.currentTarget.closest('div[draggable]').style.background = '#f4f3f0'}
+                  onMouseLeave={e => e.currentTarget.closest('div[draggable]').style.background = ''}
+                >
+                  <div className="flex items-center gap-3 min-w-0">
+                    <span className="text-sm font-semibold text-ink truncate">
+                      {ev.name ? ev.name : `Event #${ev.event_number}`}
+                    </span>
+                    {ev.course?.name && <span className="text-xs text-ink-muted hidden sm:inline">{ev.course.name}</span>}
+                    <span className="text-xs text-ink-muted">{formatDate(ev.event_date)}</span>
+                  </div>
+                  <div className="flex items-center gap-3 flex-shrink-0">
+                    <Link
+                      to={`/${orgSlug}/${league.slug}/${ev.slug}/leaderboard?eid=${ev.id}`}
+                      onClick={e => e.stopPropagation()}
+                      className="text-xs font-semibold text-fairway-700 hover:underline"
+                    >
+                      Leaderboard ↗
+                    </Link>
+                    <StatusBadge status={ev.status} />
+                  </div>
+                </Link>
+              </div>
             ))}
           </div>
         )}
