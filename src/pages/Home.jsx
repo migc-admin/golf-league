@@ -3,6 +3,7 @@ import { Link, useNavigate } from 'react-router-dom'
 import { useAuth } from '../hooks/useAuth'
 import { supabase } from '../lib/supabase'
 import { useOrg } from '../lib/OrgContext'
+import Footer from '../components/ui/Footer'
 
 export default function Home() {
   const { user, profile, signOut, loading, profileLoading } = useAuth()
@@ -189,6 +190,7 @@ export default function Home() {
           )}
         </div>
       </main>
+      <Footer />
     </div>
   )
 }
