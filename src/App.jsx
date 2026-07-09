@@ -22,6 +22,7 @@ import ScorecardJoin  from './pages/ScorecardJoin'
 import Leaderboard    from './pages/Leaderboard'
 import Standings      from './pages/Standings'
 import Schedule       from './pages/Schedule'
+import EventPage      from './pages/EventPage'
 import Import         from './pages/admin/Import'
 import Register       from './pages/Register'
 
@@ -57,6 +58,7 @@ export default function App() {
 
         {/* Generic slug-based routes — must be LAST to avoid conflicts */}
         <Route path="/:orgSlug/:leagueSlug/standings" element={<OrgRouteWrapper><Standings /></OrgRouteWrapper>} />
+        <Route path="/:orgSlug/:leagueSlug/:eventSlug/event"       element={<EventPage />} />
         <Route path="/:orgSlug/:leagueSlug/:eventSlug/leaderboard" element={<OrgRouteWrapper><Leaderboard /></OrgRouteWrapper>} />
         <Route path="/:orgSlug/:leagueSlug/:eventSlug/schedule" element={<OrgRouteWrapper><Schedule /></OrgRouteWrapper>} />
         <Route path="/:orgSlug/:leagueSlug/:eventSlug/scorecard" element={<OrgRouteWrapper><Scorecard /></OrgRouteWrapper>} />
