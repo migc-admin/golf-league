@@ -111,7 +111,8 @@ export default function EventPage() {
             <img
               src={event.league.logo_url}
               alt=""
-              className="w-16 h-16 rounded-xl object-cover shrink-0"
+              className="w-16 h-16 rounded-full object-cover shrink-0"
+              style={{ background: '#1B4332' }}
             />
           ) : (
             <div
