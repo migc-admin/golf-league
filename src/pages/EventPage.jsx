@@ -167,7 +167,7 @@ export default function EventPage() {
               <DetailRow icon="📅" label="Date">
                 <span className="font-semibold text-ink">{formatDate(event.event_date)}</span>
                 {event.start_time && (
-                  <span className="text-ink-muted ml-2">· {formatTime(event.start_time)}</span>
+                  <div className="text-sm text-ink-muted mt-0.5">First Tee Time — {formatTime(event.start_time)}</div>
                 )}
               </DetailRow>
 
