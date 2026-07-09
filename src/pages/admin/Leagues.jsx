@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../hooks/useAuth'
@@ -14,17 +14,19 @@ const CURRENT_YEAR = new Date().getFullYear()
 export default function Leagues() {
   const { user } = useAuth()
   const navigate = useNavigate()
-  const [leagues,      setLeagues]      = useState([])
-  const [orgSlug,      setOrgSlug]      = useState(null)
-  const [orgId,        setOrgId]        = useState(null)
-  const [orgLogoUrl,   setOrgLogoUrl]   = useState(null)
-  const [loading,      setLoading]      = useState(true)
-  const [leagueModal,  setLeagueModal]  = useState(false)
+  const [leagues,     setLeagues]     = useState([])
+  const [orgSlug,     setOrgSlug]     = useState(null)
+  const [orgId,       setOrgId]       = useState(null)
+  const [loading,     setLoading]     = useState(true)
+  const [leagueModal, setLeagueModal] = useState(false)
+  const dragItem    = useRef(null)
+  const dragOver    = useRef(null)
 
   async function load() {
     const { data } = await supabase
       .from('leagues')
-      .select('id, name, slug, season_year, logo_url, events(id)')
+      .select('id, name, slug, season_year, logo_url, display_order, events(id)')
+      .order('display_order', { ascending: true, nullsFirst: false })
       .order('season_year', { ascending: false })
     setLeagues(data ?? [])
     setLoading(false)
@@ -38,14 +40,37 @@ export default function Leagues() {
         .from('profiles').select('org_id').eq('id', user.id).single()
       if (profile?.org_id) {
         const { data: org } = await supabase
-          .from('organizations').select('id, slug, logo_url').eq('id', profile.org_id).single()
-        if (org?.slug)     setOrgSlug(org.slug)
-        if (org?.id)       setOrgId(org.id)
-        if (org?.logo_url) setOrgLogoUrl(org.logo_url)
+          .from('organizations').select('id, slug').eq('id', profile.org_id).single()
+        if (org?.slug) setOrgSlug(org.slug)
+        if (org?.id)   setOrgId(org.id)
       }
     }
     fetchOrg()
   }, [user])
+
+  function handleDragStart(i) {
+    dragItem.current = i
+  }
+
+  function handleDragEnter(i) {
+    dragOver.current = i
+    if (dragItem.current === i) return
+    const reordered = [...leagues]
+    const [moved] = reordered.splice(dragItem.current, 1)
+    reordered.splice(i, 0, moved)
+    dragItem.current = i
+    setLeagues(reordered)
+  }
+
+  async function handleDragEnd() {
+    dragItem.current = null
+    dragOver.current = null
+    // Persist new order
+    const updates = leagues.map((lg, i) =>
+      supabase.from('leagues').update({ display_order: i }).eq('id', lg.id)
+    )
+    await Promise.all(updates)
+  }
 
   return (
     <div className="space-y-6">
@@ -55,20 +80,6 @@ export default function Leagues() {
           <p className="text-sm text-ink-muted mt-0.5">Manage your leagues and events</p>
         </div>
         <Button onClick={() => setLeagueModal(true)}>+ New League</Button>
-      </div>
-
-      {/* Org logo */}
-      <div className="flex items-center gap-4">
-        <ImageUpload
-          shape="circle"
-          path={`orgs/${orgSlug}/logo`}
-          currentUrl={orgLogoUrl}
-          onUploaded={async (url) => {
-            setOrgLogoUrl(url)
-            await supabase.from('organizations').update({ logo_url: url }).eq('id', orgId)
-          }}
-          label="Org Logo"
-        />
       </div>
 
       {loading ? (
@@ -84,28 +95,49 @@ export default function Leagues() {
       ) : (
         <div className="card overflow-hidden p-0">
           {leagues.map((league, i) => (
-            <button
+            <div
               key={league.id}
-              onClick={() => navigate(`/admin/leagues/${league.slug}`)}
-              className="w-full flex items-center gap-4 px-5 py-4 text-left transition-colors"
+              draggable
+              onDragStart={() => handleDragStart(i)}
+              onDragEnter={() => handleDragEnter(i)}
+              onDragEnd={handleDragEnd}
+              onDragOver={e => e.preventDefault()}
+              className="flex items-center gap-3 transition-colors"
               style={{ borderBottom: i < leagues.length - 1 ? '1px solid #ebe9e4' : 'none' }}
-              onMouseEnter={e => e.currentTarget.style.background = '#f4f3f0'}
-              onMouseLeave={e => e.currentTarget.style.background = ''}
             >
-              {/* League logo or placeholder */}
-              {league.logo_url ? (
-                <img src={league.logo_url} alt="" className="w-10 h-10 rounded-lg object-cover shrink-0" style={{ border: '1px solid #ebe9e4' }} />
-              ) : (
-                <div className="w-10 h-10 rounded-lg shrink-0 flex items-center justify-center text-ink-muted text-xs font-bold" style={{ background: '#eceae5' }}>
-                  {league.name.slice(0, 2).toUpperCase()}
-                </div>
-              )}
-              <div className="flex-1 min-w-0">
-                <div className="font-semibold text-ink text-sm" style={{ letterSpacing: '-0.01em' }}>{league.name}</div>
-                <div className="text-xs text-ink-muted mt-0.5">Season {league.season_year} · {league.events?.length ?? 0} event{(league.events?.length ?? 0) !== 1 ? 's' : ''}</div>
+              {/* Drag handle */}
+              <div
+                className="pl-3 py-4 cursor-grab active:cursor-grabbing text-ink-muted flex-shrink-0"
+                style={{ touchAction: 'none' }}
+              >
+                <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
+                  <rect x="3" y="3" width="10" height="1.5" rx="0.75"/>
+                  <rect x="3" y="7.25" width="10" height="1.5" rx="0.75"/>
+                  <rect x="3" y="11.5" width="10" height="1.5" rx="0.75"/>
+                </svg>
               </div>
-              <span className="text-ink-muted text-sm">→</span>
-            </button>
+
+              {/* Row content — clickable */}
+              <button
+                onClick={() => navigate(`/admin/leagues/${league.slug}`)}
+                className="flex-1 flex items-center gap-4 pr-4 py-4 text-left"
+                onMouseEnter={e => e.currentTarget.parentElement.style.background = '#f4f3f0'}
+                onMouseLeave={e => e.currentTarget.parentElement.style.background = ''}
+              >
+                {league.logo_url ? (
+                  <img src={league.logo_url} alt="" className="w-10 h-10 rounded-lg object-cover shrink-0" style={{ border: '1px solid #ebe9e4' }} />
+                ) : (
+                  <div className="w-10 h-10 rounded-lg shrink-0 flex items-center justify-center text-ink-muted text-xs font-bold" style={{ background: '#eceae5' }}>
+                    {league.name.slice(0, 2).toUpperCase()}
+                  </div>
+                )}
+                <div className="flex-1 min-w-0">
+                  <div className="font-semibold text-ink text-sm" style={{ letterSpacing: '-0.01em' }}>{league.name}</div>
+                  <div className="text-xs text-ink-muted mt-0.5">Season {league.season_year} · {league.events?.length ?? 0} event{(league.events?.length ?? 0) !== 1 ? 's' : ''}</div>
+                </div>
+                <span className="text-ink-muted text-sm">→</span>
+              </button>
+            </div>
           ))}
         </div>
       )}
