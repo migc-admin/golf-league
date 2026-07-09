@@ -326,7 +326,7 @@ function GroupList({ eventPlayers, event }) {
                       <span className="text-xs px-1.5 py-0.5 rounded font-medium" style={{ background: '#eceae5', color: '#1B4332' }}>SK</span>
                     )}
                   </div>
-                  <span className="text-xs text-ink-muted">HI {ep.handicap_index}</span>
+                  <span className="text-xs text-ink-muted">CH {ep.course_handicap ?? ep.handicap_index}</span>
                 </div>
               ))}
             </div>
