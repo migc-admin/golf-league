@@ -31,7 +31,7 @@ const GRAY_BG   = '#f5f5f3'
 const BORDER    = '#c0c0c0'
 
 // ─── Export Button ────────────────────────────────────────────────
-export function ExportScorecardsButton({ event, eventPlayers, course, orgName }) {
+export function ExportScorecardsButton({ event, eventPlayers, course, orgName, orgSlug }) {
   const [exporting, setExporting] = useState(false)
   const containerRef = useRef(null)
 
@@ -39,8 +39,7 @@ export function ExportScorecardsButton({ event, eventPlayers, course, orgName })
     eventPlayers.map(ep => ep.group_number).filter(Boolean)
   )].sort((a, b) => a - b)
 
-  const groupCodes    = event.group_codes ?? {}
-  const scorecardBase = `${window.location.origin}/scorecard/${event.id}`
+  const groupCodes = event.group_codes ?? {}
 
   async function handleExport() {
     if (!course || groupNums.length === 0) return
@@ -51,8 +50,8 @@ export function ExportScorecardsButton({ event, eventPlayers, course, orgName })
           .filter(ep => ep.group_number === g)
           .sort((a, b) => (a.group_order ?? 0) - (b.group_order ?? 0))
 
-        const code      = groupCodes[g] ?? ''
-        const qrUrl     = code ? `${scorecardBase}?code=${code}` : scorecardBase
+        const code   = groupCodes[g] ?? ''
+        const qrUrl  = `${window.location.origin}/join/${event.id}`
         const qrDataUrl = await QRCode.toDataURL(qrUrl, {
           width: 140, margin: 1,
           color: { dark: GREEN, light: '#ffffff' },

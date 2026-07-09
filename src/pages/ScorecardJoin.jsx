@@ -5,12 +5,13 @@
  */
 
 import { useEffect, useState } from 'react'
-import { useParams, useNavigate } from 'react-router-dom'
+import { useParams, useNavigate, useSearchParams } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 
 export default function ScorecardJoin() {
   const { eventId } = useParams()
   const navigate = useNavigate()
+  const [searchParams] = useSearchParams()
 
   const [event,       setEvent]       = useState(null)
   const [groups,      setGroups]      = useState([])
@@ -25,7 +26,7 @@ export default function ScorecardJoin() {
     async function load() {
       const { data: ev } = await supabase
         .from('events')
-        .select('id, name, event_number, status, course:courses(name), league:leagues(name)')
+        .select('id, name, slug, event_number, status, course:courses(name), league:leagues(name, slug, logo_url, org:organizations(slug))')
         .eq('id', eventId)
         .single()
       setEvent(ev ?? null)
@@ -88,7 +89,10 @@ export default function ScorecardJoin() {
       groupNum: selectedGrp,
       accessCode: code.trim(),
     }))
-    navigate(`/scorecard/${eventId}`)
+    const orgSlug    = event?.league?.org?.slug ?? event?.league?.slug ?? 'org'
+    const leagueSlug = event?.league?.slug ?? 'league'
+    const eventSlug  = event?.slug ?? eventId
+    navigate(`/${orgSlug}/${leagueSlug}/${eventSlug}/scorecard?eid=${eventId}`)
   }
 
   if (loading) {
@@ -115,7 +119,22 @@ export default function ScorecardJoin() {
       <div className="w-full max-w-sm">
         {/* Logo + title */}
         <div className="text-center mb-8">
-          <img src="/logo.png" alt="Club Logo" className="w-20 h-20 rounded-full object-cover mx-auto mb-3 shadow-xl" />
+          {event.league?.logo_url ? (
+            <img
+              src={event.league.logo_url}
+              alt={event.league.name}
+              className="w-28 h-28 rounded-full object-cover mx-auto mb-3 shadow-xl"
+            />
+          ) : (
+            <div
+              className="w-28 h-28 rounded-full flex items-center justify-center mx-auto mb-3 shadow-xl"
+              style={{ background: '#1B4332' }}
+            >
+              <span className="text-white font-bold text-3xl" style={{ fontFamily: "'Playfair Display', serif" }}>
+                {(event.league?.name ?? '').slice(0, 2).toUpperCase()}
+              </span>
+            </div>
+          )}
           <h1 className="text-white font-bold text-2xl" style={{ fontFamily: "'Playfair Display', serif" }}>
             {event.name ?? `Event #${event.event_number}`}
           </h1>
