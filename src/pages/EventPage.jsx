@@ -36,6 +36,7 @@ export default function EventPage() {
 
   const [event,        setEvent]        = useState(null)
   const [playerCount,  setPlayerCount]  = useState(null)
+  const [eventPlayers, setEventPlayers] = useState([])
   const [loading,      setLoading]      = useState(true)
   const [activeTab,    setActiveTab]    = useState('about')
 
@@ -66,11 +67,15 @@ export default function EventPage() {
       if (!ev) { setLoading(false); return }
       setEvent(ev)
 
-      const { count } = await supabase
+      const { data: eps, count } = await supabase
         .from('event_players')
-        .select('id', { count: 'exact', head: true })
+        .select('*, player:players(first_name, last_name)', { count: 'exact' })
         .eq('event_id', ev.id)
         .eq('is_guest', false)
+        .order('group_number')
+        .order('flight')
+        .order('adjusted_handicap_index')
+      setEventPlayers(eps ?? [])
       setPlayerCount(count ?? 0)
       setLoading(false)
     }
@@ -207,30 +212,24 @@ export default function EventPage() {
             </div>
 
             {/* CTA buttons */}
-            <div className="flex gap-3">
-              {event.status !== 'upcoming' && (
-                <button
-                  onClick={() => setActiveTab('leaderboard')}
-                  className="flex-1 py-3 rounded-xl font-bold text-sm text-white text-center transition-opacity hover:opacity-90"
-                  style={{ background: '#1B4332' }}
-                >
-                  View Leaderboard →
-                </button>
-              )}
+            {event.status !== 'upcoming' && (
               <button
-                onClick={() => setActiveTab('pairings')}
-                className="flex-1 py-3 rounded-xl font-bold text-sm text-center transition-colors"
-                style={{ background: '#eceae5', color: '#1d1d1f' }}
+                onClick={() => setActiveTab('leaderboard')}
+                className="w-full py-3 rounded-xl font-bold text-sm text-white text-center transition-opacity hover:opacity-90"
+                style={{ background: '#1B4332' }}
               >
-                View Pairings →
+                View Leaderboard →
               </button>
-            </div>
+            )}
+
+            {/* Group pairings */}
+            <GroupList eventPlayers={eventPlayers} event={event} />
           </div>
         )}
 
         {activeTab === 'pairings' && (
           <div className="space-y-4">
-            <EmbeddedSchedule eventId={eid} event={event} orgSlug={orgSlug} leagueSlug={leagueSlug} />
+            <GroupList eventPlayers={eventPlayers} event={event} />
           </div>
         )}
 
@@ -273,28 +272,8 @@ export default function EventPage() {
   )
 }
 
-// ─── Embedded Schedule ────────────────────────────────────────────────────────
-function EmbeddedSchedule({ eventId, event, orgSlug, leagueSlug }) {
-  const [eventPlayers, setEventPlayers] = useState([])
-  const [loading,      setLoading]      = useState(true)
-
-  useEffect(() => {
-    supabase
-      .from('event_players')
-      .select('*, player:players(first_name, last_name)')
-      .eq('event_id', eventId)
-      .order('group_number')
-      .order('flight')
-      .order('adjusted_handicap_index')
-      .then(({ data }) => { setEventPlayers(data ?? []); setLoading(false) })
-  }, [eventId])
-
-  if (loading) return (
-    <div className="space-y-3 animate-pulse">
-      {[0,1,2].map(i => <div key={i} className="h-28 rounded-xl" style={{ background: '#eceae5' }} />)}
-    </div>
-  )
-
+// ─── Group List (used on both About and Pairings tabs) ───────────────────────
+function GroupList({ eventPlayers, event }) {
   const groups = {}
   for (const ep of eventPlayers) {
     const g = ep.group_number ?? 0
@@ -307,7 +286,7 @@ function EmbeddedSchedule({ eventId, event, orgSlug, leagueSlug }) {
   const ungrouped = groups[0] ?? []
 
   if (sorted.length === 0 && ungrouped.length === 0) return (
-    <div className="text-center py-16 text-ink-muted">
+    <div className="text-center py-12 text-ink-muted">
       <div className="text-4xl mb-3">⛳</div>
       <p className="font-semibold">Pairings not posted yet</p>
       <p className="text-sm mt-1">Check back closer to the event.</p>
@@ -316,6 +295,7 @@ function EmbeddedSchedule({ eventId, event, orgSlug, leagueSlug }) {
 
   return (
     <div className="space-y-3">
+      <h2 className="text-sm font-bold text-ink-muted uppercase tracking-widest">Pairings</h2>
       {sorted.map(([groupNum, members]) => {
         const teeTime = computeTeeTime(event.start_time, event.tee_time_interval_mins ?? 10, parseInt(groupNum))
         const code = event.group_codes?.[groupNum] ?? null
