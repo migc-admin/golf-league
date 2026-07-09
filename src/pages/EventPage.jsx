@@ -8,10 +8,11 @@ import { useEffect, useState } from 'react'
 import { useParams, useSearchParams, Link } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 
+const FORMAT_ORDER = ['net_stroke_front9', 'net_stroke_back9', 'net_stroke']
 const FORMAT_LABELS = {
-  net_stroke:        'Net Stroke Play (18-hole)',
   net_stroke_front9: 'Net Stroke Play (Front 9)',
   net_stroke_back9:  'Net Stroke Play (Back 9)',
+  net_stroke:        'Net Stroke Play (18-hole)',
   stableford:        'Stableford',
   match_points:      'Match Play Points',
   ryder_cup:         'Ryder Cup',
@@ -177,7 +178,10 @@ export default function EventPage() {
               {formats.length > 0 && (
                 <DetailRow icon="🏌️" label="Format">
                   <div className="space-y-0.5">
-                    {formats.map(f => (
+                    {[...formats].sort((a, b) => {
+                      const ai = FORMAT_ORDER.indexOf(a), bi = FORMAT_ORDER.indexOf(b)
+                      return (ai === -1 ? 99 : ai) - (bi === -1 ? 99 : bi)
+                    }).map(f => (
                       <div key={f} className="font-semibold text-ink">{FORMAT_LABELS[f] ?? f}</div>
                     ))}
                     {event.use_flights && (
@@ -205,26 +209,7 @@ export default function EventPage() {
                 </DetailRow>
               )}
 
-              {event.entry_fee > 0 && (
-                <DetailRow icon="💵" label="Entry Fee">
-                  <span className="font-semibold text-ink">${event.entry_fee}</span>
-                </DetailRow>
-              )}
             </div>
-
-            {/* CTA buttons */}
-            {event.status !== 'upcoming' && (
-              <button
-                onClick={() => setActiveTab('leaderboard')}
-                className="w-full py-3 rounded-xl font-bold text-sm text-white text-center transition-opacity hover:opacity-90"
-                style={{ background: '#1B4332' }}
-              >
-                View Leaderboard →
-              </button>
-            )}
-
-            {/* Group pairings */}
-            <GroupList eventPlayers={eventPlayers} event={event} />
           </div>
         )}
 
