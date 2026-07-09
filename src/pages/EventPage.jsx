@@ -112,14 +112,13 @@ export default function EventPage() {
               src={event.league.logo_url}
               alt=""
               className="w-16 h-16 rounded-xl object-cover shrink-0"
-              style={{ border: '2px solid rgba(255,255,255,0.2)' }}
             />
           ) : (
             <div
               className="w-16 h-16 rounded-xl shrink-0 flex items-center justify-center text-white font-black text-xl"
               style={{ background: 'rgba(255,255,255,0.15)' }}
             >
-              {(event.league?.name ?? '?').slice(0, 2).toUpperCase()}
+              {(event.league?.name ?? leagueSlug ?? '').slice(0, 2).toUpperCase()}
             </div>
           )}
           <div>
@@ -164,14 +163,14 @@ export default function EventPage() {
 
             {/* Detail cards */}
             <div className="card p-0 overflow-hidden divide-y" style={{ borderColor: '#ebe9e4' }}>
-              <DetailRow icon="📅" label="Date">
+              <DetailRow icon="📅">
                 <span className="font-semibold text-ink">{formatDate(event.event_date)}</span>
                 {event.start_time && (
                   <div className="text-sm text-ink-muted mt-0.5">First Tee Time — {formatTime(event.start_time)}</div>
                 )}
               </DetailRow>
 
-              <DetailRow icon="⛳" label="Course">
+              <DetailRow icon="⛳">
                 <span className="font-semibold text-ink">{event.course?.name ?? '—'}</span>
               </DetailRow>
 
@@ -355,7 +354,7 @@ function DetailRow({ icon, label, children }) {
     <div className="flex items-start gap-4 px-4 py-3.5">
       <span className="text-xl shrink-0 mt-0.5">{icon}</span>
       <div className="flex-1 min-w-0">
-        <div className="text-xs text-ink-muted mb-0.5">{label}</div>
+        {label && <div className="text-xs text-ink-muted mb-0.5">{label}</div>}
         {children}
       </div>
     </div>
