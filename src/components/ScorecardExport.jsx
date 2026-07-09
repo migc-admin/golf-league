@@ -51,7 +51,7 @@ export function ExportScorecardsButton({ event, eventPlayers, course, orgName, o
           .sort((a, b) => (a.group_order ?? 0) - (b.group_order ?? 0))
 
         const code   = groupCodes[g] ?? ''
-        const qrUrl  = `${window.location.origin}/join/${event.id}`
+        const qrUrl  = `${window.location.origin}/${orgSlug}/${event.league?.slug}/${event.slug}/scorecard?eid=${event.id}`
         const qrDataUrl = await QRCode.toDataURL(qrUrl, {
           width: 140, margin: 1,
           color: { dark: GREEN, light: '#ffffff' },

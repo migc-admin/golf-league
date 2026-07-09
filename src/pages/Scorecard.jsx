@@ -1013,7 +1013,7 @@ function GuestCodeEntry({ eventId, onSuccess }) {
 
   useEffect(() => {
     supabase.from('events')
-      .select('id, name, event_number, group_codes, course:courses(name), league:leagues(name)')
+      .select('id, name, event_number, group_codes, course:courses(name), league:leagues(name, logo_url)')
       .eq('id', eventId)
       .single()
       .then(({ data }) => setEventInfo(data))
@@ -1061,7 +1061,15 @@ function GuestCodeEntry({ eventId, onSuccess }) {
     <div className="min-h-screen flex flex-col items-center justify-center p-4" style={{ background: 'linear-gradient(150deg,#0b2318 0%,#1B4332 45%,#1f5c3e 100%)' }}>
       <div className="w-full max-w-xs">
         <div className="text-center mb-8">
-          <img src="/logo.png" alt="Club Logo" className="w-20 h-20 rounded-full object-cover mx-auto mb-3 shadow-xl" />
+          {eventInfo?.league?.logo_url ? (
+            <img src={eventInfo.league.logo_url} alt="Club Logo" className="w-28 h-28 rounded-full object-cover mx-auto mb-3 shadow-xl" />
+          ) : (
+            <div className="w-28 h-28 rounded-full flex items-center justify-center mx-auto mb-3 shadow-xl" style={{ background: '#1B4332' }}>
+              <span className="text-white font-bold text-3xl" style={{ fontFamily: "'Playfair Display', serif" }}>
+                {(eventInfo?.league?.name ?? '').slice(0, 2).toUpperCase()}
+              </span>
+            </div>
+          )}
           <h1 className="text-white font-bold text-xl" style={{ fontFamily: "'Playfair Display', serif" }}>{eventLabel}</h1>
           {eventInfo && <p className="text-white/50 text-sm mt-0.5">{eventInfo.course?.name}</p>}
           <div className="mx-auto mt-2" style={{ width: 40, height: 2, background: '#D4AF37' }} />
