@@ -1012,11 +1012,22 @@ function GuestCodeEntry({ eventId, onSuccess }) {
   const [selectedName, setSelectedName] = useState(null)
 
   useEffect(() => {
-    supabase.from('events')
-      .select('id, name, event_number, group_codes, course:courses(name), league:leagues(name, logo_url)')
-      .eq('id', eventId)
-      .single()
-      .then(({ data }) => setEventInfo(data))
+    async function loadEventInfo() {
+      const { data: ev } = await supabase
+        .from('events')
+        .select('id, name, event_number, group_codes, league_id, course:courses(name)')
+        .eq('id', eventId)
+        .single()
+      if (!ev) return
+      // Fetch league separately so RLS on leagues doesn't block the whole query
+      const { data: lg } = await supabase
+        .from('leagues')
+        .select('name, logo_url')
+        .eq('id', ev.league_id)
+        .single()
+      setEventInfo({ ...ev, league: lg ?? null })
+    }
+    loadEventInfo()
   }, [eventId])
 
   async function handleCodeSubmit(e) {
@@ -1062,16 +1073,18 @@ function GuestCodeEntry({ eventId, onSuccess }) {
       <div className="w-full max-w-xs">
         <div className="text-center mb-8">
           {eventInfo?.league?.logo_url ? (
-            <img src={eventInfo.league.logo_url} alt="Club Logo" className="w-28 h-28 rounded-full object-cover mx-auto mb-3 shadow-xl" />
+            <img src={eventInfo.league.logo_url} alt="Club Logo" className="w-32 h-32 rounded-full object-cover mx-auto mb-4 shadow-xl" />
           ) : (
-            <div className="w-28 h-28 rounded-full flex items-center justify-center mx-auto mb-3 shadow-xl" style={{ background: '#1B4332' }}>
-              <span className="text-white font-bold text-3xl" style={{ fontFamily: "'Playfair Display', serif" }}>
+            <div className="w-32 h-32 rounded-full flex items-center justify-center mx-auto mb-4 shadow-xl" style={{ background: '#1B4332', border: '2px solid rgba(255,255,255,0.15)' }}>
+              <span className="text-white font-bold text-4xl" style={{ fontFamily: "'Playfair Display', serif" }}>
                 {(eventInfo?.league?.name ?? '').slice(0, 2).toUpperCase()}
               </span>
             </div>
           )}
-          <h1 className="text-white font-bold text-xl" style={{ fontFamily: "'Playfair Display', serif" }}>{eventLabel}</h1>
-          {eventInfo && <p className="text-white/50 text-sm mt-0.5">{eventInfo.course?.name}</p>}
+          {eventInfo?.league?.name && (
+            <h1 className="text-white font-bold text-2xl" style={{ fontFamily: "'Playfair Display', serif" }}>{eventInfo.league.name}</h1>
+          )}
+          <p className="text-white/60 text-sm mt-1">{eventLabel}</p>
           <div className="mx-auto mt-2" style={{ width: 40, height: 2, background: '#D4AF37' }} />
         </div>
 
