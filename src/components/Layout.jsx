@@ -60,6 +60,12 @@ export default function Layout({ children }) {
 
           {/* Right side */}
           <div className="flex items-center gap-3">
+            <Link
+              to="/home"
+              className="text-xs font-semibold px-3 py-1.5 rounded-full transition-colors text-ink-muted hover:text-ink hover:bg-surface-high"
+            >
+              View Site ↗
+            </Link>
             <span className="text-xs hidden sm:block text-ink-muted">
               {profile?.full_name}
             </span>
