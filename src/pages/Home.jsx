@@ -70,8 +70,10 @@ const FEATURES = [
 const PLANS = [
   {
     name: 'Starter',
-    price: 'Free',
-    sub: 'Forever',
+    monthlyPrice: null,
+    yearlyPrice: null,
+    displayPrice: 'Free',
+    displaySub: 'Forever',
     highlight: false,
     features: [
       '1 league',
@@ -85,8 +87,8 @@ const PLANS = [
   },
   {
     name: 'Pro',
-    price: '$29',
-    sub: '/ month',
+    monthlyPrice: 29,
+    yearlyPrice: 199,
     highlight: true,
     features: [
       'Unlimited leagues',
@@ -102,8 +104,8 @@ const PLANS = [
   },
   {
     name: 'Club',
-    price: '$79',
-    sub: '/ month',
+    monthlyPrice: 79,
+    yearlyPrice: 549,
     highlight: false,
     features: [
       'Everything in Pro',
@@ -118,6 +120,39 @@ const PLANS = [
   },
 ]
 
+const ONE_TIME = [
+  {
+    name: 'Tournament',
+    price: '$49',
+    sub: 'one-time',
+    description: 'Perfect for a single event — set up scoring, groups, leaderboard, and printable scorecards for one tournament.',
+    features: [
+      'One event, unlimited players',
+      'Digital scoring & QR access',
+      'Live leaderboard',
+      'Printable scorecards',
+      'Skins & side games',
+    ],
+    cta: 'Get started',
+    ctaTo: '/login',
+  },
+  {
+    name: 'Golf Trip',
+    price: '$249',
+    sub: 'one-time',
+    description: 'Multiple rounds, multiple courses, one trip. Scoring, standings, and leaderboards across every round.',
+    features: [
+      'Up to 7 rounds / courses',
+      'Everything in Tournament',
+      'Cross-round standings',
+      'Trip leaderboard',
+      'Group & flight management',
+    ],
+    cta: 'Get started',
+    ctaTo: '/login',
+  },
+]
+
 // ─── Main Component ───────────────────────────────────────────────────────────
 export default function Home() {
   const { user, profile, signOut, loading, profileLoading } = useAuth()
@@ -125,6 +160,7 @@ export default function Home() {
   const [events,   setEvents]   = useState([])
   const [fetching, setFetching] = useState(false)
   const [menuOpen, setMenuOpen] = useState(false)
+  const [billing,  setBilling]  = useState('monthly') // 'monthly' | 'yearly'
 
   const isAdmin       = profile?.role === 'admin'
   const isScorekeeper = profile?.role === 'scorekeeper'
@@ -368,69 +404,147 @@ export default function Home() {
         {/* ── Pricing ────────────────────────────────────────────────── */}
         <section id="pricing" className="py-24" style={{ background: '#ffffff' }}>
           <div className="max-w-5xl mx-auto px-6">
-            <div className="text-center mb-16">
+            <div className="text-center mb-10">
               <p className="text-xs font-bold uppercase tracking-widest mb-3" style={{ color: GREEN }}>Pricing</p>
-              <h2 className="text-3xl md:text-4xl font-bold" style={{ fontFamily: "'Playfair Display', serif", color: INK }}>
+              <h2 className="text-3xl md:text-4xl font-bold mb-4" style={{ fontFamily: "'Playfair Display', serif", color: INK }}>
                 Simple, transparent pricing
               </h2>
-              <p className="mt-4 text-base max-w-xl mx-auto" style={{ color: '#6b7280' }}>
+              <p className="text-base max-w-xl mx-auto mb-8" style={{ color: '#6b7280' }}>
                 Start free. Upgrade when your league grows.
               </p>
+
+              {/* Billing toggle */}
+              <div className="inline-flex items-center rounded-full p-1 gap-1" style={{ background: '#f3f4f6' }}>
+                {[['monthly', 'Monthly'], ['yearly', 'Yearly']].map(([val, label]) => (
+                  <button key={val} onClick={() => setBilling(val)}
+                    className="px-5 py-2 rounded-full text-sm font-semibold transition-all"
+                    style={billing === val
+                      ? { background: '#fff', color: INK, boxShadow: '0 1px 4px rgba(0,0,0,0.1)' }
+                      : { color: '#6b7280' }}>
+                    {label}
+                    {val === 'yearly' && (
+                      <span className="ml-2 text-xs font-bold px-2 py-0.5 rounded-full"
+                        style={{ background: billing === 'yearly' ? GREEN : '#e5e7eb', color: billing === 'yearly' ? '#fff' : '#6b7280' }}>
+                        Save up to 43%
+                      </span>
+                    )}
+                  </button>
+                ))}
+              </div>
             </div>
 
-            <div className="grid md:grid-cols-3 gap-6">
-              {PLANS.map(plan => (
-                <div key={plan.name}
-                  className="rounded-2xl p-7 flex flex-col"
-                  style={plan.highlight
-                    ? { background: GREEN, border: `2px solid ${GREEN}` }
-                    : { background: '#ffffff', border: '1px solid #ebe9e4' }}>
-                  <div className="mb-6">
-                    <p className="text-xs font-bold uppercase tracking-widest mb-2"
-                      style={{ color: plan.highlight ? 'rgba(255,255,255,0.6)' : '#9ca3af' }}>
-                      {plan.name}
-                    </p>
-                    <div className="flex items-end gap-1">
-                      <span className="text-4xl font-bold" style={{ color: plan.highlight ? '#fff' : INK, fontFamily: "'Playfair Display', serif" }}>
-                        {plan.price}
-                      </span>
-                      <span className="text-sm mb-1.5" style={{ color: plan.highlight ? 'rgba(255,255,255,0.55)' : '#9ca3af' }}>
-                        {plan.sub}
+            <div className="grid md:grid-cols-3 gap-6 mb-16">
+              {PLANS.map(plan => {
+                const isYearly  = billing === 'yearly' && plan.yearlyPrice
+                const price     = plan.displayPrice ?? (isYearly ? `$${plan.yearlyPrice}` : `$${plan.monthlyPrice}`)
+                const sub       = plan.displaySub ?? (isYearly ? '/ year' : '/ month')
+                const fullPrice = plan.monthlyPrice ? plan.monthlyPrice * 12 : null
+
+                return (
+                  <div key={plan.name}
+                    className="rounded-2xl p-7 flex flex-col"
+                    style={plan.highlight
+                      ? { background: GREEN, border: `2px solid ${GREEN}` }
+                      : { background: '#ffffff', border: '1px solid #ebe9e4' }}>
+                    <div className="mb-6">
+                      <p className="text-xs font-bold uppercase tracking-widest mb-2"
+                        style={{ color: plan.highlight ? 'rgba(255,255,255,0.6)' : '#9ca3af' }}>
+                        {plan.name}
+                      </p>
+                      <div className="flex items-end gap-1.5 flex-wrap">
+                        <span className="text-4xl font-bold" style={{ color: plan.highlight ? '#fff' : INK, fontFamily: "'Playfair Display', serif" }}>
+                          {price}
+                        </span>
+                        <span className="text-sm mb-1.5" style={{ color: plan.highlight ? 'rgba(255,255,255,0.55)' : '#9ca3af' }}>
+                          {sub}
+                        </span>
+                      </div>
+                      {isYearly && fullPrice && (
+                        <p className="text-xs mt-1.5" style={{ color: plan.highlight ? 'rgba(255,255,255,0.5)' : '#9ca3af' }}>
+                          <span style={{ textDecoration: 'line-through' }}>${fullPrice}/yr</span>
+                          {' '}&rarr; you save ${fullPrice - plan.yearlyPrice}
+                        </p>
+                      )}
+                    </div>
+
+                    <ul className="space-y-2.5 flex-1 mb-8">
+                      {plan.features.map(f => (
+                        <li key={f} className="flex items-start gap-2.5 text-sm"
+                          style={{ color: plan.highlight ? 'rgba(255,255,255,0.85)' : '#4b5563' }}>
+                          <svg className="mt-0.5 shrink-0" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24"
+                            style={{ color: plan.highlight ? GOLD : GREEN }}>
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                          </svg>
+                          {f}
+                        </li>
+                      ))}
+                    </ul>
+
+                    {plan.ctaTo.startsWith('mailto') ? (
+                      <a href={plan.ctaTo}
+                        className="block text-center py-3 rounded-full font-bold text-sm transition-opacity hover:opacity-80"
+                        style={{ background: '#f3f4f6', color: INK }}>
+                        {plan.cta}
+                      </a>
+                    ) : (
+                      <Link to={plan.ctaTo}
+                        className="block text-center py-3 rounded-full font-bold text-sm transition-opacity hover:opacity-90"
+                        style={plan.highlight
+                          ? { background: GOLD, color: '#1a1a1a' }
+                          : { background: GREEN, color: '#fff' }}>
+                        {plan.cta}
+                      </Link>
+                    )}
+                  </div>
+                )
+              })}
+            </div>
+
+            {/* One-time options */}
+            <div style={{ borderTop: '1px solid #ebe9e4', paddingTop: '3rem' }}>
+              <div className="text-center mb-8">
+                <p className="text-xs font-bold uppercase tracking-widest mb-2" style={{ color: '#9ca3af' }}>One-Time Purchases</p>
+                <h3 className="text-2xl font-bold" style={{ fontFamily: "'Playfair Display', serif", color: INK }}>
+                  Just need it for one event?
+                </h3>
+                <p className="text-sm mt-2" style={{ color: '#6b7280' }}>No subscription. Pay once, use it for your event.</p>
+              </div>
+              <div className="grid md:grid-cols-2 gap-6">
+                {ONE_TIME.map(opt => (
+                  <div key={opt.name} className="rounded-2xl p-7 flex flex-col" style={{ border: '1px solid #ebe9e4', background: '#fbfaf8' }}>
+                    <div className="flex items-start justify-between gap-4 mb-4">
+                      <div>
+                        <p className="text-xs font-bold uppercase tracking-widest mb-1" style={{ color: '#9ca3af' }}>{opt.name}</p>
+                        <div className="flex items-end gap-1">
+                          <span className="text-3xl font-bold" style={{ color: INK, fontFamily: "'Playfair Display', serif" }}>{opt.price}</span>
+                          <span className="text-sm mb-1" style={{ color: '#9ca3af' }}>{opt.sub}</span>
+                        </div>
+                      </div>
+                      <span className="text-xs font-bold px-3 py-1 rounded-full mt-1" style={{ background: '#fef9ec', color: '#92611a', border: '1px solid #f5d87a' }}>
+                        One-time
                       </span>
                     </div>
-                  </div>
-
-                  <ul className="space-y-2.5 flex-1 mb-8">
-                    {plan.features.map(f => (
-                      <li key={f} className="flex items-start gap-2.5 text-sm"
-                        style={{ color: plan.highlight ? 'rgba(255,255,255,0.85)' : '#4b5563' }}>
-                        <svg className="mt-0.5 shrink-0" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24"
-                          style={{ color: plan.highlight ? GOLD : GREEN }}>
-                          <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-                        </svg>
-                        {f}
-                      </li>
-                    ))}
-                  </ul>
-
-                  {plan.ctaTo.startsWith('mailto') ? (
-                    <a href={plan.ctaTo}
-                      className="block text-center py-3 rounded-full font-bold text-sm transition-opacity hover:opacity-80"
-                      style={{ background: '#f3f4f6', color: INK }}>
-                      {plan.cta}
-                    </a>
-                  ) : (
-                    <Link to={plan.ctaTo}
+                    <p className="text-sm mb-4 leading-relaxed" style={{ color: '#6b7280' }}>{opt.description}</p>
+                    <ul className="space-y-2 mb-6 flex-1">
+                      {opt.features.map(f => (
+                        <li key={f} className="flex items-start gap-2.5 text-sm" style={{ color: '#4b5563' }}>
+                          <svg className="mt-0.5 shrink-0" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24" style={{ color: GREEN }}>
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                          </svg>
+                          {f}
+                        </li>
+                      ))}
+                    </ul>
+                    <Link to={opt.ctaTo}
                       className="block text-center py-3 rounded-full font-bold text-sm transition-opacity hover:opacity-90"
-                      style={plan.highlight
-                        ? { background: GOLD, color: '#1a1a1a' }
-                        : { background: GREEN, color: '#fff' }}>
-                      {plan.cta}
+                      style={{ background: GREEN, color: '#fff' }}>
+                      {opt.cta}
                     </Link>
-                  )}
-                </div>
-              ))}
+                  </div>
+                ))}
+              </div>
             </div>
+
           </div>
         </section>
 
