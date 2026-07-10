@@ -116,7 +116,7 @@ const PLANS = [
       'Dedicated onboarding',
     ],
     cta: 'Contact us',
-    ctaTo: 'mailto:hello@scorifygolf.com',
+    ctaTo: 'mailto:admin@scorifygolf.com',
   },
 ]
 
@@ -211,6 +211,7 @@ export default function Home() {
   const NAV_LINKS = [
     { label: 'Features', href: '#features' },
     { label: 'Pricing',  href: '#pricing'  },
+    { label: 'Contact',  href: '#contact'  },
     { label: 'About',    href: '#about'    },
   ]
 
@@ -545,6 +546,28 @@ export default function Home() {
               </div>
             </div>
 
+          </div>
+        </section>
+
+        {/* ── Contact ────────────────────────────────────────────────── */}
+        <section id="contact" className="py-24" style={{ background: '#ffffff' }}>
+          <div className="max-w-2xl mx-auto px-6 text-center">
+            <p className="text-xs font-bold uppercase tracking-widest mb-3" style={{ color: GREEN }}>Contact</p>
+            <h2 className="text-3xl md:text-4xl font-bold mb-4" style={{ fontFamily: "'Playfair Display', serif", color: INK }}>
+              Get in touch
+            </h2>
+            <p className="text-base mb-10" style={{ color: '#6b7280' }}>
+              Questions about pricing, setting up your league, or anything else — we're happy to help.
+            </p>
+            <a href="mailto:admin@scorifygolf.com"
+              className="inline-flex items-center gap-3 px-8 py-4 rounded-2xl font-bold text-base text-white transition-opacity hover:opacity-90"
+              style={{ background: GREEN }}>
+              <svg width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+              </svg>
+              admin@scorifygolf.com
+            </a>
+            <p className="text-xs mt-6" style={{ color: '#9ca3af' }}>We typically respond within one business day.</p>
           </div>
         </section>
 
