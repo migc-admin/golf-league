@@ -3,6 +3,7 @@ import { Link, useNavigate } from 'react-router-dom'
 import { useAuth } from '../hooks/useAuth'
 import { supabase } from '../lib/supabase'
 import Footer from '../components/ui/Footer'
+import Pricing from '../components/ui/Pricing'
 
 const GREEN  = '#1B4332'
 const GOLD   = '#D4AF37'
@@ -70,11 +71,9 @@ const FEATURES = [
 const PLANS = [
   {
     name: 'Starter',
-    monthlyPrice: null,
-    yearlyPrice: null,
-    displayPrice: 'Free',
-    displaySub: 'Forever',
-    highlight: false,
+    price: 0,
+    yearlyPrice: 0,
+    isPopular: false,
     features: [
       '1 league',
       'Up to 24 players',
@@ -82,31 +81,32 @@ const PLANS = [
       'Season standings',
       'Printable scorecards',
     ],
-    cta: 'Get started free',
-    ctaTo: '/login',
+    buttonText: 'Get started free',
+    href: '/login',
+    description: 'Perfect for small groups just getting started.',
   },
   {
     name: 'Pro',
-    monthlyPrice: 29,
+    price: 29,
     yearlyPrice: 199,
-    highlight: true,
+    isPopular: true,
     features: [
-      'Unlimited leagues',
-      'Unlimited players',
+      'Unlimited leagues & players',
       'Everything in Starter',
       'Flights A & B',
       'Skins, CTP & side games',
       'Score export (CSV)',
       'Priority support',
     ],
-    cta: 'Start free trial',
-    ctaTo: '/login',
+    buttonText: 'Start free trial',
+    href: '/login',
+    description: 'Most popular for established weekly leagues.',
   },
   {
     name: 'Club',
-    monthlyPrice: 79,
+    price: 79,
     yearlyPrice: 549,
-    highlight: false,
+    isPopular: false,
     features: [
       'Everything in Pro',
       'Multiple admins',
@@ -115,8 +115,9 @@ const PLANS = [
       'Online registration',
       'Dedicated onboarding',
     ],
-    cta: 'Contact us',
-    ctaTo: 'mailto:admin@scorifygolf.com',
+    buttonText: 'Contact us',
+    href: 'mailto:admin@scorifygolf.com',
+    description: 'For clubs and multi-league organizations.',
   },
 ]
 
@@ -160,7 +161,6 @@ export default function Home() {
   const [events,   setEvents]   = useState([])
   const [fetching, setFetching] = useState(false)
   const [menuOpen, setMenuOpen] = useState(false)
-  const [billing,  setBilling]  = useState('monthly') // 'monthly' | 'yearly'
 
   const isAdmin       = profile?.role === 'admin'
   const isScorekeeper = profile?.role === 'scorekeeper'
@@ -405,104 +405,17 @@ export default function Home() {
         {/* ── Pricing ────────────────────────────────────────────────── */}
         <section id="pricing" className="py-24" style={{ background: '#ffffff' }}>
           <div className="max-w-5xl mx-auto px-6">
-            <div className="text-center mb-10">
+            <div className="text-center mb-2">
               <p className="text-xs font-bold uppercase tracking-widest mb-3" style={{ color: GREEN }}>Pricing</p>
-              <h2 className="text-3xl md:text-4xl font-bold mb-4" style={{ fontFamily: "'Playfair Display', serif", color: INK }}>
-                Simple, transparent pricing
-              </h2>
-              <p className="text-base max-w-xl mx-auto mb-8" style={{ color: '#6b7280' }}>
-                Start free. Upgrade when your league grows.
-              </p>
-
-              {/* Billing toggle */}
-              <div className="inline-flex items-center rounded-full p-1 gap-1" style={{ background: '#f3f4f6' }}>
-                {[['monthly', 'Monthly'], ['yearly', 'Yearly']].map(([val, label]) => (
-                  <button key={val} onClick={() => setBilling(val)}
-                    className="px-5 py-2 rounded-full text-sm font-semibold transition-all"
-                    style={billing === val
-                      ? { background: '#fff', color: INK, boxShadow: '0 1px 4px rgba(0,0,0,0.1)' }
-                      : { color: '#6b7280' }}>
-                    {label}
-                    {val === 'yearly' && (
-                      <span className="ml-2 text-xs font-bold px-2 py-0.5 rounded-full"
-                        style={{ background: billing === 'yearly' ? GREEN : '#e5e7eb', color: billing === 'yearly' ? '#fff' : '#6b7280' }}>
-                        Save up to 43%
-                      </span>
-                    )}
-                  </button>
-                ))}
-              </div>
             </div>
-
-            <div className="grid md:grid-cols-3 gap-6 mb-16">
-              {PLANS.map(plan => {
-                const isYearly  = billing === 'yearly' && plan.yearlyPrice
-                const price     = plan.displayPrice ?? (isYearly ? `$${plan.yearlyPrice}` : `$${plan.monthlyPrice}`)
-                const sub       = plan.displaySub ?? (isYearly ? '/ year' : '/ month')
-                const fullPrice = plan.monthlyPrice ? plan.monthlyPrice * 12 : null
-
-                return (
-                  <div key={plan.name}
-                    className="rounded-2xl p-7 flex flex-col"
-                    style={plan.highlight
-                      ? { background: GREEN, border: `2px solid ${GREEN}` }
-                      : { background: '#ffffff', border: '1px solid #ebe9e4' }}>
-                    <div className="mb-6">
-                      <p className="text-xs font-bold uppercase tracking-widest mb-2"
-                        style={{ color: plan.highlight ? 'rgba(255,255,255,0.6)' : '#9ca3af' }}>
-                        {plan.name}
-                      </p>
-                      <div className="flex items-end gap-1.5 flex-wrap">
-                        <span className="text-4xl font-bold" style={{ color: plan.highlight ? '#fff' : INK, fontFamily: "'Playfair Display', serif" }}>
-                          {price}
-                        </span>
-                        <span className="text-sm mb-1.5" style={{ color: plan.highlight ? 'rgba(255,255,255,0.55)' : '#9ca3af' }}>
-                          {sub}
-                        </span>
-                      </div>
-                      {isYearly && fullPrice && (
-                        <p className="text-xs mt-1.5" style={{ color: plan.highlight ? 'rgba(255,255,255,0.5)' : '#9ca3af' }}>
-                          <span style={{ textDecoration: 'line-through' }}>${fullPrice}/yr</span>
-                          {' '}&rarr; you save ${fullPrice - plan.yearlyPrice}
-                        </p>
-                      )}
-                    </div>
-
-                    <ul className="space-y-2.5 flex-1 mb-8">
-                      {plan.features.map(f => (
-                        <li key={f} className="flex items-start gap-2.5 text-sm"
-                          style={{ color: plan.highlight ? 'rgba(255,255,255,0.85)' : '#4b5563' }}>
-                          <svg className="mt-0.5 shrink-0" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24"
-                            style={{ color: plan.highlight ? GOLD : GREEN }}>
-                            <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-                          </svg>
-                          {f}
-                        </li>
-                      ))}
-                    </ul>
-
-                    {plan.ctaTo.startsWith('mailto') ? (
-                      <a href={plan.ctaTo}
-                        className="block text-center py-3 rounded-full font-bold text-sm transition-opacity hover:opacity-80"
-                        style={{ background: '#f3f4f6', color: INK }}>
-                        {plan.cta}
-                      </a>
-                    ) : (
-                      <Link to={plan.ctaTo}
-                        className="block text-center py-3 rounded-full font-bold text-sm transition-opacity hover:opacity-90"
-                        style={plan.highlight
-                          ? { background: GOLD, color: '#1a1a1a' }
-                          : { background: GREEN, color: '#fff' }}>
-                        {plan.cta}
-                      </Link>
-                    )}
-                  </div>
-                )
-              })}
-            </div>
+            <Pricing
+              plans={PLANS}
+              title="Simple, transparent pricing"
+              description={'Start free. Upgrade when your league grows.'}
+            />
 
             {/* One-time options */}
-            <div style={{ borderTop: '1px solid #ebe9e4', paddingTop: '3rem' }}>
+            <div style={{ borderTop: '1px solid #ebe9e4', paddingTop: '3rem', marginTop: '4rem' }}>
               <div className="text-center mb-8">
                 <p className="text-xs font-bold uppercase tracking-widest mb-2" style={{ color: '#9ca3af' }}>One-Time Purchases</p>
                 <h3 className="text-2xl font-bold" style={{ fontFamily: "'Playfair Display', serif", color: INK }}>
@@ -545,7 +458,6 @@ export default function Home() {
                 ))}
               </div>
             </div>
-
           </div>
         </section>
 
