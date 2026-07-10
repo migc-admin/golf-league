@@ -151,6 +151,7 @@ export default function Pricing({ plans, title, description }) {
                 x: index === 2 ? -20 : index === 0 ? 20 : 0,
                 scale: index === 0 || index === 2 ? 0.95 : 1,
               }}
+              whileHover={!isPopular ? { y: -16, scale: 1.02, x: 0 } : {}}
               viewport={{ once: true }}
               transition={{
                 duration: 1.4,
@@ -168,9 +169,11 @@ export default function Pricing({ plans, title, description }) {
                 display: 'flex',
                 flexDirection: 'column',
                 zIndex: isPopular ? 10 : 0,
+                cursor: 'default',
                 boxShadow: isPopular
                   ? '0 20px 60px rgba(27,67,50,0.18)'
                   : '0 2px 12px rgba(0,0,0,0.05)',
+                transition: 'box-shadow 0.3s ease',
               }}
             >
               {/* Popular badge */}
