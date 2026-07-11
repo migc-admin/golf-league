@@ -2165,6 +2165,8 @@ function EditEventModal({ open, onClose, event, onSaved }) {
   const [eventNumber,   setEventNumber]   = useState('')
   const [entryFee,      setEntryFee]      = useState('')
   const [tournamentFee, setTournamentFee] = useState('')
+  const [venmoHandle,   setVenmoHandle]   = useState('')
+  const [paypalLink,    setPaypalLink]    = useState('')
   const [startTime,   setStartTime]   = useState('')
   const [interval,    setInterval]    = useState(10)
   const [formats,     setFormats]     = useState(new Set(['net_stroke']))
@@ -2181,6 +2183,8 @@ function EditEventModal({ open, onClose, event, onSaved }) {
       setEventNumber(event.event_number ?? '')
       setEntryFee(event.entry_fee ?? '')
       setTournamentFee(event.tournament_fee ?? '')
+      setVenmoHandle(event.venmo_handle ?? '')
+      setPaypalLink(event.paypal_link ?? '')
       setStartTime(event.start_time ? event.start_time.slice(0, 5) : '')
       setInterval(event.tee_time_interval_mins ?? 10)
       setFormats(new Set(event.formats?.length ? event.formats : [event.format ?? 'net_stroke']))
@@ -2218,6 +2222,8 @@ function EditEventModal({ open, onClose, event, onSaved }) {
         use_flights:            useFlights,
         payout_basis:           payoutBasis,
         payout_fixed_total:     payoutBasis === 'fixed' ? parseFloat(payoutFixed) || 0 : null,
+        venmo_handle:           venmoHandle.trim().replace(/^@/, '') || null,
+        paypal_link:            paypalLink.trim() || null,
       })
       .eq('id', event.id)
     setSaving(false)
@@ -2241,6 +2247,34 @@ function EditEventModal({ open, onClose, event, onSaved }) {
           <Input label="Tournament Entry Fee ($)" type="number" step="0.01" min="0" value={tournamentFee} onChange={e => setTournamentFee(e.target.value)} placeholder="Charged at registration" />
         </div>
         <p className="text-xs text-gray-400 -mt-2">Entry Fee drives payouts. Tournament Entry Fee is what players pay to register.</p>
+
+        {/* Payment links */}
+        <div className="space-y-3 bg-gray-50 rounded-xl px-4 py-3">
+          <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Payment Links (shown after registration)</p>
+          <div>
+            <label className="label">Venmo Handle</label>
+            <div className="relative">
+              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm font-medium">@</span>
+              <input
+                type="text"
+                value={venmoHandle}
+                onChange={e => setVenmoHandle(e.target.value)}
+                placeholder="yourhandle"
+                className="input pl-7"
+              />
+            </div>
+          </div>
+          <div>
+            <label className="label">PayPal.me Link</label>
+            <input
+              type="url"
+              value={paypalLink}
+              onChange={e => setPaypalLink(e.target.value)}
+              placeholder="https://paypal.me/yourname"
+              className="input"
+            />
+          </div>
+        </div>
 
         {/* Use Flights toggle */}
         <div className="bg-gray-50 rounded-xl px-4 py-3 flex items-center justify-between">
@@ -2605,9 +2639,9 @@ function TabRegistrations({ event, onUpdated }) {
             Copy
           </Button>
         </div>
-        {!event.venmo_handle && (
+        {!event.venmo_handle && !event.paypal_link && (
           <p className="text-xs text-amber-600 px-4 pb-3">
-            ⚠ No Venmo handle set on this event — players won't see a payment button. Add one in Event Settings.
+            ⚠ No payment links set — players won't see a payment button after registering. Add a Venmo handle or PayPal link in Event Settings.
           </p>
         )}
       </Card>

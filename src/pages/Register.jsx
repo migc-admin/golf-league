@@ -19,17 +19,32 @@ const GOLD = '#D4AF37'
 function VenmoButton({ handle, amount, note }) {
   const encoded = encodeURIComponent(note)
   const href = `https://account.venmo.com/u/${handle}?txn=pay&amount=${amount}&note=${encoded}`
-
   return (
-    <a
-      href={href}
-      className="flex items-center justify-center gap-3 w-full py-4 rounded-xl font-bold text-white text-lg shadow-lg"
+    <a href={href} target="_blank" rel="noopener noreferrer"
+      className="flex items-center justify-center gap-3 w-full py-3.5 rounded-xl font-bold text-white shadow-lg transition-opacity hover:opacity-90"
       style={{ background: '#008CFF' }}
     >
-      <svg viewBox="0 0 24 24" className="w-6 h-6 fill-white" xmlns="http://www.w3.org/2000/svg">
+      <svg viewBox="0 0 24 24" className="w-5 h-5 fill-white" xmlns="http://www.w3.org/2000/svg">
         <path d="M19.5 2C20.6 4.3 21 6.2 21 8.6c0 6.7-5.7 15.4-10.3 15.4-4.4 0-5.2-3.8-7.7-9.3l3.4-1.2c.8 2.1 1.6 4.4 2.9 4.4 1.5 0 3.9-5 3.9-8.3 0-2.4-.8-3.5-2-3.5-1.1 0-2.1.7-2.8 1.7L5.8 5.5C7.4 3 9.5 2 12 2c2.5 0 5.3 1.2 7.5 0z"/>
       </svg>
       Pay ${amount} via Venmo
+    </a>
+  )
+}
+
+function PayPalButton({ link, amount, note }) {
+  const url = new URL(link)
+  // Append amount to paypal.me links if not already present
+  if (!url.pathname.match(/\/\d+$/)) url.pathname += `/${amount}`
+  return (
+    <a href={url.toString()} target="_blank" rel="noopener noreferrer"
+      className="flex items-center justify-center gap-3 w-full py-3.5 rounded-xl font-bold text-white shadow-lg transition-opacity hover:opacity-90"
+      style={{ background: '#003087' }}
+    >
+      <svg viewBox="0 0 24 24" className="w-5 h-5 fill-white" xmlns="http://www.w3.org/2000/svg">
+        <path d="M7.076 21.337H2.47a.641.641 0 0 1-.633-.74L4.944.901C5.026.382 5.474 0 5.998 0h7.46c2.57 0 4.578.543 5.69 1.81 1.01 1.15 1.304 2.42 1.012 4.287-.023.143-.047.288-.077.437-.983 5.05-4.349 6.797-8.647 6.797h-2.19c-.524 0-.968.382-1.05.9l-1.12 7.106zm14.146-14.42a3.35 3.35 0 0 0-.607-.541c-.013.076-.026.175-.041.254-.59 3.025-2.566 6.082-8.558 6.082H9.825l-1.153 7.301h3.309c.458 0 .845-.333.917-.786l.038-.198.726-4.6.047-.254a.928.928 0 0 1 .917-.786h.578c3.741 0 6.671-1.52 7.526-5.914.36-1.845.174-3.386-.608-4.558z"/>
+      </svg>
+      Pay ${amount} via PayPal
     </a>
   )
 }
@@ -53,7 +68,7 @@ export default function Register() {
   useEffect(() => {
     supabase
       .from('events')
-      .select('id, name, event_number, event_date, entry_fee, tournament_fee, status, venmo_handle, course:courses(name), league:leagues(name), use_flights')
+      .select('id, name, event_number, event_date, entry_fee, tournament_fee, status, venmo_handle, paypal_link, course:courses(name), league:leagues(name), use_flights')
       .eq('id', eventId)
       .single()
       .then(({ data, error }) => {
@@ -234,13 +249,23 @@ export default function Register() {
               </p>
             </div>
 
-            {event.venmo_handle ? (
+            {(event.venmo_handle || event.paypal_link) ? (
               <div className="space-y-3">
-                <VenmoButton
-                  handle={event.venmo_handle}
-                  amount={Number(event.tournament_fee || event.entry_fee || 0).toFixed(2)}
-                  note={`${eventLabel} – ${firstName} ${lastName}`}
-                />
+                <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Complete your payment</p>
+                {event.venmo_handle && (
+                  <VenmoButton
+                    handle={event.venmo_handle}
+                    amount={Number(event.tournament_fee || event.entry_fee || 0).toFixed(2)}
+                    note={`${eventLabel} – ${firstName} ${lastName}`}
+                  />
+                )}
+                {event.paypal_link && (
+                  <PayPalButton
+                    link={event.paypal_link}
+                    amount={Number(event.tournament_fee || event.entry_fee || 0).toFixed(2)}
+                    note={`${eventLabel} – ${firstName} ${lastName}`}
+                  />
+                )}
                 <p className="text-xs text-gray-400">
                   Your registration will be confirmed once payment is received.
                   You'll hear from the organizer shortly.
