@@ -38,7 +38,7 @@ const FAQS = [
       },
       {
         q: 'What scoring formats are supported?',
-        a: 'Scorify supports stroke play (18-hole, Front 9, Back 9), Stableford, Match Points, Low Putts, and Skins. Net scoring with handicap adjustments is also supported.',
+        a: 'Scorify supports stroke play, Stableford, Match Points, Low Putts, and Skins. Net scoring with handicap adjustments is also supported. Additional formats are being developed for future enhancements — contact us at admin@scorifygolf.com with suggestions.',
       },
       {
         q: 'Can I run a shotgun start event?',
@@ -46,7 +46,7 @@ const FAQS = [
       },
       {
         q: 'What side games are supported?',
-        a: 'Scorify supports Skins, Closest to the Pin (CTP), Long Drive, Low Putts, and custom side game configurations. Payout amounts can be configured per game.',
+        a: 'Scorify supports Skins, Closest to the Pin (CTP), Long Drive, and Low Putts. Payout amounts can be configured per game. Additional side game formats are being developed — contact us at admin@scorifygolf.com with suggestions.',
       },
       {
         q: 'Can players see the leaderboard without logging in?',
@@ -59,7 +59,7 @@ const FAQS = [
     items: [
       {
         q: 'Does Scorify handle handicaps?',
-        a: 'Yes. You can enter each player\'s handicap index in their player profile. Scorify applies course handicap adjustments automatically when calculating net scores.',
+        a: 'Yes. You can enter each player\'s handicap index in their player profile. Scorify applies course handicap adjustments automatically when calculating net scores. USGA/GHIN integration is on the roadmap for a future enhancement.',
       },
       {
         q: 'What are flights and how do they work?',
@@ -136,7 +136,7 @@ const FAQS = [
       },
       {
         q: 'How does payment work for online registration?',
-        a: 'After registering, players are directed to pay via Venmo or PayPal (configured in your event settings). You confirm payment manually, and the registration status updates to confirmed. Stripe integration for automatic payment confirmation is on the roadmap.',
+        a: 'After registering, players are directed to pay via Venmo or PayPal (configured in your event settings). You confirm payment manually and the registration status updates to confirmed. Additional direct payment integrations are available — contact us at admin@scorifygolf.com for options.',
       },
     ],
   },
