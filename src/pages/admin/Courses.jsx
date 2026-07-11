@@ -162,6 +162,16 @@ export default function Courses() {
         <Button onClick={() => { setEditing(null); setModal(true) }}>+ New Course</Button>
       </div>
 
+      {/* Disclaimer */}
+      <div className="flex items-start gap-3 px-4 py-3 rounded-xl text-sm" style={{ background: '#fffbeb', border: '1px solid #fde68a' }}>
+        <svg width="18" height="18" fill="none" stroke="#d97706" strokeWidth="2" viewBox="0 0 24 24" style={{ flexShrink: 0, marginTop: 1 }}>
+          <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" />
+        </svg>
+        <p style={{ color: '#92400e' }}>
+          <strong>Please verify before play:</strong> Course Rating, Slope, and Hole Stroke Index imported from the API may not reflect current official ratings. Always confirm with the course or your local golf association prior to use in handicap calculations.
+        </p>
+      </div>
+
       {loading ? (
         <div className="space-y-3 animate-pulse">
           {[0,1,2].map(i => <div key={i} className="h-20 bg-gray-200 rounded-xl" />)}
