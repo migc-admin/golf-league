@@ -2,7 +2,6 @@ import { useEffect, useRef, useState } from 'react'
 import { Link, useParams, useNavigate } from 'react-router-dom'
 import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../hooks/useAuth'
-import { useFeatures } from '../../lib/OrgContext'
 import { hasFeature as checkFeature } from '../../lib/features'
 import toast from 'react-hot-toast'
 import Card from '../../components/ui/Card'
@@ -17,7 +16,6 @@ const CURRENT_YEAR = new Date().getFullYear()
 export default function LeagueDetail() {
   const { leagueSlug } = useParams()
   const { user } = useAuth()
-  const hasFeature = useFeatures()
   const navigate = useNavigate()
 
   const [league,       setLeague]       = useState(null)
@@ -78,7 +76,7 @@ export default function LeagueDetail() {
 
       const { data: lg } = await supabase
         .from('leagues')
-        .select('id, name, slug, season_year, logo_url')
+        .select('id, name, slug, season_year, logo_url, team_play_label')
         .eq('slug', leagueSlug)
         .single()
       if (!lg) { navigate('/admin/leagues'); return }
@@ -98,7 +96,7 @@ export default function LeagueDetail() {
 
   async function refreshLeague() {
     const { data: lg } = await supabase
-      .from('leagues').select('id, name, slug, season_year, logo_url').eq('id', league.id).single()
+      .from('leagues').select('id, name, slug, season_year, logo_url, team_play_label').eq('id', league.id).single()
     if (lg) setLeague(lg)
     await load(orgSlug, league.id)
   }
@@ -147,10 +145,10 @@ export default function LeagueDetail() {
             <Button size="sm" onClick={() => setEventModal(true)}>+ Event</Button>
             <Button size="sm" variant="secondary" onClick={() => setLeagueModal(true)}>Edit League</Button>
             <Link to={`/${orgSlug}/${league.slug}/standings`} className="btn btn-secondary btn-sm">Standings</Link>
-            {hasFeature('tgl') ? (
-              <Button size="sm" variant="secondary" onClick={() => setTglModal(true)}>TGL Teams</Button>
+            {checkFeature(orgTier, 'tgl') ? (
+              <Button size="sm" variant="secondary" onClick={() => setTglModal(true)}>{league.team_play_label || 'Team Play'}</Button>
             ) : (
-              <span className="text-xs text-ink-muted rounded-full px-3 py-1" style={{ background: '#eceae5' }}>TGL — Pro</span>
+              <span className="text-xs text-ink-muted rounded-full px-3 py-1" style={{ background: '#eceae5' }}>Team Play — Club</span>
             )}
             <Button size="sm" variant="danger" onClick={handleDeleteLeague}>Delete</Button>
           </div>
@@ -241,14 +239,15 @@ export default function LeagueDetail() {
 
 // ─── League Modal ─────────────────────────────────────────────────────────────
 function LeagueModal({ open, onClose, editing, orgId, orgSlug, onSaved }) {
-  const [name,    setName]    = useState('')
-  const [year,    setYear]    = useState(CURRENT_YEAR)
-  const [logoUrl, setLogoUrl] = useState('')
-  const [saving,  setSaving]  = useState(false)
+  const [name,          setName]          = useState('')
+  const [year,          setYear]          = useState(CURRENT_YEAR)
+  const [logoUrl,       setLogoUrl]       = useState('')
+  const [teamPlayLabel, setTeamPlayLabel] = useState('')
+  const [saving,        setSaving]        = useState(false)
 
   useEffect(() => {
-    if (editing) { setName(editing.name); setYear(editing.season_year); setLogoUrl(editing.logo_url ?? '') }
-    else         { setName('');           setYear(CURRENT_YEAR);        setLogoUrl('') }
+    if (editing) { setName(editing.name); setYear(editing.season_year); setLogoUrl(editing.logo_url ?? ''); setTeamPlayLabel(editing.team_play_label ?? '') }
+    else         { setName('');           setYear(CURRENT_YEAR);        setLogoUrl('');                     setTeamPlayLabel('') }
   }, [editing, open])
 
   async function handleSave(e) {
@@ -264,7 +263,7 @@ function LeagueModal({ open, onClose, editing, orgId, orgSlug, onSaved }) {
       }
     }
     const { error } = editing
-      ? await supabase.from('leagues').update({ name: name.trim(), season_year: +year, logo_url: logoUrl || null }).eq('id', editing.id)
+      ? await supabase.from('leagues').update({ name: name.trim(), season_year: +year, logo_url: logoUrl || null, team_play_label: teamPlayLabel.trim() || null }).eq('id', editing.id)
       : await supabase.from('leagues').insert({ name: name.trim(), season_year: +year, org_id: resolvedOrgId, logo_url: logoUrl || null })
     setSaving(false)
     if (error) toast.error(error.message)
@@ -286,6 +285,7 @@ function LeagueModal({ open, onClose, editing, orgId, orgSlug, onSaved }) {
         <Select label="Season Year" value={year} onChange={e => setYear(e.target.value)}>
           {years.map(y => <option key={y} value={y}>{y}</option>)}
         </Select>
+        <Input label="Team Play Button Label (optional)" value={teamPlayLabel} onChange={e => setTeamPlayLabel(e.target.value)} placeholder="e.g. TGL Teams, Ryder Cup, Match Play…" />
         <div className="flex justify-end gap-3 pt-2">
           <Button type="button" variant="secondary" onClick={onClose}>Cancel</Button>
           <Button type="submit" loading={saving}>{editing ? 'Save' : 'Create League'}</Button>
@@ -337,6 +337,9 @@ function EventModal({ open, onClose, league, orgTier, onSaved }) {
   const [useFlights,   setUseFlights]   = useState(false)
   const [startTime,    setStartTime]    = useState('')
   const [interval,     setInterval]     = useState(10)
+  const [tournamentFee, setTournamentFee] = useState('')
+  const [venmoHandle,  setVenmoHandle]  = useState('')
+  const [paypalLink,   setPaypalLink]   = useState('')
   const [saving,       setSaving]       = useState(false)
 
   useEffect(() => {
@@ -350,6 +353,7 @@ function EventModal({ open, onClose, league, orgTier, onSaved }) {
     setPayoutBasis('per_player'); setPayoutFixed('')
     setFormats(new Set(['net_stroke'])); setSideGames(new Set())
     setUseFlights(false); setStartTime(''); setInterval(10)
+    setTournamentFee(''); setVenmoHandle(''); setPaypalLink('')
   }, [open, league])
 
   function toggleFormat(key) {
@@ -379,6 +383,9 @@ function EventModal({ open, onClose, league, orgTier, onSaved }) {
       side_game_options:      [...sideGames],
       start_time:             startTime || null,
       tee_time_interval_mins: parseInt(interval, 10),
+      tournament_fee:         tournamentFee ? parseFloat(tournamentFee) : null,
+      venmo_handle:           venmoHandle.trim().replace(/^@/, '') || null,
+      paypal_link:            paypalLink.trim() || null,
       status:                 'upcoming',
     })
     setSaving(false)
@@ -483,6 +490,26 @@ function EventModal({ open, onClose, league, orgTier, onSaved }) {
             <Input className="mt-2" label="Fixed Pot Total ($)" type="number" step="0.01" min="0" value={payoutFixed} onChange={e => setPayoutFixed(e.target.value)} placeholder="e.g. 500" />
           )}
         </div>
+        <Input label="Tournament Entry Fee ($)" type="number" step="0.01" min="0" value={tournamentFee} onChange={e => setTournamentFee(e.target.value)} placeholder="e.g. 25.00 (shown on registration page)" />
+
+        <div className="space-y-3">
+          <div className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Payment Links (optional)</div>
+          <div>
+            <label className="label">Venmo Handle</label>
+            <div className="flex items-center border border-gray-300 rounded-lg overflow-hidden focus-within:ring-2 focus-within:ring-green-600">
+              <span className="px-3 text-gray-400 text-sm border-r border-gray-300 bg-gray-50 py-2">@</span>
+              <input
+                type="text"
+                value={venmoHandle}
+                onChange={e => setVenmoHandle(e.target.value)}
+                placeholder="your-venmo-username"
+                className="flex-1 px-3 py-2 text-sm focus:outline-none bg-white"
+              />
+            </div>
+          </div>
+          <Input label="PayPal.me Link" value={paypalLink} onChange={e => setPaypalLink(e.target.value)} placeholder="https://paypal.me/yourhandle" />
+        </div>
+
         <div className="flex justify-end gap-3 pt-2">
           <Button type="button" variant="secondary" onClick={onClose}>Cancel</Button>
           <Button type="submit" loading={saving}>Create Event</Button>
