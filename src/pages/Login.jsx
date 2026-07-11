@@ -1,13 +1,14 @@
 import { useState } from 'react'
-import { Navigate, useLocation } from 'react-router-dom'
+import { useNavigate, useLocation } from 'react-router-dom'
 import { useAuth } from '../hooks/useAuth'
 import { supabase } from '../lib/supabase'
 import toast from 'react-hot-toast'
 
 export default function Login() {
-  const { user, profile, loading, profileLoading, signIn } = useAuth()
-  const location = useLocation()
-  const from = location.state?.from?.pathname ?? '/home'
+  const { user, signIn } = useAuth()
+  const navigate  = useNavigate()
+  const location  = useLocation()
+  const from      = location.state?.from?.pathname ?? '/home'
 
   const [mode,     setMode]     = useState('signin') // 'signin' | 'signup'
   const [email,    setEmail]    = useState('')
@@ -15,10 +16,23 @@ export default function Login() {
   const [name,     setName]     = useState('')
   const [loading,  setLoading]  = useState(false)
 
-  if (user && !loading && !profileLoading) {
-    // No profile or no org set up yet → onboarding
-    if (!profile?.org_id) return <Navigate to="/onboarding" replace />
-    return <Navigate to={from} replace />
+  // If already logged in, send to right place
+  if (user) {
+    // Will be handled after submit — avoid redirect loop here
+  }
+
+  async function redirectAfterAuth(userId) {
+    const { data: prof } = await supabase
+      .from('profiles')
+      .select('org_id')
+      .eq('id', userId)
+      .maybeSingle()
+
+    if (!prof?.org_id) {
+      navigate('/onboarding', { replace: true })
+    } else {
+      navigate(from === '/login' ? '/home' : from, { replace: true })
+    }
   }
 
   async function handleSubmit(e) {
@@ -27,17 +41,26 @@ export default function Login() {
     setLoading(true)
     try {
       if (mode === 'signin') {
-        await signIn(email, password)
+        const data = await signIn(email, password)
+        await redirectAfterAuth(data.user.id)
       } else {
-        const { error } = await supabase.auth.signUp({
+        const { data, error } = await supabase.auth.signUp({
           email,
           password,
           options: { data: { full_name: name.trim() || undefined } },
         })
         if (error) throw error
-        toast.success('Account created! Check your email to confirm, then sign in.')
-        setMode('signin')
-        setPassword('')
+
+        if (data.session) {
+          // Email confirmation off — auto signed in
+          toast.success('Account created!')
+          await redirectAfterAuth(data.user.id)
+        } else {
+          // Email confirmation required
+          toast.success('Account created! Check your email to confirm, then sign in.')
+          setMode('signin')
+          setPassword('')
+        }
       }
     } catch (err) {
       toast.error(err.message ?? (mode === 'signin' ? 'Sign-in failed' : 'Sign-up failed'))
