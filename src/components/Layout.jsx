@@ -1,14 +1,118 @@
 import { Link, NavLink, useNavigate } from 'react-router-dom'
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useAuth } from '../hooks/useAuth'
 import { useOrg } from '../lib/OrgContext'
 import { supabase } from '../lib/supabase'
-import { TIER_LABELS } from '../lib/features'
+import { TIER_LABELS, hasFeature, getLimit } from '../lib/features'
+
+const GREEN = '#1B4332'
 
 const TIER_STYLE = {
   free:  { background: '#f3f4f6', color: '#6b7280' },
   pro:   { background: '#eff6ff', color: '#1d4ed8' },
-  club:  { background: '#f0fdf4', color: '#1B4332' },
+  club:  { background: '#f0fdf4', color: GREEN },
+}
+
+// All features shown in the popover with labels per tier
+const PLAN_FEATURES = [
+  { label: 'Leagues',              free: '1 league',      pro: '2 leagues',   club: 'Unlimited'   },
+  { label: 'Players per event',    free: 'Up to 16',      pro: 'Unlimited',   club: 'Unlimited'   },
+  { label: 'Digital scoring',      free: true,            pro: true,          club: true          },
+  { label: 'Leaderboards',         free: true,            pro: true,          club: true          },
+  { label: 'Printable scorecards', free: true,            pro: true,          club: true          },
+  { label: 'Flights A & B',        free: false,           pro: true,          club: true          },
+  { label: 'Skins & side games',   free: false,           pro: true,          club: true          },
+  { label: 'Score export (CSV)',    free: false,           pro: true,          club: true          },
+  { label: 'Multiple admins',      free: false,           pro: false,         club: 'Up to 3'     },
+  { label: 'TGL team scoring',     free: false,           pro: false,         club: true          },
+  { label: 'Custom branding',      free: false,           pro: false,         club: true          },
+  { label: 'Online registration',  free: false,           pro: false,         club: true          },
+]
+
+function TierPopover({ tier }) {
+  const [open, setOpen] = useState(false)
+  const ref = useRef(null)
+
+  useEffect(() => {
+    function handleClick(e) {
+      if (ref.current && !ref.current.contains(e.target)) setOpen(false)
+    }
+    document.addEventListener('mousedown', handleClick)
+    return () => document.removeEventListener('mousedown', handleClick)
+  }, [])
+
+  const label = TIER_LABELS[tier] ?? tier
+
+  function featureValue(f) {
+    return f[tier] ?? f.free
+  }
+
+  function renderValue(val) {
+    if (val === true)  return <span style={{ color: GREEN }}>✓</span>
+    if (val === false) return <span style={{ color: '#d1d5db' }}>—</span>
+    return <span style={{ color: GREEN, fontSize: '0.7rem' }}>{val}</span>
+  }
+
+  return (
+    <div ref={ref} className="relative">
+      <button
+        type="button"
+        onClick={() => setOpen(v => !v)}
+        className="text-xs font-semibold px-2 py-0.5 rounded-full transition-opacity hover:opacity-80"
+        style={TIER_STYLE[tier] ?? TIER_STYLE.free}
+      >
+        {label} ▾
+      </button>
+
+      {open && (
+        <div className="absolute right-0 top-8 z-50 w-72 bg-white rounded-2xl shadow-2xl"
+          style={{ border: '1px solid #ebe9e4' }}>
+
+          {/* Header */}
+          <div className="px-4 pt-4 pb-3" style={{ borderBottom: '1px solid #ebe9e4' }}>
+            <div className="flex items-center justify-between">
+              <span className="text-sm font-bold" style={{ color: '#1d1d1f' }}>Your Plan</span>
+              <span className="text-xs font-semibold px-2 py-0.5 rounded-full"
+                style={TIER_STYLE[tier] ?? TIER_STYLE.free}>
+                {label}
+              </span>
+            </div>
+          </div>
+
+          {/* Feature list */}
+          <ul className="px-4 py-3 space-y-2">
+            {PLAN_FEATURES.map(f => {
+              const val = featureValue(f)
+              const included = val !== false
+              return (
+                <li key={f.label} className="flex items-center justify-between gap-2">
+                  <span className="text-xs" style={{ color: included ? '#374151' : '#9ca3af' }}>
+                    {f.label}
+                  </span>
+                  <span className="text-xs font-semibold shrink-0">
+                    {renderValue(val)}
+                  </span>
+                </li>
+              )
+            })}
+          </ul>
+
+          {/* Upgrade CTA */}
+          {tier !== 'club' && (
+            <div className="px-4 pb-4" style={{ borderTop: '1px solid #ebe9e4', paddingTop: '0.75rem' }}>
+              <a
+                href="/onboarding"
+                className="block text-center text-xs font-bold py-2 rounded-full text-white transition-opacity hover:opacity-90"
+                style={{ background: GREEN }}
+              >
+                Upgrade to {tier === 'free' ? 'Pro' : 'Club'} →
+              </a>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  )
 }
 
 const navItems = [
@@ -94,12 +198,7 @@ export default function Layout({ children }) {
             </Link>
             <span className="hidden sm:flex items-center gap-2">
               <span className="text-xs text-ink-muted">{profile?.full_name}</span>
-              {org && (
-                <span className="text-xs font-semibold px-2 py-0.5 rounded-full"
-                  style={TIER_STYLE[tier] ?? TIER_STYLE.free}>
-                  {TIER_LABELS[tier] ?? tier}
-                </span>
-              )}
+              {org && <TierPopover tier={tier} />}
             </span>
             <button
               onClick={handleSignOut}
