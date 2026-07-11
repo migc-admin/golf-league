@@ -166,10 +166,15 @@ export default function Home() {
   const isScorekeeper = profile?.role === 'scorekeeper'
   const isLoggedIn    = !loading && !profileLoading && !!user
 
+  // Auto-redirect new users who haven't set up an org yet
   useEffect(() => {
     if (loading || profileLoading || !user) return
+    if (!profile?.org_id) {
+      navigate('/onboarding', { replace: true })
+      return
+    }
     loadEvents()
-  }, [user, loading, profileLoading])
+  }, [user, profile, loading, profileLoading])
 
   async function loadEvents() {
     setFetching(true)
