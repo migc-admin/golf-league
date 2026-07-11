@@ -15,6 +15,7 @@ import Input, { Select } from '../../components/ui/Input'
 import Badge, { FlightBadge, StatusBadge } from '../../components/ui/Badge'
 import ImageUpload from '../../components/ui/ImageUpload'
 import UpgradePrompt from '../../components/ui/UpgradePrompt'
+import PrintAssets from '../../components/ui/PrintAssets'
 import { atLimit, getLimit, nextTier, TIER_LABELS } from '../../lib/features'
 
 // Collapsed from 7 → 4 tabs: Players = Registrations + Players & Flights; Payout = Config + Side Games + Summary
@@ -39,6 +40,7 @@ export default function EventDetail() {
   const [tglLocked,      setTglLocked]      = useState(false)
   const [loading,        setLoading]        = useState(true)
   const [activeTab,      setActiveTab]      = useState('Overview')
+  const [printAsset,     setPrintAsset]     = useState(null) // 'cards' | 'tee_sheet' | 'cart_signs'
 
   const load = useCallback(async () => {
     const { data: league } = await supabase.from('leagues').select('id').eq('slug', leagueSlug).single()
@@ -198,6 +200,10 @@ export default function EventDetail() {
 
       {activeTab === 'Groups' && (
         <div className="space-y-6">
+          <div className="flex justify-end gap-2">
+            <Button variant="secondary" size="sm" onClick={() => setPrintAsset('tee_sheet')}>🖨 Tee Sheet</Button>
+            <Button variant="secondary" size="sm" onClick={() => setPrintAsset('cart_signs')}>🖨 Cart Signs</Button>
+          </div>
           <TabGroups event={event} eventPlayers={eventPlayers} onUpdated={load} />
           {((event.formats ?? (event.format ? [event.format] : [])).includes('match_points') ||
             (event.formats ?? (event.format ? [event.format] : [])).includes('ryder_cup')) && (
@@ -225,6 +231,11 @@ export default function EventDetail() {
             <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-widest mb-3">Payout Summary</h3>
             <TabPayoutSummary event={event} eventPlayers={eventPlayers} allScores={allScores} sideGames={sideGames} course={course} />
           </div>
+          {((event?.side_game_options ?? []).some(s => s === 'ctp' || s.startsWith('long_drive'))) && (
+            <div className="border-t border-gray-100 pt-6 flex justify-end">
+              <Button variant="secondary" onClick={() => setPrintAsset('cards')}>🖨 Print Cards</Button>
+            </div>
+          )}
         </div>
       )}
 
@@ -241,6 +252,8 @@ export default function EventDetail() {
           onUpdated={load}
         />
       )}
+
+      {printAsset && <PrintAssets type={printAsset} event={event} eventPlayers={eventPlayers} onClose={() => setPrintAsset(null)} />}
     </div>
   )
 }
