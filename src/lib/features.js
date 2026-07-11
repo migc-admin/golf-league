@@ -1,39 +1,79 @@
 /**
  * Tier-based feature gates for Scorify Golf.
- * Tiers: 'free' | 'pro' | 'elite'
+ * Tiers: 'free' | 'pro' | 'club'
  */
 
-export const TIER_FEATURES = {
-  free:  ['scoring', 'leaderboard', 'flights', 'side_games', 'skins'],
-  pro:   ['scoring', 'leaderboard', 'flights', 'side_games', 'skins', 'tgl', 'trip_manager'],
-  elite: ['scoring', 'leaderboard', 'flights', 'side_games', 'skins', 'tgl', 'trip_manager', 'registration', 'stripe', 'event_websites'],
+// ─── Limits ───────────────────────────────────────────────────────────────────
+export const TIER_LIMITS = {
+  free: {
+    leagues:     1,
+    players:     16,  // per league/event
+    admins:      1,
+  },
+  pro: {
+    leagues:     2,
+    players:     Infinity,
+    admins:      1,
+  },
+  club: {
+    leagues:     Infinity,
+    players:     Infinity,
+    admins:      3,
+  },
 }
 
-export const TIER_LABELS = {
-  free:  'Free',
-  pro:   'Pro',
-  elite: 'Elite',
+// ─── Feature flags ────────────────────────────────────────────────────────────
+// Each feature lists the minimum tier required to access it.
+export const FEATURE_MIN_TIER = {
+  flights:           'pro',
+  side_games:        'pro',
+  skins:             'pro',
+  csv_export:        'pro',
+  tgl:               'club',
+  custom_branding:   'club',
+  registration:      'club',
+  multiple_admins:   'club',
 }
 
-export const FEATURE_TIER = {}
-for (const [tier, features] of Object.entries(TIER_FEATURES)) {
-  for (const f of features) {
-    // Only record the LOWEST tier that unlocks a feature
-    if (!FEATURE_TIER[f]) FEATURE_TIER[f] = tier
-  }
-}
+const TIER_ORDER = ['free', 'pro', 'club']
 
 /**
  * Returns true if the given tier has access to the given feature.
  */
 export function hasFeature(tier, feature) {
-  const tierFeatures = TIER_FEATURES[tier] ?? TIER_FEATURES.free
-  return tierFeatures.includes(feature)
+  const minTier = FEATURE_MIN_TIER[feature]
+  if (!minTier) return true // unknown feature = unrestricted
+  return TIER_ORDER.indexOf(tier ?? 'free') >= TIER_ORDER.indexOf(minTier)
 }
 
 /**
- * Returns the minimum tier required for a feature.
+ * Returns the limit for a given resource on a given tier.
  */
-export function requiredTier(feature) {
-  return FEATURE_TIER[feature] ?? 'elite'
+export function getLimit(tier, resource) {
+  return TIER_LIMITS[tier ?? 'free']?.[resource] ?? TIER_LIMITS.free[resource]
+}
+
+/**
+ * Returns true if adding one more would exceed the tier limit.
+ */
+export function atLimit(tier, resource, currentCount) {
+  const limit = getLimit(tier, resource)
+  return currentCount >= limit
+}
+
+/**
+ * Human-readable tier name.
+ */
+export const TIER_LABELS = {
+  free:  'Starter',
+  pro:   'Pro',
+  club:  'Club',
+}
+
+/**
+ * The next tier up from the given tier.
+ */
+export function nextTier(tier) {
+  const idx = TIER_ORDER.indexOf(tier ?? 'free')
+  return TIER_ORDER[idx + 1] ?? 'club'
 }

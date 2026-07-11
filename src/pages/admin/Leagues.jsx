@@ -8,17 +8,21 @@ import Button from '../../components/ui/Button'
 import Modal from '../../components/ui/Modal'
 import Input, { Select } from '../../components/ui/Input'
 import ImageUpload from '../../components/ui/ImageUpload'
+import UpgradePrompt from '../../components/ui/UpgradePrompt'
+import { atLimit, getLimit, nextTier, TIER_LABELS } from '../../lib/features'
 
 const CURRENT_YEAR = new Date().getFullYear()
 
 export default function Leagues() {
   const { user } = useAuth()
   const navigate = useNavigate()
-  const [leagues,     setLeagues]     = useState([])
-  const [orgSlug,     setOrgSlug]     = useState(null)
-  const [orgId,       setOrgId]       = useState(null)
-  const [loading,     setLoading]     = useState(true)
-  const [leagueModal, setLeagueModal] = useState(false)
+  const [leagues,       setLeagues]       = useState([])
+  const [orgSlug,       setOrgSlug]       = useState(null)
+  const [orgId,         setOrgId]         = useState(null)
+  const [orgTier,       setOrgTier]       = useState('free')
+  const [loading,       setLoading]       = useState(true)
+  const [leagueModal,   setLeagueModal]   = useState(false)
+  const [upgradePrompt, setUpgradePrompt] = useState(false)
   const dragItem    = useRef(null)
   const dragOver    = useRef(null)
 
@@ -40,9 +44,10 @@ export default function Leagues() {
         .from('profiles').select('org_id').eq('id', user.id).single()
       if (profile?.org_id) {
         const { data: org } = await supabase
-          .from('organizations').select('id, slug').eq('id', profile.org_id).single()
+          .from('organizations').select('id, slug, tier').eq('id', profile.org_id).single()
         if (org?.slug) setOrgSlug(org.slug)
         if (org?.id)   setOrgId(org.id)
+        if (org?.tier) setOrgTier(org.tier)
       }
     }
     fetchOrg()
@@ -79,7 +84,17 @@ export default function Leagues() {
           <h1 className="text-2xl font-bold text-ink" style={{ letterSpacing: '-0.03em' }}>Leagues</h1>
           <p className="text-sm text-ink-muted mt-0.5">Manage your leagues and events</p>
         </div>
-        <Button onClick={() => setLeagueModal(true)}>+ New League</Button>
+        <div className="flex items-center gap-3">
+          {atLimit(orgTier, 'leagues', leagues.length) && (
+            <span className="text-xs font-medium px-2.5 py-1 rounded-full" style={{ background: '#fef9c3', color: '#854d0e' }}>
+              {leagues.length} / {getLimit(orgTier, 'leagues')} leagues — {TIER_LABELS[nextTier(orgTier)]} plan required
+            </span>
+          )}
+          <Button onClick={() => {
+            if (atLimit(orgTier, 'leagues', leagues.length)) setUpgradePrompt(true)
+            else setLeagueModal(true)
+          }}>+ New League</Button>
+        </div>
       </div>
 
       {loading ? (
@@ -148,6 +163,13 @@ export default function Leagues() {
         orgId={orgId}
         orgSlug={orgSlug}
         onSaved={() => { setLeagueModal(false); load() }}
+      />
+
+      <UpgradePrompt
+        open={upgradePrompt}
+        onClose={() => setUpgradePrompt(false)}
+        reason={`You've reached the ${getLimit(orgTier, 'leagues')}-league limit on the ${TIER_LABELS[orgTier]} plan.`}
+        requiredTier={nextTier(orgTier)}
       />
     </div>
   )

@@ -14,6 +14,8 @@ import Modal from '../../components/ui/Modal'
 import Input, { Select } from '../../components/ui/Input'
 import Badge, { FlightBadge, StatusBadge } from '../../components/ui/Badge'
 import ImageUpload from '../../components/ui/ImageUpload'
+import UpgradePrompt from '../../components/ui/UpgradePrompt'
+import { atLimit, getLimit, nextTier, TIER_LABELS } from '../../lib/features'
 
 // Collapsed from 7 → 4 tabs: Players = Registrations + Players & Flights; Payout = Config + Side Games + Summary
 const ALL_ADMIN_TABS = ['Overview', 'Players', 'Groups', 'Payout', 'TGL']
@@ -709,8 +711,11 @@ function EditHandicapModal({ ep, course, onClose, onSaved }) {
 
 // ─── Tab: Players & Flights ────────────────────────────────────────
 function TabFlights({ event, eventPlayers, course, allPlayers, onUpdated }) {
-  const [addModal, setAddModal] = useState(false)
+  const [addModal,      setAddModal]      = useState(false)
+  const [upgradePrompt, setUpgradePrompt] = useState(false)
   const [editingEp, setEditingEp] = useState(null) // ep being edited
+  const org     = useOrg()
+  const orgTier = org?.tier ?? 'free'
 
   const rostered = new Set(eventPlayers.map(ep => ep.player_id))
   const available = allPlayers.filter(p => !rostered.has(p.id))
@@ -873,14 +878,22 @@ function TabFlights({ event, eventPlayers, course, allPlayers, onUpdated }) {
         </Card>
       )}
 
-      <div className="flex items-center gap-3">
-        <Button onClick={() => setAddModal(true)} variant="secondary">+ Add Player to Event</Button>
+      <div className="flex items-center gap-3 flex-wrap">
+        <Button onClick={() => {
+          if (atLimit(orgTier, 'players', eventPlayers.length)) setUpgradePrompt(true)
+          else setAddModal(true)
+        }} variant="secondary">+ Add Player to Event</Button>
         {eventPlayers.length > 0 && (
           <span className="text-sm text-gray-500">
             {useFlights
               ? `${nonGuests.length} players · Flight A: ${flightA.length} · Flight B: ${flightB.length}${guests.length > 0 ? ` · ${guests.length} guest${guests.length !== 1 ? 's' : ''}` : ''}`
               : `${nonGuests.length} player${nonGuests.length !== 1 ? 's' : ''}${guests.length > 0 ? ` · ${guests.length} guest${guests.length !== 1 ? 's' : ''}` : ''}`
             }
+          </span>
+        )}
+        {atLimit(orgTier, 'players', eventPlayers.length) && (
+          <span className="text-xs font-medium px-2.5 py-1 rounded-full" style={{ background: '#fef9c3', color: '#854d0e' }}>
+            {eventPlayers.length} / {getLimit(orgTier, 'players')} players — {TIER_LABELS[nextTier(orgTier)]} plan required
           </span>
         )}
       </div>
@@ -961,6 +974,13 @@ function TabFlights({ event, eventPlayers, course, allPlayers, onUpdated }) {
         course={course}
         useFlights={useFlights}
         onSaved={onUpdated}
+      />
+
+      <UpgradePrompt
+        open={upgradePrompt}
+        onClose={() => setUpgradePrompt(false)}
+        reason={`You've reached the ${getLimit(orgTier, 'players')}-player limit on the ${TIER_LABELS[orgTier]} plan.`}
+        requiredTier={nextTier(orgTier)}
       />
     </div>
   )

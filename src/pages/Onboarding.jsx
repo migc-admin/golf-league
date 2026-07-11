@@ -27,7 +27,7 @@ const TIERS = [
     sub: 'forever free',
     features: [
       '1 league',
-      'Up to 24 players',
+      'Up to 16 players',
       'Digital scoring & leaderboards',
       'Season standings',
       'Printable scorecards',
@@ -42,7 +42,8 @@ const TIERS = [
     yearlySub: '/yr · save $149',
     popular: true,
     features: [
-      'Unlimited leagues & players',
+      'Up to 2 leagues',
+      'Unlimited players',
       'Everything in Starter',
       'Flights A & B',
       'Skins, CTP & side games',
@@ -58,11 +59,12 @@ const TIERS = [
     monthlySub: '/mo',
     yearlySub: '/yr · save $399',
     features: [
+      'Unlimited leagues',
+      'Up to 3 admins',
       'Everything in Pro',
-      'Multiple admins',
       'TGL team scoring',
       'Custom branding',
-      'Online registration',
+      'Online player registration',
       'Dedicated onboarding',
     ],
   },

@@ -76,7 +76,7 @@ const PLANS = [
     isPopular: false,
     features: [
       '1 league',
-      'Up to 24 players',
+      'Up to 16 players',
       'Digital scoring & leaderboards',
       'Season standings',
       'Printable scorecards',
@@ -91,7 +91,8 @@ const PLANS = [
     yearlyPrice: 199,
     isPopular: true,
     features: [
-      'Unlimited leagues & players',
+      'Up to 2 leagues',
+      'Unlimited players',
       'Everything in Starter',
       'Flights A & B',
       'Skins, CTP & side games',
@@ -140,17 +141,19 @@ const ONE_TIME = [
   {
     name: 'Golf Trip',
     price: '$249',
-    sub: 'one-time',
-    description: 'Multiple rounds, multiple courses, one trip. Scoring, standings, and leaderboards across every round.',
+    sub: 'one-time · assisted setup',
+    description: 'We set it up for you. Submit your itinerary, players, and courses — we handle the rest. Up to 7 rounds across multiple courses.',
     features: [
       'Up to 7 rounds / courses',
+      'Unlimited players',
       'Everything in Tournament',
       'Cross-round standings',
-      'Trip leaderboard',
-      'Group & flight management',
+      'Skins per round',
+      'Email consultation available',
+      'Data available for 90 days',
     ],
-    cta: 'Get started',
-    ctaTo: '/login',
+    cta: 'Plan my trip',
+    ctaTo: '/golf-trip',
   },
 ]
 
