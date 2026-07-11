@@ -1,7 +1,8 @@
 import { Link, NavLink, useNavigate } from 'react-router-dom'
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useAuth } from '../hooks/useAuth'
 import { useOrg } from '../lib/OrgContext'
+import { supabase } from '../lib/supabase'
 import { TIER_LABELS } from '../lib/features'
 
 const TIER_STYLE = {
@@ -19,12 +20,29 @@ const navItems = [
 ]
 
 export default function Layout({ children }) {
-  const { profile, signOut } = useAuth()
+  const { user, profile, signOut } = useAuth()
   const navigate = useNavigate()
   const [menuOpen, setMenuOpen] = useState(false)
-  const org = useOrg()
+  const [fetchedOrg, setFetchedOrg] = useState(null)
+  const ctxOrg = useOrg()
+
+  // OrgContext is only populated on org-slug routes. For plain /admin routes,
+  // fetch the org directly from the user's profile.
+  useEffect(() => {
+    if (ctxOrg || !user) return
+    supabase
+      .from('profiles').select('org_id').eq('id', user.id).single()
+      .then(({ data: p }) => {
+        if (!p?.org_id) return
+        supabase
+          .from('organizations').select('id, name, slug, logo_url, tier').eq('id', p.org_id).single()
+          .then(({ data: o }) => { if (o) setFetchedOrg(o) })
+      })
+  }, [user, ctxOrg])
+
+  const org     = ctxOrg ?? fetchedOrg
   const orgName = org?.name ?? 'Scorify Golf'
-  const tier = org?.tier ?? 'free'
+  const tier    = org?.tier ?? 'free'
 
   async function handleSignOut() {
     await signOut()
