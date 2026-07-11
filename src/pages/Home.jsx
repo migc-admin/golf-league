@@ -117,8 +117,8 @@ const PLANS = [
       'Online registration',
       'Dedicated onboarding',
     ],
-    buttonText: 'Contact us',
-    href: 'mailto:admin@scorifygolf.com',
+    buttonText: 'Start free trial',
+    href: '/login',
     description: 'For clubs and multi-league organizations.',
   },
 ]
@@ -126,8 +126,8 @@ const PLANS = [
 const ONE_TIME = [
   {
     name: 'Tournament',
-    price: '$49',
-    sub: 'one-time',
+    price: 'Starting at $49',
+    sub: 'one-time · assisted setup',
     description: 'Perfect for a single event — set up scoring, groups, leaderboard, and printable scorecards for one tournament.',
     features: [
       'One event, unlimited players',
@@ -136,12 +136,12 @@ const ONE_TIME = [
       'Printable scorecards',
       'Skins & side games',
     ],
-    cta: 'Get started',
-    ctaTo: '/login',
+    cta: 'Contact Us',
+    ctaTo: 'mailto:admin@scorifygolf.com',
   },
   {
     name: 'Golf Trip',
-    price: '$249',
+    price: 'Starting at $249',
     sub: 'one-time · assisted setup',
     description: 'We set it up for you. Submit your itinerary, players, and courses — we handle the rest. Up to 7 rounds across multiple courses.',
     features: [
@@ -153,8 +153,8 @@ const ONE_TIME = [
       'Email consultation available',
       'Data available for 90 days',
     ],
-    cta: 'Plan my trip',
-    ctaTo: '/golf-trip',
+    cta: 'Contact Us',
+    ctaTo: 'mailto:admin@scorifygolf.com',
   },
 ]
 
@@ -220,6 +220,7 @@ export default function Home() {
   const NAV_LINKS = [
     { label: 'Features', href: '#features' },
     { label: 'Pricing',  href: '#pricing'  },
+    { label: 'FAQ',      href: '/faq'      },
     { label: 'Contact',  href: '#contact'  },
     { label: 'About',    href: '#about'    },
   ]
@@ -497,11 +498,19 @@ export default function Home() {
                         </li>
                       ))}
                     </ul>
-                    <Link to={opt.ctaTo}
-                      className="block text-center py-3 rounded-full font-bold text-sm transition-opacity hover:opacity-90"
-                      style={{ background: GREEN, color: '#fff' }}>
-                      {opt.cta}
-                    </Link>
+                    {opt.ctaTo.startsWith('mailto') ? (
+                      <a href={opt.ctaTo}
+                        className="block text-center py-3 rounded-full font-bold text-sm transition-opacity hover:opacity-90"
+                        style={{ background: GREEN, color: '#fff' }}>
+                        {opt.cta}
+                      </a>
+                    ) : (
+                      <Link to={opt.ctaTo}
+                        className="block text-center py-3 rounded-full font-bold text-sm transition-opacity hover:opacity-90"
+                        style={{ background: GREEN, color: '#fff' }}>
+                        {opt.cta}
+                      </Link>
+                    )}
                   </div>
                 ))}
               </div>

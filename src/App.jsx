@@ -26,6 +26,7 @@ import EventPage      from './pages/EventPage'
 import Import         from './pages/admin/Import'
 import Register       from './pages/Register'
 import Onboarding    from './pages/Onboarding'
+import FAQ           from './pages/FAQ'
 
 export default function App() {
   return (
@@ -55,6 +56,7 @@ export default function App() {
 
         {/* Public event registration — no auth required */}
         <Route path="/register/:eventId" element={<Register />} />
+        <Route path="/faq" element={<FAQ />} />
 
         <Route path="/" element={<Navigate to="/home" replace />} />
 
