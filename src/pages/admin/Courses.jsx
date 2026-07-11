@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useRef } from 'react'
 import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../hooks/useAuth'
 import toast from 'react-hot-toast'
@@ -7,6 +7,92 @@ import Button from '../../components/ui/Button'
 import Modal from '../../components/ui/Modal'
 import Input from '../../components/ui/Input'
 import ImageUpload from '../../components/ui/ImageUpload'
+
+const GOLF_API_KEY  = import.meta.env.VITE_GOLF_COURSE_API_KEY
+const GOLF_API_HOST = 'golf-course-api.p.rapidapi.com'
+
+async function searchGolfCourses(query) {
+  const res = await fetch(
+    `https://${GOLF_API_HOST}/search?name=${encodeURIComponent(query)}`,
+    {
+      headers: {
+        'Content-Type': 'application/json',
+        'x-rapidapi-host': GOLF_API_HOST,
+        'x-rapidapi-key':  GOLF_API_KEY,
+      },
+    }
+  )
+  if (!res.ok) throw new Error('Course search failed')
+  return res.json()
+}
+
+/**
+ * Maps API course data into the format CourseModal uses internally.
+ */
+function mapApiCourse(api) {
+  // Build tees from teeBoxes (slope/rating) + scorecard (yardages per hole per tee)
+  const teeBoxes = api.teeBoxes ?? []
+
+  // Collect tee keys from scorecard holes (teeBox1, teeBox2, ...)
+  const teeKeys = api.scorecard?.length
+    ? Object.keys(api.scorecard[0].tees ?? {})
+    : []
+
+  let tees = []
+  let holes = []
+
+  if (teeKeys.length > 0 && teeBoxes.length > 0) {
+    // Map each teeKey to a tee definition
+    tees = teeKeys.map((key, i) => {
+      const box = teeBoxes[i] ?? teeBoxes[0]
+      const sampleTee = api.scorecard[0].tees[key]
+      return {
+        name:   box.tee ?? sampleTee?.color ?? `Tee ${i + 1}`,
+        color:  sampleTee?.color ?? 'White',
+        slope:  box.slope  ?? 113,
+        rating: box.handicap ?? 72.0,
+      }
+    })
+
+    holes = (api.scorecard ?? []).map(h => ({
+      hole:         h.Hole,
+      par:          h.Par,
+      stroke_index: h.Handicap ?? DEFAULT_SI[h.Hole - 1],
+      yardages:     teeKeys.map(key => h.tees[key]?.yards ?? 350),
+    }))
+  } else if (teeBoxes.length > 0) {
+    // No per-hole tee data — use teeBoxes only, holes get default yardage
+    tees = teeBoxes.map(box => ({
+      name:   box.tee ?? 'Back',
+      color:  'White',
+      slope:  box.slope  ?? 113,
+      rating: box.handicap ?? 72.0,
+    }))
+    holes = (api.scorecard ?? []).map(h => ({
+      hole:         h.Hole,
+      par:          h.Par,
+      stroke_index: h.Handicap ?? DEFAULT_SI[h.Hole - 1],
+      yardages:     tees.map(() => 350),
+    }))
+  } else {
+    // Fallback — default tees
+    tees = DEFAULT_TEES.map(t => ({ ...t }))
+    holes = (api.scorecard ?? []).map(h => ({
+      hole:         h.Hole,
+      par:          h.Par,
+      stroke_index: h.Handicap ?? DEFAULT_SI[h.Hole - 1],
+      yardages:     [350, 330, 310],
+    }))
+  }
+
+  // Pad to 18 holes if needed
+  while (holes.length < 18) {
+    const i = holes.length
+    holes.push({ hole: i + 1, par: 4, stroke_index: DEFAULT_SI[i], yardages: tees.map(() => 350) })
+  }
+
+  return { name: api.name, tees, holes }
+}
 
 const DEFAULT_SI = [1,3,5,7,9,11,13,15,17,2,4,6,8,10,12,14,16,18]
 
@@ -135,7 +221,54 @@ function CourseModal({ open, onClose, editing, orgId, orgSlug, onSaved }) {
   const [holes,    setHoles]    = useState(() => emptyHoles(3))
   const [photoUrl, setPhotoUrl] = useState('')
   const [saving,   setSaving]   = useState(false)
-  const [activeTeeIdx, setActiveTeeIdx] = useState(0)  // which tee to preview yardage for
+  const [activeTeeIdx, setActiveTeeIdx] = useState(0)
+
+  // API search state
+  const [searchQuery,   setSearchQuery]   = useState('')
+  const [searchResults, setSearchResults] = useState([])
+  const [searching,     setSearching]     = useState(false)
+  const [showResults,   setShowResults]   = useState(false)
+  const searchRef = useRef(null)
+  const searchTimer = useRef(null)
+
+  // Close dropdown on outside click
+  useEffect(() => {
+    function handleClick(e) {
+      if (searchRef.current && !searchRef.current.contains(e.target)) setShowResults(false)
+    }
+    document.addEventListener('mousedown', handleClick)
+    return () => document.removeEventListener('mousedown', handleClick)
+  }, [])
+
+  function handleSearchChange(e) {
+    const q = e.target.value
+    setSearchQuery(q)
+    clearTimeout(searchTimer.current)
+    if (q.length < 3) { setSearchResults([]); setShowResults(false); return }
+    searchTimer.current = setTimeout(async () => {
+      setSearching(true)
+      try {
+        const results = await searchGolfCourses(q)
+        setSearchResults(results ?? [])
+        setShowResults(true)
+      } catch {
+        toast.error('Course search failed')
+      } finally {
+        setSearching(false)
+      }
+    }, 500)
+  }
+
+  function importCourse(apiCourse) {
+    const mapped = mapApiCourse(apiCourse)
+    setName(mapped.name)
+    setTees(mapped.tees)
+    setHoles(mapped.holes)
+    setActiveTeeIdx(0)
+    setSearchQuery('')
+    setShowResults(false)
+    toast.success(`Imported "${mapped.name}" — review and save`)
+  }
 
   useEffect(() => {
     if (!open) return
@@ -291,6 +424,59 @@ function CourseModal({ open, onClose, editing, orgId, orgSlug, onSaved }) {
   return (
     <Modal open={open} onClose={onClose} title={editing ? 'Edit Course' : 'New Course'} maxWidth="max-w-5xl">
       <form onSubmit={handleSave} className="space-y-6">
+
+        {/* ── API Course Search ── */}
+        {!editing && (
+          <div ref={searchRef} className="relative">
+            <label className="label">Search & Import Course</label>
+            <div className="relative">
+              <input
+                type="text"
+                value={searchQuery}
+                onChange={handleSearchChange}
+                placeholder="Search by course name (e.g. Pebble Beach)…"
+                className="input pr-10"
+                autoComplete="off"
+              />
+              {searching && (
+                <div className="absolute right-3 top-1/2 -translate-y-1/2">
+                  <svg className="animate-spin h-4 w-4 text-gray-400" fill="none" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                  </svg>
+                </div>
+              )}
+            </div>
+            {showResults && searchResults.length > 0 && (
+              <div className="absolute z-50 w-full mt-1 bg-white border border-gray-200 rounded-xl shadow-lg overflow-hidden max-h-64 overflow-y-auto">
+                {searchResults.map((r, i) => (
+                  <button
+                    key={i}
+                    type="button"
+                    onClick={() => importCourse(r)}
+                    className="w-full text-left px-4 py-3 hover:bg-gray-50 transition-colors border-b border-gray-100 last:border-0"
+                  >
+                    <div className="text-sm font-semibold text-gray-800">{r.name}</div>
+                    <div className="text-xs text-gray-500 mt-0.5">
+                      {[r.city, r.state, r.country].filter(Boolean).join(', ')}
+                      {r.teeBoxes?.length > 0 && ` · ${r.teeBoxes.length} tee${r.teeBoxes.length !== 1 ? 's' : ''}`}
+                      {r.scorecard?.length > 0 && ` · ${r.scorecard.length} holes`}
+                    </div>
+                  </button>
+                ))}
+              </div>
+            )}
+            {showResults && searchResults.length === 0 && !searching && (
+              <div className="absolute z-50 w-full mt-1 bg-white border border-gray-200 rounded-xl shadow-lg px-4 py-3 text-sm text-gray-500">
+                No courses found — try a different name or add manually below.
+              </div>
+            )}
+            <p className="text-xs text-gray-400 mt-1">
+              Imports hole-by-hole par, stroke index, yardages, and tee ratings automatically.
+            </p>
+          </div>
+        )}
+
         <ImageUpload
           path={`orgs/${orgSlug}/courses/${Date.now()}`}
           currentUrl={photoUrl || null}
