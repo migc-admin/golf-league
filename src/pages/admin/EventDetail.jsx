@@ -19,7 +19,7 @@ import PrintAssets from '../../components/ui/PrintAssets'
 import { atLimit, getLimit, nextTier, TIER_LABELS } from '../../lib/features'
 
 // Collapsed from 7 → 4 tabs: Players = Registrations + Players & Flights; Payout = Config + Side Games + Summary
-const ALL_ADMIN_TABS = ['Overview', 'Players', 'Groups', 'Payout', 'TGL']
+const ALL_ADMIN_TABS = ['Overview', 'Players', 'Groups', 'Payout', 'Team Play']
 
 
 export default function EventDetail() {
@@ -152,7 +152,7 @@ export default function EventDetail() {
       <div className="border-b border-gray-200">
         <nav className="-mb-px flex gap-1 overflow-x-auto">
           {ALL_ADMIN_TABS.filter(tab => {
-            if (tab === 'TGL') return hasFeature('tgl') && tglTeams.length > 0
+            if (tab === 'Team Play') return hasFeature('tgl') && tglTeams.length > 0
             return true
           }).map(tab => (
             <button
@@ -230,7 +230,7 @@ export default function EventDetail() {
         </div>
       )}
 
-      {activeTab === 'TGL' && (
+      {activeTab === 'Team Play' && (
         <TGLManager
           event={event}
           eventPlayers={eventPlayers}
@@ -2860,7 +2860,7 @@ function TGLManager({ event, eventPlayers, allScores, course, tglTeams, tglMembe
       <div className="flex items-center justify-between gap-4">
         <div>
           <div className="flex items-center gap-2">
-            <h3 className="text-sm font-semibold text-gray-800">TGL Teams</h3>
+            <h3 className="text-sm font-semibold text-gray-800">Team Play</h3>
             {tglLocked && (
               <span className="text-xs bg-green-100 text-green-700 font-semibold px-2 py-0.5 rounded-full">
                 🔒 Locked
@@ -2986,7 +2986,7 @@ function TGLManager({ event, eventPlayers, allScores, course, tglTeams, tglMembe
       {eventResults && (
         <div className="border border-gray-200 rounded-xl overflow-hidden">
           <div className="bg-gray-50 px-4 py-2 border-b border-gray-200">
-            <span className="text-xs font-semibold text-gray-500 uppercase tracking-widest">Event TGL Scores</span>
+            <span className="text-xs font-semibold text-gray-500 uppercase tracking-widest">Event Team Play Scores</span>
           </div>
           <table className="w-full text-sm">
             <thead>
@@ -3022,7 +3022,7 @@ function TGLManager({ event, eventPlayers, allScores, course, tglTeams, tglMembe
 
       {/* New Team Modal */}
       {showTeamModal && (
-        <Modal open={showTeamModal} title="New TGL Team" onClose={() => setShowTeamModal(false)}>
+        <Modal open={showTeamModal} title="New Team Play Team" onClose={() => setShowTeamModal(false)}>
           <div className="space-y-4">
             <Input
               label="Team Name"

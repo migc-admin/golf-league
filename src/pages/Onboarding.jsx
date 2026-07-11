@@ -62,7 +62,7 @@ const TIERS = [
       'Unlimited leagues',
       'Up to 3 admins',
       'Everything in Pro',
-      'TGL team scoring',
+      'Team Play scoring',
       'Custom branding',
       'Online player registration',
       'Dedicated onboarding',

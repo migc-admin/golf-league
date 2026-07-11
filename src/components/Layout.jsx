@@ -24,7 +24,7 @@ const PLAN_FEATURES = [
   { label: 'Skins & side games',   free: false,           pro: true,          club: true          },
   { label: 'Score export (CSV)',    free: false,           pro: true,          club: true          },
   { label: 'Multiple admins',      free: false,           pro: false,         club: 'Up to 3'     },
-  { label: 'TGL team scoring',     free: false,           pro: false,         club: true          },
+  { label: 'Team Play scoring',     free: false,           pro: false,         club: true          },
   { label: 'Custom branding',      free: false,           pro: false,         club: true          },
   { label: 'Online registration',  free: false,           pro: false,         club: true          },
 ]

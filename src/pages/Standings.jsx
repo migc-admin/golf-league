@@ -198,7 +198,7 @@ export default function Standings() {
                   view === v ? 'bg-ink text-white' : 'text-ink-muted hover:text-ink hover:bg-surface-high'
                 }`}
               >
-                {v === 'earnings' ? 'Earnings' : 'TGL Teams'}
+                {v === 'earnings' ? 'Earnings' : 'Team Play'}
               </button>
             ))}
           </div>

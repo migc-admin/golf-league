@@ -112,7 +112,7 @@ const PLANS = [
     features: [
       'Everything in Pro',
       'Multiple admins',
-      'TGL team scoring',
+      'Team Play scoring',
       'Custom branding',
       'Online registration',
       'Dedicated onboarding',
@@ -233,6 +233,26 @@ export default function Home() {
       <meta property="og:description" content="Run your golf league with live leaderboards, digital scorecards, handicap tracking, and payout management. Free to start." />
       <meta property="og:url" content="https://scorifygolf.com" />
       <link rel="canonical" href="https://scorifygolf.com" />
+      <script type="application/ld+json">{JSON.stringify({
+        "@context": "https://schema.org",
+        "@type": "SoftwareApplication",
+        "name": "Scorify Golf",
+        "applicationCategory": "SportsApplication",
+        "operatingSystem": "Web",
+        "description": "Golf league management software with live leaderboards, digital scorecards, handicap tracking, and payout management.",
+        "url": "https://scorifygolf.com",
+        "offers": {
+          "@type": "Offer",
+          "price": "0",
+          "priceCurrency": "USD",
+          "description": "Free plan available"
+        },
+        "provider": {
+          "@type": "Organization",
+          "name": "Scorify Golf",
+          "url": "https://scorifygolf.com"
+        }
+      })}</script>
     </Helmet>
     <div className="min-h-screen flex flex-col" style={{ background: '#fbfaf8', color: INK }}>
 
@@ -375,15 +395,15 @@ export default function Home() {
             <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full text-xs font-semibold mb-6"
               style={{ background: 'rgba(255,255,255,0.1)', color: 'rgba(255,255,255,0.8)' }}>
               <span style={{ width: 6, height: 6, borderRadius: '50%', background: GOLD, display: 'inline-block' }} />
-              Modern golf league management
+              Golf league management software — free to start
             </div>
             <h1 className="text-4xl md:text-6xl font-bold text-white mb-6" style={{ fontFamily: "'Playfair Display', serif", lineHeight: 1.1 }}>
               Run your golf league<br />
               <span style={{ color: GOLD }}>the right way.</span>
             </h1>
             <p className="text-lg md:text-xl mb-10 max-w-2xl mx-auto" style={{ color: 'rgba(255,255,255,0.65)', lineHeight: 1.7 }}>
-              Digital scoring, live leaderboards, season standings, and printable scorecards —
-              built for the way your league actually plays.
+              Digital scoring, live leaderboards, handicap tracking, payout management, and printable scorecards —
+              built for the way your golf league actually plays.
             </p>
             <div className="flex flex-col sm:flex-row gap-3 justify-center">
               <Link to="/login"
@@ -411,10 +431,10 @@ export default function Home() {
             <div className="text-center mb-16">
               <p className="text-xs font-bold uppercase tracking-widest mb-3" style={{ color: GREEN }}>Features</p>
               <h2 className="text-3xl md:text-4xl font-bold" style={{ fontFamily: "'Playfair Display', serif", color: INK }}>
-                Everything your league needs
+                Everything your golf league needs
               </h2>
               <p className="mt-4 text-base max-w-xl mx-auto" style={{ color: '#6b7280' }}>
-                From the first tee to season champion — Scorify handles the whole thing.
+                From the first tee to season champion — Scorify Golf handles scoring, handicaps, payouts, and standings for your golf league.
               </p>
             </div>
 

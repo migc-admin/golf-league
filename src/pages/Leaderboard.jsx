@@ -17,7 +17,7 @@ import { computeTGLEventResults } from '../lib/engines/tgl'
 import { FlightBadge, StatusBadge } from '../components/ui/Badge'
 import { useFeatures } from '../lib/OrgContext'
 
-const ALL_TABS = ['18-Hole', 'Front 9', 'Back 9', 'Stableford', 'Match Points', 'Low Putts', 'Skins', 'Payouts', 'TGL']
+const ALL_TABS = ['18-Hole', 'Front 9', 'Back 9', 'Stableford', 'Match Points', 'Low Putts', 'Skins', 'Payouts', 'Team Play']
 
 function visibleTabs(event, hasTGL = false) {
   if (!event) return ALL_TABS
@@ -32,7 +32,7 @@ function visibleTabs(event, hasTGL = false) {
     if (tab === 'Match Points')  return formats.includes('match_points') || formats.includes('ryder_cup')
     if (tab === 'Low Putts')     return sideOpts.includes('low_putts')
     if (tab === 'Skins')         return sideOpts.some(s => s.startsWith('skins_'))
-    if (tab === 'TGL')           return hasTGL
+    if (tab === 'Team Play')      return hasTGL
     return false
   })
 }
@@ -354,7 +354,7 @@ export default function Leaderboard() {
             playerMap={playerMap}
           />
         )}
-        {activeTab === 'TGL' && (
+        {activeTab === 'Team Play' && (
           <TGLBoard tglData={tglData} locked={tglLocked} />
         )}
       </div>
@@ -1055,8 +1055,8 @@ function TGLBoard({ tglData, locked }) {
   if (!tglData) {
     return (
       <div className="text-center py-12 text-gray-400">
-        <p className="font-medium">No TGL data yet</p>
-        <p className="text-sm mt-1">Assign team selections in the admin TGL tab, then scores will appear here.</p>
+        <p className="font-medium">No Team Play data yet</p>
+        <p className="text-sm mt-1">Assign team selections in the admin Team Play tab, then scores will appear here.</p>
       </div>
     )
   }

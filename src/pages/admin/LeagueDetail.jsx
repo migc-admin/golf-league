@@ -592,7 +592,7 @@ function TGLTeamsModal({ open, onClose, league }) {
   const teamMemberIds = (teamId) => new Set(members.filter(m => m.team_id === teamId).map(m => m.player_id))
 
   return (
-    <Modal open={open} onClose={onClose} title={`TGL Teams — ${league.name}`} maxWidth="max-w-2xl">
+    <Modal open={open} onClose={onClose} title={`Team Play — ${league.name}`} maxWidth="max-w-2xl">
       <div className="space-y-5">
         <div className="flex gap-2 items-end">
           <div className="flex-1">
