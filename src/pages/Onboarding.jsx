@@ -64,7 +64,6 @@ export default function Onboarding() {
           org_id:    org.id,
           role:      'admin',
           full_name: fullName,
-          email:     user.email,
         }, { onConflict: 'id' })
 
       if (profErr) throw new Error(`Profile error: ${profErr.message}. You may need to add RLS policies — contact support at admin@scorifygolf.com`)
