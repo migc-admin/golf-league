@@ -317,9 +317,19 @@ function TabOverview({ event, eventPlayers, allScores, course, conflicts, onUpda
   return (
     <div className="grid sm:grid-cols-2 gap-4">
       <Card>
-        <h3 className="font-bold text-augusta-600 mb-4" style={{ fontFamily: "'Manrope','DM Sans',sans-serif", fontSize: '1rem', letterSpacing: '-0.01em' }}>
-          Event Details
-        </h3>
+        <CardHeader
+          title="Event Details"
+          action={
+            <div className="flex gap-2">
+              <Button size="sm" variant="secondary" onClick={() => exportScoresCSV(event, eventPlayers, allScores, course)}>⬇ Export</Button>
+              <Button size="sm" variant="secondary" onClick={() => setScoreEditor(true)}>✎ Scores</Button>
+              <Button size="sm" variant="secondary" onClick={() => setEditModal(true)}>Edit</Button>
+              {event.status !== 'complete' && (
+                <Button size="sm" variant="danger" onClick={() => setDeleteModal(true)}>Delete</Button>
+              )}
+            </div>
+          }
+        />
         <dl className="space-y-2 text-sm">
           <Row label="Date"         value={formatDate(event.event_date)} />
           <Row label="Course"       value={event.course?.name} />
@@ -331,16 +341,10 @@ function TabOverview({ event, eventPlayers, allScores, course, conflicts, onUpda
           {event.tournament_fee > 0 && <Row label="Tournament Entry Fee" value={`$${Number(event.tournament_fee).toFixed(2)}`} />}
           <Row label="Status"       value={<StatusBadge status={event.status} />} />
         </dl>
-        <div className="flex flex-wrap gap-2 mt-4 pt-4 border-t border-gray-100">
-          <Button size="sm" variant="secondary" onClick={() => onPrintAsset('tee_sheet')}>🖨 Tee Sheet</Button>
-          <Button size="sm" variant="secondary" onClick={() => onPrintAsset('cart_signs')}>🖨 Cart Signs</Button>
-          <Button size="sm" variant="secondary" onClick={() => onPrintAsset('cards')}>🖨 Cards</Button>
-          <Button size="sm" variant="secondary" onClick={() => exportScoresCSV(event, eventPlayers, allScores, course)}>⬇ Export</Button>
-          <Button size="sm" variant="secondary" onClick={() => setScoreEditor(true)}>✎ Scores</Button>
-          <Button size="sm" variant="secondary" onClick={() => setEditModal(true)}>Edit</Button>
-          {event.status !== 'complete' && (
-            <Button size="sm" variant="danger" onClick={() => setDeleteModal(true)}>Delete</Button>
-          )}
+        <div className="grid grid-cols-3 gap-2 mt-4 pt-4 border-t border-gray-100">
+          <Button variant="secondary" size="sm" className="w-full justify-center" onClick={() => onPrintAsset('tee_sheet')}>🖨 Tee Sheet</Button>
+          <Button variant="secondary" size="sm" className="w-full justify-center" onClick={() => onPrintAsset('cart_signs')}>🖨 Cart Signs</Button>
+          <Button variant="secondary" size="sm" className="w-full justify-center" onClick={() => onPrintAsset('cards')}>🖨 Cards</Button>
         </div>
       </Card>
 
