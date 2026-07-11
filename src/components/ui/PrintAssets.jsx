@@ -5,29 +5,23 @@
  *  'cards'      → CTP and Long Drive cards  (5.5" × 8.5" portrait)
  *  'tee_sheet'  → Tee Sheet                 (8.5" × 11" portrait)
  *  'cart_signs' → Cart Signs                (5.5" × 8.5" portrait, 2 players / sign)
- *
- * Usage:
- *   <PrintAssets type="cards"      event={event} eventPlayers={eventPlayers} onClose={...} />
- *   <PrintAssets type="tee_sheet"  event={event} eventPlayers={eventPlayers} onClose={...} />
- *   <PrintAssets type="cart_signs" event={event} eventPlayers={eventPlayers} onClose={...} />
  */
 
 import { useEffect } from 'react'
+import { createPortal } from 'react-dom'
 
-// ─── Colors ───────────────────────────────────────────────────────────────────
-const GOLD      = '#C9A84C'
-const GREEN     = '#1B4332'
-const GREEN_MID = '#2D6A4F'
+const GOLD  = '#C9A84C'
+const GREEN = '#1B4332'
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 function calcTeeTime(startTime, intervalMins, groupNum) {
   if (!startTime) return null
   const [h, m] = startTime.split(':').map(Number)
-  const total   = h * 60 + m + (groupNum - 1) * (intervalMins ?? 10)
-  const hh      = Math.floor(total / 60) % 24
-  const mm      = total % 60
-  const ampm    = hh >= 12 ? 'PM' : 'AM'
-  const hour    = hh % 12 || 12
+  const total  = h * 60 + m + (groupNum - 1) * (intervalMins ?? 10)
+  const hh     = Math.floor(total / 60) % 24
+  const mm     = total % 60
+  const ampm   = hh >= 12 ? 'PM' : 'AM'
+  const hour   = hh % 12 || 12
   return `${hour}:${mm.toString().padStart(2, '0')} ${ampm}`
 }
 
@@ -38,32 +32,34 @@ function formatEventDate(dateStr) {
   })
 }
 
-function playerName(ep) {
-  const p = ep.player ?? {}
-  return `${p.first_name ?? ''} ${p.last_name ?? ''}`.trim()
-}
-
 function groupedPlayers(eventPlayers) {
   const groups = {}
   for (const ep of eventPlayers) {
     const g = ep.group_number
-    if (!g) continue
-    if (!groups[g]) groups[g] = []
-    groups[g].push(ep)
+    if (g == null || g === 0) continue
+    const key = Number(g)
+    if (!groups[key]) groups[key] = []
+    groups[key].push(ep)
   }
-  // Sort each group by group_order
   for (const g of Object.keys(groups)) {
     groups[g].sort((a, b) => (a.group_order ?? 0) - (b.group_order ?? 0))
   }
   return groups
 }
 
+function epName(ep) {
+  const p = ep?.player ?? {}
+  const first = p.first_name ?? ''
+  const last  = p.last_name  ?? ''
+  return last ? `${last}, ${first}` : first || '—'
+}
+
 // ─── Shared Logo Header ───────────────────────────────────────────────────────
 function LogoHeader({ logoUrl, leagueName, eventName, date, size = 'lg' }) {
-  const logoSize  = size === 'sm' ? '0.8in'  : '1.1in'
-  const nameSz    = size === 'sm' ? '0.17in' : '0.2in'
-  const eventSz   = size === 'sm' ? '0.14in' : '0.16in'
-  const dateSz    = size === 'sm' ? '0.12in' : '0.14in'
+  const logoSize = size === 'sm' ? '0.8in'  : '1.1in'
+  const nameSz   = size === 'sm' ? '0.17in' : '0.2in'
+  const eventSz  = size === 'sm' ? '0.14in' : '0.16in'
+  const dateSz   = size === 'sm' ? '0.12in' : '0.14in'
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.1in' }}>
@@ -103,11 +99,7 @@ function WriteInLines({ count = 10 }) {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '0.22in', width: '100%' }}>
       {Array.from({ length: count }).map((_, i) => (
-        <div key={i} style={{
-          borderBottom: `1px solid rgba(255,255,255,0.35)`,
-          width: '100%',
-          paddingBottom: '0.05in',
-        }} />
+        <div key={i} style={{ borderBottom: '1px solid rgba(255,255,255,0.3)', width: '100%', paddingBottom: '0.05in' }} />
       ))}
     </div>
   )
@@ -128,12 +120,10 @@ function CtpLongDriveCard({ logoUrl, leagueName, eventName, date, competitionLin
       pageBreakAfter: 'always',
       fontFamily: 'Georgia, serif',
     }}>
-      {/* Header */}
       <LogoHeader logoUrl={logoUrl} leagueName={leagueName} eventName={eventName} date={date} />
 
-      {/* Competition label */}
       <div style={{ textAlign: 'center' }}>
-        <div style={{ fontSize: '0.65in', fontWeight: 'bold', color: '#fff', lineHeight: 1.05, letterSpacing: '-0.01em' }}>
+        <div style={{ fontSize: '0.65in', fontWeight: 'bold', color: '#fff', lineHeight: 1.05 }}>
           {competitionLine}
         </div>
         {sublabel && (
@@ -143,7 +133,6 @@ function CtpLongDriveCard({ logoUrl, leagueName, eventName, date, competitionLin
         )}
       </div>
 
-      {/* Write-in lines */}
       <div style={{ width: '100%', paddingTop: '0.15in' }}>
         <div style={{ fontSize: '0.11in', color: 'rgba(255,255,255,0.35)', textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: '0.2in', textAlign: 'center' }}>
           Results
@@ -168,20 +157,23 @@ function TeeSheetPage({ event, eventPlayers }) {
   const isShotgun  = event?.shotgun_start ?? false
   const holeMap    = event?.group_hole_assignments ?? {}
 
-  const groups = groupedPlayers(eventPlayers)
+  const groups    = groupedPlayers(eventPlayers)
   const groupNums = Object.keys(groups).map(Number).sort((a, b) => a - b)
+
+  // Columns: Time 0.85in | Group 0.55in | Players flex | Hole 0.75in
+  const cols = '0.85in 0.55in 4.5in 0.75in'
 
   return (
     <div style={{
       width: '8.5in', minHeight: '11in',
       background: '#fff', color: '#111',
-      padding: '0.5in 0.6in',
+      padding: '0.5in 0.55in',
       boxSizing: 'border-box',
       fontFamily: 'Georgia, serif',
       pageBreakAfter: 'always',
     }}>
       {/* Page header */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: '0.25in', marginBottom: '0.25in' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: '0.22in', marginBottom: '0.22in' }}>
         {logoUrl ? (
           <img src={logoUrl} alt="" style={{ width: '0.85in', height: '0.85in', borderRadius: '50%', objectFit: 'cover', border: `2px solid ${GOLD}`, flexShrink: 0 }} />
         ) : (
@@ -190,24 +182,29 @@ function TeeSheetPage({ event, eventPlayers }) {
           </div>
         )}
         <div>
-          <div style={{ fontSize: '0.22in', fontWeight: 'bold', color: GREEN, letterSpacing: '-0.01em' }}>{leagueName}</div>
-          <div style={{ fontSize: '0.18in', color: '#333', marginTop: '0.03in' }}>{eventName}</div>
-          <div style={{ fontSize: '0.13in', color: '#666', marginTop: '0.02in' }}>
-            {[date, courseName, event?.start_time ? `First tee ${calcTeeTime(event.start_time, interval, 1)}` : null, `${interval}-min intervals`].filter(Boolean).join('  ·  ')}
+          <div style={{ fontSize: '0.22in', fontWeight: 'bold', color: GREEN }}>{leagueName}</div>
+          <div style={{ fontSize: '0.17in', color: '#333', marginTop: '0.03in' }}>{eventName}</div>
+          <div style={{ fontSize: '0.12in', color: '#666', marginTop: '0.02in' }}>
+            {[
+              date,
+              courseName,
+              isShotgun ? 'Shotgun Start' : (event?.start_time ? `First tee ${calcTeeTime(event.start_time, interval, 1)}` : null),
+              !isShotgun ? `${interval}-min intervals` : null,
+            ].filter(Boolean).join('  ·  ')}
           </div>
         </div>
       </div>
 
-      {/* Gold divider */}
-      <div style={{ height: '2px', background: `linear-gradient(90deg, ${GOLD}, ${GREEN})`, marginBottom: '0.2in' }} />
+      {/* Divider */}
+      <div style={{ height: '2px', background: `linear-gradient(90deg, ${GOLD}, ${GREEN})`, marginBottom: '0.18in' }} />
 
       {/* Table header */}
       <div style={{
-        display: 'grid', gridTemplateColumns: '0.9in 0.65in 3.5in 1.5in',
-        gap: '0 0.15in', padding: '0.07in 0.12in',
+        display: 'grid', gridTemplateColumns: cols,
+        gap: '0 0.1in', padding: '0.07in 0.1in',
         background: GREEN, color: '#fff', borderRadius: '3px',
-        fontSize: '0.13in', fontWeight: 'bold', letterSpacing: '0.04em', textTransform: 'uppercase',
-        marginBottom: '0.04in',
+        fontSize: '0.12in', fontWeight: 'bold', letterSpacing: '0.04em', textTransform: 'uppercase',
+        marginBottom: '0.03in',
       }}>
         <div>Time</div>
         <div>Group</div>
@@ -217,51 +214,45 @@ function TeeSheetPage({ event, eventPlayers }) {
 
       {/* Rows */}
       {groupNums.map((g, i) => {
-        const members  = groups[g]
-        const teeTime  = isShotgun ? calcTeeTime(event?.start_time, 0, 1) : calcTeeTime(event?.start_time, interval, g)
-        const names    = members.map(ep => {
-          const p = ep.player ?? {}
-          return `${p.last_name ?? ''}${p.first_name ? ', ' + p.first_name : ''}`
-        }).join('  /  ')
+        const members = groups[g]
+        const teeTime = isShotgun
+          ? calcTeeTime(event?.start_time, 0, 1)
+          : calcTeeTime(event?.start_time, interval, g)
+        const names = members.map(ep => epName(ep)).join('  /  ')
+        const hole  = isShotgun ? (holeMap[g] ? `Hole ${holeMap[g]}` : '—') : 'Hole 1'
 
         return (
           <div key={g} style={{
-            display: 'grid', gridTemplateColumns: '0.9in 0.65in 3.5in 1.5in',
-            gap: '0 0.15in', padding: '0.1in 0.12in',
-            background: i % 2 === 0 ? '#f8f8f6' : '#fff',
+            display: 'grid', gridTemplateColumns: cols,
+            gap: '0 0.1in', padding: '0.09in 0.1in',
+            background: i % 2 === 0 ? '#f7f7f5' : '#fff',
             borderBottom: '1px solid #e8e8e4',
             alignItems: 'center',
           }}>
-            <div style={{ fontSize: '0.15in', fontWeight: 'bold', color: GREEN }}>
+            <div style={{ fontSize: '0.14in', fontWeight: 'bold', color: GREEN, whiteSpace: 'nowrap' }}>
               {teeTime ?? '—'}
             </div>
-            <div style={{ fontSize: '0.14in', color: '#555', fontWeight: 'bold' }}>
-              #{g}
-            </div>
-            <div style={{ fontSize: '0.14in', color: '#222', lineHeight: 1.4 }}>
+            <div style={{ fontSize: '0.13in', color: '#555', fontWeight: 'bold' }}>#{g}</div>
+            <div style={{ fontSize: '0.13in', color: '#222', lineHeight: 1.3, wordBreak: 'break-word' }}>
               {names || '—'}
             </div>
-            <div style={{ fontSize: '0.13in', color: '#888' }}>
-              {isShotgun ? (holeMap[g] ? `Hole ${holeMap[g]}` : '—') : 'Hole 1'}
-            </div>
+            <div style={{ fontSize: '0.12in', color: '#888', whiteSpace: 'nowrap' }}>{hole}</div>
           </div>
         )
       })}
 
       {groupNums.length === 0 && (
-        <div style={{ textAlign: 'center', padding: '0.5in', color: '#999', fontSize: '0.15in' }}>
+        <div style={{ textAlign: 'center', padding: '0.5in', color: '#999', fontSize: '0.14in' }}>
           No groups assigned yet.
         </div>
       )}
 
       {/* Footer */}
-      <div style={{ marginTop: '0.3in', borderTop: `1px solid ${GOLD}`, paddingTop: '0.12in', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <div style={{ fontSize: '0.11in', color: '#aaa' }}>
+      <div style={{ marginTop: '0.25in', borderTop: `1px solid ${GOLD}`, paddingTop: '0.1in', display: 'flex', justifyContent: 'space-between' }}>
+        <div style={{ fontSize: '0.1in', color: '#aaa' }}>
           {groupNums.length} group{groupNums.length !== 1 ? 's' : ''} · {eventPlayers.filter(ep => ep.group_number).length} players
         </div>
-        <div style={{ fontSize: '0.11in', color: '#aaa' }}>
-          Printed {new Date().toLocaleDateString()}
-        </div>
+        <div style={{ fontSize: '0.1in', color: '#aaa' }}>Printed {new Date().toLocaleDateString()}</div>
       </div>
     </div>
   )
@@ -282,67 +273,64 @@ function CartSignCard({ logoUrl, leagueName, eventName, date, groupNum, teeTime,
       pageBreakAfter: 'always',
       fontFamily: 'Georgia, serif',
     }}>
-      {/* Header */}
       <LogoHeader logoUrl={logoUrl} leagueName={leagueName} eventName={eventName} date={date} size="sm" />
 
-      {/* Group info */}
+      {/* Group + Tee Time */}
       <div style={{ textAlign: 'center', width: '100%' }}>
-        <div style={{ display: 'flex', justifyContent: 'center', gap: '0.3in', marginBottom: '0.15in' }}>
+        <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '0.3in', marginBottom: '0.12in' }}>
           <div style={{ textAlign: 'center' }}>
             <div style={{ fontSize: '0.11in', color: 'rgba(255,255,255,0.45)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Group</div>
-            <div style={{ fontSize: '0.38in', fontWeight: 'bold', color: '#fff', lineHeight: 1 }}>#{groupNum}</div>
+            <div style={{ fontSize: '0.42in', fontWeight: 'bold', color: '#fff', lineHeight: 1 }}>#{groupNum}</div>
           </div>
           {teeTime && (
             <>
-              <div style={{ width: '1px', background: 'rgba(255,255,255,0.2)' }} />
+              <div style={{ width: '1px', height: '0.55in', background: 'rgba(255,255,255,0.2)' }} />
               <div style={{ textAlign: 'center' }}>
                 <div style={{ fontSize: '0.11in', color: 'rgba(255,255,255,0.45)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Tee Time</div>
-                <div style={{ fontSize: '0.38in', fontWeight: 'bold', color: GOLD, lineHeight: 1 }}>{teeTime}</div>
+                <div style={{ fontSize: '0.42in', fontWeight: 'bold', color: GOLD, lineHeight: 1 }}>{teeTime}</div>
               </div>
             </>
           )}
         </div>
-
-        {/* Hole */}
-        <div style={{ fontSize: '0.13in', color: 'rgba(255,255,255,0.5)', letterSpacing: '0.04em' }}>
-          {holeLabel ?? 'Hole 1'}
+        <div style={{ fontSize: '0.13in', color: 'rgba(255,255,255,0.45)', letterSpacing: '0.04em' }}>
+          {holeLabel}
         </div>
       </div>
 
-      {/* Player names */}
+      {/* Players */}
       <div style={{ width: '100%' }}>
         <div style={{ width: '2in', height: '1.5px', background: GOLD, margin: '0 auto 0.2in' }} />
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.18in' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.16in' }}>
           {players.map((ep, i) => (
-            <div key={ep.id ?? i} style={{
+            <div key={ep?.id ?? i} style={{
               background: 'rgba(255,255,255,0.08)',
               border: '1px solid rgba(255,255,255,0.15)',
               borderRadius: '6px',
               padding: '0.14in 0.2in',
               textAlign: 'center',
             }}>
-              <div style={{ fontSize: '0.22in', fontWeight: 'bold', color: '#fff', lineHeight: 1.1 }}>
-                {playerName(ep) || '—'}
+              <div style={{ fontSize: '0.24in', fontWeight: 'bold', color: '#fff', lineHeight: 1.1 }}>
+                {epName(ep)}
               </div>
-              {ep.flight && (
+              {ep?.flight && (
                 <div style={{ fontSize: '0.12in', color: GOLD, marginTop: '0.04in', letterSpacing: '0.04em' }}>
                   Flight {ep.flight}
                 </div>
               )}
             </div>
           ))}
-          {/* Blank slots if fewer than 2 */}
-          {Array.from({ length: Math.max(0, 2 - players.length) }).map((_, i) => (
-            <div key={`blank-${i}`} style={{
-              background: 'rgba(255,255,255,0.04)',
+          {/* Blank slot if only 1 player */}
+          {players.length < 2 && (
+            <div style={{
+              background: 'rgba(255,255,255,0.03)',
               border: '1px dashed rgba(255,255,255,0.1)',
               borderRadius: '6px',
               padding: '0.14in 0.2in',
               textAlign: 'center',
             }}>
-              <div style={{ fontSize: '0.18in', color: 'rgba(255,255,255,0.2)' }}>—</div>
+              <div style={{ fontSize: '0.18in', color: 'rgba(255,255,255,0.15)' }}>—</div>
             </div>
-          ))}
+          )}
         </div>
       </div>
     </div>
@@ -350,7 +338,7 @@ function CartSignCard({ logoUrl, leagueName, eventName, date, groupNum, teeTime,
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// Main PrintAssets component
+// Main export
 // ═══════════════════════════════════════════════════════════════════════════════
 const PAGE_SIZE = {
   cards:      '5.5in 8.5in',
@@ -372,28 +360,42 @@ export default function PrintAssets({ type, event, eventPlayers = [], onClose })
   const date       = formatEventDate(event?.event_date)
   const interval   = event?.tee_time_interval_mins ?? 10
 
-  // ── Derive cards list based on type ──────────────────────────────────────
   let printNodes = []
 
+  // ── CTP / Long Drive cards ────────────────────────────────────────────────
   if (type === 'cards') {
+    const sideGames    = event?.side_game_options ?? []
     const payoutConfig = event?.payout_config ?? {}
-    const ctpHoles = Object.keys(payoutConfig)
+
+    // CTP: prefer holes from payout_config; fall back to a generic card if CTP enabled but no holes configured
+    const hasCtp    = sideGames.includes('ctp')
+    const ctpHoles  = Object.keys(payoutConfig)
       .filter(k => k.startsWith('ctp_'))
       .map(k => parseInt(k.replace('ctp_', ''), 10))
       .sort((a, b) => a - b)
 
-    const hasLongDrive = (event?.side_game_options ?? []).some(s => s.startsWith('long_drive'))
-    const ldHole = event?.long_drive_hole ?? null
-
-    ctpHoles.forEach(h => {
+    if (hasCtp && ctpHoles.length > 0) {
+      ctpHoles.forEach(h => {
+        printNodes.push(
+          <CtpLongDriveCard key={`ctp_${h}`}
+            logoUrl={logoUrl} leagueName={leagueName} eventName={eventName} date={date}
+            competitionLine={`Hole ${h}`} sublabel="Closest to the Pin"
+          />
+        )
+      })
+    } else if (hasCtp) {
+      // CTP enabled but no specific holes set yet — generic card
       printNodes.push(
-        <CtpLongDriveCard key={`ctp_${h}`}
+        <CtpLongDriveCard key="ctp_generic"
           logoUrl={logoUrl} leagueName={leagueName} eventName={eventName} date={date}
-          competitionLine={`Hole ${h}`}
-          sublabel="Closest to the Pin"
+          competitionLine="Closest to the Pin" sublabel={null}
         />
       )
-    })
+    }
+
+    // Long Drive
+    const hasLongDrive = sideGames.some(s => s.startsWith('long_drive'))
+    const ldHole       = event?.long_drive_hole ?? null
 
     if (hasLongDrive) {
       printNodes.push(
@@ -406,22 +408,23 @@ export default function PrintAssets({ type, event, eventPlayers = [], onClose })
     }
   }
 
+  // ── Tee Sheet ─────────────────────────────────────────────────────────────
   if (type === 'tee_sheet') {
-    printNodes = [
-      <TeeSheetPage key="tee_sheet" event={event} eventPlayers={eventPlayers} />
-    ]
+    printNodes = [<TeeSheetPage key="tee_sheet" event={event} eventPlayers={eventPlayers} />]
   }
 
+  // ── Cart Signs ────────────────────────────────────────────────────────────
   if (type === 'cart_signs') {
-    const groups        = groupedPlayers(eventPlayers)
-    const groupNums     = Object.keys(groups).map(Number).sort((a, b) => a - b)
-    const isShotgun     = event?.shotgun_start ?? false
-    const holeMap       = event?.group_hole_assignments ?? {}
+    const groups    = groupedPlayers(eventPlayers)
+    const groupNums = Object.keys(groups).map(Number).sort((a, b) => a - b)
+    const isShotgun = event?.shotgun_start ?? false
+    const holeMap   = event?.group_hole_assignments ?? {}
 
     groupNums.forEach(g => {
-      const members  = groups[g]
-      const teeTime  = isShotgun ? (event?.start_time ? calcTeeTime(event.start_time, 0, 1) : null)
-                                 : calcTeeTime(event?.start_time, interval, g)
+      const members   = groups[g]
+      const teeTime   = isShotgun
+        ? calcTeeTime(event?.start_time, 0, 1)
+        : calcTeeTime(event?.start_time, interval, g)
       const holeLabel = isShotgun
         ? (holeMap[g] ? `Hole ${holeMap[g]}` : 'TBD')
         : 'Hole 1'
@@ -447,15 +450,17 @@ export default function PrintAssets({ type, event, eventPlayers = [], onClose })
   }
 
   // ── Print CSS ─────────────────────────────────────────────────────────────
+  // #print-assets-root is portaled directly onto <body> so body > * hides
+  // #root but the @media print rule can un-hide #print-assets-root.
   useEffect(() => {
-    const size = PAGE_SIZE[type] ?? '8.5in 11in'
+    const size  = PAGE_SIZE[type] ?? '8.5in 11in'
     const style = document.createElement('style')
-    style.id = 'print-assets-style'
+    style.id    = 'print-assets-style'
     style.textContent = `
       @page { size: ${size}; margin: 0; }
       @media print {
         body > * { display: none !important; }
-        #print-assets-root { display: flex !important; }
+        #print-assets-root { display: block !important; }
       }
     `
     document.head.appendChild(style)
@@ -465,9 +470,9 @@ export default function PrintAssets({ type, event, eventPlayers = [], onClose })
   // ── Empty state ───────────────────────────────────────────────────────────
   if (printNodes.length === 0) {
     const hint = type === 'cards'
-      ? 'Add CTP holes in Payout Config or enable Long Drive to generate cards.'
+      ? 'Enable CTP or Long Drive in the event\'s Side Games to generate cards.'
       : type === 'cart_signs'
-      ? 'Assign players to groups first in the Groups tab.'
+      ? 'Assign players to groups in the Groups tab first.'
       : 'No data to print.'
 
     return (
@@ -482,13 +487,13 @@ export default function PrintAssets({ type, event, eventPlayers = [], onClose })
   }
 
   const cardCount = printNodes.length
-  const subtitle  = type === 'cards'      ? `${cardCount} card${cardCount !== 1 ? 's' : ''} · 5.5" × 8.5"`
-                  : type === 'tee_sheet'  ? '1 page · 8.5" × 11"'
-                  : `${cardCount} sign${cardCount !== 1 ? 's' : ''} · 5.5" × 8.5" · 2 players / sign`
+  const subtitle  = type === 'tee_sheet'
+    ? '1 page · 8.5" × 11"'
+    : `${cardCount} ${type === 'cart_signs' ? 'sign' : 'card'}${cardCount !== 1 ? 's' : ''} · 5.5" × 8.5"`
 
   return (
     <>
-      {/* Preview modal */}
+      {/* ── Preview modal ── */}
       <div className="fixed inset-0 z-50 flex flex-col" style={{ background: 'rgba(0,0,0,0.72)' }}>
         {/* Toolbar */}
         <div className="flex items-center justify-between px-6 py-3 bg-white shadow-md flex-shrink-0">
@@ -520,13 +525,13 @@ export default function PrintAssets({ type, event, eventPlayers = [], onClose })
         </div>
       </div>
 
-      {/* Hidden element that actually prints */}
-      <div
-        id="print-assets-root"
-        style={{ display: 'none', flexDirection: 'column', position: 'fixed', top: 0, left: 0, zIndex: 9999 }}
-      >
-        {printNodes}
-      </div>
+      {/* Print root portaled to <body> so body > * { display:none } + #print-assets-root { display:block } works */}
+      {createPortal(
+        <div id="print-assets-root" style={{ display: 'none' }}>
+          {printNodes}
+        </div>,
+        document.body
+      )}
     </>
   )
 }

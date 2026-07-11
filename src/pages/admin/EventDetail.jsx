@@ -200,10 +200,6 @@ export default function EventDetail() {
 
       {activeTab === 'Groups' && (
         <div className="space-y-6">
-          <div className="flex justify-end gap-2">
-            <Button variant="secondary" size="sm" onClick={() => setPrintAsset('tee_sheet')}>🖨 Tee Sheet</Button>
-            <Button variant="secondary" size="sm" onClick={() => setPrintAsset('cart_signs')}>🖨 Cart Signs</Button>
-          </div>
           <TabGroups event={event} eventPlayers={eventPlayers} onUpdated={load} />
           {((event.formats ?? (event.format ? [event.format] : [])).includes('match_points') ||
             (event.formats ?? (event.format ? [event.format] : [])).includes('ryder_cup')) && (
@@ -231,11 +227,6 @@ export default function EventDetail() {
             <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-widest mb-3">Payout Summary</h3>
             <TabPayoutSummary event={event} eventPlayers={eventPlayers} allScores={allScores} sideGames={sideGames} course={course} />
           </div>
-          {((event?.side_game_options ?? []).some(s => s === 'ctp' || s.startsWith('long_drive'))) && (
-            <div className="border-t border-gray-100 pt-6 flex justify-end">
-              <Button variant="secondary" onClick={() => setPrintAsset('cards')}>🖨 Print Cards</Button>
-            </div>
-          )}
         </div>
       )}
 
@@ -329,7 +320,10 @@ function TabOverview({ event, eventPlayers, allScores, course, conflicts, onUpda
         <CardHeader
           title="Event Details"
           action={
-            <div className="flex gap-2">
+            <div className="flex gap-2 flex-wrap justify-end">
+              <Button size="sm" variant="secondary" onClick={() => setPrintAsset('tee_sheet')}>🖨 Tee Sheet</Button>
+              <Button size="sm" variant="secondary" onClick={() => setPrintAsset('cart_signs')}>🖨 Cart Signs</Button>
+              <Button size="sm" variant="secondary" onClick={() => setPrintAsset('cards')}>🖨 Cards</Button>
               <Button size="sm" variant="secondary" onClick={() => exportScoresCSV(event, eventPlayers, allScores, course)}>
                 ⬇ Export
               </Button>
