@@ -2,6 +2,13 @@ import { Link, NavLink, useNavigate } from 'react-router-dom'
 import { useState } from 'react'
 import { useAuth } from '../hooks/useAuth'
 import { useOrg } from '../lib/OrgContext'
+import { TIER_LABELS } from '../lib/features'
+
+const TIER_STYLE = {
+  free:  { background: '#f3f4f6', color: '#6b7280' },
+  pro:   { background: '#eff6ff', color: '#1d4ed8' },
+  club:  { background: '#f0fdf4', color: '#1B4332' },
+}
 
 const navItems = [
   { to: '/admin',         label: 'Home',    icon: HomeIcon,   end: true },
@@ -17,6 +24,7 @@ export default function Layout({ children }) {
   const [menuOpen, setMenuOpen] = useState(false)
   const org = useOrg()
   const orgName = org?.name ?? 'Scorify Golf'
+  const tier = org?.tier ?? 'free'
 
   async function handleSignOut() {
     await signOut()
@@ -66,8 +74,14 @@ export default function Layout({ children }) {
             >
               View Site ↗
             </Link>
-            <span className="text-xs hidden sm:block text-ink-muted">
-              {profile?.full_name}
+            <span className="hidden sm:flex items-center gap-2">
+              <span className="text-xs text-ink-muted">{profile?.full_name}</span>
+              {org && (
+                <span className="text-xs font-semibold px-2 py-0.5 rounded-full"
+                  style={TIER_STYLE[tier] ?? TIER_STYLE.free}>
+                  {TIER_LABELS[tier] ?? tier}
+                </span>
+              )}
             </span>
             <button
               onClick={handleSignOut}
