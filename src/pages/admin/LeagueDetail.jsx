@@ -3,6 +3,7 @@ import { Link, useParams, useNavigate } from 'react-router-dom'
 import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../hooks/useAuth'
 import { useFeatures } from '../../lib/OrgContext'
+import { hasFeature as checkFeature } from '../../lib/features'
 import toast from 'react-hot-toast'
 import Card from '../../components/ui/Card'
 import Button from '../../components/ui/Button'
@@ -23,6 +24,7 @@ export default function LeagueDetail() {
   const [events,       setEvents]       = useState([])
   const [orgSlug,      setOrgSlug]      = useState(null)
   const [orgId,        setOrgId]        = useState(null)
+  const [orgTier,      setOrgTier]      = useState('free')
   const [loading,      setLoading]      = useState(true)
   const [leagueModal,  setLeagueModal]  = useState(false)
   const [eventModal,   setEventModal]   = useState(false)
@@ -71,8 +73,8 @@ export default function LeagueDetail() {
         .from('profiles').select('org_id').eq('id', user.id).single()
       if (!profile?.org_id) return
       const { data: org } = await supabase
-        .from('organizations').select('id, slug').eq('id', profile.org_id).single()
-      if (org) { setOrgSlug(org.slug); setOrgId(org.id) }
+        .from('organizations').select('id, slug, tier').eq('id', profile.org_id).single()
+      if (org) { setOrgSlug(org.slug); setOrgId(org.id); setOrgTier(org.tier ?? 'free') }
 
       const { data: lg } = await supabase
         .from('leagues')
@@ -223,6 +225,7 @@ export default function LeagueDetail() {
         open={eventModal}
         onClose={() => setEventModal(false)}
         league={league}
+        orgTier={orgTier}
         onSaved={() => { setEventModal(false); load(orgSlug, league.id) }}
       />
       {tglModal && (
@@ -318,9 +321,8 @@ const FORMAT_OPTIONS = [
   ]},
 ]
 
-function EventModal({ open, onClose, league, onSaved }) {
-  const hasFeature = useFeatures()
-  const canUsePro  = hasFeature('side_games')
+function EventModal({ open, onClose, league, orgTier, onSaved }) {
+  const canUsePro = checkFeature(orgTier ?? 'free', 'side_games')
 
   const [courses,      setCourses]      = useState([])
   const [courseId,     setCourseId]     = useState('')
