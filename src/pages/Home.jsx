@@ -308,8 +308,8 @@ export default function Home() {
               <p className="text-sm font-semibold text-gray-900">{profile?.full_name || user?.email}</p>
             </div>
 
-            {/* No profile yet — prompt onboarding */}
-            {!profile && (
+            {/* No org set up yet — prompt onboarding */}
+            {!profile?.org_id && (
               <Link to="/onboarding"
                 className="shrink-0 text-sm font-bold px-5 py-2.5 rounded-full text-white transition-opacity hover:opacity-90"
                 style={{ background: GREEN }}>

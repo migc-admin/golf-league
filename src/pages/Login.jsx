@@ -5,7 +5,7 @@ import { supabase } from '../lib/supabase'
 import toast from 'react-hot-toast'
 
 export default function Login() {
-  const { user, profile, profileLoading, signIn } = useAuth()
+  const { user, profile, loading, profileLoading, signIn } = useAuth()
   const location = useLocation()
   const from = location.state?.from?.pathname ?? '/home'
 
@@ -15,9 +15,9 @@ export default function Login() {
   const [name,     setName]     = useState('')
   const [loading,  setLoading]  = useState(false)
 
-  if (user && !profileLoading) {
-    // New user with no org/profile — send to onboarding
-    if (profile === null) return <Navigate to="/onboarding" replace />
+  if (user && !loading && !profileLoading) {
+    // No profile or no org set up yet → onboarding
+    if (!profile?.org_id) return <Navigate to="/onboarding" replace />
     return <Navigate to={from} replace />
   }
 

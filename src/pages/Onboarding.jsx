@@ -65,9 +65,9 @@ export default function Onboarding() {
           role:      'admin',
           full_name: fullName,
           email:     user.email,
-        })
+        }, { onConflict: 'id' })
 
-      if (profErr) throw profErr
+      if (profErr) throw new Error(`Profile error: ${profErr.message}. You may need to add RLS policies — contact support at admin@scorifygolf.com`)
 
       toast.success('Welcome to Scorify Golf!')
       // Hard reload so AuthProvider re-fetches the new profile
