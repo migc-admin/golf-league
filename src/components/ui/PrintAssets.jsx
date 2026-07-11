@@ -165,6 +165,8 @@ function TeeSheetPage({ event, eventPlayers }) {
   const date       = formatEventDate(event?.event_date)
   const courseName = event?.course?.name ?? ''
   const interval   = event?.tee_time_interval_mins ?? 10
+  const isShotgun  = event?.shotgun_start ?? false
+  const holeMap    = event?.group_hole_assignments ?? {}
 
   const groups = groupedPlayers(eventPlayers)
   const groupNums = Object.keys(groups).map(Number).sort((a, b) => a - b)
@@ -216,7 +218,7 @@ function TeeSheetPage({ event, eventPlayers }) {
       {/* Rows */}
       {groupNums.map((g, i) => {
         const members  = groups[g]
-        const teeTime  = calcTeeTime(event?.start_time, interval, g)
+        const teeTime  = isShotgun ? calcTeeTime(event?.start_time, 0, 1) : calcTeeTime(event?.start_time, interval, g)
         const names    = members.map(ep => {
           const p = ep.player ?? {}
           return `${p.last_name ?? ''}${p.first_name ? ', ' + p.first_name : ''}`
@@ -240,7 +242,7 @@ function TeeSheetPage({ event, eventPlayers }) {
               {names || '—'}
             </div>
             <div style={{ fontSize: '0.13in', color: '#888' }}>
-              Hole 1
+              {isShotgun ? (holeMap[g] ? `Hole ${holeMap[g]}` : '—') : 'Hole 1'}
             </div>
           </div>
         )
@@ -268,7 +270,7 @@ function TeeSheetPage({ event, eventPlayers }) {
 // ═══════════════════════════════════════════════════════════════════════════════
 // ASSET TYPE 3 — Cart Signs  (5.5" × 8.5", 2 players per card)
 // ═══════════════════════════════════════════════════════════════════════════════
-function CartSignCard({ logoUrl, leagueName, eventName, date, groupNum, teeTime, players }) {
+function CartSignCard({ logoUrl, leagueName, eventName, date, groupNum, teeTime, holeLabel, players }) {
   return (
     <div style={{
       width: '5.5in', height: '8.5in',
@@ -303,7 +305,7 @@ function CartSignCard({ logoUrl, leagueName, eventName, date, groupNum, teeTime,
 
         {/* Hole */}
         <div style={{ fontSize: '0.13in', color: 'rgba(255,255,255,0.5)', letterSpacing: '0.04em' }}>
-          Hole 1
+          {holeLabel ?? 'Hole 1'}
         </div>
       </div>
 
@@ -411,27 +413,33 @@ export default function PrintAssets({ type, event, eventPlayers = [], onClose })
   }
 
   if (type === 'cart_signs') {
-    const groups = groupedPlayers(eventPlayers)
-    const groupNums = Object.keys(groups).map(Number).sort((a, b) => a - b)
+    const groups        = groupedPlayers(eventPlayers)
+    const groupNums     = Object.keys(groups).map(Number).sort((a, b) => a - b)
+    const isShotgun     = event?.shotgun_start ?? false
+    const holeMap       = event?.group_hole_assignments ?? {}
 
     groupNums.forEach(g => {
-      const members = groups[g]
-      const teeTime = calcTeeTime(event?.start_time, interval, g)
-      // Card 1: players 1–2, Card 2: players 3–4
+      const members  = groups[g]
+      const teeTime  = isShotgun ? (event?.start_time ? calcTeeTime(event.start_time, 0, 1) : null)
+                                 : calcTeeTime(event?.start_time, interval, g)
+      const holeLabel = isShotgun
+        ? (holeMap[g] ? `Hole ${holeMap[g]}` : 'TBD')
+        : 'Hole 1'
+
       const card1 = members.slice(0, 2)
       const card2 = members.slice(2, 4)
 
       printNodes.push(
         <CartSignCard key={`g${g}-c1`}
           logoUrl={logoUrl} leagueName={leagueName} eventName={eventName} date={date}
-          groupNum={g} teeTime={teeTime} players={card1}
+          groupNum={g} teeTime={teeTime} holeLabel={holeLabel} players={card1}
         />
       )
       if (card2.length > 0) {
         printNodes.push(
           <CartSignCard key={`g${g}-c2`}
             logoUrl={logoUrl} leagueName={leagueName} eventName={eventName} date={date}
-            groupNum={g} teeTime={teeTime} players={card2}
+            groupNum={g} teeTime={teeTime} holeLabel={holeLabel} players={card2}
           />
         )
       }

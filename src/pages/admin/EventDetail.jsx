@@ -1411,8 +1411,20 @@ function MatchPairingsManager({ eventId, eventPlayers }) {
 }
 
 function TabGroups({ event, eventPlayers, onUpdated }) {
-  const ungrouped = eventPlayers.filter(ep => !ep.group_number)
-  const maxGroup  = Math.max(0, ...eventPlayers.map(ep => ep.group_number ?? 0))
+  const ungrouped    = eventPlayers.filter(ep => !ep.group_number)
+  const maxGroup     = Math.max(0, ...eventPlayers.map(ep => ep.group_number ?? 0))
+  const isShotgun    = event?.shotgun_start ?? false
+
+  // Hole assignments: { [groupNum]: holeNum }
+  const [holeAssignments, setHoleAssignments] = useState(event?.group_hole_assignments ?? {})
+
+  async function setGroupHole(groupNum, hole) {
+    const next = { ...holeAssignments, [groupNum]: hole ? parseInt(hole, 10) : null }
+    // Remove null entries
+    Object.keys(next).forEach(k => { if (!next[k]) delete next[k] })
+    setHoleAssignments(next)
+    await supabase.from('events').update({ group_hole_assignments: next }).eq('id', event.id)
+  }
 
   // Local order state: { [epId]: orderIndex }
   const [localOrder, setLocalOrder] = useState(() => {
@@ -1499,9 +1511,30 @@ function TabGroups({ event, eventPlayers, onUpdated }) {
 
       {groupNums.map(g => {
         const members = groupMembers(g)
+        const assignedHole = holeAssignments[g] ?? ''
         return (
           <Card key={g}>
-            <CardHeader title={`Group ${g}`} subtitle={`${members.length} player${members.length !== 1 ? 's' : ''}`} />
+            <div className="flex items-center justify-between px-5 pt-4 pb-2">
+              <div>
+                <div className="font-semibold text-gray-900">Group {g}</div>
+                <div className="text-xs text-gray-400 mt-0.5">{members.length} player{members.length !== 1 ? 's' : ''}</div>
+              </div>
+              {isShotgun && (
+                <div className="flex items-center gap-2">
+                  <label className="text-xs font-medium text-gray-500">Start Hole</label>
+                  <select
+                    value={assignedHole}
+                    onChange={e => setGroupHole(g, e.target.value)}
+                    className="input py-1 text-sm w-20 bg-white"
+                  >
+                    <option value="">—</option>
+                    {Array.from({ length: 18 }, (_, i) => i + 1).map(h => (
+                      <option key={h} value={h}>Hole {h}</option>
+                    ))}
+                  </select>
+                </div>
+              )}
+            </div>
             <div className="divide-y divide-gray-100">
               {members.map((ep, i) => (
                 <GroupRow
@@ -2184,10 +2217,11 @@ function EditEventModal({ open, onClose, event, onSaved }) {
   const [interval,    setInterval]    = useState(10)
   const [formats,     setFormats]     = useState(new Set(['net_stroke']))
   const [sideGames,   setSideGames]   = useState(new Set())
-  const [useFlights,  setUseFlights]  = useState(false)
-  const [payoutBasis, setPayoutBasis] = useState('per_player')
-  const [payoutFixed, setPayoutFixed] = useState('')
-  const [saving,      setSaving]      = useState(false)
+  const [useFlights,   setUseFlights]   = useState(false)
+  const [shotgunStart, setShotgunStart] = useState(false)
+  const [payoutBasis,  setPayoutBasis]  = useState('per_player')
+  const [payoutFixed,  setPayoutFixed]  = useState('')
+  const [saving,       setSaving]       = useState(false)
 
   useEffect(() => {
     if (event && open) {
@@ -2203,6 +2237,7 @@ function EditEventModal({ open, onClose, event, onSaved }) {
       setFormats(new Set(event.formats?.length ? event.formats : [event.format ?? 'net_stroke']))
       setSideGames(new Set(event.side_game_options ?? []))
       setUseFlights(event.use_flights ?? false)
+      setShotgunStart(event.shotgun_start ?? false)
       setPayoutBasis(event.payout_basis ?? 'per_player')
       setPayoutFixed(event.payout_fixed_total ?? '')
     }
@@ -2233,6 +2268,7 @@ function EditEventModal({ open, onClose, event, onSaved }) {
         formats:                formatsArr,
         side_game_options:      [...sideGames],
         use_flights:            useFlights,
+        shotgun_start:          shotgunStart,
         payout_basis:           payoutBasis,
         payout_fixed_total:     payoutBasis === 'fixed' ? parseFloat(payoutFixed) || 0 : null,
         venmo_handle:           venmoHandle.trim().replace(/^@/, '') || null,
@@ -2301,6 +2337,21 @@ function EditEventModal({ open, onClose, event, onSaved }) {
             className={`relative inline-flex h-6 w-11 shrink-0 rounded-full border-2 border-transparent transition-colors focus:outline-none ${useFlights ? 'bg-fairway-600' : 'bg-gray-300'}`}
           >
             <span className={`inline-block h-5 w-5 rounded-full bg-white shadow transition-transform ${useFlights ? 'translate-x-5' : 'translate-x-0'}`} />
+          </button>
+        </div>
+
+        {/* Shotgun Start toggle */}
+        <div className="bg-gray-50 rounded-xl px-4 py-3 flex items-center justify-between">
+          <div>
+            <div className="text-sm font-medium text-gray-800">Shotgun Start?</div>
+            <div className="text-xs text-gray-400 mt-0.5">All groups tee off simultaneously from different holes</div>
+          </div>
+          <button
+            type="button"
+            onClick={() => setShotgunStart(v => !v)}
+            className={`relative inline-flex h-6 w-11 shrink-0 rounded-full border-2 border-transparent transition-colors focus:outline-none ${shotgunStart ? 'bg-fairway-600' : 'bg-gray-300'}`}
+          >
+            <span className={`inline-block h-5 w-5 rounded-full bg-white shadow transition-transform ${shotgunStart ? 'translate-x-5' : 'translate-x-0'}`} />
           </button>
         </div>
 

@@ -337,10 +337,11 @@ function EventModal({ open, onClose, league, orgTier, onSaved }) {
   const [useFlights,   setUseFlights]   = useState(false)
   const [startTime,    setStartTime]    = useState('')
   const [interval,     setInterval]     = useState(10)
-  const [tournamentFee, setTournamentFee] = useState('')
-  const [venmoHandle,  setVenmoHandle]  = useState('')
-  const [paypalLink,   setPaypalLink]   = useState('')
-  const [saving,       setSaving]       = useState(false)
+  const [tournamentFee,  setTournamentFee]  = useState('')
+  const [venmoHandle,   setVenmoHandle]   = useState('')
+  const [paypalLink,    setPaypalLink]    = useState('')
+  const [shotgunStart,  setShotgunStart]  = useState(false)
+  const [saving,        setSaving]        = useState(false)
 
   useEffect(() => {
     if (!open) return
@@ -353,7 +354,7 @@ function EventModal({ open, onClose, league, orgTier, onSaved }) {
     setPayoutBasis('per_player'); setPayoutFixed('')
     setFormats(new Set(['net_stroke'])); setSideGames(new Set())
     setUseFlights(false); setStartTime(''); setInterval(10)
-    setTournamentFee(''); setVenmoHandle(''); setPaypalLink('')
+    setTournamentFee(''); setVenmoHandle(''); setPaypalLink(''); setShotgunStart(false)
   }, [open, league])
 
   function toggleFormat(key) {
@@ -386,6 +387,7 @@ function EventModal({ open, onClose, league, orgTier, onSaved }) {
       tournament_fee:         tournamentFee ? parseFloat(tournamentFee) : null,
       venmo_handle:           venmoHandle.trim().replace(/^@/, '') || null,
       paypal_link:            paypalLink.trim() || null,
+      shotgun_start:          shotgunStart,
       status:                 'upcoming',
     })
     setSaving(false)
@@ -424,6 +426,20 @@ function EventModal({ open, onClose, league, orgTier, onSaved }) {
             className={`relative inline-flex h-6 w-11 shrink-0 rounded-full border-2 border-transparent transition-colors focus:outline-none ${!canUsePro ? 'cursor-not-allowed' : ''} ${useFlights && canUsePro ? 'bg-fairway-600' : 'bg-gray-300'}`}
           >
             <span className={`inline-block h-5 w-5 rounded-full bg-white shadow transition-transform ${useFlights && canUsePro ? 'translate-x-5' : 'translate-x-0'}`} />
+          </button>
+        </div>
+
+        <div className="bg-gray-50 rounded-xl px-4 py-3 flex items-center justify-between">
+          <div>
+            <div className="text-sm font-medium text-gray-800">Shotgun Start?</div>
+            <div className="text-xs text-gray-400 mt-0.5">All groups tee off simultaneously from different holes</div>
+          </div>
+          <button
+            type="button"
+            onClick={() => setShotgunStart(v => !v)}
+            className={`relative inline-flex h-6 w-11 shrink-0 rounded-full border-2 border-transparent transition-colors focus:outline-none ${shotgunStart ? 'bg-fairway-600' : 'bg-gray-300'}`}
+          >
+            <span className={`inline-block h-5 w-5 rounded-full bg-white shadow transition-transform ${shotgunStart ? 'translate-x-5' : 'translate-x-0'}`} />
           </button>
         </div>
 
