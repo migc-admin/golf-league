@@ -473,7 +473,7 @@ function EventModal({ open, onClose, league, orgTier, onSaved }) {
           <Input label="Start Time" type="time" value={startTime} onChange={e => setStartTime(e.target.value)} />
           <Input label="Tee Interval (min)" type="number" min="1" max="60" value={interval} onChange={e => setInterval(e.target.value)} />
         </div>
-        <Input label="Entry Fee ($)" type="number" step="0.01" min="0" value={entryFee} onChange={e => setEntryFee(e.target.value)} required />
+        <Input label="Side Games / Competitions Entry Fee ($)" type="number" step="0.01" min="0" value={entryFee} onChange={e => setEntryFee(e.target.value)} required />
         <div>
           <label className="label">Payout Pot Based On</label>
           <div className="flex gap-4 mt-1">
