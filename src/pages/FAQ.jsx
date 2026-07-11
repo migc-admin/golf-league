@@ -25,7 +25,7 @@ const FAQS = [
       },
       {
         q: 'Can I try Scorify Golf before paying?',
-        a: 'Yes. All plans — including Pro and Club — start with a free trial. No credit card required to get started.',
+        a: 'Yes. All plans — including Pro and Club — start with a free trial.',
       },
     ],
   },
