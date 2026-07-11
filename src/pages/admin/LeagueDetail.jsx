@@ -400,17 +400,21 @@ function EventModal({ open, onClose, league, onSaved }) {
           </select>
         </div>
 
-        <div className="bg-gray-50 rounded-xl px-4 py-3 flex items-center justify-between">
+        <div className={`bg-gray-50 rounded-xl px-4 py-3 flex items-center justify-between ${!canUsePro ? 'opacity-50' : ''}`}>
           <div>
-            <div className="text-sm font-medium text-gray-800">Use Flights (A &amp; B)?</div>
+            <div className="text-sm font-medium text-gray-800 flex items-center gap-2">
+              Use Flights (A &amp; B)?
+              {!canUsePro && <span className="text-xs font-semibold px-1.5 py-0.5 rounded-full" style={{ background: '#eff6ff', color: '#1d4ed8' }}>Pro</span>}
+            </div>
             <div className="text-xs text-gray-400 mt-0.5">Enable if splitting players into two competitive flights</div>
           </div>
           <button
             type="button"
-            onClick={() => setUseFlights(v => !v)}
-            className={`relative inline-flex h-6 w-11 shrink-0 rounded-full border-2 border-transparent transition-colors focus:outline-none ${useFlights ? 'bg-fairway-600' : 'bg-gray-300'}`}
+            onClick={() => canUsePro && setUseFlights(v => !v)}
+            disabled={!canUsePro}
+            className={`relative inline-flex h-6 w-11 shrink-0 rounded-full border-2 border-transparent transition-colors focus:outline-none ${!canUsePro ? 'cursor-not-allowed' : ''} ${useFlights && canUsePro ? 'bg-fairway-600' : 'bg-gray-300'}`}
           >
-            <span className={`inline-block h-5 w-5 rounded-full bg-white shadow transition-transform ${useFlights ? 'translate-x-5' : 'translate-x-0'}`} />
+            <span className={`inline-block h-5 w-5 rounded-full bg-white shadow transition-transform ${useFlights && canUsePro ? 'translate-x-5' : 'translate-x-0'}`} />
           </button>
         </div>
 
