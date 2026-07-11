@@ -142,14 +142,14 @@ export default function LeagueDetail() {
 
           {/* Actions */}
           <div className="flex items-center gap-2 flex-wrap justify-end shrink-0">
+            <Button size="sm" onClick={() => setEventModal(true)}>+ Event</Button>
+            <Button size="sm" variant="secondary" onClick={() => setLeagueModal(true)}>Edit League</Button>
             <Link to={`/${orgSlug}/${league.slug}/standings`} className="btn btn-secondary btn-sm">Standings</Link>
             {hasFeature('tgl') ? (
               <Button size="sm" variant="secondary" onClick={() => setTglModal(true)}>TGL Teams</Button>
             ) : (
               <span className="text-xs text-ink-muted rounded-full px-3 py-1" style={{ background: '#eceae5' }}>TGL — Pro</span>
             )}
-            <Button size="sm" onClick={() => setEventModal(true)}>+ Event</Button>
-            <Button size="sm" variant="secondary" onClick={() => setLeagueModal(true)}>Edit League</Button>
             <Button size="sm" variant="danger" onClick={handleDeleteLeague}>Delete</Button>
           </div>
         </div>

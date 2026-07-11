@@ -23,9 +23,15 @@ export default function Players() {
   const [orgId,       setOrgId]       = useState(null)
 
   async function load() {
+    const { data: adminProfile } = await supabase
+      .from('profiles').select('org_id').eq('id', (await supabase.auth.getUser()).data.user?.id).single()
+    const orgId = adminProfile?.org_id ?? null
+
     const [{ data: p }, { data: pr }] = await Promise.all([
       supabase.from('players').select('*').order('last_name'),
-      supabase.from('profiles').select('*').order('full_name'),
+      orgId
+        ? supabase.from('profiles').select('*').eq('org_id', orgId).order('full_name')
+        : Promise.resolve({ data: [] }),
     ])
     setPlayers(p ?? [])
     setProfiles(pr ?? [])
@@ -139,18 +145,11 @@ export default function Players() {
       {/* ── User Accounts Tab ── */}
       {activeTab === 'User Accounts' && (
         <div className="space-y-4">
-          <div className="flex items-start justify-between gap-4">
-            <p className="text-sm text-gray-600">
-              Manage login accounts and roles. <strong>Admin</strong> — full access.{' '}
-              <strong>Scorekeeper</strong> — score entry only.{' '}
-              <strong>None</strong> — can log in but no access.
-            </p>
-            <Button size="sm" onClick={() => setLoginModal(true)} className="shrink-0">+ Create Login</Button>
-          </div>
-
-          <div className="bg-yellow-50 border border-yellow-200 rounded-lg px-4 py-3 text-xs text-yellow-800">
-            <strong>Note:</strong> Adding a player to the roster does not create a login. Use <strong>Create Login</strong> to set up an email + password for a user so they can sign in.
-          </div>
+          <p className="text-sm text-gray-600">
+            Manage login accounts and roles for your organization. <strong>Admin</strong> — full access.{' '}
+            <strong>Scorekeeper</strong> — score entry only.{' '}
+            <strong>None</strong> — can log in but no access.
+          </p>
 
           {loading ? (
             <div className="space-y-2 animate-pulse">
