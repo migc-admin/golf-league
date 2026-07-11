@@ -317,24 +317,9 @@ function TabOverview({ event, eventPlayers, allScores, course, conflicts, onUpda
   return (
     <div className="grid sm:grid-cols-2 gap-4">
       <Card>
-        <CardHeader
-          title="Event Details"
-          action={
-            <div className="flex gap-2 flex-wrap justify-end">
-              <Button size="sm" variant="secondary" onClick={() => onPrintAsset('tee_sheet')}>🖨 Tee Sheet</Button>
-              <Button size="sm" variant="secondary" onClick={() => onPrintAsset('cart_signs')}>🖨 Cart Signs</Button>
-              <Button size="sm" variant="secondary" onClick={() => onPrintAsset('cards')}>🖨 Cards</Button>
-              <Button size="sm" variant="secondary" onClick={() => exportScoresCSV(event, eventPlayers, allScores, course)}>
-                ⬇ Export
-              </Button>
-              <Button size="sm" variant="secondary" onClick={() => setScoreEditor(true)}>✎ Scores</Button>
-              <Button size="sm" variant="secondary" onClick={() => setEditModal(true)}>Edit</Button>
-              {event.status !== 'complete' && (
-                <Button size="sm" variant="danger" onClick={() => setDeleteModal(true)}>Delete</Button>
-              )}
-            </div>
-          }
-        />
+        <h3 className="font-bold text-augusta-600 mb-4" style={{ fontFamily: "'Manrope','DM Sans',sans-serif", fontSize: '1rem', letterSpacing: '-0.01em' }}>
+          Event Details
+        </h3>
         <dl className="space-y-2 text-sm">
           <Row label="Date"         value={formatDate(event.event_date)} />
           <Row label="Course"       value={event.course?.name} />
@@ -342,10 +327,21 @@ function TabOverview({ event, eventPlayers, allScores, course, conflicts, onUpda
           <Row label="Format"       value={FORMAT_LABELS[event.format] ?? event.format ?? 'Net Stroke Play'} />
           <Row label="Start Time"   value={event.start_time ? formatTime(event.start_time) : '—'} />
           <Row label="Tee Interval" value={`${event.tee_time_interval_mins ?? 10} min`} />
-          <Row label="Entry Fee" value={`$${event.entry_fee}`} />
+          <Row label="Entry Fee"    value={`$${event.entry_fee}`} />
           {event.tournament_fee > 0 && <Row label="Tournament Entry Fee" value={`$${Number(event.tournament_fee).toFixed(2)}`} />}
           <Row label="Status"       value={<StatusBadge status={event.status} />} />
         </dl>
+        <div className="flex flex-wrap gap-2 mt-4 pt-4 border-t border-gray-100">
+          <Button size="sm" variant="secondary" onClick={() => onPrintAsset('tee_sheet')}>🖨 Tee Sheet</Button>
+          <Button size="sm" variant="secondary" onClick={() => onPrintAsset('cart_signs')}>🖨 Cart Signs</Button>
+          <Button size="sm" variant="secondary" onClick={() => onPrintAsset('cards')}>🖨 Cards</Button>
+          <Button size="sm" variant="secondary" onClick={() => exportScoresCSV(event, eventPlayers, allScores, course)}>⬇ Export</Button>
+          <Button size="sm" variant="secondary" onClick={() => setScoreEditor(true)}>✎ Scores</Button>
+          <Button size="sm" variant="secondary" onClick={() => setEditModal(true)}>Edit</Button>
+          {event.status !== 'complete' && (
+            <Button size="sm" variant="danger" onClick={() => setDeleteModal(true)}>Delete</Button>
+          )}
+        </div>
       </Card>
 
       <div className="space-y-4">
