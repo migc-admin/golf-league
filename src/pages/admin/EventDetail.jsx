@@ -173,10 +173,22 @@ export default function EventDetail() {
 
       {activeTab === 'Players' && (
         <div className="space-y-6">
-          <div>
-            <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-widest mb-3">Registrations</h3>
-            <TabRegistrations event={event} onUpdated={load} />
-          </div>
+          {hasFeature('registration') ? (
+            <div>
+              <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-widest mb-3">Registrations</h3>
+              <TabRegistrations event={event} onUpdated={load} />
+            </div>
+          ) : (
+            <div className="flex items-center gap-3 px-4 py-3 rounded-xl text-sm" style={{ background: '#eff6ff', border: '1px solid #bfdbfe' }}>
+              <svg width="16" height="16" fill="none" stroke="#1d4ed8" strokeWidth="2" viewBox="0 0 24 24" style={{ flexShrink: 0 }}>
+                <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0110 0v4"/>
+              </svg>
+              <span style={{ color: '#1e40af' }}>
+                <strong>Online Registration</strong> is a Club plan feature.{' '}
+                <a href="/onboarding" className="underline font-semibold">Upgrade to Club →</a>
+              </span>
+            </div>
+          )}
           <div className="border-t border-gray-100 pt-6">
             <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-widest mb-3">Players &amp; Flights</h3>
             <TabFlights event={event} eventPlayers={eventPlayers} course={course} allPlayers={allPlayers} onUpdated={load} />
