@@ -170,7 +170,7 @@ export default function EventDetail() {
 
       {/* Tab content */}
       {activeTab === 'Overview' && (
-        <TabOverview event={event} eventPlayers={eventPlayers} allScores={allScores} course={course} conflicts={conflicts} onUpdated={load} leagues={leagues} orgName={org?.name} orgSlug={orgSlug} />
+        <TabOverview event={event} eventPlayers={eventPlayers} allScores={allScores} course={course} conflicts={conflicts} onUpdated={load} leagues={leagues} orgName={org?.name} orgSlug={orgSlug} onPrintAsset={setPrintAsset} />
       )}
 
       {activeTab === 'Players' && (
@@ -301,7 +301,7 @@ function exportScoresCSV(event, eventPlayers, allScores, course) {
 }
 
 // ─── Tab: Overview ────────────────────────────────────────────────
-function TabOverview({ event, eventPlayers, allScores, course, conflicts, onUpdated, orgName, orgSlug }) {
+function TabOverview({ event, eventPlayers, allScores, course, conflicts, onUpdated, orgName, orgSlug, onPrintAsset }) {
   const [editModal,   setEditModal]   = useState(false)
   const [deleteModal, setDeleteModal] = useState(false)
   const [scoreEditor, setScoreEditor] = useState(false)
@@ -321,9 +321,9 @@ function TabOverview({ event, eventPlayers, allScores, course, conflicts, onUpda
           title="Event Details"
           action={
             <div className="flex gap-2 flex-wrap justify-end">
-              <Button size="sm" variant="secondary" onClick={() => setPrintAsset('tee_sheet')}>🖨 Tee Sheet</Button>
-              <Button size="sm" variant="secondary" onClick={() => setPrintAsset('cart_signs')}>🖨 Cart Signs</Button>
-              <Button size="sm" variant="secondary" onClick={() => setPrintAsset('cards')}>🖨 Cards</Button>
+              <Button size="sm" variant="secondary" onClick={() => onPrintAsset('tee_sheet')}>🖨 Tee Sheet</Button>
+              <Button size="sm" variant="secondary" onClick={() => onPrintAsset('cart_signs')}>🖨 Cart Signs</Button>
+              <Button size="sm" variant="secondary" onClick={() => onPrintAsset('cards')}>🖨 Cards</Button>
               <Button size="sm" variant="secondary" onClick={() => exportScoresCSV(event, eventPlayers, allScores, course)}>
                 ⬇ Export
               </Button>
