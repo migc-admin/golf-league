@@ -87,7 +87,7 @@ export default function Leagues() {
         <div className="flex items-center gap-3">
           {atLimit(orgTier, 'leagues', leagues.length) && (
             <span className="text-xs font-medium px-2.5 py-1 rounded-full" style={{ background: '#fef9c3', color: '#854d0e' }}>
-              {leagues.length} / {getLimit(orgTier, 'leagues')} leagues — {TIER_LABELS[nextTier(orgTier)]} plan required
+              {leagues.length} / {getLimit(orgTier, 'leagues')} leagues — {TIER_LABELS[nextTier(orgTier)]} plan required for additional leagues
             </span>
           )}
           <Button onClick={() => {
