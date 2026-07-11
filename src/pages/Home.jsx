@@ -307,6 +307,16 @@ export default function Home() {
               <p className="text-xs text-gray-400">Signed in as</p>
               <p className="text-sm font-semibold text-gray-900">{profile?.full_name || user?.email}</p>
             </div>
+
+            {/* No profile yet — prompt onboarding */}
+            {!profile && (
+              <Link to="/onboarding"
+                className="shrink-0 text-sm font-bold px-5 py-2.5 rounded-full text-white transition-opacity hover:opacity-90"
+                style={{ background: GREEN }}>
+                Set up your league →
+              </Link>
+            )}
+
             {(isAdmin || isScorekeeper) && (
               <div className="flex-1">
                 <p className="text-xs text-gray-400 mb-2">{isAdmin ? 'Active & Upcoming Events' : 'Your Events'}</p>

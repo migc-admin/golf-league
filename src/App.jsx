@@ -25,13 +25,15 @@ import Schedule       from './pages/Schedule'
 import EventPage      from './pages/EventPage'
 import Import         from './pages/admin/Import'
 import Register       from './pages/Register'
+import Onboarding    from './pages/Onboarding'
 
 export default function App() {
   return (
     <AuthProvider>
       <Routes>
-        <Route path="/login" element={<Login />} />
-        <Route path="/home"  element={<Home />} />
+        <Route path="/login"       element={<Login />} />
+        <Route path="/home"        element={<Home />} />
+        <Route path="/onboarding"  element={<Onboarding />} />
 
         {/* Admin (requires admin role) */}
         <Route path="/admin" element={<AdminRoute />}>
