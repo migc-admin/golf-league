@@ -12,6 +12,7 @@
 
 import { useEffect, useState } from 'react'
 import { useParams, Link } from 'react-router-dom'
+import { Helmet } from 'react-helmet-async'
 import { supabase } from '../lib/supabase'
 
 const GOLD = '#D4AF37'
@@ -110,7 +111,17 @@ export default function Register() {
     ? new Date(event.event_date + 'T00:00:00').toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })
     : ''
 
+  const regTitle = event
+    ? `Register for ${eventLabel} — ${event.league?.name ?? ''} | Scorify Golf`
+    : 'Event Registration | Scorify Golf'
+
   return (
+    <>
+    <Helmet>
+      <title>{regTitle}</title>
+      <meta name="description" content={event ? `Register for ${eventLabel} on ${eventDate}${event.course?.name ? ` at ${event.course.name}` : ''}. Powered by Scorify Golf.` : 'Golf event registration powered by Scorify Golf.'} />
+      <meta name="robots" content="noindex" />
+    </Helmet>
     <div className="min-h-screen flex flex-col items-center justify-center p-4"
       style={{ background: 'linear-gradient(150deg,#0b2318 0%,#1B4332 45%,#1f5c3e 100%)' }}>
       <div className="w-full max-w-sm">
@@ -281,5 +292,6 @@ export default function Register() {
 
       </div>
     </div>
+    </>
   )
 }

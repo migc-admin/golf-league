@@ -6,6 +6,7 @@
 
 import { useEffect, useState } from 'react'
 import { useParams, Link } from 'react-router-dom'
+import { Helmet } from 'react-helmet-async'
 import { supabase } from '../lib/supabase'
 import { useFeatures } from '../lib/OrgContext'
 import Card from '../components/ui/Card'
@@ -162,7 +163,18 @@ export default function Standings() {
     </div>
   )
 
+  const pageTitle = league
+    ? `${league.name} Season Standings | Scorify Golf`
+    : 'Season Standings | Scorify Golf'
+
   return (
+    <>
+    <Helmet>
+      <title>{pageTitle}</title>
+      <meta name="description" content={league ? `Season standings for ${league.name}. Track earnings, wins, and points across all events. Powered by Scorify Golf.` : 'Golf league season standings powered by Scorify Golf.'} />
+      <meta property="og:title" content={pageTitle} />
+      <meta name="robots" content="noindex" />
+    </Helmet>
     <div className="min-h-screen" style={{ background: '#fbfaf8' }}>
       <div className="sticky top-0 z-10" style={{ background: '#ffffff', borderBottom: '1px solid #ebe9e4' }}>
         <div className="max-w-4xl mx-auto px-4 py-4">
@@ -205,6 +217,7 @@ export default function Standings() {
         )}
       </div>
     </div>
+    </>
   )
 }
 

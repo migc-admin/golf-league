@@ -6,6 +6,7 @@
 
 import { useEffect, useState, useRef } from 'react'
 import { useParams, Link, useNavigate, useLocation, useSearchParams } from 'react-router-dom'
+import { Helmet } from 'react-helmet-async'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../hooks/useAuth'
 import { computeLeaderboards, computeStableford } from '../lib/engines/scoring'
@@ -180,7 +181,18 @@ export default function Leaderboard() {
   const playerMap  = Object.fromEntries(eventPlayers.map(ep => [ep.player_id, ep.player]))
   const hasFlights = eventPlayers.some(ep => !ep.is_guest && (ep.flight === 'A' || ep.flight === 'B'))
 
+  const pageTitle = event
+    ? `${event.league?.name ?? ''} — ${event.name ?? `Event #${event.event_number}`} Leaderboard | Scorify Golf`
+    : 'Live Leaderboard | Scorify Golf'
+
   return (
+    <>
+    <Helmet>
+      <title>{pageTitle}</title>
+      <meta name="description" content={event ? `Live leaderboard for ${event.name ?? `Event #${event.event_number}`} — ${event.league?.name ?? ''} at ${event.course?.name ?? ''}. Powered by Scorify Golf.` : 'Live golf event leaderboard powered by Scorify Golf.'} />
+      <meta property="og:title" content={pageTitle} />
+      <meta name="robots" content="noindex" />
+    </Helmet>
     <div className="min-h-screen" style={{ background: '#fbfaf8' }}>
       {/* Back nav */}
       <div className="px-4 py-2 flex items-center justify-between" style={{ background: '#fbfaf8' }}>
@@ -347,6 +359,7 @@ export default function Leaderboard() {
         )}
       </div>
     </div>
+    </>
   )
 }
 

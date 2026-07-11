@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
+import { Helmet } from 'react-helmet-async'
 import { useAuth } from '../hooks/useAuth'
 import { supabase } from '../lib/supabase'
 import Footer from '../components/ui/Footer'
@@ -224,6 +225,15 @@ export default function Home() {
   ]
 
   return (
+    <>
+    <Helmet>
+      <title>Scorify Golf — Golf League Management Software</title>
+      <meta name="description" content="The easiest way to run a golf league. Live leaderboards, digital scorecards, handicap tracking, payout management, and online registration — free to start." />
+      <meta property="og:title" content="Scorify Golf — Golf League Management Software" />
+      <meta property="og:description" content="Run your golf league with live leaderboards, digital scorecards, handicap tracking, and payout management. Free to start." />
+      <meta property="og:url" content="https://scorifygolf.com" />
+      <link rel="canonical" href="https://scorifygolf.com" />
+    </Helmet>
     <div className="min-h-screen flex flex-col" style={{ background: '#fbfaf8', color: INK }}>
 
       {/* ── Public nav ─────────────────────────────────────────────── */}
@@ -529,5 +539,6 @@ export default function Home() {
 
       <Footer />
     </div>
+    </>
   )
 }
