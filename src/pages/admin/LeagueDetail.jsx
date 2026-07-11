@@ -294,15 +294,15 @@ function LeagueModal({ open, onClose, editing, orgId, orgSlug, onSaved }) {
 
 // ─── Event Modal ──────────────────────────────────────────────────────────────
 const SIDE_GAME_OPTIONS = [
-  { key: 'skins',         label: 'Skins',                flightsOff: true,  flightsOn: false },
-  { key: 'skins_a',       label: 'Skins — Flight A',     flightsOff: false, flightsOn: true  },
-  { key: 'skins_b',       label: 'Skins — Flight B',     flightsOff: false, flightsOn: true  },
-  { key: 'long_drive',    label: 'Long Drive',           flightsOff: true,  flightsOn: false },
-  { key: 'long_drive_a',  label: 'Long Drive — Flight A',flightsOff: false, flightsOn: true  },
-  { key: 'long_drive_b',  label: 'Long Drive — Flight B',flightsOff: false, flightsOn: true  },
-  { key: 'low_putts',     label: 'Low Putts',            flightsOff: true,  flightsOn: true  },
-  { key: 'ctp',           label: 'Closest to Pin (par 3s)', flightsOff: true, flightsOn: true },
-  { key: 'track_putts',   label: 'Track Putts on Scorecard', flightsOff: true, flightsOn: true },
+  { key: 'skins',         label: 'Skins',                flightsOff: true,  flightsOn: false, pro: true },
+  { key: 'skins_a',       label: 'Skins — Flight A',     flightsOff: false, flightsOn: true,  pro: true },
+  { key: 'skins_b',       label: 'Skins — Flight B',     flightsOff: false, flightsOn: true,  pro: true },
+  { key: 'long_drive',    label: 'Long Drive',           flightsOff: true,  flightsOn: false, pro: true },
+  { key: 'long_drive_a',  label: 'Long Drive — Flight A',flightsOff: false, flightsOn: true,  pro: true },
+  { key: 'long_drive_b',  label: 'Long Drive — Flight B',flightsOff: false, flightsOn: true,  pro: true },
+  { key: 'low_putts',     label: 'Low Putts',            flightsOff: true,  flightsOn: true,  pro: true },
+  { key: 'ctp',           label: 'Closest to Pin (par 3s)', flightsOff: true, flightsOn: true, pro: true },
+  { key: 'track_putts',   label: 'Track Putts on Scorecard', flightsOff: true, flightsOn: true, pro: false },
 ]
 
 const FORMAT_OPTIONS = [
@@ -313,12 +313,15 @@ const FORMAT_OPTIONS = [
   ]},
   { group: 'Other Formats', options: [
     { value: 'stableford',   label: 'Stableford' },
-    { value: 'match_points', label: 'Match Play Points' },
-    { value: 'ryder_cup',    label: 'Ryder Cup' },
+    { value: 'match_points', label: 'Match Play Points', pro: true },
+    { value: 'ryder_cup',    label: 'Ryder Cup',         pro: true },
   ]},
 ]
 
 function EventModal({ open, onClose, league, onSaved }) {
+  const hasFeature = useFeatures()
+  const canUsePro  = hasFeature('side_games')
+
   const [courses,      setCourses]      = useState([])
   const [courseId,     setCourseId]     = useState('')
   const [eventDate,    setEventDate]    = useState('')
@@ -418,12 +421,17 @@ function EventModal({ open, onClose, league, onSaved }) {
               <div key={group.group}>
                 <div className="text-xs text-gray-400 font-medium uppercase tracking-wide mb-1.5">{group.group}</div>
                 <div className="space-y-1.5">
-                  {group.options.map(opt => (
-                    <label key={opt.value} className="flex items-center gap-2.5 cursor-pointer">
-                      <input type="checkbox" checked={formats.has(opt.value)} onChange={() => toggleFormat(opt.value)} className="accent-fairway-600 w-4 h-4" />
-                      <span className="text-sm text-gray-800">{opt.label}</span>
-                    </label>
-                  ))}
+                  {group.options.map(opt => {
+                    const locked = opt.pro && !canUsePro
+                    return (
+                      <label key={opt.value} className={`flex items-center gap-2.5 ${locked ? 'cursor-not-allowed opacity-50' : 'cursor-pointer'}`}>
+                        <input type="checkbox" checked={formats.has(opt.value)} onChange={() => !locked && toggleFormat(opt.value)}
+                          disabled={locked} className="accent-fairway-600 w-4 h-4" />
+                        <span className="text-sm text-gray-800">{opt.label}</span>
+                        {locked && <span className="text-xs font-semibold px-1.5 py-0.5 rounded-full" style={{ background: '#eff6ff', color: '#1d4ed8' }}>Pro</span>}
+                      </label>
+                    )
+                  })}
                 </div>
               </div>
             ))}
@@ -434,12 +442,17 @@ function EventModal({ open, onClose, league, onSaved }) {
         <div>
           <label className="label">Side Games / Competitions</label>
           <div className="space-y-1.5 bg-gray-50 rounded-xl px-4 py-3">
-            {SIDE_GAME_OPTIONS.filter(opt => useFlights ? opt.flightsOn : opt.flightsOff).map(opt => (
-              <label key={opt.key} className="flex items-center gap-2.5 py-0.5 cursor-pointer">
-                <input type="checkbox" checked={sideGames.has(opt.key)} onChange={() => toggleSideGame(opt.key)} className="accent-fairway-600 w-4 h-4" />
-                <span className="text-sm text-gray-800">{opt.label}</span>
-              </label>
-            ))}
+            {SIDE_GAME_OPTIONS.filter(opt => useFlights ? opt.flightsOn : opt.flightsOff).map(opt => {
+              const locked = opt.pro && !canUsePro
+              return (
+                <label key={opt.key} className={`flex items-center gap-2.5 py-0.5 ${locked ? 'cursor-not-allowed opacity-50' : 'cursor-pointer'}`}>
+                  <input type="checkbox" checked={sideGames.has(opt.key)} onChange={() => !locked && toggleSideGame(opt.key)}
+                    disabled={locked} className="accent-fairway-600 w-4 h-4" />
+                  <span className="text-sm text-gray-800">{opt.label}</span>
+                  {locked && <span className="text-xs font-semibold px-1.5 py-0.5 rounded-full" style={{ background: '#eff6ff', color: '#1d4ed8' }}>Pro</span>}
+                </label>
+              )
+            })}
           </div>
         </div>
 
