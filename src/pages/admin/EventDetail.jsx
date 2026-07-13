@@ -295,20 +295,27 @@ async function exportScoresCSV(event, eventPlayers, allScores, course) {
     for (const h of course.holes) parByHole[h.hole_number] = h.par ?? 0
   }
 
+  const sis = course?.stroke_index ?? Array(18).fill(0)
+
   const summaryRows = eventPlayers.map(ep => {
     const pScores = scoreMap[ep.player_id] ?? {}
     const ch = parseInt(ep.course_handicap) || 0
-    const grossArr = Array.from({ length: 18 }, (_, i) => parseInt(pScores[i + 1]?.gross_score) || 0)
-    const puttsArr = Array.from({ length: 18 }, (_, i) => parseInt(pScores[i + 1]?.putts) || 0)
-    const totalGross = grossArr.reduce((a, v) => a + v, 0)
-    const frontGross = grossArr.slice(0, 9).reduce((a, v) => a + v, 0)
-    const backGross  = grossArr.slice(9).reduce((a, v) => a + v, 0)
-    const totalPutts = puttsArr.reduce((a, v) => a + v, 0)
-    const netFront = frontGross ? frontGross - Math.round(ch / 2) : ''
-    const netBack  = backGross  ? backGross  - Math.round(ch / 2) : ''
+    const holes = Array.from({ length: 18 }, (_, i) => {
+      const gross  = parseInt(pScores[i + 1]?.gross_score) || 0
+      const putts  = parseInt(pScores[i + 1]?.putts) || 0
+      const si     = sis[i] ?? (i + 1)
+      const strokes = Math.floor(ch / 18) + (si <= (ch % 18) ? 1 : 0)
+      const net    = gross ? gross - strokes : 0
+      return { gross, putts, net }
+    })
+    const totalGross = holes.reduce((a, h) => a + h.gross, 0)
+    const netFront   = holes.slice(0, 9).reduce((a, h) => a + h.net, 0)
+    const netBack    = holes.slice(9).reduce((a, h) => a + h.net, 0)
+    const totalPutts = holes.reduce((a, h) => a + h.putts, 0)
     const playerName = [ep.player?.first_name, ep.player?.last_name].filter(Boolean).join(' ')
     return [
-      playerName, ep.flight ?? '', ch || '', totalGross || '', netFront, netBack, totalPutts || '',
+      playerName, ep.flight ?? '', ch || '',
+      totalGross || '', netFront || '', netBack || '', totalPutts || '',
     ]
   })
 
