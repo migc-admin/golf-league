@@ -250,15 +250,8 @@ export default function EventDetail() {
 }
 
 // ─── Export Scores ────────────────────────────────────────────────
-function exportScoresCSV(event, eventPlayers, allScores, course) {
-  const headers = [
-    'last_name', 'first_name', 'flight', 'group',
-    'course_handicap',
-    ...Array.from({ length: 18 }, (_, i) => `hole_${i + 1}_gross`),
-    ...Array.from({ length: 18 }, (_, i) => `hole_${i + 1}_putts`),
-    'total_gross', 'front_gross', 'back_gross',
-    'total_putts',
-  ]
+async function exportScoresCSV(event, eventPlayers, allScores, course) {
+  const XLSX = await import('xlsx')
 
   const scoreMap = {}
   for (const s of allScores) {
@@ -266,7 +259,16 @@ function exportScoresCSV(event, eventPlayers, allScores, course) {
     scoreMap[s.player_id][s.hole_number] = s
   }
 
-  const rows = eventPlayers.map(ep => {
+  // ── Sheet 1: Full detail (original) ──────────────────────────────
+  const detailHeaders = [
+    'last_name', 'first_name', 'flight', 'group',
+    'course_handicap',
+    ...Array.from({ length: 18 }, (_, i) => `hole_${i + 1}_gross`),
+    ...Array.from({ length: 18 }, (_, i) => `hole_${i + 1}_putts`),
+    'total_gross', 'front_gross', 'back_gross', 'total_putts',
+  ]
+
+  const detailRows = eventPlayers.map(ep => {
     const pScores = scoreMap[ep.player_id] ?? {}
     const grossArr = Array.from({ length: 18 }, (_, i) => pScores[i + 1]?.gross_score ?? '')
     const puttsArr = Array.from({ length: 18 }, (_, i) => pScores[i + 1]?.putts ?? '')
@@ -274,30 +276,50 @@ function exportScoresCSV(event, eventPlayers, allScores, course) {
     const frontGross = grossArr.slice(0, 9).reduce((a, v) => a + (parseInt(v) || 0), 0)
     const backGross  = grossArr.slice(9).reduce((a, v) => a + (parseInt(v) || 0), 0)
     const totalPutts = puttsArr.reduce((a, v) => a + (parseInt(v) || 0), 0)
-
     return [
-      ep.player?.last_name ?? '',
-      ep.player?.first_name ?? '',
-      ep.flight ?? '',
-      ep.group_number ?? '',
-      ep.course_handicap ?? '',
-      ...grossArr,
-      ...puttsArr,
-      totalGross || '',
-      frontGross || '',
-      backGross || '',
-      totalPutts || '',
+      ep.player?.last_name ?? '', ep.player?.first_name ?? '',
+      ep.flight ?? '', ep.group_number ?? '', ep.course_handicap ?? '',
+      ...grossArr, ...puttsArr,
+      totalGross || '', frontGross || '', backGross || '', totalPutts || '',
     ]
   })
 
-  const csv = [headers, ...rows].map(r => r.join(',')).join('\n')
-  const blob = new Blob([csv], { type: 'text/csv' })
-  const url  = URL.createObjectURL(blob)
-  const a    = document.createElement('a')
-  a.href = url
-  a.download = `event_${event.event_number}_scores.csv`
-  a.click()
-  URL.revokeObjectURL(url)
+  // ── Sheet 2: Summary ──────────────────────────────────────────────
+  const summaryHeaders = [
+    'Player', 'Flight', 'Course Handicap',
+    'Gross Score', 'Net Front 9', 'Net Back 9', 'Putts',
+  ]
+
+  const parByHole = {}
+  if (course?.holes) {
+    for (const h of course.holes) parByHole[h.hole_number] = h.par ?? 0
+  }
+
+  const summaryRows = eventPlayers.map(ep => {
+    const pScores = scoreMap[ep.player_id] ?? {}
+    const ch = parseInt(ep.course_handicap) || 0
+    const grossArr = Array.from({ length: 18 }, (_, i) => parseInt(pScores[i + 1]?.gross_score) || 0)
+    const puttsArr = Array.from({ length: 18 }, (_, i) => parseInt(pScores[i + 1]?.putts) || 0)
+    const totalGross = grossArr.reduce((a, v) => a + v, 0)
+    const frontGross = grossArr.slice(0, 9).reduce((a, v) => a + v, 0)
+    const backGross  = grossArr.slice(9).reduce((a, v) => a + v, 0)
+    const totalPutts = puttsArr.reduce((a, v) => a + v, 0)
+    const netFront = frontGross ? frontGross - Math.round(ch / 2) : ''
+    const netBack  = backGross  ? backGross  - Math.round(ch / 2) : ''
+    const playerName = [ep.player?.first_name, ep.player?.last_name].filter(Boolean).join(' ')
+    return [
+      playerName, ep.flight ?? '', ch || '', totalGross || '', netFront, netBack, totalPutts || '',
+    ]
+  })
+
+  // ── Build workbook ────────────────────────────────────────────────
+  const wb = XLSX.utils.book_new()
+  const ws1 = XLSX.utils.aoa_to_sheet([detailHeaders, ...detailRows])
+  const ws2 = XLSX.utils.aoa_to_sheet([summaryHeaders, ...summaryRows])
+  XLSX.utils.book_append_sheet(wb, ws1, 'Full Detail')
+  XLSX.utils.book_append_sheet(wb, ws2, 'Summary')
+
+  XLSX.writeFile(wb, `event_${event.event_number}_scores.xlsx`)
 }
 
 // ─── Tab: Overview ────────────────────────────────────────────────
