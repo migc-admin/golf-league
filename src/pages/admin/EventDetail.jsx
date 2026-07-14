@@ -170,7 +170,7 @@ export default function EventDetail() {
 
       {/* Tab content */}
       {activeTab === 'Overview' && (
-        <TabOverview event={event} eventPlayers={eventPlayers} allScores={allScores} course={course} conflicts={conflicts} onUpdated={load} leagues={leagues} orgName={org?.name} orgSlug={orgSlug} onPrintAsset={setPrintAsset} />
+        <TabOverview event={event} eventPlayers={eventPlayers} allScores={allScores} sideGames={sideGames} course={course} conflicts={conflicts} onUpdated={load} leagues={leagues} orgName={org?.name} orgSlug={orgSlug} onPrintAsset={setPrintAsset} />
       )}
 
       {activeTab === 'Players' && (
@@ -250,7 +250,7 @@ export default function EventDetail() {
 }
 
 // ─── Export Scores ────────────────────────────────────────────────
-async function exportScoresCSV(event, eventPlayers, allScores, course) {
+async function exportScoresCSV(event, eventPlayers, allScores, course, sideGames = []) {
   const XLSX = await import('xlsx')
 
   const scoreMap = {}
@@ -310,19 +310,48 @@ async function exportScoresCSV(event, eventPlayers, allScores, course) {
     p.totalNet || '', p.totalPutts || '',
   ])
 
+  // ── Sheet 3: Payouts ──────────────────────────────────────────────
+  const nonGuestEPs  = eventPlayers.filter(ep => !ep.is_guest)
+  const flightCounts = {
+    A: nonGuestEPs.filter(ep => ep.flight === 'A').length,
+    B: nonGuestEPs.filter(ep => ep.flight === 'B').length,
+  }
+  const leaderboards  = computeLeaderboards(nonGuestEPs, allScores, course)
+  const skinsResults  = computeAllSkins(nonGuestEPs, allScores, sis)
+  const { byCategory } = computePayouts(event, nonGuestEPs.length, leaderboards, sideGames, skinsResults, flightCounts)
+
+  const playerMap = Object.fromEntries(eventPlayers.map(ep => [ep.player_id, ep.player]))
+
+  const payoutHeaders = ['Player', 'Category', 'Amount']
+  const payoutRows = []
+  for (const cat of byCategory) {
+    const playerIds = cat.playerIds ?? (cat.playerId ? [cat.playerId] : [])
+    const perPlayer = playerIds.length > 0 ? Math.round((cat.amount / playerIds.length) * 100) / 100 : cat.amount
+    for (const pid of playerIds) {
+      const p = playerMap[pid]
+      const name = p ? `${p.first_name} ${p.last_name}` : pid
+      payoutRows.push([name, cat.label, perPlayer])
+    }
+    if (playerIds.length === 0) {
+      payoutRows.push(['—', cat.label, cat.amount])
+    }
+  }
+
   // ── Build workbook ────────────────────────────────────────────────
   const wb = XLSX.utils.book_new()
 
   const ws1 = XLSX.utils.aoa_to_sheet([sheetHeaders, parRow, siRow, ...grossRows])
   const ws2 = XLSX.utils.aoa_to_sheet([sheetHeaders, parRow, siRow, ...netRows])
+  const ws3 = XLSX.utils.aoa_to_sheet([payoutHeaders, ...payoutRows])
   XLSX.utils.book_append_sheet(wb, ws1, 'Gross')
   XLSX.utils.book_append_sheet(wb, ws2, 'Net')
+  XLSX.utils.book_append_sheet(wb, ws3, 'Payouts')
 
   XLSX.writeFile(wb, `event_${event.event_number}_scores.xlsx`)
 }
 
 // ─── Tab: Overview ────────────────────────────────────────────────
-function TabOverview({ event, eventPlayers, allScores, course, conflicts, onUpdated, orgName, orgSlug, onPrintAsset }) {
+function TabOverview({ event, eventPlayers, allScores, sideGames, course, conflicts, onUpdated, orgName, orgSlug, onPrintAsset }) {
   const [editModal,   setEditModal]   = useState(false)
   const [deleteModal, setDeleteModal] = useState(false)
   const [scoreEditor, setScoreEditor] = useState(false)
@@ -342,7 +371,7 @@ function TabOverview({ event, eventPlayers, allScores, course, conflicts, onUpda
           title="Event Details"
           action={
             <div className="flex gap-2">
-              <Button size="sm" variant="secondary" onClick={() => exportScoresCSV(event, eventPlayers, allScores, course)}>⬇ Export</Button>
+              <Button size="sm" variant="secondary" onClick={() => exportScoresCSV(event, eventPlayers, allScores, course, sideGames)}>⬇ Export</Button>
               <Button size="sm" variant="secondary" onClick={() => setScoreEditor(true)}>✎ Scores</Button>
               <Button size="sm" variant="secondary" onClick={() => setEditModal(true)}>Edit</Button>
               {event.status !== 'complete' && (
