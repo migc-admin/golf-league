@@ -259,72 +259,64 @@ async function exportScoresCSV(event, eventPlayers, allScores, course) {
     scoreMap[s.player_id][s.hole_number] = s
   }
 
-  // ── Sheet 1: Full detail (original) ──────────────────────────────
-  const detailHeaders = [
-    'last_name', 'first_name', 'flight', 'group',
-    'course_handicap',
-    ...Array.from({ length: 18 }, (_, i) => `hole_${i + 1}_gross`),
-    ...Array.from({ length: 18 }, (_, i) => `hole_${i + 1}_putts`),
-    'total_gross', 'front_gross', 'back_gross', 'total_putts',
-  ]
+  const sis  = course?.stroke_index ?? Array(18).fill(0)
+  const pars = course?.par_per_hole  ?? Array(18).fill(0)
 
-  const detailRows = eventPlayers.map(ep => {
-    const pScores = scoreMap[ep.player_id] ?? {}
-    const grossArr = Array.from({ length: 18 }, (_, i) => pScores[i + 1]?.gross_score ?? '')
-    const puttsArr = Array.from({ length: 18 }, (_, i) => pScores[i + 1]?.putts ?? '')
-    const totalGross = grossArr.reduce((a, v) => a + (parseInt(v) || 0), 0)
-    const frontGross = grossArr.slice(0, 9).reduce((a, v) => a + (parseInt(v) || 0), 0)
-    const backGross  = grossArr.slice(9).reduce((a, v) => a + (parseInt(v) || 0), 0)
-    const totalPutts = puttsArr.reduce((a, v) => a + (parseInt(v) || 0), 0)
-    return [
-      ep.player?.last_name ?? '', ep.player?.first_name ?? '',
-      ep.flight ?? '', ep.group_number ?? '', ep.course_handicap ?? '',
-      ...grossArr, ...puttsArr,
-      totalGross || '', frontGross || '', backGross || '', totalPutts || '',
-    ]
-  })
+  const holeHeaders = Array.from({ length: 18 }, (_, i) => `H${i + 1}`)
+  const sheetHeaders = ['Player', 'Flight', 'CH', ...holeHeaders, 'Total', 'Putts']
 
-  // ── Sheet 2: Summary ──────────────────────────────────────────────
-  const summaryHeaders = [
-    'Player', 'Flight', 'Course Handicap',
-    'Gross Score', 'Net Front 9', 'Net Back 9', 'Putts',
-  ]
+  const parRow  = ['PAR',  '', '', ...pars, pars.reduce((a, v) => a + v, 0), '']
+  const siRow   = ['S.I.', '', '', ...sis,  '', '']
 
-  const parByHole = {}
-  if (course?.holes) {
-    for (const h of course.holes) parByHole[h.hole_number] = h.par ?? 0
-  }
-
-  const sis = course?.stroke_index ?? Array(18).fill(0)
-
-  const summaryRows = eventPlayers.map(ep => {
+  // Build per-player hole data
+  const playerData = eventPlayers.map(ep => {
     const pScores = scoreMap[ep.player_id] ?? {}
     const ch = parseInt(ep.course_handicap) || 0
     const holes = Array.from({ length: 18 }, (_, i) => {
-      const gross  = parseInt(pScores[i + 1]?.gross_score) || 0
+      const gross  = parseInt(pScores[i + 1]?.gross_score) || null
       const putts  = parseInt(pScores[i + 1]?.putts) || 0
       const si     = sis[i] ?? (i + 1)
       const strokes = Math.floor(ch / 18) + (si <= (ch % 18) ? 1 : 0)
-      const net    = gross ? gross - strokes : 0
-      return { gross, putts, net }
+      const net    = gross != null ? gross - strokes : null
+      return { gross, net, putts }
     })
-    const totalGross = holes.reduce((a, h) => a + h.gross, 0)
-    const netFront   = holes.slice(0, 9).reduce((a, h) => a + h.net, 0)
-    const netBack    = holes.slice(9).reduce((a, h) => a + h.net, 0)
+    const totalGross = holes.reduce((a, h) => a + (h.gross ?? 0), 0)
+    const totalNet   = holes.reduce((a, h) => a + (h.net   ?? 0), 0)
     const totalPutts = holes.reduce((a, h) => a + h.putts, 0)
     const playerName = [ep.player?.first_name, ep.player?.last_name].filter(Boolean).join(' ')
-    return [
-      playerName, ep.flight ?? '', ch || '',
-      totalGross || '', netFront || '', netBack || '', totalPutts || '',
-    ]
+    return { playerName, flight: ep.flight ?? '', ch, holes, totalGross, totalNet, totalPutts }
   })
+
+  // Sort by flight then score
+  function sortedRows(data, scoreKey) {
+    return [...data].sort((a, b) => {
+      if (a.flight < b.flight) return -1
+      if (a.flight > b.flight) return 1
+      return (a[scoreKey] || 999) - (b[scoreKey] || 999)
+    })
+  }
+
+  // ── Sheet 1: Gross ────────────────────────────────────────────────
+  const grossRows = sortedRows(playerData, 'totalGross').map(p => [
+    p.playerName, p.flight, p.ch || '',
+    ...p.holes.map(h => h.gross ?? ''),
+    p.totalGross || '', p.totalPutts || '',
+  ])
+
+  // ── Sheet 2: Net ──────────────────────────────────────────────────
+  const netRows = sortedRows(playerData, 'totalNet').map(p => [
+    p.playerName, p.flight, p.ch || '',
+    ...p.holes.map(h => h.net ?? ''),
+    p.totalNet || '', p.totalPutts || '',
+  ])
 
   // ── Build workbook ────────────────────────────────────────────────
   const wb = XLSX.utils.book_new()
-  const ws1 = XLSX.utils.aoa_to_sheet([detailHeaders, ...detailRows])
-  const ws2 = XLSX.utils.aoa_to_sheet([summaryHeaders, ...summaryRows])
-  XLSX.utils.book_append_sheet(wb, ws1, 'Full Detail')
-  XLSX.utils.book_append_sheet(wb, ws2, 'Summary')
+
+  const ws1 = XLSX.utils.aoa_to_sheet([sheetHeaders, parRow, siRow, ...grossRows])
+  const ws2 = XLSX.utils.aoa_to_sheet([sheetHeaders, parRow, siRow, ...netRows])
+  XLSX.utils.book_append_sheet(wb, ws1, 'Gross')
+  XLSX.utils.book_append_sheet(wb, ws2, 'Net')
 
   XLSX.writeFile(wb, `event_${event.event_number}_scores.xlsx`)
 }
