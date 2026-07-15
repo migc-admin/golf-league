@@ -29,6 +29,119 @@ const PLAN_FEATURES = [
   { label: 'Online registration',  free: false,           pro: false,         club: true          },
 ]
 
+function AccountDropdown({ user, profile, org, tier, onSignOut }) {
+  const [open, setOpen] = useState(false)
+  const ref = useRef(null)
+
+  useEffect(() => {
+    function handleClick(e) {
+      if (ref.current && !ref.current.contains(e.target)) setOpen(false)
+    }
+    document.addEventListener('mousedown', handleClick)
+    return () => document.removeEventListener('mousedown', handleClick)
+  }, [])
+
+  const label     = TIER_LABELS[tier] ?? tier
+  const joinedAt  = user?.created_at ? new Date(user.created_at).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' }) : null
+  const initials  = (profile?.full_name ?? user?.email ?? '?').split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase()
+
+  return (
+    <div ref={ref} className="relative">
+      <button
+        type="button"
+        onClick={() => setOpen(v => !v)}
+        className="flex items-center gap-2 px-2 py-1 rounded-full hover:bg-surface-high transition-colors"
+      >
+        {/* Avatar circle */}
+        <span
+          className="w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold text-white shrink-0"
+          style={{ background: GREEN }}
+        >
+          {initials}
+        </span>
+        <span className="hidden sm:inline text-xs font-semibold text-ink-muted">
+          {profile?.full_name ?? user?.email}
+        </span>
+        <svg className="w-3 h-3 text-ink-muted hidden sm:block" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+        </svg>
+      </button>
+
+      {open && (
+        <div
+          className="absolute right-0 top-10 z-50 w-72 bg-white rounded-2xl shadow-2xl"
+          style={{ border: '1px solid #ebe9e4' }}
+        >
+          {/* User info */}
+          <div className="px-5 pt-4 pb-3" style={{ borderBottom: '1px solid #ebe9e4' }}>
+            <div className="flex items-center gap-3">
+              <span
+                className="w-10 h-10 rounded-full flex items-center justify-center text-sm font-bold text-white shrink-0"
+                style={{ background: GREEN }}
+              >
+                {initials}
+              </span>
+              <div className="min-w-0">
+                <p className="text-sm font-semibold text-ink truncate">{profile?.full_name ?? '—'}</p>
+                <p className="text-xs text-ink-muted truncate">{user?.email}</p>
+              </div>
+            </div>
+          </div>
+
+          {/* Subscription info */}
+          <div className="px-5 py-3 space-y-2" style={{ borderBottom: '1px solid #ebe9e4' }}>
+            <div className="flex items-center justify-between">
+              <span className="text-xs text-ink-muted">Plan</span>
+              <span
+                className="text-xs font-semibold px-2 py-0.5 rounded-full"
+                style={TIER_STYLE[tier] ?? TIER_STYLE.free}
+              >
+                {label}
+              </span>
+            </div>
+            {org?.name && (
+              <div className="flex items-center justify-between">
+                <span className="text-xs text-ink-muted">Organization</span>
+                <span className="text-xs font-semibold text-ink">{org.name}</span>
+              </div>
+            )}
+            {joinedAt && (
+              <div className="flex items-center justify-between">
+                <span className="text-xs text-ink-muted">Member since</span>
+                <span className="text-xs text-ink">{joinedAt}</span>
+              </div>
+            )}
+          </div>
+
+          {/* Upgrade CTA */}
+          {tier !== 'club' && (
+            <div className="px-5 py-3" style={{ borderBottom: '1px solid #ebe9e4' }}>
+              <a
+                href="/onboarding"
+                onClick={() => setOpen(false)}
+                className="block text-center text-xs font-bold py-2 rounded-full text-white transition-opacity hover:opacity-90"
+                style={{ background: GREEN }}
+              >
+                Upgrade to {tier === 'free' || tier === 'starter' ? 'Pro' : 'Club'} →
+              </a>
+            </div>
+          )}
+
+          {/* Sign out */}
+          <div className="px-5 py-3">
+            <button
+              onClick={() => { setOpen(false); onSignOut() }}
+              className="w-full text-left text-xs font-semibold text-red-500 hover:text-red-700 transition-colors"
+            >
+              Sign out
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
 function TierPopover({ tier }) {
   const [open, setOpen] = useState(false)
   const ref = useRef(null)
@@ -196,16 +309,13 @@ export default function Layout({ children }) {
             >
               View Site ↗
             </Link>
-            <span className="hidden sm:flex items-center gap-2">
-              <span className="text-xs text-ink-muted">{profile?.full_name}</span>
-              {org && <TierPopover tier={tier} />}
-            </span>
-            <button
-              onClick={handleSignOut}
-              className="text-xs font-semibold px-3 py-1.5 rounded-full transition-colors text-ink-muted hover:text-ink hover:bg-surface-high"
-            >
-              Sign out
-            </button>
+            <AccountDropdown
+              user={user}
+              profile={profile}
+              org={org}
+              tier={tier}
+              onSignOut={handleSignOut}
+            />
 
             {/* Mobile hamburger */}
             <button
