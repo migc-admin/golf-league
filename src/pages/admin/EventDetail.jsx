@@ -2661,7 +2661,7 @@ function TabRegistrations({ event, onUpdated }) {
     if (!playerId) {
       const { data: newPlayer, error: pErr } = await supabase
         .from('players')
-        .insert({ first_name: reg.first_name, last_name: reg.last_name, email: reg.email ?? null, handicap_index: reg.handicap_index ?? 0 })
+        .insert({ first_name: reg.first_name, last_name: reg.last_name, email: reg.email ?? null })
         .select('id')
         .single()
       if (pErr) { toast.error('Failed to create player: ' + pErr.message); return }
