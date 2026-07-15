@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useSearchParams } from 'react-router-dom'
 import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../hooks/useAuth'
 import Card from '../../components/ui/Card'
@@ -10,10 +10,12 @@ import TierBadge from '../../components/ui/TierBadge'
 export default function Dashboard() {
   const { user } = useAuth()
   const org = useOrg()
-  const [stats,    setStats]    = useState(null)
-  const [events,   setEvents]   = useState([])
-  const [orgSlug,  setOrgSlug]  = useState(null)
-  const [loading,  setLoading]  = useState(true)
+  const [stats,        setStats]        = useState(null)
+  const [events,       setEvents]       = useState([])
+  const [orgSlug,      setOrgSlug]      = useState(null)
+  const [loading,      setLoading]      = useState(true)
+  const [searchParams, setSearchParams] = useSearchParams()
+  const showUpgradeBanner = searchParams.get('upgraded') === 'true'
 
   useEffect(() => {
     async function load() {
@@ -68,6 +70,27 @@ export default function Dashboard() {
 
   return (
     <div className="space-y-6">
+      {showUpgradeBanner && (
+        <div className="flex items-center justify-between gap-4 bg-green-50 border border-green-200 rounded-xl px-5 py-4">
+          <div className="flex items-center gap-3">
+            <span className="text-green-600 text-xl">🎉</span>
+            <div>
+              <p className="font-semibold text-green-800">
+                You're now on the {org?.tier ? org.tier.charAt(0).toUpperCase() + org.tier.slice(1) : ''} plan!
+              </p>
+              <p className="text-sm text-green-700">Your account has been upgraded. All features for your plan are now active.</p>
+            </div>
+          </div>
+          <button
+            onClick={() => setSearchParams({})}
+            className="text-green-500 hover:text-green-700 text-lg leading-none"
+            aria-label="Dismiss"
+          >
+            ×
+          </button>
+        </div>
+      )}
+
       <div className="flex items-start justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Home</h1>
