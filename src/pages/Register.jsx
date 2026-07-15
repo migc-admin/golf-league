@@ -17,19 +17,50 @@ import { supabase } from '../lib/supabase'
 
 const GOLD = '#D4AF37'
 
+function isMobile() {
+  return /android|iphone|ipad|ipod/i.test(navigator.userAgent)
+}
+
 function VenmoButton({ handle, amount, note }) {
   const encoded = encodeURIComponent(note)
-  const href = `https://account.venmo.com/u/${handle}?txn=pay&amount=${amount}&note=${encoded}`
+  const webUrl  = `https://venmo.com/${handle}?txn=pay&amount=${amount}&note=${encoded}`
+  const appUrl  = `venmo://paycharge?txn=pay&recipients=${handle}&amount=${amount}&note=${encoded}`
+
+  function handleClick(e) {
+    if (!isMobile()) return // let the <a> href handle desktop naturally
+
+    e.preventDefault()
+
+    // Attempt to open the app; fall back to web after 1.5s if app isn't installed
+    const fallbackTimer = setTimeout(() => {
+      window.location.href = webUrl
+    }, 1500)
+
+    window.location.href = appUrl
+
+    // If the app opened, the page will blur — cancel the fallback
+    window.addEventListener('blur', () => clearTimeout(fallbackTimer), { once: true })
+  }
+
   return (
-    <a href={href} target="_blank" rel="noopener noreferrer"
-      className="flex items-center justify-center gap-3 w-full py-3.5 rounded-xl font-bold text-white shadow-lg transition-opacity hover:opacity-90"
-      style={{ background: '#008CFF' }}
-    >
-      <svg viewBox="0 0 24 24" className="w-5 h-5 fill-white" xmlns="http://www.w3.org/2000/svg">
-        <path d="M19.5 2C20.6 4.3 21 6.2 21 8.6c0 6.7-5.7 15.4-10.3 15.4-4.4 0-5.2-3.8-7.7-9.3l3.4-1.2c.8 2.1 1.6 4.4 2.9 4.4 1.5 0 3.9-5 3.9-8.3 0-2.4-.8-3.5-2-3.5-1.1 0-2.1.7-2.8 1.7L5.8 5.5C7.4 3 9.5 2 12 2c2.5 0 5.3 1.2 7.5 0z"/>
-      </svg>
-      Pay ${amount} via Venmo
-    </a>
+    <>
+      <a
+        href={webUrl}
+        target="_blank"
+        rel="noopener noreferrer"
+        onClick={handleClick}
+        className="flex items-center justify-center gap-3 w-full py-3.5 rounded-xl font-bold text-white shadow-lg transition-opacity hover:opacity-90"
+        style={{ background: '#008CFF' }}
+      >
+        <svg viewBox="0 0 24 24" className="w-5 h-5 fill-white" xmlns="http://www.w3.org/2000/svg">
+          <path d="M19.5 2C20.6 4.3 21 6.2 21 8.6c0 6.7-5.7 15.4-10.3 15.4-4.4 0-5.2-3.8-7.7-9.3l3.4-1.2c.8 2.1 1.6 4.4 2.9 4.4 1.5 0 3.9-5 3.9-8.3 0-2.4-.8-3.5-2-3.5-1.1 0-2.1.7-2.8 1.7L5.8 5.5C7.4 3 9.5 2 12 2c2.5 0 5.3 1.2 7.5 0z"/>
+        </svg>
+        Pay ${amount} via Venmo
+      </a>
+      <p className="text-xs text-gray-400 text-center -mt-1">
+        Please confirm the amount is <strong>${amount}</strong> before sending.
+      </p>
+    </>
   )
 }
 
