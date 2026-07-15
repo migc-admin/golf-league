@@ -9,28 +9,31 @@ import Input from '../../components/ui/Input'
 import Badge from '../../components/ui/Badge'
 
 const TABS = ['Roster', 'User Accounts']
+const MAX_ADMINS = 3
 
 export default function Players() {
   const { user } = useAuth()
-  const [players,  setPlayers]  = useState([])
-  const [profiles, setProfiles] = useState([])
-  const [search,   setSearch]   = useState('')
-  const [loading,  setLoading]  = useState(true)
-  const [modal,       setModal]       = useState(false)
-  const [editing,     setEditing]     = useState(null)
-  const [loginModal,  setLoginModal]  = useState(false)
-  const [activeTab,   setActiveTab]   = useState('Roster')
-  const [orgId,       setOrgId]       = useState(null)
+  const [players,      setPlayers]      = useState([])
+  const [profiles,     setProfiles]     = useState([])
+  const [search,       setSearch]       = useState('')
+  const [loading,      setLoading]      = useState(true)
+  const [modal,        setModal]        = useState(false)
+  const [editing,      setEditing]      = useState(null)
+  const [loginModal,   setLoginModal]   = useState(false)
+  const [inviteModal,  setInviteModal]  = useState(false)
+  const [activeTab,    setActiveTab]    = useState('Roster')
+  const [orgId,        setOrgId]        = useState(null)
+  const [orgTier,      setOrgTier]      = useState(null)
 
   async function load() {
     const { data: adminProfile } = await supabase
       .from('profiles').select('org_id').eq('id', (await supabase.auth.getUser()).data.user?.id).single()
-    const orgId = adminProfile?.org_id ?? null
+    const currentOrgId = adminProfile?.org_id ?? null
 
     const [{ data: p }, { data: pr }] = await Promise.all([
       supabase.from('players').select('*').order('last_name'),
-      orgId
-        ? supabase.from('profiles').select('*').eq('org_id', orgId).order('full_name')
+      currentOrgId
+        ? supabase.from('profiles').select('*').eq('org_id', currentOrgId).order('full_name')
         : Promise.resolve({ data: [] }),
     ])
     setPlayers(p ?? [])
@@ -40,12 +43,16 @@ export default function Players() {
 
   useEffect(() => {
     load()
-    async function fetchOrgId() {
+    async function fetchOrg() {
       if (!user) return
       const { data: profile } = await supabase.from('profiles').select('org_id').eq('id', user.id).single()
-      if (profile?.org_id) setOrgId(profile.org_id)
+      if (profile?.org_id) {
+        setOrgId(profile.org_id)
+        const { data: org } = await supabase.from('organizations').select('tier').eq('id', profile.org_id).single()
+        if (org) setOrgTier(org.tier)
+      }
     }
-    fetchOrgId()
+    fetchOrg()
   }, [user])
 
   const filtered = players.filter(p =>
@@ -145,11 +152,32 @@ export default function Players() {
       {/* ── User Accounts Tab ── */}
       {activeTab === 'User Accounts' && (
         <div className="space-y-4">
-          <p className="text-sm text-gray-600">
-            Manage login accounts and roles for your organization. <strong>Admin</strong> — full access.{' '}
-            <strong>Scorekeeper</strong> — score entry only.{' '}
-            <strong>None</strong> — can log in but no access.
-          </p>
+          <div className="flex items-start justify-between gap-4">
+            <p className="text-sm text-gray-600">
+              Manage login accounts and roles for your organization. <strong>Admin</strong> — full access.{' '}
+              <strong>None</strong> — can log in but no access.
+            </p>
+            {orgTier === 'club' && (
+              <div className="shrink-0 text-right">
+                <Button
+                  onClick={() => setInviteModal(true)}
+                  disabled={profiles.filter(p => p.role === 'admin').length >= MAX_ADMINS}
+                >
+                  + Invite Admin
+                </Button>
+                <p className="text-xs text-gray-400 mt-1">
+                  {profiles.filter(p => p.role === 'admin').length} / {MAX_ADMINS} admins used
+                </p>
+              </div>
+            )}
+            {orgTier !== 'club' && (
+              <div className="shrink-0">
+                <span className="text-xs text-gray-400 bg-gray-100 rounded-full px-3 py-1">
+                  Multiple admins — Club plan only
+                </span>
+              </div>
+            )}
+          </div>
 
           {loading ? (
             <div className="space-y-2 animate-pulse">
@@ -166,10 +194,10 @@ export default function Players() {
                   <div key={pr.id} className="flex items-center justify-between px-5 py-3.5">
                     <div>
                       <div className="font-medium text-gray-900 flex items-center gap-2">
-                        {pr.full_name || pr.id.slice(0, 8) + '…'}
+                        {pr.full_name || '—'}
                         <RoleBadge role={pr.role} />
                       </div>
-                      <div className="text-xs text-gray-400 mt-0.5">ID: {pr.id.slice(0, 12)}…</div>
+                      <div className="text-xs text-gray-400 mt-0.5">{pr.email ?? pr.id.slice(0, 12) + '…'}</div>
                     </div>
                     <div className="flex items-center gap-2">
                       <select
@@ -204,6 +232,13 @@ export default function Players() {
         onClose={() => setLoginModal(false)}
         players={players}
         onSaved={() => { setLoginModal(false); load() }}
+      />
+      <InviteAdminModal
+        open={inviteModal}
+        onClose={() => setInviteModal(false)}
+        orgId={orgId}
+        adminCount={profiles.filter(p => p.role === 'admin').length}
+        onSaved={() => { setInviteModal(false); load() }}
       />
     </div>
   )
@@ -307,6 +342,78 @@ function CreateLoginModal({ open, onClose, players, onSaved }) {
         <div className="flex justify-end gap-3 pt-2">
           <Button type="button" variant="secondary" onClick={onClose}>Cancel</Button>
           <Button type="submit" loading={saving}>Create Login</Button>
+        </div>
+      </form>
+    </Modal>
+  )
+}
+
+function InviteAdminModal({ open, onClose, orgId, adminCount, onSaved }) {
+  const [email,    setEmail]    = useState('')
+  const [fullName, setFullName] = useState('')
+  const [saving,   setSaving]   = useState(false)
+
+  useEffect(() => {
+    if (!open) { setEmail(''); setFullName('') }
+  }, [open])
+
+  async function handleInvite(e) {
+    e.preventDefault()
+    if (!email || !orgId) return
+    if (adminCount >= MAX_ADMINS) {
+      toast.error(`Club plan allows up to ${MAX_ADMINS} admins.`)
+      return
+    }
+    setSaving(true)
+
+    const { data: { session } } = await supabase.auth.getSession()
+    const res = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/invite-admin`, {
+      method: 'POST',
+      headers: {
+        'Content-Type':  'application/json',
+        'Authorization': `Bearer ${session?.access_token}`,
+        'apikey':        import.meta.env.VITE_SUPABASE_ANON_KEY,
+      },
+      body: JSON.stringify({ email: email.trim(), orgId, fullName: fullName.trim() }),
+    })
+
+    const json = await res.json()
+    setSaving(false)
+
+    if (!res.ok || json.error) {
+      toast.error(json.error ?? 'Failed to send invite')
+    } else {
+      toast.success(`Invite sent to ${email}. They'll receive an email to set up their account.`)
+      onSaved()
+    }
+  }
+
+  return (
+    <Modal open={open} onClose={onClose} title="Invite Admin">
+      <form onSubmit={handleInvite} className="space-y-4">
+        <div className="bg-blue-50 border border-blue-200 rounded-lg px-4 py-3 text-xs text-blue-800">
+          An email invite will be sent. When they accept, their account will be linked to your organization with Admin access.
+        </div>
+        <Input
+          label="Email"
+          type="email"
+          value={email}
+          onChange={e => setEmail(e.target.value)}
+          placeholder="colleague@example.com"
+          required
+        />
+        <Input
+          label="Full Name (optional)"
+          value={fullName}
+          onChange={e => setFullName(e.target.value)}
+          placeholder="First Last"
+        />
+        <p className="text-xs text-gray-400">
+          {adminCount} of {MAX_ADMINS} admin seats used on your Club plan.
+        </p>
+        <div className="flex justify-end gap-3 pt-2">
+          <Button type="button" variant="secondary" onClick={onClose}>Cancel</Button>
+          <Button type="submit" loading={saving}>Send Invite</Button>
         </div>
       </form>
     </Modal>

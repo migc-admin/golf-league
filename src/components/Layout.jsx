@@ -149,7 +149,7 @@ function AccountDropdown({ user, profile, org, tier, onSignOut }) {
             )}
           </div>
 
-          {/* Upgrade CTA */}
+          {/* Upgrade CTA — hidden for Club (highest tier) */}
           {tier !== 'club' && (
             <div className="px-5 py-3" style={{ borderBottom: '1px solid #ebe9e4' }}>
               <a
@@ -158,7 +158,7 @@ function AccountDropdown({ user, profile, org, tier, onSignOut }) {
                 className="block text-center text-xs font-bold py-2 rounded-full text-white transition-opacity hover:opacity-90"
                 style={{ background: GREEN }}
               >
-                Upgrade to {tier === 'free' || tier === 'starter' ? 'Pro' : 'Club'} →
+                {tier === 'pro' ? 'Upgrade to Club →' : 'Upgrade to Pro →'}
               </a>
             </div>
           )}
