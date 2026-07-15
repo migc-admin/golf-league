@@ -97,7 +97,14 @@ export default function Standings() {
           const skinsResults = computeAllSkins(nonGuest, scores, course.stroke_index)
           const { byPlayer } = computePayouts(ev, nonGuest.length, leaderboards, sideGames, skinsResults, flightCounts)
 
-          for (const { playerId, total } of byPlayer) {
+          for (const { playerId, items } of byPlayer) {
+            // Exclude skins from season earnings total
+            const nonSkinsTotal = (items ?? [])
+              .filter(item => !item.category.startsWith('Skins'))
+              .reduce((sum, item) => sum + item.amount, 0)
+
+            if (nonSkinsTotal === 0) continue
+
             const ep = eps.find(e => e.player_id === playerId)
             if (!playerEarnings[playerId]) {
               playerEarnings[playerId] = {
@@ -107,9 +114,9 @@ export default function Standings() {
                 byEvent: {},
               }
             }
-            playerEarnings[playerId].totalEarnings += total
+            playerEarnings[playerId].totalEarnings += nonSkinsTotal
             playerEarnings[playerId].eventsPlayed  += 1
-            playerEarnings[playerId].byEvent[ev.id] = total
+            playerEarnings[playerId].byEvent[ev.id] = nonSkinsTotal
           }
         } catch { /* skip event if engine errors */ }
       }
@@ -133,10 +140,18 @@ export default function Standings() {
           if (!eps.length || !scs.length || !sels.length) continue
           try {
             const lb     = computeLeaderboards(eps, scs, course)
-            const ranked = [...(lb.full?.A ?? []), ...(lb.full?.B ?? [])]
-            if (!ranked.length) continue
+            // Merge flights and re-rank cross-field by net score for TGL points
+            const allRanked = [...(lb.full?.A ?? []), ...(lb.full?.B ?? [])]
+            if (!allRanked.length) continue
+            // Sort by net ascending, then assign cross-field rank with tie handling
+            const sorted = [...allRanked].sort((a, b) => (a.net ?? 999) - (b.net ?? 999))
+            let crossRank = 1
+            const crossRanked = sorted.map((p, i) => {
+              if (i > 0 && p.net !== sorted[i - 1].net) crossRank = i + 1
+              return { ...p, rank: crossRank }
+            })
             const epMap = Object.fromEntries(eps.map(ep => [ep.player_id, ep]))
-            const rankedWithPlayer = ranked.map(r => ({ ...r, player: epMap[r.player_id]?.player ?? null }))
+            const rankedWithPlayer = crossRanked.map(r => ({ ...r, player: epMap[r.player_id]?.player ?? null }))
             const result = computeTGLEventResults(rankedWithPlayer, sels, teams, tglMembers)
             eventResultsByEventId[ev.id] = result
             eventRows.push({ event: ev, teamResults: result.teamResults })
