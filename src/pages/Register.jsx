@@ -286,8 +286,10 @@ export default function Register() {
               </div>
               <h2 className="text-lg font-bold text-gray-900">You're registered!</h2>
               <p className="text-sm text-gray-500 mt-1">
-                {firstName}, your spot is <span className="font-semibold text-amber-600">pending payment</span>.
-                Complete your payment below to confirm your registration.
+                {(event.venmo_handle || event.paypal_link)
+                  ? <>{firstName}, your spot is <span className="font-semibold text-amber-600">pending payment</span>. Complete your payment below to confirm your registration.</>
+                  : <>{firstName}, your spot is <span className="font-semibold text-amber-600">pending payment</span>. Follow payment instructions provided by your administrator.</>
+                }
               </p>
             </div>
 
@@ -313,10 +315,6 @@ export default function Register() {
                   You'll hear from the organizer shortly.
                 </p>
               </div>
-            ) : (
-              <p className="text-sm text-gray-500">
-                The organizer will follow up with payment details.
-              </p>
             )}
           </div>
         )}
