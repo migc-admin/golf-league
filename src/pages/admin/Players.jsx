@@ -495,8 +495,9 @@ function PlayerModal({ open, onClose, editing, orgId, onSaved }) {
         <div>
           <label className="label">Role</label>
           <select value={form.intended_role} onChange={e => setField('intended_role', e.target.value)} className="input bg-white">
-            <option value="player">Player</option>
+            <option value="player">Member</option>
             <option value="admin">Admin</option>
+            <option value="guest">Guest</option>
           </select>
           <p className="text-xs text-gray-400 mt-1">
             Admin role is applied immediately if a matching email account exists.
