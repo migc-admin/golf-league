@@ -99,9 +99,8 @@ export default function Standings() {
 
           for (const { playerId, items } of byPlayer) {
             // Exclude skins from season earnings total
-            const nonSkinsTotal = (items ?? [])
-              .filter(item => !item.category.startsWith('Skins'))
-              .reduce((sum, item) => sum + item.amount, 0)
+            const nonSkinsItems = (items ?? []).filter(item => !item.category.startsWith('Skins'))
+            const nonSkinsTotal = nonSkinsItems.reduce((sum, item) => sum + item.amount, 0)
 
             if (nonSkinsTotal === 0) continue
 
@@ -112,16 +111,19 @@ export default function Standings() {
                 totalEarnings: 0,
                 eventsPlayed: 0,
                 byEvent: {},
+                itemsByEvent: {},
               }
             }
-            playerEarnings[playerId].totalEarnings += nonSkinsTotal
-            playerEarnings[playerId].eventsPlayed  += 1
-            playerEarnings[playerId].byEvent[ev.id] = nonSkinsTotal
+            playerEarnings[playerId].totalEarnings          += nonSkinsTotal
+            playerEarnings[playerId].eventsPlayed           += 1
+            playerEarnings[playerId].byEvent[ev.id]          = nonSkinsTotal
+            playerEarnings[playerId].itemsByEvent[ev.id]     = nonSkinsItems
           }
         } catch { /* skip event if engine errors */ }
       }
 
-      const sorted = Object.values(playerEarnings).sort((a, b) => b.totalEarnings - a.totalEarnings)
+      const sorted = Object.values(playerEarnings)
+        .sort((a, b) => b.totalEarnings - a.totalEarnings)
       setStandings(sorted)
 
       // ── TGL standings ───────────────────────────────────────────────
@@ -140,19 +142,23 @@ export default function Standings() {
           if (!eps.length || !scs.length || !sels.length) continue
           try {
             const lb     = computeLeaderboards(eps, scs, course)
-            // Merge flights and re-rank cross-field by net score for TGL points
-            const allRanked = [...(lb.full?.A ?? []), ...(lb.full?.B ?? [])]
-            if (!allRanked.length) continue
-            // Sort by net ascending, then assign cross-field rank with tie handling
-            const sorted = [...allRanked].sort((a, b) => (a.net ?? 999) - (b.net ?? 999))
-            let crossRank = 1
-            const crossRanked = sorted.map((p, i) => {
-              if (i > 0 && p.net !== sorted[i - 1].net) crossRank = i + 1
-              return { ...p, rank: crossRank }
-            })
+            // Assign TGL points within each flight separately, then merge
+            const flightA = lb.full?.A ?? []
+            const flightB = lb.full?.B ?? []
+            if (!flightA.length && !flightB.length) continue
+            const { assignTGLPoints } = await import('../lib/engines/tgl.js')
+            const ptsA = assignTGLPoints(flightA, flightA.length)
+            const ptsB = assignTGLPoints(flightB, flightB.length)
+            const mergedPoints = { ...ptsA, ...ptsB }
+            // Build a unified ranked array with per-flight points attached
+            const allRanked = [...flightA, ...flightB]
             const epMap = Object.fromEntries(eps.map(ep => [ep.player_id, ep]))
-            const rankedWithPlayer = crossRanked.map(r => ({ ...r, player: epMap[r.player_id]?.player ?? null }))
-            const result = computeTGLEventResults(rankedWithPlayer, sels, teams, tglMembers)
+            const rankedWithPlayer = allRanked.map(r => ({
+              ...r,
+              tglPoints: mergedPoints[r.player_id] ?? 0,
+              player: epMap[r.player_id]?.player ?? null,
+            }))
+            const result = computeTGLEventResults(rankedWithPlayer, sels, teams, tglMembers, mergedPoints)
             eventResultsByEventId[ev.id] = result
             eventRows.push({ event: ev, teamResults: result.teamResults })
           } catch (err) { console.error('[TGL] compute error', err) }
@@ -238,56 +244,81 @@ export default function Standings() {
 
 function EarningsTable({ standings, events }) {
   const medals = ['🥇', '🥈', '🥉']
-  const [showBreakdown, setShowBreakdown] = useState(false)
+  const [expandedPlayer, setExpandedPlayer] = useState(null)
 
   return (
-    <div className="space-y-3">
-      <div className="flex justify-end">
-        <button
-          onClick={() => setShowBreakdown(v => !v)}
-          className="text-xs text-status-active-text hover:underline font-medium"
-        >
-          {showBreakdown ? 'Hide event breakdown' : 'Show event breakdown'}
-        </button>
-      </div>
-
+    <div className="space-y-2">
+      <p className="text-xs text-ink-muted px-1">Click a player to see their earnings breakdown. Skins winnings are excluded from totals.</p>
       <Card className="overflow-hidden p-0">
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm min-w-max">
-            <thead>
-              <tr className="text-left text-xs font-semibold text-ink-muted" style={{ background: '#f4f3f0', borderBottom: '1px solid #ebe9e4' }}>
-                <th className="px-5 py-3 sticky left-0 z-10" style={{ background: '#f4f3f0' }}>Rank</th>
-                <th className="px-4 py-3 sticky left-12 z-10" style={{ background: '#f4f3f0' }}>Player</th>
-                <th className="px-4 py-3 text-center">Events</th>
-                {showBreakdown && events.map(ev => (
-                  <th key={ev.id} className="px-3 py-3 text-right whitespace-nowrap">
-                    #{ev.event_number}
-                  </th>
-                ))}
-                <th className="px-4 py-3 text-right">Total</th>
-              </tr>
-            </thead>
-            <tbody>
-              {standings.map((s, i) => (
-                <tr key={s.player?.id ?? i} style={{ borderBottom: '1px solid #ebe9e4', background: i % 2 === 1 ? 'rgba(27,67,50,0.025)' : '#ffffff' }}>
-                  <td className="px-5 py-3 text-base sticky left-0 bg-inherit z-10">{medals[i] ?? i + 1}</td>
-                  <td className="px-4 py-3 font-medium text-ink sticky left-12 bg-inherit z-10 whitespace-nowrap">
-                    {s.player?.last_name}, {s.player?.first_name}
-                  </td>
-                  <td className="px-4 py-3 text-center text-ink-muted">{s.eventsPlayed}</td>
-                  {showBreakdown && events.map(ev => (
-                    <td key={ev.id} className="px-3 py-3 text-right text-ink-muted">
-                      {s.byEvent[ev.id] ? `$${s.byEvent[ev.id].toFixed(2)}` : '—'}
+        <table className="w-full text-sm">
+          <thead>
+            <tr className="text-left text-xs font-semibold text-ink-muted" style={{ background: '#f4f3f0', borderBottom: '1px solid #ebe9e4' }}>
+              <th className="px-5 py-3">Rank</th>
+              <th className="px-4 py-3">Player</th>
+              <th className="px-4 py-3 text-center">Events</th>
+              <th className="px-4 py-3 text-right">Total</th>
+            </tr>
+          </thead>
+          <tbody>
+            {standings.map((s, i) => {
+              const pid = s.player?.id ?? i
+              const isExpanded = expandedPlayer === pid
+              return (
+                <>
+                  <tr
+                    key={pid}
+                    onClick={() => setExpandedPlayer(isExpanded ? null : pid)}
+                    className="cursor-pointer hover:bg-surface-high transition-colors"
+                    style={{ borderBottom: isExpanded ? 'none' : '1px solid #ebe9e4', background: isExpanded ? '#f4f3f0' : (i % 2 === 1 ? 'rgba(27,67,50,0.025)' : '#ffffff') }}
+                  >
+                    <td className="px-5 py-3 text-base">{medals[i] ?? i + 1}</td>
+                    <td className="px-4 py-3 font-medium text-ink whitespace-nowrap">
+                      <span className="flex items-center gap-1.5">
+                        {s.player?.last_name}, {s.player?.first_name}
+                        <svg className="w-3 h-3 text-ink-muted transition-transform" style={{ transform: isExpanded ? 'rotate(180deg)' : '' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                        </svg>
+                      </span>
                     </td>
-                  ))}
-                  <td className="px-4 py-3 text-right font-bold text-status-active-text">
-                    ${s.totalEarnings.toFixed(2)}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+                    <td className="px-4 py-3 text-center text-ink-muted">{s.eventsPlayed}</td>
+                    <td className="px-4 py-3 text-right font-bold text-status-active-text">
+                      ${s.totalEarnings.toFixed(2)}
+                    </td>
+                  </tr>
+                  {isExpanded && (
+                    <tr key={`${pid}-detail`} style={{ borderBottom: '1px solid #ebe9e4' }}>
+                      <td colSpan={4} className="px-5 pb-4 pt-1" style={{ background: '#f9f8f6' }}>
+                        <div className="space-y-3">
+                          {events
+                            .filter(ev => s.itemsByEvent?.[ev.id]?.length)
+                            .map(ev => (
+                              <div key={ev.id}>
+                                <p className="text-xs font-semibold text-ink-muted mb-1">
+                                  Event #{ev.event_number}{ev.name ? ` — ${ev.name}` : ''}
+                                </p>
+                                <div className="space-y-0.5">
+                                  {s.itemsByEvent[ev.id].map((item, j) => (
+                                    <div key={j} className="flex items-center justify-between text-xs text-ink">
+                                      <span className="text-ink-muted">{item.category}</span>
+                                      <span className="font-medium">${item.amount.toFixed(2)}</span>
+                                    </div>
+                                  ))}
+                                  <div className="flex items-center justify-between text-xs font-semibold text-ink border-t border-gray-200 pt-0.5 mt-0.5">
+                                    <span>Event total</span>
+                                    <span>${s.byEvent[ev.id].toFixed(2)}</span>
+                                  </div>
+                                </div>
+                              </div>
+                            ))}
+                        </div>
+                      </td>
+                    </tr>
+                  )}
+                </>
+              )
+            })}
+          </tbody>
+        </table>
       </Card>
     </div>
   )

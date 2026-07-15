@@ -59,9 +59,11 @@ export function assignTGLPoints(ranked, fieldSize) {
  * @param {Array}  tglMembers       — tgl_team_members rows with { team_id, player_id, player: {...} }
  * @returns {{ teamResults, playerPoints }}
  */
-export function computeTGLEventResults(ranked, tglSelections, tglTeams, tglMembers) {
-  const fieldSize = ranked.length
-  const playerPoints = assignTGLPoints(ranked, fieldSize)
+export function computeTGLEventResults(ranked, tglSelections, tglTeams, tglMembers, precomputedPoints) {
+  const playerPoints = precomputedPoints ?? (() => {
+    const fieldSize = ranked.length
+    return assignTGLPoints(ranked, fieldSize)
+  })()
 
   // Map team_id → selected player_ids for this event
   const teamSelections = {}
