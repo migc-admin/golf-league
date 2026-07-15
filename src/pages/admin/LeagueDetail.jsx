@@ -120,18 +120,28 @@ export default function LeagueDetail() {
       {/* League header card */}
       <div className="card overflow-hidden p-0">
         <div className="flex items-start gap-5 px-5 py-5" style={{ borderBottom: '1px solid #ebe9e4' }}>
-          {/* Logo upload */}
+          {/* Logo upload — Club tier only */}
           <div className="shrink-0">
-            <ImageUpload
-              shape="rect"
-              path={`orgs/${orgSlug}/leagues/${league.id}/logo`}
-              currentUrl={league.logo_url ?? null}
-              onUploaded={async (url) => {
-                await supabase.from('leagues').update({ logo_url: url }).eq('id', league.id)
-                setLeague(prev => ({ ...prev, logo_url: url }))
-              }}
-              label="League Logo"
-            />
+            {checkFeature(orgTier ?? 'free', 'custom_branding') ? (
+              <ImageUpload
+                shape="rect"
+                path={`orgs/${orgSlug}/leagues/${league.id}/logo`}
+                currentUrl={league.logo_url ?? null}
+                onUploaded={async (url) => {
+                  await supabase.from('leagues').update({ logo_url: url }).eq('id', league.id)
+                  setLeague(prev => ({ ...prev, logo_url: url }))
+                }}
+                label="League Logo"
+              />
+            ) : (
+              <div className="w-20 h-20 rounded-xl flex flex-col items-center justify-center text-center gap-1"
+                style={{ border: '2px dashed #d1d5db', background: '#f9fafb' }}>
+                <svg width="20" height="20" fill="none" stroke="#9ca3af" strokeWidth="1.5" viewBox="0 0 24 24">
+                  <rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0110 0v4"/>
+                </svg>
+                <span className="text-xs text-gray-400 leading-tight">Club plan</span>
+              </div>
+            )}
           </div>
 
           {/* League info */}

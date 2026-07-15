@@ -87,7 +87,9 @@ export function ExportScorecardsButton({ event, eventPlayers, course, orgName, o
         })
 
         const link = document.createElement('a')
-        link.download = `scorecard-group-${g}.png`
+        const leaguePart = (event.league?.name ?? 'league').replace(/[^a-z0-9]/gi, '_').toLowerCase()
+        const eventPart  = (event.name ?? `event_${event.event_number}`).replace(/[^a-z0-9]/gi, '_').toLowerCase()
+        link.download = `scorecard_${leaguePart}_${eventPart}_group${g}.png`
         link.href = dataUrl
         link.click()
         await new Promise(r => setTimeout(r, 250))

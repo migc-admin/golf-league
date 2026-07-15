@@ -74,11 +74,17 @@ function downloadTemplate(filename, content) {
   URL.revokeObjectURL(url)
 }
 
+const MAX_FILE_BYTES = 3 * 1024 * 1024 // 3MB
+
 function FileDropZone({ onFile, accept = '.csv' }) {
   const [dragging, setDragging] = useState(false)
 
   function handleFile(file) {
     if (!file) return
+    if (file.size > MAX_FILE_BYTES) {
+      alert(`File is too large (${(file.size / 1024 / 1024).toFixed(1)} MB). Maximum allowed size is 3 MB.`)
+      return
+    }
     const reader = new FileReader()
     reader.onload = e => onFile(e.target.result, file.name)
     reader.readAsText(file)
