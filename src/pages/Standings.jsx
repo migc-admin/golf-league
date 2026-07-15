@@ -4,7 +4,7 @@
  * No dependency on season_earnings table.
  */
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, Fragment } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import { Helmet } from 'react-helmet-async'
 import { supabase } from '../lib/supabase'
@@ -13,7 +13,7 @@ import Card from '../components/ui/Card'
 import { computeLeaderboards } from '../lib/engines/scoring'
 import { computeAllSkins } from '../lib/engines/skins'
 import { computePayouts } from '../lib/engines/payouts'
-import { computeTGLEventResults, computeTGLSeasonStandings } from '../lib/engines/tgl'
+import { computeTGLEventResults, computeTGLSeasonStandings, assignTGLPoints } from '../lib/engines/tgl'
 
 export default function Standings() {
   const { orgSlug, leagueSlug } = useParams()
@@ -146,16 +146,13 @@ export default function Standings() {
             const flightA = lb.full?.A ?? []
             const flightB = lb.full?.B ?? []
             if (!flightA.length && !flightB.length) continue
-            const { assignTGLPoints } = await import('../lib/engines/tgl.js')
-            const ptsA = assignTGLPoints(flightA, flightA.length)
-            const ptsB = assignTGLPoints(flightB, flightB.length)
+            const ptsA = flightA.length ? assignTGLPoints(flightA, flightA.length) : {}
+            const ptsB = flightB.length ? assignTGLPoints(flightB, flightB.length) : {}
             const mergedPoints = { ...ptsA, ...ptsB }
-            // Build a unified ranked array with per-flight points attached
             const allRanked = [...flightA, ...flightB]
             const epMap = Object.fromEntries(eps.map(ep => [ep.player_id, ep]))
             const rankedWithPlayer = allRanked.map(r => ({
               ...r,
-              tglPoints: mergedPoints[r.player_id] ?? 0,
               player: epMap[r.player_id]?.player ?? null,
             }))
             const result = computeTGLEventResults(rankedWithPlayer, sels, teams, tglMembers, mergedPoints)
@@ -264,9 +261,8 @@ function EarningsTable({ standings, events }) {
               const pid = s.player?.id ?? i
               const isExpanded = expandedPlayer === pid
               return (
-                <>
+                <Fragment key={pid}>
                   <tr
-                    key={pid}
                     onClick={() => setExpandedPlayer(isExpanded ? null : pid)}
                     className="cursor-pointer hover:bg-surface-high transition-colors"
                     style={{ borderBottom: isExpanded ? 'none' : '1px solid #ebe9e4', background: isExpanded ? '#f4f3f0' : (i % 2 === 1 ? 'rgba(27,67,50,0.025)' : '#ffffff') }}
@@ -286,7 +282,7 @@ function EarningsTable({ standings, events }) {
                     </td>
                   </tr>
                   {isExpanded && (
-                    <tr key={`${pid}-detail`} style={{ borderBottom: '1px solid #ebe9e4' }}>
+                    <tr style={{ borderBottom: '1px solid #ebe9e4' }}>
                       <td colSpan={4} className="px-5 pb-4 pt-1" style={{ background: '#f9f8f6' }}>
                         <div className="space-y-3">
                           {events
@@ -314,7 +310,7 @@ function EarningsTable({ standings, events }) {
                       </td>
                     </tr>
                   )}
-                </>
+                </Fragment>
               )
             })}
           </tbody>
