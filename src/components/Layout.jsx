@@ -29,7 +29,7 @@ const PLAN_FEATURES = [
   { label: 'Online registration',  free: false,           pro: false,         club: true          },
 ]
 
-function AccountDropdown({ user, profile, org, tier, onSignOut }) {
+function AccountDropdown({ user, profile, org, tier, isOwner, onSignOut }) {
   const [open, setOpen] = useState(false)
   const [planOpen, setPlanOpen] = useState(false)
   const ref = useRef(null)
@@ -98,12 +98,19 @@ function AccountDropdown({ user, profile, org, tier, onSignOut }) {
                 onClick={() => setPlanOpen(v => !v)}
                 className="flex items-center gap-1.5 group"
               >
+                {isOwner ? (
+                  <span className="text-xs font-semibold px-2 py-0.5 rounded-full"
+                    style={{ background: '#1B4332', color: '#fff' }}>
+                    Owner
+                  </span>
+                ) : (
                 <span
                   className="text-xs font-semibold px-2 py-0.5 rounded-full"
                   style={TIER_STYLE[tier] ?? TIER_STYLE.free}
                 >
                   {label}
                 </span>
+                )}
                 <svg
                   className="w-3 h-3 text-ink-muted transition-transform"
                   style={{ transform: planOpen ? 'rotate(180deg)' : 'rotate(0deg)' }}
@@ -149,8 +156,8 @@ function AccountDropdown({ user, profile, org, tier, onSignOut }) {
             )}
           </div>
 
-          {/* Upgrade CTA — hidden for Club (highest tier) */}
-          {tier !== 'club' && (
+          {/* Upgrade CTA — hidden for Club (highest tier) and owners */}
+          {!isOwner && tier !== 'club' && (
             <div className="px-5 py-3" style={{ borderBottom: '1px solid #ebe9e4' }}>
               <a
                 href="/onboarding"
@@ -275,18 +282,20 @@ const navItems = [
 export default function Layout({ children }) {
   const { user, profile, signOut } = useAuth()
   const navigate = useNavigate()
-  const [menuOpen, setMenuOpen] = useState(false)
+  const [menuOpen,   setMenuOpen]   = useState(false)
   const [fetchedOrg, setFetchedOrg] = useState(null)
+  const [isOwner,    setIsOwner]    = useState(false)
   const ctxOrg = useOrg()
 
   // OrgContext is only populated on org-slug routes. For plain /admin routes,
   // fetch the org directly from the user's profile.
   useEffect(() => {
-    if (ctxOrg || !user) return
+    if (!user) return
     supabase
-      .from('profiles').select('org_id').eq('id', user.id).single()
+      .from('profiles').select('org_id, is_owner').eq('id', user.id).single()
       .then(({ data: p }) => {
-        if (!p?.org_id) return
+        if (p?.is_owner) setIsOwner(true)
+        if (!p?.org_id || ctxOrg) return
         supabase
           .from('organizations').select('id, name, slug, logo_url, tier').eq('id', p.org_id).single()
           .then(({ data: o }) => { if (o) setFetchedOrg(o) })
@@ -350,6 +359,7 @@ export default function Layout({ children }) {
               profile={profile}
               org={org}
               tier={tier}
+              isOwner={isOwner}
               onSignOut={handleSignOut}
             />
 
