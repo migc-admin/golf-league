@@ -86,7 +86,7 @@ export default function Standings() {
         const sideGames = (allSideGames ?? []).filter(sg => sg.event_id === ev.id)
         if (!eps.length) continue
 
-        const nonGuest     = eps.filter(ep => !ep.is_guest)
+        const nonGuest     = eps.filter(ep => !ep.is_guest && ep.player?.intended_role !== 'guest')
         const flightCounts = {
           A: nonGuest.filter(ep => ep.flight === 'A').length,
           B: nonGuest.filter(ep => ep.flight === 'B').length,
@@ -136,7 +136,7 @@ export default function Standings() {
           if (!lockedEventIds.has(ev.id)) continue
           const course = ev.course
           if (!course?.stroke_index || !course?.par_per_hole) continue
-          const eps   = (allEPs    ?? []).filter(ep => ep.event_id === ev.id)
+          const eps   = (allEPs    ?? []).filter(ep => ep.event_id === ev.id && !ep.is_guest && ep.player?.intended_role !== 'guest')
           const scs   = (allScores ?? []).filter(s  => s.event_id  === ev.id)
           const sels  = (tglSels  ?? []).filter(s  => s.event_id  === ev.id)
           if (!eps.length || !scs.length || !sels.length) continue
