@@ -31,6 +31,7 @@ const PLAN_FEATURES = [
 
 function AccountDropdown({ user, profile, org, tier, onSignOut }) {
   const [open, setOpen] = useState(false)
+  const [planOpen, setPlanOpen] = useState(false)
   const ref = useRef(null)
 
   useEffect(() => {
@@ -92,13 +93,48 @@ function AccountDropdown({ user, profile, org, tier, onSignOut }) {
           <div className="px-5 py-3 space-y-2" style={{ borderBottom: '1px solid #ebe9e4' }}>
             <div className="flex items-center justify-between">
               <span className="text-xs text-ink-muted">Plan</span>
-              <span
-                className="text-xs font-semibold px-2 py-0.5 rounded-full"
-                style={TIER_STYLE[tier] ?? TIER_STYLE.free}
+              <button
+                type="button"
+                onClick={() => setPlanOpen(v => !v)}
+                className="flex items-center gap-1.5 group"
               >
-                {label}
-              </span>
+                <span
+                  className="text-xs font-semibold px-2 py-0.5 rounded-full"
+                  style={TIER_STYLE[tier] ?? TIER_STYLE.free}
+                >
+                  {label}
+                </span>
+                <svg
+                  className="w-3 h-3 text-ink-muted transition-transform"
+                  style={{ transform: planOpen ? 'rotate(180deg)' : 'rotate(0deg)' }}
+                  fill="none" stroke="currentColor" viewBox="0 0 24 24"
+                >
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                </svg>
+              </button>
             </div>
+
+            {planOpen && (
+              <ul className="pt-1 space-y-1.5">
+                {PLAN_FEATURES.map(f => {
+                  const val = f[tier] ?? f.free
+                  const included = val !== false
+                  return (
+                    <li key={f.label} className="flex items-center justify-between gap-2">
+                      <span className="text-xs" style={{ color: included ? '#374151' : '#9ca3af' }}>
+                        {f.label}
+                      </span>
+                      <span className="text-xs font-semibold shrink-0">
+                        {val === true  ? <span style={{ color: GREEN }}>✓</span>
+                        : val === false ? <span style={{ color: '#d1d5db' }}>—</span>
+                        : <span style={{ color: GREEN, fontSize: '0.7rem' }}>{val}</span>}
+                      </span>
+                    </li>
+                  )
+                })}
+              </ul>
+            )}
+          </div>
             {org?.name && (
               <div className="flex items-center justify-between">
                 <span className="text-xs text-ink-muted">Organization</span>
