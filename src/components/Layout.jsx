@@ -141,7 +141,6 @@ function AccountDropdown({ user, profile, org, tier, isOwner, onSignOut }) {
                 })}
               </ul>
             )}
-          </div>
             {org?.name && (
               <div className="flex items-center justify-between">
                 <span className="text-xs text-ink-muted">Organization</span>
