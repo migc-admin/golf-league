@@ -70,6 +70,18 @@ export default function Players() {
   }
 
   async function handleMerge(sourceId, targetId) {
+    // Copy supplemental fields from source → target if target is missing them
+    const { data: source } = await supabase.from('players').select('email, ghin_number').eq('id', sourceId).single()
+    const { data: target } = await supabase.from('players').select('email, ghin_number').eq('id', targetId).single()
+    if (source && target) {
+      const patch = {}
+      if (!target.email      && source.email)       patch.email       = source.email
+      if (!target.ghin_number && source.ghin_number) patch.ghin_number = source.ghin_number
+      if (Object.keys(patch).length) {
+        await supabase.from('players').update(patch).eq('id', targetId)
+      }
+    }
+
     // Reassign all references from source → target, then delete source
     await Promise.all([
       supabase.from('event_players').update({ player_id: targetId }).eq('player_id', sourceId),
@@ -246,6 +258,7 @@ export default function Players() {
         editing={editing}
         orgId={orgId}
         onSaved={() => { setModal(false); load() }}
+        onOpenMerge={(p) => { setModal(false); setMergeSource(p); setMergeModal(true) }}
       />
       <CreateLoginModal
         open={loginModal}
@@ -512,7 +525,7 @@ function RoleBadge({ role }) {
   return <Badge variant="gray">No Role</Badge>
 }
 
-function PlayerModal({ open, onClose, editing, orgId, onSaved }) {
+function PlayerModal({ open, onClose, editing, orgId, onSaved, onOpenMerge }) {
   const [form,   setForm]   = useState({ first_name: '', last_name: '', email: '', ghin_number: '', intended_role: 'player' })
   const [saving, setSaving] = useState(false)
 
@@ -589,9 +602,20 @@ function PlayerModal({ open, onClose, editing, orgId, onSaved }) {
             Admin role is applied immediately if a matching email account exists.
           </p>
         </div>
-        <div className="flex justify-end gap-3 pt-2">
-          <Button type="button" variant="secondary" onClick={onClose}>Cancel</Button>
-          <Button type="submit" loading={saving}>{editing ? 'Save' : 'Add Player'}</Button>
+        <div className="flex items-center justify-between pt-2">
+          {editing && onOpenMerge ? (
+            <button
+              type="button"
+              onClick={() => onOpenMerge(editing)}
+              className="text-xs text-ink-muted hover:text-ink underline"
+            >
+              Merge duplicate…
+            </button>
+          ) : <span />}
+          <div className="flex gap-3">
+            <Button type="button" variant="secondary" onClick={onClose}>Cancel</Button>
+            <Button type="submit" loading={saving}>{editing ? 'Save' : 'Add Player'}</Button>
+          </div>
         </div>
       </form>
     </Modal>
