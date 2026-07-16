@@ -133,17 +133,11 @@ export default function Settings() {
                 required
               />
             </div>
-            <div>
-              <label className="label">URL Slug <span className="font-normal text-gray-400">(auto-generated)</span></label>
-              <div className="text-xs text-ink-muted bg-gray-50 rounded-lg px-3 py-2 border border-gray-200 font-mono">
-                {slug}
-              </div>
-              {slug !== org.slug && (
-                <p className="text-xs text-amber-600 mt-1">
-                  ⚠ Changing the slug will break existing public links (standings, leaderboard, etc.)
-                </p>
-              )}
-            </div>
+            {name.trim() !== org.name && (
+              <p className="text-xs text-amber-600">
+                ⚠ Renaming the org will update your public URL slug and break existing public links (standings, leaderboard, etc.)
+              </p>
+            )}
             <div className="flex justify-end">
               <button
                 type="submit"
