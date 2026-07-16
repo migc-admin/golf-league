@@ -167,7 +167,6 @@ export default function Players() {
                     </div>
                     <div className="flex items-center gap-2">
                       <Button variant="secondary" size="sm" onClick={() => { setEditing(p); setModal(true) }}>Edit</Button>
-                      <Button variant="secondary" size="sm" onClick={() => { setMergeSource(p); setMergeModal(true) }}>Merge</Button>
                       <Button variant="danger" size="sm" onClick={() => handleDelete(p.id)}>Remove</Button>
                     </div>
                   </div>
