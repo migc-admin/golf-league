@@ -26,6 +26,7 @@ import EventPage      from './pages/EventPage'
 import Import         from './pages/admin/Import'
 import Register       from './pages/Register'
 import Onboarding    from './pages/Onboarding'
+import Upgrade       from './pages/Upgrade'
 import FAQ           from './pages/FAQ'
 
 export default function App() {
@@ -35,6 +36,7 @@ export default function App() {
         <Route path="/login"       element={<Login />} />
         <Route path="/home"        element={<Home />} />
         <Route path="/onboarding"  element={<Onboarding />} />
+        <Route path="/upgrade"     element={<ProtectedRoute><Upgrade /></ProtectedRoute>} />
 
         {/* Admin (requires admin role) */}
         <Route path="/admin" element={<AdminRoute />}>

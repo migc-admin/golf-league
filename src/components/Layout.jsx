@@ -159,7 +159,7 @@ function AccountDropdown({ user, profile, org, tier, isOwner, onSignOut }) {
           {!isOwner && tier !== 'club' && (
             <div className="px-5 py-3" style={{ borderBottom: '1px solid #ebe9e4' }}>
               <a
-                href="/onboarding"
+                href="/upgrade"
                 onClick={() => setOpen(false)}
                 className="block text-center text-xs font-bold py-2 rounded-full text-white transition-opacity hover:opacity-90"
                 style={{ background: GREEN }}
@@ -256,7 +256,7 @@ function TierPopover({ tier }) {
           {tier !== 'club' && (
             <div className="px-4 pb-4" style={{ borderTop: '1px solid #ebe9e4', paddingTop: '0.75rem' }}>
               <a
-                href="/onboarding"
+                href="/upgrade"
                 className="block text-center text-xs font-bold py-2 rounded-full text-white transition-opacity hover:opacity-90"
                 style={{ background: GREEN }}
               >
