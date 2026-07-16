@@ -21,10 +21,10 @@ import Stripe from 'https://esm.sh/stripe@14'
 // Fill these in after creating live products in Stripe dashboard
 // Test price IDs are prefixed price_test_, live ones are price_
 const PRICE_TO_TIER: Record<string, 'pro' | 'club'> = {
-  'price_1TrshtBBkSA7QqV5d9MLS1uA': 'pro',   // Pro Monthly
-  'price_1TrshuBBkSA7QqV5K3SAQKFh': 'pro',   // Pro Yearly
-  'price_1TrshtBBkSA7QqV5NUr1D8S1': 'club',  // Club Monthly
-  'price_1TrshuBBkSA7QqV5bS4N5PtT': 'club',  // Club Yearly
+  'price_1TtgehB9aL8m2eo9d29Ra3vK': 'pro',   // Pro Monthly
+  'price_1Ttgf3B9aL8m2eo9PFjIzwrN': 'pro',   // Pro Yearly
+  'price_1Ttgc1B9aL8m2eo9eJ3gMfgz': 'club',  // Club Monthly
+  'price_1Ttgc1B9aL8m2eo9gQquicBu': 'club',  // Club Yearly
 }
 
 const stripe = new Stripe(Deno.env.get('STRIPE_SECRET_KEY') ?? '', {
