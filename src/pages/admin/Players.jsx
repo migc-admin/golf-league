@@ -21,6 +21,8 @@ export default function Players() {
   const [editing,      setEditing]      = useState(null)
   const [loginModal,   setLoginModal]   = useState(false)
   const [inviteModal,  setInviteModal]  = useState(false)
+  const [mergeModal,   setMergeModal]   = useState(false)
+  const [mergeSource,  setMergeSource]  = useState(null)  // player to be deleted
   const [activeTab,    setActiveTab]    = useState('Roster')
   const [orgId,        setOrgId]        = useState(null)
   const [orgTier,      setOrgTier]      = useState(null)
@@ -65,6 +67,23 @@ export default function Players() {
     const { error } = await supabase.from('players').delete().eq('id', id)
     if (error) toast.error(error.message)
     else { toast.success('Player removed'); load() }
+  }
+
+  async function handleMerge(sourceId, targetId) {
+    // Reassign all references from source → target, then delete source
+    await Promise.all([
+      supabase.from('event_players').update({ player_id: targetId }).eq('player_id', sourceId),
+      supabase.from('scores').update({ player_id: targetId }).eq('player_id', sourceId),
+      supabase.from('registrations').update({ player_id: targetId }).eq('player_id', sourceId),
+      supabase.from('tgl_team_members').update({ player_id: targetId }).eq('player_id', sourceId),
+      supabase.from('tgl_event_selections').update({ player_id: targetId }).eq('player_id', sourceId),
+    ])
+    const { error } = await supabase.from('players').delete().eq('id', sourceId)
+    if (error) { toast.error('Merge failed: ' + error.message); return }
+    toast.success('Players merged successfully')
+    setMergeModal(false)
+    setMergeSource(null)
+    load()
   }
 
   async function handleRoleChange(profileId, newRole) {
@@ -136,6 +155,7 @@ export default function Players() {
                     </div>
                     <div className="flex items-center gap-2">
                       <Button variant="secondary" size="sm" onClick={() => { setEditing(p); setModal(true) }}>Edit</Button>
+                      <Button variant="secondary" size="sm" onClick={() => { setMergeSource(p); setMergeModal(true) }}>Merge</Button>
                       <Button variant="danger" size="sm" onClick={() => handleDelete(p.id)}>Remove</Button>
                     </div>
                   </div>
@@ -239,6 +259,13 @@ export default function Players() {
         orgId={orgId}
         adminCount={profiles.filter(p => p.role === 'admin').length}
         onSaved={() => { setInviteModal(false); load() }}
+      />
+      <MergePlayerModal
+        open={mergeModal}
+        onClose={() => { setMergeModal(false); setMergeSource(null) }}
+        source={mergeSource}
+        players={players}
+        onMerge={handleMerge}
       />
     </div>
   )
@@ -414,6 +441,65 @@ function InviteAdminModal({ open, onClose, orgId, adminCount, onSaved }) {
         <div className="flex justify-end gap-3 pt-2">
           <Button type="button" variant="secondary" onClick={onClose}>Cancel</Button>
           <Button type="submit" loading={saving}>Send Invite</Button>
+        </div>
+      </form>
+    </Modal>
+  )
+}
+
+function MergePlayerModal({ open, onClose, source, players, onMerge }) {
+  const [targetId, setTargetId] = useState('')
+  const [saving,   setSaving]   = useState(false)
+
+  useEffect(() => { if (!open) { setTargetId(''); setSaving(false) } }, [open])
+
+  const options = players.filter(p => p.id !== source?.id)
+
+  async function handleSubmit(e) {
+    e.preventDefault()
+    if (!targetId || !source) return
+    if (!window.confirm(
+      `Merge "${source.first_name} ${source.last_name}" INTO the selected player?\n\nAll event history will move to the target and "${source.first_name} ${source.last_name}" will be deleted. This cannot be undone.`
+    )) return
+    setSaving(true)
+    await onMerge(source.id, targetId)
+    setSaving(false)
+  }
+
+  return (
+    <Modal open={open} onClose={onClose} title="Merge Players">
+      <form onSubmit={handleSubmit} className="space-y-4">
+        <div className="bg-amber-50 border border-amber-200 rounded-lg px-4 py-3 text-xs text-amber-800">
+          All event history (scores, registrations, Team Play) will be moved from the <strong>duplicate</strong> to the <strong>keep</strong> player. The duplicate will be permanently deleted.
+        </div>
+
+        <div>
+          <label className="label">Duplicate (will be deleted)</label>
+          <div className="input bg-gray-50 text-gray-700">
+            {source ? `${source.last_name}, ${source.first_name}${source.email ? ` — ${source.email}` : ''}` : '—'}
+          </div>
+        </div>
+
+        <div>
+          <label className="label">Keep (merge into)</label>
+          <select
+            value={targetId}
+            onChange={e => setTargetId(e.target.value)}
+            className="input bg-white"
+            required
+          >
+            <option value="">— Select player to keep —</option>
+            {options.map(p => (
+              <option key={p.id} value={p.id}>
+                {p.last_name}, {p.first_name}{p.email ? ` — ${p.email}` : ''}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        <div className="flex justify-end gap-3 pt-2">
+          <Button type="button" variant="secondary" onClick={onClose}>Cancel</Button>
+          <Button type="submit" variant="danger" loading={saving}>Merge & Delete Duplicate</Button>
         </div>
       </form>
     </Modal>
