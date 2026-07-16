@@ -22,6 +22,7 @@ export default function Leagues() {
   const [orgTier,       setOrgTier]       = useState('free')
   const [loading,       setLoading]       = useState(true)
   const [leagueModal,   setLeagueModal]   = useState(false)
+  const [editLeague,    setEditLeague]    = useState(null)
   const [upgradePrompt, setUpgradePrompt] = useState(false)
   const dragItem    = useRef(null)
   const dragOver    = useRef(null)
@@ -135,7 +136,7 @@ export default function Leagues() {
               {/* Row content — clickable */}
               <button
                 onClick={() => navigate(`/admin/leagues/${league.slug}`)}
-                className="flex-1 flex items-center gap-4 pr-4 py-4 text-left"
+                className="flex-1 flex items-center gap-4 py-4 text-left"
                 onMouseEnter={e => e.currentTarget.parentElement.style.background = '#f4f3f0'}
                 onMouseLeave={e => e.currentTarget.parentElement.style.background = ''}
               >
@@ -152,6 +153,12 @@ export default function Leagues() {
                 </div>
                 <span className="text-ink-muted text-sm">→</span>
               </button>
+              <button
+                onClick={e => { e.stopPropagation(); setEditLeague(league) }}
+                className="pr-4 py-4 text-xs text-ink-muted hover:text-ink transition-colors shrink-0"
+              >
+                Edit
+              </button>
             </div>
           ))}
         </div>
@@ -163,6 +170,13 @@ export default function Leagues() {
         orgId={orgId}
         orgSlug={orgSlug}
         onSaved={() => { setLeagueModal(false); load() }}
+      />
+
+      <EditLeagueModal
+        league={editLeague}
+        orgSlug={orgSlug}
+        onClose={() => setEditLeague(null)}
+        onSaved={() => { setEditLeague(null); load() }}
       />
 
       <UpgradePrompt
@@ -223,6 +237,60 @@ function LeagueModal({ open, onClose, orgId, orgSlug, onSaved }) {
         <div className="flex justify-end gap-3 pt-2">
           <Button type="button" variant="secondary" onClick={onClose}>Cancel</Button>
           <Button type="submit" loading={saving}>Create League</Button>
+        </div>
+      </form>
+    </Modal>
+  )
+}
+
+function EditLeagueModal({ league, orgSlug, onClose, onSaved }) {
+  const [name,    setName]    = useState('')
+  const [year,    setYear]    = useState(CURRENT_YEAR)
+  const [logoUrl, setLogoUrl] = useState(null)
+  const [saving,  setSaving]  = useState(false)
+
+  useEffect(() => {
+    if (league) {
+      setName(league.name)
+      setYear(league.season_year)
+      setLogoUrl(league.logo_url ?? null)
+    }
+  }, [league])
+
+  async function handleSave(e) {
+    e.preventDefault()
+    if (!name.trim()) return
+    setSaving(true)
+    const { error } = await supabase.from('leagues').update({
+      name: name.trim(),
+      season_year: +year,
+      logo_url: logoUrl ?? null,
+    }).eq('id', league.id)
+    setSaving(false)
+    if (error) toast.error(error.message)
+    else { toast.success('League updated'); onSaved() }
+  }
+
+  const years = Array.from({ length: 5 }, (_, i) => CURRENT_YEAR - 1 + i)
+
+  return (
+    <Modal open={!!league} onClose={onClose} title="Edit League">
+      <form onSubmit={handleSave} className="space-y-4">
+        <ImageUpload
+          shape="rect"
+          path={`orgs/${orgSlug}/leagues/${league?.id}`}
+          currentUrl={logoUrl}
+          onUploaded={url => setLogoUrl(url)}
+          onRemoved={() => setLogoUrl(null)}
+          label="League Logo (optional)"
+        />
+        <Input label="League Name" value={name} onChange={e => setName(e.target.value)} required />
+        <Select label="Season Year" value={year} onChange={e => setYear(e.target.value)}>
+          {years.map(y => <option key={y} value={y}>{y}</option>)}
+        </Select>
+        <div className="flex justify-end gap-3 pt-2">
+          <Button type="button" variant="secondary" onClick={onClose}>Cancel</Button>
+          <Button type="submit" loading={saving}>Save Changes</Button>
         </div>
       </form>
     </Modal>

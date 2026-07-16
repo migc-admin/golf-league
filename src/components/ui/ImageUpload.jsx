@@ -11,7 +11,7 @@ import { supabase } from '../../lib/supabase'
  *   shape       — 'circle' | 'rect' (default 'rect')
  *   label       — optional label text shown below
  */
-export default function ImageUpload({ bucket = 'media', path, currentUrl, onUploaded, shape = 'rect', label }) {
+export default function ImageUpload({ bucket = 'media', path, currentUrl, onUploaded, onRemoved, shape = 'rect', label }) {
   const [uploading, setUploading] = useState(false)
   const [preview,   setPreview]   = useState(currentUrl ?? null)
   const inputRef = useRef()
@@ -59,6 +59,15 @@ export default function ImageUpload({ bucket = 'media', path, currentUrl, onUplo
         )}
       </div>
       {label && <span className="text-xs text-gray-500">{label}</span>}
+      {preview && onRemoved && (
+        <button
+          type="button"
+          onClick={() => { setPreview(null); onRemoved() }}
+          className="text-xs text-red-500 hover:text-red-700 underline"
+        >
+          Remove image
+        </button>
+      )}
       <input ref={inputRef} type="file" accept="image/*" className="hidden" onChange={e => handleFile(e.target.files[0])} />
     </div>
   )
