@@ -24,6 +24,7 @@ import Standings      from './pages/Standings'
 import Schedule       from './pages/Schedule'
 import EventPage      from './pages/EventPage'
 import Import         from './pages/admin/Import'
+import Settings       from './pages/admin/Settings'
 import Register       from './pages/Register'
 import Onboarding    from './pages/Onboarding'
 import Upgrade        from './pages/Upgrade'
@@ -47,6 +48,7 @@ export default function App() {
           <Route path="courses"       element={<Courses />} />
           <Route path="players"       element={<Players />} />
           <Route path="import"        element={<Import />} />
+          <Route path="settings"      element={<Settings />} />
           <Route path=":orgSlug/:leagueSlug"            element={<OrgRouteWrapper><Leagues /></OrgRouteWrapper>} />
           <Route path=":orgSlug/:leagueSlug/:eventSlug" element={<OrgRouteWrapper><EventDetail /></OrgRouteWrapper>} />
         </Route>
