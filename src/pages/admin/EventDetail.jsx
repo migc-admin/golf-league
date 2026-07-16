@@ -178,7 +178,7 @@ export default function EventDetail() {
           {hasFeature('registration') ? (
             <div>
               <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-widest mb-3">Registrations</h3>
-              <TabRegistrations event={event} onUpdated={load} />
+              <TabRegistrations event={event} onUpdated={load} orgId={org?.id} />
             </div>
           ) : (
             <div className="flex items-center gap-3 px-4 py-3 rounded-xl text-sm" style={{ background: '#eff6ff', border: '1px solid #bfdbfe' }}>
@@ -2606,7 +2606,7 @@ function AccessCodeSection({ event, eventPlayers, onUpdated, orgSlug }) {
 }
 
 // ─── Tab: Registrations ───────────────────────────────────────────
-function TabRegistrations({ event, onUpdated }) {
+function TabRegistrations({ event, onUpdated, orgId }) {
   const [regs,    setRegs]    = useState([])
   const [loading, setLoading] = useState(true)
 
@@ -2661,7 +2661,7 @@ function TabRegistrations({ event, onUpdated }) {
     if (!playerId) {
       const { data: newPlayer, error: pErr } = await supabase
         .from('players')
-        .insert({ first_name: reg.first_name, last_name: reg.last_name, email: reg.email ?? null, org_id: org?.id })
+        .insert({ first_name: reg.first_name, last_name: reg.last_name, email: reg.email ?? null, org_id: orgId })
         .select('id')
         .single()
       if (pErr) { toast.error('Failed to create player: ' + pErr.message); return }
