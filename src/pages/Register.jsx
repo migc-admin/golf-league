@@ -293,7 +293,7 @@ export default function Register() {
               </p>
             </div>
 
-            {(event.venmo_handle || event.paypal_link) ? (
+            {(event.venmo_handle || event.paypal_link) && (
               <div className="space-y-3">
                 <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Complete your payment</p>
                 {event.venmo_handle && (
