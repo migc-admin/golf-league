@@ -37,20 +37,22 @@ function Dash() {
 
 export default function Settings() {
   const { user } = useAuth()
-  const [org,          setOrg]          = useState(null)
-  const [name,         setName]         = useState('')
-  const [saving,       setSaving]       = useState(false)
-  const [portalLoading,setPortalLoading]= useState(false)
-  const [loading,      setLoading]      = useState(true)
+  const [org,           setOrg]           = useState(null)
+  const [name,          setName]          = useState('')
+  const [saving,        setSaving]        = useState(false)
+  const [portalLoading, setPortalLoading] = useState(false)
+  const [loading,       setLoading]       = useState(true)
+  const [isPrivileged,  setIsPrivileged]  = useState(false)
 
   useEffect(() => {
     if (!user) return
     supabase
       .from('profiles')
-      .select('org_id')
+      .select('org_id, is_owner, is_platform_admin')
       .eq('id', user.id)
       .single()
       .then(({ data: p }) => {
+        if (p?.is_owner || p?.is_platform_admin) setIsPrivileged(true)
         if (!p?.org_id) { setLoading(false); return }
         supabase
           .from('organizations')
@@ -106,7 +108,7 @@ export default function Settings() {
   if (loading) return <div className="text-sm text-gray-400 py-8">Loading…</div>
   if (!org)    return <div className="text-sm text-gray-400 py-8">No organization found.</div>
 
-  const tier      = org.tier ?? 'free'
+  const tier      = (isPrivileged || org.tier === 'club') ? 'club' : (org.tier ?? 'free')
   const tierLabel = TIER_LABELS[tier] ?? tier
   const badge     = TIER_BADGE[tier] ?? TIER_BADGE.free
   const isPaid    = tier !== 'free'

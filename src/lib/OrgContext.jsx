@@ -24,6 +24,19 @@ export function useOrg() {
   return useContext(OrgContext)
 }
 
+// Resolves effective tier — platform admins/owners always get 'club'
+export async function getEffectiveTier(baseTier) {
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return baseTier
+  const { data: profile } = await supabase
+    .from('profiles')
+    .select('is_owner, is_platform_admin')
+    .eq('id', user.id)
+    .single()
+  if (profile?.is_owner || profile?.is_platform_admin) return 'club'
+  return baseTier
+}
+
 export function useFeatures() {
   const org = useContext(OrgContext)
   const tier = org?.tier ?? 'free'

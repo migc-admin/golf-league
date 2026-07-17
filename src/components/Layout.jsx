@@ -283,8 +283,9 @@ export default function Layout({ children }) {
   const { user, profile, signOut } = useAuth()
   const navigate = useNavigate()
   const [menuOpen,   setMenuOpen]   = useState(false)
-  const [fetchedOrg, setFetchedOrg] = useState(null)
-  const [isOwner,    setIsOwner]    = useState(false)
+  const [fetchedOrg,     setFetchedOrg]     = useState(null)
+  const [isOwner,        setIsOwner]        = useState(false)
+  const [isPlatformAdmin,setIsPlatformAdmin]= useState(false)
   const ctxOrg = useOrg()
 
   // OrgContext is only populated on org-slug routes. For plain /admin routes,
@@ -292,9 +293,10 @@ export default function Layout({ children }) {
   useEffect(() => {
     if (!user) return
     supabase
-      .from('profiles').select('org_id, is_owner').eq('id', user.id).single()
+      .from('profiles').select('org_id, is_owner, is_platform_admin').eq('id', user.id).single()
       .then(({ data: p }) => {
-        if (p?.is_owner) setIsOwner(true)
+        if (p?.is_owner)         setIsOwner(true)
+        if (p?.is_platform_admin) setIsPlatformAdmin(true)
         if (!p?.org_id || ctxOrg) return
         supabase
           .from('organizations').select('id, name, slug, logo_url, tier').eq('id', p.org_id).single()
@@ -304,7 +306,8 @@ export default function Layout({ children }) {
 
   const org     = ctxOrg ?? fetchedOrg
   const orgName = org?.name ?? 'Scorify Golf'
-  const tier    = org?.tier ?? 'free'
+  // Platform admins and owners always get Club-level access
+  const tier    = (isOwner || isPlatformAdmin) ? 'club' : (org?.tier ?? 'free')
 
   async function handleSignOut() {
     await signOut()
