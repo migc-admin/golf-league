@@ -33,6 +33,7 @@ const BORDER    = '#c0c0c0'
 // ─── Export Button ────────────────────────────────────────────────
 export function ExportScorecardsButton({ event, eventPlayers, course, orgName, orgSlug, orgLogoUrl }) {
   const [exporting, setExporting] = useState(false)
+  const [exportError, setExportError] = useState(null)
   const containerRef = useRef(null)
 
   const groupNums = [...new Set(
@@ -42,7 +43,9 @@ export function ExportScorecardsButton({ event, eventPlayers, course, orgName, o
   const groupCodes = event.group_codes ?? {}
 
   async function handleExport() {
-    if (!course || groupNums.length === 0) return
+    setExportError(null)
+    if (!course) { setExportError('No course loaded — cannot export.'); return }
+    if (groupNums.length === 0) { setExportError('No groups assigned.'); return }
     setExporting(true)
     try {
       // Pre-fetch logo once for all groups (4s timeout, skip on failure)
@@ -118,6 +121,9 @@ export function ExportScorecardsButton({ event, eventPlayers, course, orgName, o
         link.click()
         await new Promise(r => setTimeout(r, 250))
       }
+    } catch (err) {
+      console.error('Scorecard export failed:', err)
+      setExportError(err?.message ?? 'Export failed — check console for details.')
     } finally {
       if (containerRef.current) containerRef.current.innerHTML = ''
       setExporting(false)
@@ -157,6 +163,9 @@ export function ExportScorecardsButton({ event, eventPlayers, course, orgName, o
           </>
         )}
       </button>
+      {exportError && (
+        <p style={{ marginTop: 6, fontSize: 12, color: '#dc2626' }}>{exportError}</p>
+      )}
       <div
         ref={containerRef}
         style={{ position: 'fixed', top: -99999, left: -99999, pointerEvents: 'none', zIndex: -1 }}
