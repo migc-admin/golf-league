@@ -228,7 +228,7 @@ export default function Scorecard() {
         const initKey = `${evId}:${loadTrigger}`
         if (holeInitKey.current !== initKey) {
           holeInitKey.current = initKey
-          if (lastComplete === 0 && ev.format === 'shotgun' && groupNum) {
+          if (lastComplete === 0 && ev.shotgun_start && groupNum) {
             // Start on the group's assigned shotgun hole (e.g. "4A" → 4), fallback to 1
             const assignStr = (ev.group_hole_assignments ?? {})[String(groupNum)] ?? null
             const shotgunStart = assignStr ? (parseInt(assignStr, 10) || 1) : 1
