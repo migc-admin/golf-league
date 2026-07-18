@@ -325,9 +325,10 @@ const FORMAT_OPTIONS = [
     { value: 'net_stroke_back9',  label: 'Back Nine Net' },
   ]},
   { group: 'Other Formats', options: [
-    { value: 'stableford',   label: 'Stableford' },
-    { value: 'match_points', label: 'Match Play Points', pro: true },
-    { value: 'ryder_cup',    label: 'Ryder Cup',         pro: true },
+    { value: 'stableford',      label: 'Stableford' },
+    { value: 'match_points',    label: 'Match Play (Head-to-Head)',  pro: true },
+    { value: 'team_match_play', label: 'Match Play (Team Best Ball)', pro: true },
+    { value: 'ryder_cup',       label: 'Ryder Cup',                  pro: true },
   ]},
 ]
 
