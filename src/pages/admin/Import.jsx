@@ -684,12 +684,15 @@ Bob,Nguyen,15.3,B,18
 Sarah,Okonkwo,18.7,B,22`
 
 function ImportRoster() {
-  const [events,    setEvents]    = useState([])
-  const [eventId,   setEventId]   = useState('')
-  const [rows,      setRows]      = useState([])
-  const [headers,   setHeaders]   = useState([])
-  const [importing, setImporting] = useState(false)
-  const [done,      setDone]      = useState(false)
+  const [events,       setEvents]       = useState([])
+  const [eventId,      setEventId]      = useState('')
+  const [rows,         setRows]         = useState([])
+  const [headers,      setHeaders]      = useState([])
+  const [importing,    setImporting]    = useState(false)
+  const [done,         setDone]         = useState(false)
+  const [checking,     setChecking]     = useState(false)
+  // conflicts: array of { rowIndex, csvName, exactMatch, fuzzyMatches, resolution: 'exact'|'new'|playerId }
+  const [conflicts,    setConflicts]    = useState(null)
 
   useEffect(() => {
     supabase
@@ -701,9 +704,59 @@ function ImportRoster() {
 
   function handleFile(text) {
     setDone(false)
+    setConflicts(null)
     const { headers, rows } = parseCSV(text)
     setHeaders(headers)
     setRows(rows.map(r => ({ ...r, _status: null, _message: null })))
+  }
+
+  async function checkDuplicates() {
+    setChecking(true)
+    const { data: allPlayers } = await supabase
+      .from('players')
+      .select('id, first_name, last_name')
+
+    const detected = []
+
+    for (let i = 0; i < rows.length; i++) {
+      const row   = rows[i]
+      const first = row['first_name']?.trim().toLowerCase()
+      const last  = row['last_name']?.trim().toLowerCase()
+      if (!first || !last) continue
+
+      const exactMatch  = allPlayers?.find(p =>
+        p.first_name.toLowerCase() === first && p.last_name.toLowerCase() === last
+      ) ?? null
+
+      // Fuzzy: same last name, first name starts with same letter (catches Mike/Michael)
+      const fuzzyMatches = exactMatch ? [] : (allPlayers?.filter(p =>
+        p.last_name.toLowerCase() === last &&
+        p.first_name.toLowerCase() !== first &&
+        p.first_name[0]?.toLowerCase() === first[0]
+      ) ?? [])
+
+      if (fuzzyMatches.length > 0) {
+        detected.push({
+          rowIndex:     i,
+          csvName:      `${row['first_name']} ${row['last_name']}`,
+          exactMatch:   null,
+          fuzzyMatches,
+          resolution:   'new', // default: create new
+        })
+      }
+      // exact matches are fine — handled automatically
+    }
+
+    setConflicts(detected)
+    setChecking(false)
+
+    if (detected.length === 0) {
+      toast.success('No conflicts found — ready to import.')
+    }
+  }
+
+  function setResolution(rowIndex, value) {
+    setConflicts(prev => prev.map(c => c.rowIndex === rowIndex ? { ...c, resolution: value } : c))
   }
 
   async function runImport() {
@@ -711,9 +764,16 @@ function ImportRoster() {
     setImporting(true)
     const updated = [...rows]
 
-    // Load event + course for auto course handicap calc fallback
     const ev = events.find(e => e.id === eventId)
     const eventCourse = ev?.course ?? null
+
+    // Build resolution map from conflicts
+    const resolutionMap = {}
+    if (conflicts) {
+      for (const c of conflicts) {
+        resolutionMap[c.rowIndex] = c.resolution
+      }
+    }
 
     for (let i = 0; i < updated.length; i++) {
       const row    = updated[i]
@@ -737,31 +797,42 @@ function ImportRoster() {
         continue
       }
 
-      // Match player by name — avoid duplicates
-      let playerId = null
-      const { data: match } = await supabase
-        .from('players')
-        .select('id')
-        .ilike('first_name', first)
-        .ilike('last_name', last)
-        .limit(1)
-        .maybeSingle()
+      let playerId   = null
+      let wasMatched = false
 
-      if (match) {
-        playerId = match.id
+      const resolution = resolutionMap[i]
+
+      if (resolution && resolution !== 'new') {
+        // User picked an existing player to link to
+        playerId   = resolution
+        wasMatched = true
       } else {
-        // New player — add to roster
-        const { data: newP, error: pErr } = await supabase
+        // Exact name match
+        const { data: match } = await supabase
           .from('players')
-          .insert({ first_name: first, last_name: last })
           .select('id')
-          .single()
-        if (pErr) {
-          updated[i] = { ...row, _status: 'error', _message: pErr.message }
-          setRows([...updated])
-          continue
+          .ilike('first_name', first)
+          .ilike('last_name', last)
+          .limit(1)
+          .maybeSingle()
+
+        if (match) {
+          playerId   = match.id
+          wasMatched = true
+        } else {
+          // Create new player
+          const { data: newP, error: pErr } = await supabase
+            .from('players')
+            .insert({ first_name: first, last_name: last })
+            .select('id')
+            .single()
+          if (pErr) {
+            updated[i] = { ...row, _status: 'error', _message: pErr.message }
+            setRows([...updated])
+            continue
+          }
+          playerId = newP.id
         }
-        playerId = newP.id
       }
 
       // Skip if already on this event
@@ -773,12 +844,18 @@ function ImportRoster() {
         .maybeSingle()
 
       if (alreadyOn) {
-        updated[i] = { ...row, _status: 'skipped', _message: 'Already on roster' }
+        // Update handicap/flight instead of skipping
+        await supabase.from('event_players').update({
+          ...(hi !== null ? { handicap_index: hi, adjusted_handicap_index: hi } : {}),
+          ...(chManual !== null ? { course_handicap: chManual } : {}),
+          ...(flight ? { flight } : {}),
+        }).eq('event_id', eventId).eq('player_id', playerId)
+        updated[i] = { ...row, _status: 'matched', _message: null }
         setRows([...updated])
         continue
       }
 
-      // Course handicap: use CSV value if provided, otherwise auto-calc from course
+      // Course handicap auto-calc
       let course_handicap = chManual
       if (course_handicap === null && hi !== null && eventCourse) {
         const { slope, rating, par } = eventCourse
@@ -797,7 +874,7 @@ function ImportRoster() {
       if (epErr) {
         updated[i] = { ...row, _status: 'error', _message: `Roster error: ${epErr.message}` }
       } else {
-        updated[i] = { ...row, _status: 'imported', _message: null }
+        updated[i] = { ...row, _status: wasMatched ? 'matched' : 'imported', _message: null }
       }
 
       setRows([...updated])
@@ -806,12 +883,13 @@ function ImportRoster() {
     setImporting(false)
     setDone(true)
     const imported = updated.filter(r => r._status === 'imported').length
-    const skipped  = updated.filter(r => r._status === 'skipped').length
+    const matched  = updated.filter(r => r._status === 'matched').length
     const errors   = updated.filter(r => r._status === 'error').length
-    toast.success(`Done — ${imported} added, ${skipped} skipped, ${errors} errors`)
+    toast.success(`Done — ${imported} created, ${matched} matched/updated, ${errors} errors`)
   }
 
   const pendingCount = rows.filter(r => !r._status).length
+  const hasConflicts = conflicts !== null && conflicts.length > 0
 
   return (
     <div className="space-y-5">
@@ -838,11 +916,11 @@ function ImportRoster() {
         </div>
         <ul className="mt-3 text-xs text-gray-500 space-y-1 list-disc list-inside">
           <li><strong>first_name</strong> and <strong>last_name</strong> are required</li>
-          <li><strong>handicap_index</strong> — USGA index (e.g. 14.2). Used to auto-calculate course handicap if <code>course_handicap</code> is not provided.</li>
-          <li><strong>course_handicap</strong> — optional. If provided, used directly (e.g. after win deductions). If blank, auto-calculated from slope/rating/par.</li>
+          <li><strong>handicap_index</strong> — USGA index. Used to auto-calculate course handicap if not provided.</li>
+          <li><strong>course_handicap</strong> — optional. If blank, auto-calculated from slope/rating/par.</li>
           <li><strong>flight</strong> — A or B (optional)</li>
-          <li>Players matched by first + last name are reused — no duplicates created</li>
-          <li>New players not found in the system are added to the roster automatically</li>
+          <li>Exact name matches are reused automatically. Fuzzy matches (e.g. Mike vs Michael) are flagged for review.</li>
+          <li>Players already on the event will have their handicap and flight updated.</li>
         </ul>
       </Card>
 
@@ -850,7 +928,7 @@ function ImportRoster() {
       <Card>
         <CardHeader title="Step 2 — Select the event" />
         {events.length === 0
-          ? <p className="text-sm text-gray-400">No upcoming or active events found. Create an event first.</p>
+          ? <p className="text-sm text-gray-400">No events found. Create an event first.</p>
           : (
           <select
             value={eventId}
@@ -873,13 +951,70 @@ function ImportRoster() {
         <FileDropZone onFile={handleFile} />
       </Card>
 
-      {/* Preview + import */}
-      {rows.length > 0 && (
+      {/* Conflict check */}
+      {rows.length > 0 && conflicts === null && (
         <Card>
           <CardHeader
-            title={`Step 4 — Review & Import (${rows.length} players)`}
+            title={`Step 4 — Check for duplicates (${rows.length} rows)`}
+            subtitle="Scans your CSV against existing players to catch name variations before importing."
             action={
-              !done && pendingCount > 0 && (
+              <Button onClick={checkDuplicates} loading={checking}>
+                Check for Duplicates
+              </Button>
+            }
+          />
+        </Card>
+      )}
+
+      {/* Resolve conflicts */}
+      {hasConflicts && (
+        <Card>
+          <CardHeader
+            title={`Step 5 — Resolve ${conflicts.length} possible duplicate${conflicts.length !== 1 ? 's' : ''}`}
+            subtitle="These CSV names closely match existing players. Choose what to do with each."
+          />
+          <div className="space-y-3">
+            {conflicts.map(c => (
+              <div key={c.rowIndex} className="rounded-xl border border-amber-200 bg-amber-50 p-4">
+                <div className="flex items-center justify-between gap-4 flex-wrap">
+                  <div>
+                    <p className="text-sm font-semibold text-gray-900">CSV: <span className="text-amber-700">{c.csvName}</span></p>
+                    <p className="text-xs text-gray-500 mt-0.5">Similar name{c.fuzzyMatches.length !== 1 ? 's' : ''} found in roster</p>
+                  </div>
+                  <select
+                    value={c.resolution}
+                    onChange={e => setResolution(c.rowIndex, e.target.value)}
+                    className="input bg-white text-sm"
+                    style={{ minWidth: 220 }}
+                  >
+                    <option value="new">Create new player ({c.csvName})</option>
+                    {c.fuzzyMatches.map(p => (
+                      <option key={p.id} value={p.id}>
+                        Link to existing: {p.first_name} {p.last_name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+            ))}
+          </div>
+        </Card>
+      )}
+
+      {/* No conflicts found */}
+      {conflicts !== null && conflicts.length === 0 && !done && (
+        <div className="rounded-xl bg-green-50 border border-green-200 px-4 py-3 text-sm text-green-800 font-medium">
+          ✓ No duplicate conflicts found.
+        </div>
+      )}
+
+      {/* Import */}
+      {conflicts !== null && !done && (
+        <Card>
+          <CardHeader
+            title={`Step ${hasConflicts ? 6 : 5} — Import (${rows.length} players)`}
+            action={
+              pendingCount > 0 && (
                 <Button onClick={runImport} loading={importing} disabled={!eventId}>
                   Add {pendingCount} to Event
                 </Button>
@@ -890,12 +1025,13 @@ function ImportRoster() {
             <p className="mb-3 text-sm text-orange-600">Select an event above before importing.</p>
           )}
           <PreviewTable headers={[...headers, '_status']} rows={rows} />
-          {done && (
-            <p className="mt-3 text-sm text-fairway-700 font-medium">
-              ✓ Done. Review players in the event's Players &amp; Flights tab to verify handicaps and flights.
-            </p>
-          )}
         </Card>
+      )}
+
+      {done && (
+        <div className="bg-fairway-50 border border-fairway-200 rounded-xl p-4 text-sm text-fairway-800 font-medium">
+          ✓ Done. Review players in the event's Players &amp; Flights tab to verify handicaps and flights.
+        </div>
       )}
     </div>
   )
