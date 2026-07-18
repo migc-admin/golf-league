@@ -70,6 +70,15 @@ export default function Scorecard() {
   const [loadTrigger,   setLoadTrigger]   = useState(0)
   // Prevent hole from resetting on auth re-renders after initial load
   const holeInitKey = useRef(null)
+  // Flag: focus first score input when hole advances after a save
+  const focusFirstOnHoleChange = useRef(false)
+
+  useEffect(() => {
+    if (!focusFirstOnHoleChange.current) return
+    focusFirstOnHoleChange.current = false
+    const first = document.querySelectorAll('[data-player-gross]')[0]
+    if (first) { first.focus(); first.select() }
+  }, [currentHole])
 
   useEffect(() => {
     // Wait for auth to resolve before loading
@@ -321,13 +330,9 @@ export default function Scorecard() {
     }
 
     if (allValid && currentHole < 18) {
+      focusFirstOnHoleChange.current = true
       setCurrentHole(h => h + 1)
       window.scrollTo({ top: 0, behavior: 'instant' })
-      // Focus first player's score input on the new hole after render
-      setTimeout(() => {
-        const first = document.querySelectorAll('[data-player-gross]')[0]
-        if (first) { first.focus(); first.select() }
-      }, 100)
     } else if (allValid && currentHole === 18) {
       toast.success('Round complete! All 18 holes saved.')
       setShowScorecard(true)
