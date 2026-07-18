@@ -11,13 +11,13 @@ import { supabase } from '../lib/supabase'
 import { useAuth } from '../hooks/useAuth'
 import { computeLeaderboards, computeStableford } from '../lib/engines/scoring'
 import { computeAllSkins } from '../lib/engines/skins'
-import { computeMatchPoints } from '../lib/engines/matchPoints'
+import { computeMatchPoints, computeTeamMatchPoints } from '../lib/engines/matchPoints'
 import { computePayouts, CATEGORY_LABELS, ctpLabel } from '../lib/engines/payouts'
 import { computeTGLEventResults } from '../lib/engines/tgl'
 import { FlightBadge, StatusBadge } from '../components/ui/Badge'
 import { useFeatures } from '../lib/OrgContext'
 
-const ALL_TABS = ['18-Hole', 'Front 9', 'Back 9', 'Stableford', 'Match Points', 'Low Putts', 'Skins', 'Payouts', 'Team Play']
+const ALL_TABS = ['18-Hole', 'Front 9', 'Back 9', 'Stableford', 'Match Points', 'Team Match', 'Low Putts', 'Skins', 'Payouts', 'Team Play']
 
 function visibleTabs(event, hasTGL = false) {
   if (!event) return ALL_TABS
@@ -30,6 +30,7 @@ function visibleTabs(event, hasTGL = false) {
     if (tab === 'Back 9')        return formats.includes('net_stroke_back9')
     if (tab === 'Stableford')    return formats.includes('stableford')
     if (tab === 'Match Points')  return formats.includes('match_points') || formats.includes('ryder_cup')
+    if (tab === 'Team Match')    return formats.includes('team_match_play')
     if (tab === 'Low Putts')     return sideOpts.includes('low_putts')
     if (tab === 'Skins')         return sideOpts.some(s => s.startsWith('skins_'))
     if (tab === 'Team Play')      return hasTGL
@@ -38,10 +39,11 @@ function visibleTabs(event, hasTGL = false) {
 }
 
 const FORMAT_LABELS = {
-  net_stroke:   'Net Stroke Play',
-  stableford:   'Stableford',
-  match_points: 'Match Play Points',
-  ryder_cup:    'Ryder Cup',
+  net_stroke:      'Net Stroke Play',
+  stableford:      'Stableford',
+  match_points:    'Match Play (Head-to-Head)',
+  team_match_play: 'Match Play (Team Best Ball)',
+  ryder_cup:       'Ryder Cup',
 }
 
 export default function Leaderboard() {
@@ -166,6 +168,7 @@ export default function Leaderboard() {
   const skinsResults    = course ? computeAllSkins(eventPlayers, allScores, course.stroke_index)     : null
   const stablefordData  = course ? computeStableford(eventPlayers, allScores, course)                : null
   const matchData       = course ? computeMatchPoints(eventPlayers, allScores, course, matchPairings) : null
+  const teamMatchData   = course ? computeTeamMatchPoints(eventPlayers, allScores, course) : null
 
   const tglData = (() => {
     if (!leaderboards || !tglTeams.length || !tglSelections.length) return null
@@ -259,7 +262,7 @@ export default function Leaderboard() {
       )}
 
       {/* Flight toggle — only shown when flights are in use */}
-      {hasFlights && !['Low Putts', 'Skins', 'Match Points', 'Payouts'].includes(activeTab) && (
+      {hasFlights && !['Low Putts', 'Skins', 'Match Points', 'Team Match', 'Payouts'].includes(activeTab) && (
         <div className="max-w-2xl mx-auto px-4 pt-4 flex gap-2">
           {['A', 'B'].map(f => (
             <button
@@ -340,6 +343,9 @@ export default function Leaderboard() {
         )}
         {activeTab === 'Match Points' && matchData && (
           <MatchPointsBoard matchData={matchData} />
+        )}
+        {activeTab === 'Team Match' && teamMatchData && (
+          <TeamMatchBoard teamMatchData={teamMatchData} />
         )}
         {activeTab === 'Skins' && skinsResults && (
           <SkinsBoard skinsResults={skinsResults} playerMap={playerMap} />
@@ -798,6 +804,126 @@ function MatchPointsBoard({ matchData }) {
                   <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-full bg-blue-500 inline-block"/> A wins hole</span>
                   <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-full bg-purple-500 inline-block"/> B wins hole</span>
                   <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-full bg-gray-200 inline-block"/> Halved</span>
+                </div>
+              </div>
+            )}
+          </div>
+        )
+      })}
+    </div>
+  )
+}
+
+// ─── Team Match Board ─────────────────────────────────────────────
+function TeamMatchBoard({ teamMatchData }) {
+  const { groupMatches, totalA, totalB } = teamMatchData
+
+  if (!groupMatches.length) return (
+    <div className="text-center py-12 text-gray-400">
+      <p className="font-medium">No team match results yet.</p>
+      <p className="text-sm mt-1">Assign players to Flight A and Flight B within each group.</p>
+    </div>
+  )
+
+  const totalLeader = totalA > totalB ? 'Flight A leads' : totalB > totalA ? 'Flight B leads' : 'All Square'
+
+  return (
+    <div className="space-y-4">
+      {/* Overall team score */}
+      {totalA + totalB > 0 && (
+        <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+          <div className="bg-gray-50 px-4 py-2 border-b border-gray-100">
+            <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Team Best Ball — Overall</h3>
+          </div>
+          <div className="flex">
+            <div className="flex-1 text-center py-4 bg-blue-50">
+              <div className="text-xs font-bold text-blue-600 mb-1">Flight A</div>
+              <div className="text-4xl font-black text-blue-700">{totalA}</div>
+              <div className="text-xs text-blue-400 mt-0.5">matches won</div>
+            </div>
+            <div className="w-px bg-gray-200" />
+            <div className="flex-1 text-center py-4 bg-purple-50">
+              <div className="text-xs font-bold text-purple-600 mb-1">Flight B</div>
+              <div className="text-4xl font-black text-purple-700">{totalB}</div>
+              <div className="text-xs text-purple-400 mt-0.5">matches won</div>
+            </div>
+          </div>
+          <div className="text-center py-2 border-t border-gray-100">
+            <span className="text-xs font-semibold text-gray-600">{totalLeader}</span>
+          </div>
+        </div>
+      )}
+
+      {/* Per-group match cards */}
+      {groupMatches.map((match, idx) => {
+        const leaderSide = match.upBy > 0 ? 'A' : match.upBy < 0 ? 'B' : null
+        const isFinished = match.winner != null
+        const statusColor = isFinished
+          ? (match.winner === 'A' ? 'bg-blue-600 text-white' : match.winner === 'B' ? 'bg-purple-600 text-white' : 'bg-gray-200 text-gray-700')
+          : (leaderSide === 'A' ? 'bg-blue-100 text-blue-700' : leaderSide === 'B' ? 'bg-purple-100 text-purple-700' : 'bg-gray-100 text-gray-600')
+
+        return (
+          <div key={idx} className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+            <div className="bg-gray-50 px-4 py-2 border-b border-gray-100 flex items-center justify-between">
+              <span className="text-xs font-semibold text-gray-600">Group {match.groupNumber} — Best Ball</span>
+              <span className={`text-xs font-bold px-2.5 py-1 rounded-full ${statusColor}`}>
+                {match.holesPlayed === 0 ? 'Not started' : match.matchStatus}
+              </span>
+            </div>
+
+            <div className="flex items-stretch divide-x divide-gray-100">
+              {/* Team A */}
+              <div className={`flex-1 px-4 py-3 ${leaderSide === 'A' || match.winner === 'A' ? 'bg-blue-50' : ''}`}>
+                <div className="text-xs font-bold text-blue-600 mb-1">Flight A</div>
+                {match.teamA.map(ep => (
+                  <div key={ep.player_id} className="text-sm text-gray-800 leading-snug">
+                    {ep.player?.last_name}, {ep.player?.first_name}
+                    <span className="text-xs text-gray-400 ml-1">({match.relCH[ep.player_id]} rel. strokes)</span>
+                  </div>
+                ))}
+                {match.holesPlayed > 0 && (
+                  <div className={`text-lg font-black mt-2 ${match.winner === 'A' ? 'text-blue-700' : match.winner === 'B' ? 'text-gray-300' : leaderSide === 'A' ? 'text-blue-600' : 'text-gray-500'}`}>
+                    {match.winner === 'A' ? `W ${match.matchStatus}` : match.winner === 'B' ? 'Lost' : match.winner === 'halve' ? '½' : leaderSide === 'A' ? `↑ ${match.matchStatus}` : leaderSide === 'B' ? 'AS' : 'AS'}
+                  </div>
+                )}
+              </div>
+
+              <div className="flex items-center justify-center w-8 bg-gray-50 text-xs text-gray-400 font-bold">vs</div>
+
+              {/* Team B */}
+              <div className={`flex-1 px-4 py-3 ${leaderSide === 'B' || match.winner === 'B' ? 'bg-purple-50' : ''}`}>
+                <div className="text-xs font-bold text-purple-600 mb-1">Flight B</div>
+                {match.teamB.map(ep => (
+                  <div key={ep.player_id} className="text-sm text-gray-800 leading-snug">
+                    {ep.player?.last_name}, {ep.player?.first_name}
+                    <span className="text-xs text-gray-400 ml-1">({match.relCH[ep.player_id]} rel. strokes)</span>
+                  </div>
+                ))}
+                {match.holesPlayed > 0 && (
+                  <div className={`text-lg font-black mt-2 ${match.winner === 'B' ? 'text-purple-700' : match.winner === 'A' ? 'text-gray-300' : leaderSide === 'B' ? 'text-purple-600' : 'text-gray-500'}`}>
+                    {match.winner === 'B' ? `W ${match.matchStatus}` : match.winner === 'A' ? 'Lost' : match.winner === 'halve' ? '½' : leaderSide === 'B' ? `↑ ${match.matchStatus}` : leaderSide === 'A' ? 'AS' : 'AS'}
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Hole-by-hole contributor summary */}
+            {match.holesPlayed > 0 && (
+              <div className="px-4 py-3 border-t border-gray-100 bg-gray-50">
+                <p className="text-xs font-semibold text-gray-500 mb-2 uppercase tracking-wide">Best Ball by Hole</p>
+                <div className="flex flex-wrap gap-1.5">
+                  {match.holes.filter(h => h.status === 'played').map(h => {
+                    const bgColor = h.result === 'A' ? 'bg-blue-100 text-blue-700' : h.result === 'B' ? 'bg-purple-100 text-purple-700' : 'bg-gray-100 text-gray-500'
+                    const contributor = h.result === 'A' ? h.contributorA : h.result === 'B' ? h.contributorB : null
+                    const initials = contributor
+                      ? `${contributor.player?.first_name?.[0] ?? ''}${contributor.player?.last_name?.[0] ?? ''}`
+                      : '½'
+                    return (
+                      <div key={h.hole} className={`text-xs font-bold px-2 py-1 rounded-lg ${bgColor}`} title={contributor ? `${contributor.player?.first_name} ${contributor.player?.last_name}` : 'Halved'}>
+                        #{h.hole} {initials}
+                      </div>
+                    )
+                  })}
                 </div>
               </div>
             )}

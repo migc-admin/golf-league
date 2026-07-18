@@ -202,6 +202,7 @@ export default function EventDetail() {
         <div className="space-y-6">
           <TabGroups event={event} eventPlayers={eventPlayers} onUpdated={load} />
           {((event.formats ?? (event.format ? [event.format] : [])).includes('match_points') ||
+            (event.formats ?? (event.format ? [event.format] : [])).includes('team_match_play') ||
             (event.formats ?? (event.format ? [event.format] : [])).includes('ryder_cup')) && (
             <div className="border-t border-gray-100 pt-6">
               <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-widest mb-3">Match Play Pairings</h3>
@@ -2233,8 +2234,9 @@ const EDIT_FORMAT_OPTIONS = [
   ]},
   { group: 'Other Formats', options: [
     { value: 'stableford',   label: 'Stableford' },
-    { value: 'match_points', label: 'Match Play Points' },
-    { value: 'ryder_cup',    label: 'Ryder Cup' },
+    { value: 'match_points',    label: 'Match Play (Head-to-Head)' },
+    { value: 'team_match_play', label: 'Match Play (Team Best Ball)' },
+    { value: 'ryder_cup',       label: 'Ryder Cup' },
   ]},
 ]
 
@@ -2832,8 +2834,9 @@ function formatTime(t) {
 const FORMAT_LABELS = {
   net_stroke:   'Net Stroke Play',
   stableford:   'Stableford',
-  match_points: 'Match Play Points',
-  ryder_cup:    'Ryder Cup',
+  match_points:    'Match Play (Head-to-Head)',
+  team_match_play: 'Match Play (Team Best Ball)',
+  ryder_cup:       'Ryder Cup',
 }
 
 // ─── TGL Manager ─────────────────────────────────────────────────────────────
