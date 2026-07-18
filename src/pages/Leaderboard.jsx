@@ -668,7 +668,7 @@ function StablefordLeaderboard({ data, activeFlight }) {
 
 // ─── Match Points Board ───────────────────────────────────────────
 function MatchPointsBoard({ matchData }) {
-  const { pairings, teamPoints, ranked } = matchData
+  const { pairings, teamPoints, hasTeams, ranked } = matchData
 
   if (!pairings.length) return (
     <div className="text-center py-12 text-gray-400">
@@ -678,13 +678,12 @@ function MatchPointsBoard({ matchData }) {
     </div>
   )
 
-  const totalHolesA = teamPoints.A + teamPoints.B > 0
-  const teamLeader = teamPoints.A > teamPoints.B ? 'Flight A' : teamPoints.B > teamPoints.A ? 'Flight B' : 'All Square'
+  const teamLeader = teamPoints.A > teamPoints.B ? 'Flight A leads' : teamPoints.B > teamPoints.A ? 'Flight B leads' : 'All Square'
 
   return (
     <div className="space-y-4">
-      {/* Team banner — wins/halves/losses tally */}
-      {teamPoints.A + teamPoints.B > 0 && (
+      {/* Team banner — only when cross-flight (Ryder Cup style) */}
+      {hasTeams && teamPoints.A + teamPoints.B > 0 && (
         <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
           <div className="bg-gray-50 px-4 py-2 border-b border-gray-100">
             <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Team Score</h3>
@@ -712,9 +711,22 @@ function MatchPointsBoard({ matchData }) {
       {pairings.map((pair, idx) => {
         const leaderSide = pair.upBy > 0 ? 'A' : pair.upBy < 0 ? 'B' : null
         const isFinished = pair.winner != null
+        // Determine if this specific pairing is cross-flight
+        const pairCrossFlights = pair.playerA.flight && pair.playerB.flight && pair.playerA.flight !== pair.playerB.flight
+        // Use blue/purple for cross-flight, teal/amber for same-flight or no-flight
+        const stylesA = pairCrossFlights
+          ? { label: 'text-blue-600', winner: 'text-blue-700', leading: 'text-blue-600', bg: 'bg-blue-50', status: { win: 'bg-blue-600 text-white', lead: 'bg-blue-100 text-blue-700' } }
+          : { label: 'text-teal-600',  winner: 'text-teal-700',  leading: 'text-teal-600',  bg: 'bg-teal-50',  status: { win: 'bg-teal-600 text-white',  lead: 'bg-teal-100 text-teal-700'  } }
+        const stylesB = pairCrossFlights
+          ? { label: 'text-purple-600', winner: 'text-purple-700', leading: 'text-purple-600', bg: 'bg-purple-50', status: { win: 'bg-purple-600 text-white', lead: 'bg-purple-100 text-purple-700' } }
+          : { label: 'text-amber-600',  winner: 'text-amber-700',  leading: 'text-amber-600',  bg: 'bg-amber-50',  status: { win: 'bg-amber-600 text-white',  lead: 'bg-amber-100 text-amber-700'  } }
+
         const statusColor = isFinished
-          ? (pair.winner === 'A' ? 'bg-blue-600 text-white' : pair.winner === 'B' ? 'bg-purple-600 text-white' : 'bg-gray-200 text-gray-700')
-          : (leaderSide === 'A' ? 'bg-blue-100 text-blue-700' : leaderSide === 'B' ? 'bg-purple-100 text-purple-700' : 'bg-gray-100 text-gray-600')
+          ? (pair.winner === 'A' ? stylesA.status.win : pair.winner === 'B' ? stylesB.status.win : 'bg-gray-200 text-gray-700')
+          : (leaderSide === 'A' ? stylesA.status.lead : leaderSide === 'B' ? stylesB.status.lead : 'bg-gray-100 text-gray-600')
+
+        const labelA = pair.playerA.flight ? `Flight ${pair.playerA.flight}` : null
+        const labelB = pair.playerB.flight ? `Flight ${pair.playerB.flight}` : null
 
         return (
           <div key={idx} className="bg-white rounded-xl border border-gray-200 overflow-hidden">
@@ -729,16 +741,14 @@ function MatchPointsBoard({ matchData }) {
             {/* Players vs layout */}
             <div className="flex items-stretch divide-x divide-gray-100">
               {/* Player A */}
-              <div className={`flex-1 px-4 py-3 ${leaderSide === 'A' || pair.winner === 'A' ? 'bg-blue-50/60' : ''}`}>
-                <div className="text-xs font-bold text-blue-600 mb-0.5">
-                  {pair.playerA.flight ? `Flight ${pair.playerA.flight}` : 'Player A'}
-                </div>
+              <div className={`flex-1 px-4 py-3 ${leaderSide === 'A' || pair.winner === 'A' ? stylesA.bg : ''}`}>
+                {labelA && <div className={`text-xs font-bold ${stylesA.label} mb-0.5`}>{labelA}</div>}
                 <div className="font-semibold text-sm text-gray-900 leading-tight">
                   {pair.playerA.player?.last_name}, {pair.playerA.player?.first_name}
                 </div>
                 <div className="text-xs text-gray-400">CH {pair.playerA.course_handicap ?? '—'}</div>
                 {pair.holesPlayed > 0 && (
-                  <div className={`text-lg font-black mt-1 ${pair.winner === 'A' ? 'text-blue-700' : pair.winner === 'B' ? 'text-gray-300' : leaderSide === 'A' ? 'text-blue-600' : 'text-gray-500'}`}>
+                  <div className={`text-lg font-black mt-1 ${pair.winner === 'A' ? stylesA.winner : pair.winner === 'B' ? 'text-gray-300' : leaderSide === 'A' ? stylesA.leading : 'text-gray-500'}`}>
                     {pair.winner === 'A' ? `W ${pair.matchStatus}` : pair.winner === 'B' ? 'Lost' : pair.winner === 'halve' ? '½' : leaderSide === 'A' ? `↑ ${pair.matchStatus}` : leaderSide === 'B' ? 'AS' : 'AS'}
                   </div>
                 )}
@@ -748,16 +758,14 @@ function MatchPointsBoard({ matchData }) {
               <div className="flex items-center justify-center w-8 bg-gray-50 text-xs text-gray-400 font-bold">vs</div>
 
               {/* Player B */}
-              <div className={`flex-1 px-4 py-3 ${leaderSide === 'B' || pair.winner === 'B' ? 'bg-purple-50/60' : ''}`}>
-                <div className="text-xs font-bold text-purple-600 mb-0.5">
-                  {pair.playerB.flight ? `Flight ${pair.playerB.flight}` : 'Player B'}
-                </div>
+              <div className={`flex-1 px-4 py-3 ${leaderSide === 'B' || pair.winner === 'B' ? stylesB.bg : ''}`}>
+                {labelB && <div className={`text-xs font-bold ${stylesB.label} mb-0.5`}>{labelB}</div>}
                 <div className="font-semibold text-sm text-gray-900 leading-tight">
                   {pair.playerB.player?.last_name}, {pair.playerB.player?.first_name}
                 </div>
                 <div className="text-xs text-gray-400">CH {pair.playerB.course_handicap ?? '—'}</div>
                 {pair.holesPlayed > 0 && (
-                  <div className={`text-lg font-black mt-1 ${pair.winner === 'B' ? 'text-purple-700' : pair.winner === 'A' ? 'text-gray-300' : leaderSide === 'B' ? 'text-purple-600' : 'text-gray-500'}`}>
+                  <div className={`text-lg font-black mt-1 ${pair.winner === 'B' ? stylesB.winner : pair.winner === 'A' ? 'text-gray-300' : leaderSide === 'B' ? stylesB.leading : 'text-gray-500'}`}>
                     {pair.winner === 'B' ? `W ${pair.matchStatus}` : pair.winner === 'A' ? 'Lost' : pair.winner === 'halve' ? '½' : leaderSide === 'B' ? `↑ ${pair.matchStatus}` : leaderSide === 'A' ? 'AS' : 'AS'}
                   </div>
                 )}

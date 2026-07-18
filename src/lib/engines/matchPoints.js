@@ -40,24 +40,40 @@ import { getStrokesOnHole } from './scoring'
 
 /**
  * Pair players within a group for match play.
- * A players sorted by course_handicap asc vs B players sorted asc.
- * If uneven, unpaired players are tracked separately.
+ *
+ * Strategy:
+ *   1. If the group has both Flight A and Flight B players → pair A vs B by handicap order (original behavior)
+ *   2. Otherwise (same flight, mixed, or no flights) → pair by handicap order top-down (1v2, 3v4, …)
  *
  * @param {Array} groupPlayers — event_players with player attached
  * @returns {Array<{playerA, playerB}>}
  */
 function buildPairings(groupPlayers) {
-  const flightA = [...groupPlayers.filter(ep => ep.flight === 'A')]
-    .sort((a, b) => (a.course_handicap ?? 99) - (b.course_handicap ?? 99))
-  const flightB = [...groupPlayers.filter(ep => ep.flight === 'B')]
-    .sort((a, b) => (a.course_handicap ?? 99) - (b.course_handicap ?? 99))
+  const hasA = groupPlayers.some(ep => ep.flight === 'A')
+  const hasB = groupPlayers.some(ep => ep.flight === 'B')
 
-  const pairs = []
-  const count = Math.max(flightA.length, flightB.length)
-  for (let i = 0; i < count; i++) {
-    if (flightA[i] && flightB[i]) {
-      pairs.push({ playerA: flightA[i], playerB: flightB[i] })
+  if (hasA && hasB) {
+    // Classic A vs B cross-flight pairing
+    const flightA = [...groupPlayers.filter(ep => ep.flight === 'A')]
+      .sort((a, b) => (a.course_handicap ?? 99) - (b.course_handicap ?? 99))
+    const flightB = [...groupPlayers.filter(ep => ep.flight === 'B')]
+      .sort((a, b) => (a.course_handicap ?? 99) - (b.course_handicap ?? 99))
+
+    const pairs = []
+    const count = Math.max(flightA.length, flightB.length)
+    for (let i = 0; i < count; i++) {
+      if (flightA[i] && flightB[i]) {
+        pairs.push({ playerA: flightA[i], playerB: flightB[i] })
+      }
     }
+    return pairs
+  }
+
+  // Same-flight or no-flight: pair by handicap order (lowest vs next, etc.)
+  const sorted = [...groupPlayers].sort((a, b) => (a.course_handicap ?? 99) - (b.course_handicap ?? 99))
+  const pairs = []
+  for (let i = 0; i + 1 < sorted.length; i += 2) {
+    pairs.push({ playerA: sorted[i], playerB: sorted[i + 1] })
   }
   return pairs
 }
@@ -205,12 +221,15 @@ export function computeMatchPoints(eventPlayers, allScores, course, storedPairin
   }
   }
 
-  // Team totals (Ryder Cup style: Flight A vs Flight B)
+  // Team totals — only meaningful when pairings cross flights (A vs B)
+  const hasTeams = pairings.some(p => p.playerA.flight !== p.playerB.flight)
   let teamA = 0, teamB = 0
-  for (const ep of eventPlayers) {
-    const pts = playerPoints[ep.player_id] ?? 0
-    if (ep.flight === 'A') teamA += pts
-    else if (ep.flight === 'B') teamB += pts
+  if (hasTeams) {
+    for (const ep of eventPlayers) {
+      const pts = playerPoints[ep.player_id] ?? 0
+      if (ep.flight === 'A') teamA += pts
+      else if (ep.flight === 'B') teamB += pts
+    }
   }
 
   // Individual rankings
@@ -229,6 +248,7 @@ export function computeMatchPoints(eventPlayers, allScores, course, storedPairin
     pairings,
     playerPoints,
     teamPoints: { A: teamA, B: teamB },
+    hasTeams,
     ranked:     { A: rankedA, B: rankedB, overall: ranked },
   }
 }
