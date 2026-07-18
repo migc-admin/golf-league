@@ -45,6 +45,26 @@ export function ExportScorecardsButton({ event, eventPlayers, course, orgName, o
     if (!course || groupNums.length === 0) return
     setExporting(true)
     try {
+      // Pre-fetch logo once for all groups (4s timeout, skip on failure)
+      let logoDataUrl = null
+      if (orgLogoUrl) {
+        try {
+          const ctrl = new AbortController()
+          const timer = setTimeout(() => ctrl.abort(), 4000)
+          const resp = await fetch(orgLogoUrl, { signal: ctrl.signal })
+          clearTimeout(timer)
+          const blob = await resp.blob()
+          logoDataUrl = await new Promise((res, rej) => {
+            const reader = new FileReader()
+            reader.onload = () => res(reader.result)
+            reader.onerror = rej
+            reader.readAsDataURL(blob)
+          })
+        } catch {
+          logoDataUrl = null
+        }
+      }
+
       for (const g of groupNums) {
         const players = eventPlayers
           .filter(ep => ep.group_number === g)
@@ -70,23 +90,6 @@ export function ExportScorecardsButton({ event, eventPlayers, course, orgName, o
         // Parse starting hole number from group_hole_assignments (e.g. "4A" or "4B" → 4)
         const holeAssignStr = (event.group_hole_assignments ?? {})[g] ?? null
         const startingHole = holeAssignStr ? parseInt(holeAssignStr, 10) || null : null
-
-        // Convert logo to data URL to avoid CORS issues in html-to-image
-        let logoDataUrl = null
-        if (orgLogoUrl) {
-          try {
-            const resp = await fetch(orgLogoUrl)
-            const blob = await resp.blob()
-            logoDataUrl = await new Promise((res, rej) => {
-              const reader = new FileReader()
-              reader.onload = () => res(reader.result)
-              reader.onerror = rej
-              reader.readAsDataURL(blob)
-            })
-          } catch {
-            logoDataUrl = null
-          }
-        }
 
         const pageEl = buildPage({ event, course, groupNum: g, players, code, qrDataUrl, ctpHoles, longDriveHole, orgName, startingHole, holeAssignStr, orgLogoUrl: logoDataUrl })
         node.appendChild(pageEl)
