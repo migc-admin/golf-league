@@ -323,6 +323,11 @@ export default function Scorecard() {
     if (allValid && currentHole < 18) {
       setCurrentHole(h => h + 1)
       window.scrollTo({ top: 0, behavior: 'instant' })
+      // Focus first player's score input on the new hole after render
+      setTimeout(() => {
+        const first = document.querySelectorAll('[data-player-gross]')[0]
+        if (first) { first.focus(); first.select() }
+      }, 100)
     } else if (allValid && currentHole === 18) {
       toast.success('Round complete! All 18 holes saved.')
       setShowScorecard(true)
@@ -520,9 +525,15 @@ export default function Scorecard() {
             trackPutts={trackPutts}
             onChange={(field, val) => updateScore(ep.player_id, hole, field, val)}
             onGrossDone={() => {
-              // Focus next player's gross input
-              const nextCard = document.querySelectorAll('[data-player-gross]')[idx + 1]
-              if (nextCard) { nextCard.focus(); nextCard.select() }
+              const inputs = document.querySelectorAll('[data-player-gross]')
+              const nextCard = inputs[idx + 1]
+              if (nextCard) {
+                nextCard.focus()
+                nextCard.select()
+              } else {
+                // Last player — dismiss keyboard
+                document.activeElement?.blur()
+              }
             }}
           />
         ))}
