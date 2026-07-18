@@ -416,7 +416,7 @@ function TabOverview({ event, eventPlayers, allScores, sideGames, course, confli
             <CardHeader title="Scoring Access" subtitle="Share with players to enter scores" />
             <AccessCodeSection event={event} eventPlayers={eventPlayers} onUpdated={onUpdated} orgSlug={orgSlug} />
             <div className="mt-3 pt-3 border-t border-gray-100">
-              <ExportScorecardsButton event={event} eventPlayers={eventPlayers} course={course} orgName={event.league?.name ?? orgName} orgSlug={orgSlug} />
+              <ExportScorecardsButton event={event} eventPlayers={eventPlayers} course={course} orgName={event.league?.name ?? orgName} orgSlug={orgSlug} orgLogoUrl={event.league?.logo_url ?? null} />
             </div>
           </Card>
         )}
@@ -1463,8 +1463,8 @@ function TabGroups({ event, eventPlayers, onUpdated }) {
   const [holeAssignments, setHoleAssignments] = useState(event?.group_hole_assignments ?? {})
 
   async function setGroupHole(groupNum, hole) {
-    const next = { ...holeAssignments, [groupNum]: hole ? parseInt(hole, 10) : null }
-    // Remove null entries
+    // Store as string e.g. "4A" or "4B" to support two groups per hole
+    const next = { ...holeAssignments, [groupNum]: hole || null }
     Object.keys(next).forEach(k => { if (!next[k]) delete next[k] })
     setHoleAssignments(next)
     await supabase.from('events').update({ group_hole_assignments: next }).eq('id', event.id)
@@ -1569,12 +1569,13 @@ function TabGroups({ event, eventPlayers, onUpdated }) {
                   <select
                     value={assignedHole}
                     onChange={e => setGroupHole(g, e.target.value)}
-                    className="input py-1 text-sm w-20 bg-white"
+                    className="input py-1 text-sm w-24 bg-white"
                   >
                     <option value="">—</option>
-                    {Array.from({ length: 18 }, (_, i) => i + 1).map(h => (
-                      <option key={h} value={h}>Hole {h}</option>
-                    ))}
+                    {Array.from({ length: 18 }, (_, i) => i + 1).flatMap(h => [
+                      <option key={`${h}A`} value={`${h}A`}>Hole {h}A</option>,
+                      <option key={`${h}B`} value={`${h}B`}>Hole {h}B</option>,
+                    ])}
                   </select>
                 </div>
               )}

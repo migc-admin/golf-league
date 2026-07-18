@@ -31,7 +31,7 @@ const GRAY_BG   = '#f5f5f3'
 const BORDER    = '#c0c0c0'
 
 // ─── Export Button ────────────────────────────────────────────────
-export function ExportScorecardsButton({ event, eventPlayers, course, orgName, orgSlug }) {
+export function ExportScorecardsButton({ event, eventPlayers, course, orgName, orgSlug, orgLogoUrl }) {
   const [exporting, setExporting] = useState(false)
   const containerRef = useRef(null)
 
@@ -71,7 +71,7 @@ export function ExportScorecardsButton({ event, eventPlayers, course, orgName, o
         const holeAssignStr = (event.group_hole_assignments ?? {})[g] ?? null
         const startingHole = holeAssignStr ? parseInt(holeAssignStr, 10) || null : null
 
-        const pageEl = buildPage({ event, course, groupNum: g, players, code, qrDataUrl, ctpHoles, longDriveHole, orgName, startingHole, holeAssignStr })
+        const pageEl = buildPage({ event, course, groupNum: g, players, code, qrDataUrl, ctpHoles, longDriveHole, orgName, startingHole, holeAssignStr, orgLogoUrl })
         node.appendChild(pageEl)
 
         // Wait for images to load
@@ -156,14 +156,14 @@ function buildPage({ event, course, groupNum, players, code, qrDataUrl, ctpHoles
     boxSizing: 'border-box',
     fontFamily: 'Arial, Helvetica, sans-serif',
   })
-  const opts = { event, course, groupNum, players, code, qrDataUrl, ctpHoles, longDriveHole, orgName, startingHole, holeAssignStr }
+  const opts = { event, course, groupNum, players, code, qrDataUrl, ctpHoles, longDriveHole, orgName, startingHole, holeAssignStr, orgLogoUrl }
   page.appendChild(buildCard(opts))
   page.appendChild(buildCard(opts))
   return page
 }
 
 // ─── Card ─────────────────────────────────────────────────────────
-function buildCard({ event, course, groupNum, players, code, qrDataUrl, ctpHoles, longDriveHole, orgName, startingHole, holeAssignStr }) {
+function buildCard({ event, course, groupNum, players, code, qrDataUrl, ctpHoles, longDriveHole, orgName, startingHole, holeAssignStr, orgLogoUrl }) {
   const parPerHole  = course.par_per_hole  ?? []
   const strokeIndex = course.stroke_index  ?? []
   const courseTees  = course.tees          ?? []
@@ -373,6 +373,16 @@ function buildCard({ event, course, groupNum, players, code, qrDataUrl, ctpHoles
     }
 
     footer.appendChild(panel)
+  }
+
+  // ── Org logo (bottom-right) ───────────────────────────────────────
+  if (orgLogoUrl) {
+    const logoWrap = el('div', { marginLeft: 'auto', flexShrink: '0' })
+    const logoImg = document.createElement('img')
+    logoImg.src = orgLogoUrl
+    logoImg.style.cssText = 'width: 64px; height: 64px; border-radius: 50%; object-fit: cover; border: 2px solid ' + GREEN + ';'
+    logoWrap.appendChild(logoImg)
+    footer.appendChild(logoWrap)
   }
 
   card.appendChild(footer)
