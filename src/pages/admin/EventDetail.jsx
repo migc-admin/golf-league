@@ -2266,6 +2266,8 @@ function EditEventModal({ open, onClose, event, onSaved }) {
   const [shotgunStart, setShotgunStart] = useState(false)
   const [payoutBasis,  setPayoutBasis]  = useState('per_player')
   const [payoutFixed,  setPayoutFixed]  = useState('')
+  const [courseId,     setCourseId]     = useState('')
+  const [courses,      setCourses]      = useState([])
   const [saving,       setSaving]       = useState(false)
 
   useEffect(() => {
@@ -2285,8 +2287,14 @@ function EditEventModal({ open, onClose, event, onSaved }) {
       setShotgunStart(event.shotgun_start ?? false)
       setPayoutBasis(event.payout_basis ?? 'per_player')
       setPayoutFixed(event.payout_fixed_total ?? '')
+      setCourseId(event.course_id ?? '')
     }
   }, [event, open])
+
+  useEffect(() => {
+    if (!open) return
+    supabase.from('courses').select('id, name').order('name').then(({ data }) => setCourses(data ?? []))
+  }, [open])
 
   function toggleFormat(key) {
     setFormats(prev => { const n = new Set(prev); n.has(key) ? n.delete(key) : n.add(key); return n })
@@ -2318,6 +2326,7 @@ function EditEventModal({ open, onClose, event, onSaved }) {
         payout_fixed_total:     payoutBasis === 'fixed' ? parseFloat(payoutFixed) || 0 : null,
         venmo_handle:           venmoHandle.trim().replace(/^@/, '') || null,
         paypal_link:            paypalLink.trim() || null,
+        course_id:              courseId || null,
       })
       .eq('id', event.id)
     setSaving(false)
@@ -2331,6 +2340,13 @@ function EditEventModal({ open, onClose, event, onSaved }) {
         <div className="grid grid-cols-2 gap-4">
           <Input label="Date" type="date" value={eventDate} onChange={e => setEventDate(e.target.value)} required />
           <Input label="Start Time" type="time" value={startTime} onChange={e => setStartTime(e.target.value)} />
+        </div>
+        <div>
+          <label className="label">Course</label>
+          <select className="input w-full" value={courseId} onChange={e => setCourseId(e.target.value)}>
+            <option value="">— Select course —</option>
+            {courses.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+          </select>
         </div>
         <div className="grid grid-cols-2 gap-4">
           <Input label="Event Name (optional)" value={eventName} onChange={e => setEventName(e.target.value)} placeholder="e.g. Spring Opener…" />
