@@ -373,7 +373,7 @@ export default function Scorecard() {
   const par        = parPerHole[hole - 1]
   const si         = strokeIndex[hole - 1]
   const yd         = course.yardage?.[hole - 1] ?? '—'
-  const trackPutts = !event.side_game_options?.length || event.side_game_options.includes('track_putts')
+  const trackPutts = (event.side_game_options ?? []).includes('track_putts') || (event.side_game_options ?? []).includes('low_putts')
   const holesEntered = groupPlayers.length > 0
     ? Math.max(0, ...groupPlayers.map(ep => Object.keys(scores[ep.player_id] ?? {}).length))
     : 0
