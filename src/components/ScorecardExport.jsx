@@ -71,7 +71,24 @@ export function ExportScorecardsButton({ event, eventPlayers, course, orgName, o
         const holeAssignStr = (event.group_hole_assignments ?? {})[g] ?? null
         const startingHole = holeAssignStr ? parseInt(holeAssignStr, 10) || null : null
 
-        const pageEl = buildPage({ event, course, groupNum: g, players, code, qrDataUrl, ctpHoles, longDriveHole, orgName, startingHole, holeAssignStr, orgLogoUrl })
+        // Convert logo to data URL to avoid CORS issues in html-to-image
+        let logoDataUrl = null
+        if (orgLogoUrl) {
+          try {
+            const resp = await fetch(orgLogoUrl)
+            const blob = await resp.blob()
+            logoDataUrl = await new Promise((res, rej) => {
+              const reader = new FileReader()
+              reader.onload = () => res(reader.result)
+              reader.onerror = rej
+              reader.readAsDataURL(blob)
+            })
+          } catch {
+            logoDataUrl = null
+          }
+        }
+
+        const pageEl = buildPage({ event, course, groupNum: g, players, code, qrDataUrl, ctpHoles, longDriveHole, orgName, startingHole, holeAssignStr, orgLogoUrl: logoDataUrl })
         node.appendChild(pageEl)
 
         // Wait for images to load
