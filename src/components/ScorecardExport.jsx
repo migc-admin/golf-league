@@ -163,7 +163,7 @@ export function ExportScorecardsButton({ event, eventPlayers, course, orgName, o
 }
 
 // ─── Page: two cards stacked ──────────────────────────────────────
-function buildPage({ event, course, groupNum, players, code, qrDataUrl, ctpHoles, longDriveHole, orgName }) {
+function buildPage({ event, course, groupNum, players, code, qrDataUrl, ctpHoles, longDriveHole, orgName, startingHole, holeAssignStr, orgLogoUrl }) {
   const page = el('div', {
     width: PAGE_W + 'px', height: PAGE_H + 'px',
     background: '#ffffff',
