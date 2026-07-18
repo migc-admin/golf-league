@@ -67,7 +67,11 @@ export function ExportScorecardsButton({ event, eventPlayers, course, orgName, o
           .sort((a, b) => a - b)
         const longDriveHole = event.long_drive_hole ?? null
 
-        const pageEl = buildPage({ event, course, groupNum: g, players, code, qrDataUrl, ctpHoles, longDriveHole, orgName })
+        // Parse starting hole number from group_hole_assignments (e.g. "4A" or "4B" → 4)
+        const holeAssignStr = (event.group_hole_assignments ?? {})[g] ?? null
+        const startingHole = holeAssignStr ? parseInt(holeAssignStr, 10) || null : null
+
+        const pageEl = buildPage({ event, course, groupNum: g, players, code, qrDataUrl, ctpHoles, longDriveHole, orgName, startingHole, holeAssignStr })
         node.appendChild(pageEl)
 
         // Wait for images to load
@@ -152,14 +156,14 @@ function buildPage({ event, course, groupNum, players, code, qrDataUrl, ctpHoles
     boxSizing: 'border-box',
     fontFamily: 'Arial, Helvetica, sans-serif',
   })
-  const opts = { event, course, groupNum, players, code, qrDataUrl, ctpHoles, longDriveHole, orgName }
+  const opts = { event, course, groupNum, players, code, qrDataUrl, ctpHoles, longDriveHole, orgName, startingHole, holeAssignStr }
   page.appendChild(buildCard(opts))
   page.appendChild(buildCard(opts))
   return page
 }
 
 // ─── Card ─────────────────────────────────────────────────────────
-function buildCard({ event, course, groupNum, players, code, qrDataUrl, ctpHoles, longDriveHole, orgName }) {
+function buildCard({ event, course, groupNum, players, code, qrDataUrl, ctpHoles, longDriveHole, orgName, startingHole, holeAssignStr }) {
   const parPerHole  = course.par_per_hole  ?? []
   const strokeIndex = course.stroke_index  ?? []
   const courseTees  = course.tees          ?? []
@@ -264,7 +268,7 @@ function buildCard({ event, course, groupNum, players, code, qrDataUrl, ctpHoles
   card.appendChild(header)
 
   // ── Score table ──────────────────────────────────────────────────
-  card.appendChild(buildTable({ parPerHole, strokeIndex, teesToShow, players, longDriveHole }))
+  card.appendChild(buildTable({ parPerHole, strokeIndex, teesToShow, players, longDriveHole, startingHole }))
 
   // ── Footer ───────────────────────────────────────────────────────
   const footer = el('div', {
@@ -295,13 +299,35 @@ function buildCard({ event, course, groupNum, players, code, qrDataUrl, ctpHoles
   }
   footer.appendChild(ftxt)
 
-  // ── Competitions panel (CTP + Long Drive) ────────────────────────
+  // ── Competitions panel (Starting Hole + CTP + Long Drive) ────────
   const hasCtp = ctpHoles && ctpHoles.length > 0
   const hasLd  = !!longDriveHole
-  if (hasCtp || hasLd) {
+  const hasStart = !!startingHole
+  if (hasStart || hasCtp || hasLd) {
     const panel = el('div', {
       display: 'flex', gap: '10px', alignItems: 'stretch',
     })
+
+    if (hasStart) {
+      const startBox = el('div', {
+        background: '#e8f0e8',
+        border: '1px solid #9dbf9d',
+        borderRadius: '8px',
+        padding: '6px 10px',
+        minWidth: '80px',
+        textAlign: 'center',
+      })
+      startBox.appendChild(txt('Starting Hole', {
+        display: 'block', fontSize: '8px', fontWeight: '700',
+        color: GREEN, textTransform: 'uppercase', letterSpacing: '0.05em',
+        marginBottom: '4px', textAlign: 'center',
+      }))
+      startBox.appendChild(txt(holeAssignStr ? `#${holeAssignStr}` : `#${startingHole}`, {
+        display: 'block', fontSize: '13px', fontWeight: '800',
+        color: '#1a1a1a', letterSpacing: '0.03em', textAlign: 'center',
+      }))
+      panel.appendChild(startBox)
+    }
 
     if (hasCtp) {
       const ctpBox = el('div', {
@@ -355,7 +381,7 @@ function buildCard({ event, course, groupNum, players, code, qrDataUrl, ctpHoles
 }
 
 // ─── Score table ─────────────────────────────────────────────────
-function buildTable({ parPerHole, strokeIndex, teesToShow, players, longDriveHole }) {
+function buildTable({ parPerHole, strokeIndex, teesToShow, players, longDriveHole, startingHole }) {
   const tbl = document.createElement('table')
   tbl.style.cssText = `
     width: 100%;
@@ -462,16 +488,22 @@ function buildTable({ parPerHole, strokeIndex, teesToShow, players, longDriveHol
       skipLdHighlight = false,
     } = rowDef
 
-    const LD_BG = '#fffbe6'  // light yellow for long drive hole
+    const LD_BG    = '#fffbe6'  // light yellow for long drive hole
+    const START_BG = '#e8f0e8'  // light green for starting hole (same as INIT)
 
     const tr = document.createElement('tr')
     tr.appendChild(mkLabel(label, { bg: labelBg, color: labelColor, fontSize: labelFontSize }))
 
     // H1-9
     ;(h1to9 ?? Array(9).fill('')).forEach((v, i) => {
-      const hNum = i + 1
-      const isLd = !skipLdHighlight && longDriveHole === hNum
-      const bg   = isLd ? (holeBg === 'transparent' ? 'rgba(255,235,59,0.18)' : LD_BG) : holeBg
+      const hNum  = i + 1
+      const isLd  = !skipLdHighlight && longDriveHole === hNum
+      const isSt  = !skipLdHighlight && startingHole === hNum
+      const bg = isLd
+        ? (holeBg === 'transparent' ? 'rgba(255,235,59,0.18)' : LD_BG)
+        : isSt
+          ? (holeBg === 'transparent' ? 'rgba(27,67,50,0.10)' : START_BG)
+          : holeBg
       tr.appendChild(mkTd(v, { bg, color: holeColor, bold: holeBold }))
     })
     // OUT
@@ -483,9 +515,14 @@ function buildTable({ parPerHole, strokeIndex, teesToShow, players, longDriveHol
     )
     // H10-18
     ;(h10to18 ?? Array(9).fill('')).forEach((v, i) => {
-      const hNum = i + 10
-      const isLd = !skipLdHighlight && longDriveHole === hNum
-      const bg   = isLd ? (holeBg === 'transparent' ? 'rgba(255,235,59,0.18)' : LD_BG) : holeBg
+      const hNum  = i + 10
+      const isLd  = !skipLdHighlight && longDriveHole === hNum
+      const isSt  = !skipLdHighlight && startingHole === hNum
+      const bg = isLd
+        ? (holeBg === 'transparent' ? 'rgba(255,235,59,0.18)' : LD_BG)
+        : isSt
+          ? (holeBg === 'transparent' ? 'rgba(27,67,50,0.10)' : START_BG)
+          : holeBg
       tr.appendChild(mkTd(v, { bg, color: holeColor, bold: holeBold }))
     })
     // IN / TOT
@@ -589,20 +626,28 @@ function buildTable({ parPerHole, strokeIndex, teesToShow, players, longDriveHol
       bg: 'transparent', color: ep ? '#111827' : '#b0b0b0', bold: false,
     }))
 
-    // H1-9 with stroke dots (+ long drive highlight)
+    // H1-9 with stroke dots (+ long drive / starting hole highlight)
     for (let h = 1; h <= 9; h++) {
       const strokes = (ep && ch !== null) ? getStrokesOnHole(ch, strokeIndex[h - 1]) : 0
-      const bg = longDriveHole === h ? 'rgba(255,235,59,0.18)' : 'transparent'
+      const bg = longDriveHole === h
+        ? 'rgba(255,235,59,0.18)'
+        : startingHole === h
+          ? 'rgba(27,67,50,0.10)'
+          : 'transparent'
       tr.appendChild(mkScoreCell(strokes, { bg }))
     }
     // OUT
     tr.appendChild(mkTd('', { bg: 'transparent', color: '#374151', bold: true }))
     // INIT
     tr.appendChild(mkInitCell(initials))
-    // H10-18 with stroke dots (+ long drive highlight)
+    // H10-18 with stroke dots (+ long drive / starting hole highlight)
     for (let h = 10; h <= 18; h++) {
       const strokes = (ep && ch !== null) ? getStrokesOnHole(ch, strokeIndex[h - 1]) : 0
-      const bg = longDriveHole === h ? 'rgba(255,235,59,0.18)' : 'transparent'
+      const bg = longDriveHole === h
+        ? 'rgba(255,235,59,0.18)'
+        : startingHole === h
+          ? 'rgba(27,67,50,0.10)'
+          : 'transparent'
       tr.appendChild(mkScoreCell(strokes, { bg }))
     }
     // IN / TOT
