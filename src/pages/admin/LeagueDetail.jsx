@@ -139,6 +139,10 @@ export default function LeagueDetail() {
                   await supabase.from('leagues').update({ logo_url: url }).eq('id', league.id)
                   setLeague(prev => ({ ...prev, logo_url: url }))
                 }}
+                onRemoved={async () => {
+                  await supabase.from('leagues').update({ logo_url: null }).eq('id', league.id)
+                  setLeague(prev => ({ ...prev, logo_url: null }))
+                }}
                 label="League Logo"
               />
             ) : (
@@ -297,6 +301,7 @@ function LeagueModal({ open, onClose, editing, orgId, orgSlug, onSaved }) {
           path={`orgs/${orgSlug}/leagues/${Date.now()}`}
           currentUrl={logoUrl || null}
           onUploaded={url => setLogoUrl(url)}
+          onRemoved={() => setLogoUrl('')}
           label="League Logo (optional)"
         />
         <Input label="League Name" value={name} onChange={e => setName(e.target.value)} placeholder="Tuesday Evening League" required />
