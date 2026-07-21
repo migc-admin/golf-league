@@ -73,6 +73,13 @@ serve(async (req) => {
       p_window_seconds: 3600,
     })
     if (!allowed) {
+      const ip = req.headers.get('x-forwarded-for') ?? 'unknown'
+      console.warn(`[invite-admin] rate_limited user=${user.id} ip=${ip}`)
+      await serviceClient.rpc('log_security_event', {
+        p_event: 'rate_limited', p_severity: 'warn',
+        p_user_id: user.id, p_org_id: orgId, p_ip: ip, p_endpoint: 'invite-admin',
+        p_message: 'Invite rate limit exceeded',
+      })
       return new Response(JSON.stringify({ error: 'Too many invite attempts. Please wait before sending more invitations.' }), {
         status: 429, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       })
@@ -103,11 +110,23 @@ serve(async (req) => {
     })
 
     if (inviteError) {
+      console.error(`[invite-admin] error user=${user.id} email=${email} err=${inviteError.message}`)
+      await serviceClient.rpc('log_security_event', {
+        p_event: 'api_error', p_severity: 'error',
+        p_user_id: user.id, p_org_id: orgId, p_endpoint: 'invite-admin',
+        p_message: inviteError.message, p_metadata: { invited_email: email },
+      })
       return new Response(JSON.stringify({ error: inviteError.message }), {
         status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       })
     }
 
+    console.log(`[invite-admin] ok inviter=${user.id} invited=${email} org=${orgId}`)
+    await serviceClient.rpc('log_security_event', {
+      p_event: 'admin_invited', p_severity: 'info',
+      p_user_id: user.id, p_org_id: orgId, p_endpoint: 'invite-admin',
+      p_message: `Admin invitation sent to ${email}`,
+    })
     return new Response(JSON.stringify({ success: true, userId: data.user?.id }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     })

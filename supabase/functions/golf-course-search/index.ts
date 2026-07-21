@@ -45,6 +45,13 @@ serve(async (req) => {
     p_window_seconds: 60,
   })
   if (!allowed) {
+    const ip = req.headers.get('x-forwarded-for') ?? 'unknown'
+    console.warn(`[golf-course-search] rate_limited user=${user.id} ip=${ip}`)
+    await serviceClient.rpc('log_security_event', {
+      p_event: 'rate_limited', p_severity: 'warn',
+      p_user_id: user.id, p_ip: ip, p_endpoint: 'golf-course-search',
+      p_message: 'Search rate limit exceeded',
+    })
     return new Response(JSON.stringify({ error: 'Too many searches. Please wait a moment.' }), {
       status: 429, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     })
@@ -77,12 +84,20 @@ serve(async (req) => {
   )
 
   if (!apiRes.ok) {
+    console.error(`[golf-course-search] api_error status=${apiRes.status} user=${user.id} query="${query}"`)
+    await serviceClient.rpc('log_security_event', {
+      p_event: 'api_error', p_severity: 'error',
+      p_user_id: user.id, p_endpoint: 'golf-course-search',
+      p_message: `RapidAPI returned ${apiRes.status}`,
+      p_metadata: { query, status: apiRes.status },
+    })
     return new Response(JSON.stringify({ error: 'Course search failed' }), {
       status: apiRes.status, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     })
   }
 
   const data = await apiRes.json()
+  console.log(`[golf-course-search] ok user=${user.id} query="${query}" results=${Array.isArray(data) ? data.length : '?'}`)
   return new Response(JSON.stringify(data), {
     headers: { ...corsHeaders, 'Content-Type': 'application/json' },
   })

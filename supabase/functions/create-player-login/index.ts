@@ -83,6 +83,13 @@ serve(async (req) => {
       p_window_seconds: 3600,
     })
     if (!allowed) {
+      const ip = req.headers.get('x-forwarded-for') ?? 'unknown'
+      console.warn(`[create-player-login] rate_limited user=${user.id} org=${callerProfile.org_id} ip=${ip}`)
+      await serviceClient.rpc('log_security_event', {
+        p_event: 'rate_limited', p_severity: 'warn',
+        p_user_id: user.id, p_org_id: callerProfile.org_id, p_ip: ip,
+        p_endpoint: 'create-player-login', p_message: 'Account creation rate limit exceeded',
+      })
       return new Response(JSON.stringify({ error: 'Too many accounts created recently. Please wait before creating more.' }), {
         status: 429, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       })
@@ -118,6 +125,12 @@ serve(async (req) => {
       org_id:    orgId,
     }, { onConflict: 'id' })
 
+    console.log(`[create-player-login] ok creator=${user.id} new_user=${userId} org=${orgId}`)
+    await serviceClient.rpc('log_security_event', {
+      p_event: 'player_login_created', p_severity: 'info',
+      p_user_id: user.id, p_org_id: orgId, p_endpoint: 'create-player-login',
+      p_message: `Login created for ${email}`, p_metadata: { new_user_id: userId, role: role ?? 'none' },
+    })
     return new Response(JSON.stringify({ success: true, userId }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     })
