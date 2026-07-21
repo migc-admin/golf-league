@@ -231,16 +231,25 @@ export function computeMatchPoints(eventPlayers, allScores, course, storedPairin
 /**
  * Compute Best Ball team match play results per group.
  *
- * For each group:
- *   - Flight A players form one team, Flight B the other
- *   - Relative handicaps: each player's strokes = their CH minus the lowest CH in the group
- *   - Each hole: team's score = best (lowest) net among its players
- *   - Standard USGA match play rules applied to the team scores
+ * Teams are defined by team_match_config.sides: { [player_id]: 'A' | 'B' }
+ * Falls back to flight assignments if no config provided.
  *
- * @returns {Array<GroupTeamMatch>}  one result per group that has both A and B players
+ * Relative handicaps: each player's strokes = their CH minus the lowest CH in the group.
+ * Each hole: team's score = best (lowest) net among its players.
+ * Standard USGA match play rules applied to the team scores.
+ *
+ * @param {Array}   eventPlayers
+ * @param {Array}   allScores
+ * @param {Object}  course
+ * @param {Object}  [teamMatchConfig]  — event.team_match_config
+ * @returns {{ groupMatches, totalA, totalB, teamAName, teamBName }}
  */
-export function computeTeamMatchPoints(eventPlayers, allScores, course) {
+export function computeTeamMatchPoints(eventPlayers, allScores, course, teamMatchConfig = null) {
   const { stroke_index: strokeIndexes, par_per_hole: parPerHole } = course
+  const sides    = teamMatchConfig?.sides    ?? {}
+  const teamAName = teamMatchConfig?.teamA   || 'Team A'
+  const teamBName = teamMatchConfig?.teamB   || 'Team B'
+  const hasSides = Object.keys(sides).length > 0
 
   // Build score lookup
   const scoreMap = {}
@@ -260,8 +269,13 @@ export function computeTeamMatchPoints(eventPlayers, allScores, course) {
   const groupMatches = []
 
   for (const [groupNum, members] of Object.entries(groups)) {
-    const teamA = members.filter(ep => ep.flight === 'A')
-    const teamB = members.filter(ep => ep.flight === 'B')
+    // Use team_match_config sides if available, otherwise fall back to flights
+    const teamA = hasSides
+      ? members.filter(ep => sides[ep.player_id] === 'A')
+      : members.filter(ep => ep.flight === 'A')
+    const teamB = hasSides
+      ? members.filter(ep => sides[ep.player_id] === 'B')
+      : members.filter(ep => ep.flight === 'B')
     if (teamA.length === 0 || teamB.length === 0) continue
 
     // Baseline = lowest CH across all players in the group
@@ -358,7 +372,7 @@ export function computeTeamMatchPoints(eventPlayers, allScores, course) {
   const totalA = groupMatches.reduce((s, m) => s + m.pointsA, 0)
   const totalB = groupMatches.reduce((s, m) => s + m.pointsB, 0)
 
-  return { groupMatches, totalA, totalB }
+  return { groupMatches, totalA, totalB, teamAName, teamBName }
 }
 
 /**

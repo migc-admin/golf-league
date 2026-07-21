@@ -202,11 +202,16 @@ export default function EventDetail() {
         <div className="space-y-6">
           <TabGroups event={event} eventPlayers={eventPlayers} onUpdated={load} />
           {((event.formats ?? (event.format ? [event.format] : [])).includes('match_points') ||
-            (event.formats ?? (event.format ? [event.format] : [])).includes('team_match_play') ||
             (event.formats ?? (event.format ? [event.format] : [])).includes('ryder_cup')) && (
             <div className="border-t border-gray-100 pt-6">
               <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-widest mb-3">Match Play Pairings</h3>
               <MatchPairingsManager eventId={event.id} eventPlayers={eventPlayers} />
+            </div>
+          )}
+          {(event.formats ?? (event.format ? [event.format] : [])).includes('team_match_play') && (
+            <div className="border-t border-gray-100 pt-6">
+              <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-widest mb-3">Team Match Setup</h3>
+              <TeamMatchSetup event={event} eventPlayers={eventPlayers} onUpdated={load} />
             </div>
           )}
         </div>
@@ -1451,6 +1456,106 @@ function MatchPairingsManager({ eventId, eventPlayers }) {
       {unpairedPlayers.length < 2 && pairings.length > 0 && (
         <p className="text-sm text-gray-400 text-center">All players have been paired.</p>
       )}
+    </div>
+  )
+}
+
+// ─── Team Match Setup ─────────────────────────────────────────────
+function TeamMatchSetup({ event, eventPlayers, onUpdated }) {
+  const cfg = event.team_match_config ?? {}
+  const [teamAName, setTeamAName] = useState(cfg.teamA ?? '')
+  const [teamBName, setTeamBName] = useState(cfg.teamB ?? '')
+  const [sides,     setSides]     = useState(cfg.sides ?? {})
+  const [saving,    setSaving]    = useState(false)
+
+  useEffect(() => {
+    const c = event.team_match_config ?? {}
+    setTeamAName(c.teamA ?? '')
+    setTeamBName(c.teamB ?? '')
+    setSides(c.sides ?? {})
+  }, [event.team_match_config])
+
+  function setSide(playerId, side) {
+    setSides(prev => ({ ...prev, [playerId]: side }))
+  }
+
+  async function handleSave() {
+    setSaving(true)
+    const { error } = await supabase.from('events').update({
+      team_match_config: { teamA: teamAName.trim(), teamB: teamBName.trim(), sides },
+    }).eq('id', event.id)
+    setSaving(false)
+    if (error) toast.error(error.message)
+    else { toast.success('Team match saved'); onUpdated() }
+  }
+
+  const unassigned = eventPlayers.filter(ep => !sides[ep.player_id])
+  const teamA = eventPlayers.filter(ep => sides[ep.player_id] === 'A')
+  const teamB = eventPlayers.filter(ep => sides[ep.player_id] === 'B')
+
+  function playerName(ep) {
+    return `${ep.player?.first_name ?? ''} ${ep.player?.last_name ?? ''}`.trim()
+  }
+
+  return (
+    <div className="space-y-4">
+      {/* Team names */}
+      <div className="bg-white rounded-xl border border-gray-200 p-4 space-y-3">
+        <h3 className="text-sm font-semibold text-gray-800">Team Names</h3>
+        <div className="grid grid-cols-2 gap-3">
+          <div>
+            <label className="block text-xs font-medium text-gray-500 mb-1">Team A</label>
+            <input className="input w-full" value={teamAName} onChange={e => setTeamAName(e.target.value)} placeholder="e.g. MIGC" />
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-gray-500 mb-1">Team B</label>
+            <input className="input w-full" value={teamBName} onChange={e => setTeamBName(e.target.value)} placeholder="e.g. Westside Eagles" />
+          </div>
+        </div>
+      </div>
+
+      {/* Player assignments */}
+      <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+        <div className="px-4 py-3 bg-gray-50 border-b border-gray-100">
+          <h3 className="text-sm font-semibold text-gray-800">Assign Players to Teams</h3>
+        </div>
+        <div className="divide-y divide-gray-100">
+          {eventPlayers.map(ep => {
+            const side = sides[ep.player_id]
+            return (
+              <div key={ep.player_id} className="flex items-center justify-between px-4 py-3">
+                <div className="text-sm font-medium text-gray-800">
+                  {playerName(ep)}
+                  <span className="text-xs text-gray-400 ml-2">CH {ep.course_handicap ?? '—'}</span>
+                </div>
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => setSide(ep.player_id, 'A')}
+                    className={`text-xs font-bold px-3 py-1.5 rounded-lg border transition-colors ${side === 'A' ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-gray-500 border-gray-200 hover:border-blue-300'}`}
+                  >
+                    {teamAName || 'Team A'}
+                  </button>
+                  <button
+                    onClick={() => setSide(ep.player_id, 'B')}
+                    className={`text-xs font-bold px-3 py-1.5 rounded-lg border transition-colors ${side === 'B' ? 'bg-purple-600 text-white border-purple-600' : 'bg-white text-gray-500 border-gray-200 hover:border-purple-300'}`}
+                  >
+                    {teamBName || 'Team B'}
+                  </button>
+                  {side && (
+                    <button onClick={() => setSide(ep.player_id, null)} className="text-xs text-gray-400 hover:text-red-500 px-1">✕</button>
+                  )}
+                </div>
+              </div>
+            )
+          })}
+        </div>
+      </div>
+
+      {unassigned.length > 0 && (
+        <p className="text-xs text-amber-600 font-medium">⚠ {unassigned.length} player{unassigned.length !== 1 ? 's' : ''} not yet assigned to a team</p>
+      )}
+
+      <Button onClick={handleSave} loading={saving}>Save Team Setup</Button>
     </div>
   )
 }

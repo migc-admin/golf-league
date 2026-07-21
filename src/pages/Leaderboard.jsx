@@ -168,7 +168,7 @@ export default function Leaderboard() {
   const skinsResults    = course ? computeAllSkins(eventPlayers, allScores, course.stroke_index)     : null
   const stablefordData  = course ? computeStableford(eventPlayers, allScores, course)                : null
   const matchData       = course ? computeMatchPoints(eventPlayers, allScores, course, matchPairings) : null
-  const teamMatchData   = course ? computeTeamMatchPoints(eventPlayers, allScores, course) : null
+  const teamMatchData   = course ? computeTeamMatchPoints(eventPlayers, allScores, course, event?.team_match_config ?? null) : null
 
   const tglData = (() => {
     if (!leaderboards || !tglTeams.length || !tglSelections.length) return null
@@ -345,7 +345,7 @@ export default function Leaderboard() {
           <MatchPointsBoard matchData={matchData} />
         )}
         {activeTab === 'Team Match' && teamMatchData && (
-          <TeamMatchBoard teamMatchData={teamMatchData} />
+          <TeamMatchBoard teamMatchData={teamMatchData} teamAName={teamMatchData.teamAName} teamBName={teamMatchData.teamBName} />
         )}
         {activeTab === 'Skins' && skinsResults && (
           <SkinsBoard skinsResults={skinsResults} playerMap={playerMap} />
@@ -815,17 +815,17 @@ function MatchPointsBoard({ matchData }) {
 }
 
 // ─── Team Match Board ─────────────────────────────────────────────
-function TeamMatchBoard({ teamMatchData }) {
+function TeamMatchBoard({ teamMatchData, teamAName = 'Team A', teamBName = 'Team B' }) {
   const { groupMatches, totalA, totalB } = teamMatchData
 
   if (!groupMatches.length) return (
     <div className="text-center py-12 text-gray-400">
       <p className="font-medium">No team match results yet.</p>
-      <p className="text-sm mt-1">Assign players to Flight A and Flight B within each group.</p>
+      <p className="text-sm mt-1">Assign players to teams in the Team Play tab on the event admin page.</p>
     </div>
   )
 
-  const totalLeader = totalA > totalB ? 'Flight A leads' : totalB > totalA ? 'Flight B leads' : 'All Square'
+  const totalLeader = totalA > totalB ? `${teamAName} leads` : totalB > totalA ? `${teamBName} leads` : 'All Square'
 
   return (
     <div className="space-y-4">
@@ -837,13 +837,13 @@ function TeamMatchBoard({ teamMatchData }) {
           </div>
           <div className="flex">
             <div className="flex-1 text-center py-4 bg-blue-50">
-              <div className="text-xs font-bold text-blue-600 mb-1">Flight A</div>
+              <div className="text-xs font-bold text-blue-600 mb-1">{teamAName}</div>
               <div className="text-4xl font-black text-blue-700">{totalA}</div>
               <div className="text-xs text-blue-400 mt-0.5">matches won</div>
             </div>
             <div className="w-px bg-gray-200" />
             <div className="flex-1 text-center py-4 bg-purple-50">
-              <div className="text-xs font-bold text-purple-600 mb-1">Flight B</div>
+              <div className="text-xs font-bold text-purple-600 mb-1">{teamBName}</div>
               <div className="text-4xl font-black text-purple-700">{totalB}</div>
               <div className="text-xs text-purple-400 mt-0.5">matches won</div>
             </div>
@@ -874,7 +874,7 @@ function TeamMatchBoard({ teamMatchData }) {
             <div className="flex items-stretch divide-x divide-gray-100">
               {/* Team A */}
               <div className={`flex-1 px-4 py-3 ${leaderSide === 'A' || match.winner === 'A' ? 'bg-blue-50' : ''}`}>
-                <div className="text-xs font-bold text-blue-600 mb-1">Flight A</div>
+                <div className="text-xs font-bold text-blue-600 mb-1">{teamAName}</div>
                 {match.teamA.map(ep => (
                   <div key={ep.player_id} className="text-sm text-gray-800 leading-snug">
                     {ep.player?.last_name}, {ep.player?.first_name}
@@ -892,7 +892,7 @@ function TeamMatchBoard({ teamMatchData }) {
 
               {/* Team B */}
               <div className={`flex-1 px-4 py-3 ${leaderSide === 'B' || match.winner === 'B' ? 'bg-purple-50' : ''}`}>
-                <div className="text-xs font-bold text-purple-600 mb-1">Flight B</div>
+                <div className="text-xs font-bold text-purple-600 mb-1">{teamBName}</div>
                 {match.teamB.map(ep => (
                   <div key={ep.player_id} className="text-sm text-gray-800 leading-snug">
                     {ep.player?.last_name}, {ep.player?.first_name}
