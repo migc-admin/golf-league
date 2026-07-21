@@ -72,7 +72,15 @@ export default function LeagueDetail() {
       if (!profile?.org_id) return
       const { data: org } = await supabase
         .from('organizations').select('id, slug, tier').eq('id', profile.org_id).single()
-      if (org) { setOrgSlug(org.slug); setOrgId(org.id); setOrgTier(org.tier ?? 'free') }
+      if (org) {
+        setOrgSlug(org.slug)
+        setOrgId(org.id)
+        // Apply same owner/platform-admin Club override as Layout + Settings
+        const { data: prof2 } = await supabase
+          .from('profiles').select('is_owner, is_platform_admin').eq('id', user.id).single()
+        const isPrivileged = prof2?.is_owner || prof2?.is_platform_admin
+        setOrgTier(isPrivileged ? 'club' : (org.tier ?? 'free'))
+      }
 
       const { data: lg } = await supabase
         .from('leagues')
