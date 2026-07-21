@@ -14,6 +14,16 @@ const supabase = createClient(
 const RESEND_API_KEY = Deno.env.get('RESEND_API_KEY') ?? ''
 const FROM_EMAIL     = 'notifications@scorifygolf.com'
 
+/** Escape user-supplied strings before embedding in HTML email templates. */
+function esc(str: unknown): string {
+  return String(str ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#x27;')
+}
+
 serve(async (req) => {
   try {
     const payload = await req.json()
@@ -58,23 +68,23 @@ serve(async (req) => {
       return new Response('No admin emails found', { status: 200 })
     }
 
-    const eventLabel = event.name ?? `Event #${event.event_number}`
+    const eventLabel = esc(event.name ?? `Event #${event.event_number}`)
     const eventDate  = event.event_date
       ? new Date(event.event_date + 'T00:00:00').toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })
       : ''
-    const playerName = `${registration.first_name} ${registration.last_name}`.trim()
+    const playerName = esc(`${registration.first_name} ${registration.last_name}`.trim())
 
     const html = `
       <div style="font-family: sans-serif; max-width: 480px; margin: 0 auto;">
         <div style="background: #1B4332; padding: 24px; border-radius: 12px 12px 0 0;">
           <h1 style="color: #D4AF37; margin: 0; font-size: 20px;">New Registration</h1>
-          <p style="color: rgba(255,255,255,0.7); margin: 4px 0 0; font-size: 14px;">${eventLabel}${eventDate ? ` · ${eventDate}` : ''}</p>
+          <p style="color: rgba(255,255,255,0.7); margin: 4px 0 0; font-size: 14px;">${eventLabel}${eventDate ? ` · ${esc(eventDate)}` : ''}</p>
         </div>
         <div style="background: #ffffff; padding: 24px; border: 1px solid #e5e7eb; border-top: none; border-radius: 0 0 12px 12px;">
           <table style="width: 100%; border-collapse: collapse;">
             <tr><td style="padding: 8px 0; color: #6b7280; font-size: 13px; width: 120px;">Name</td><td style="padding: 8px 0; font-weight: 600; font-size: 14px;">${playerName}</td></tr>
-            ${registration.email ? `<tr><td style="padding: 8px 0; color: #6b7280; font-size: 13px;">Email</td><td style="padding: 8px 0; font-size: 14px;">${registration.email}</td></tr>` : ''}
-            ${registration.notes ? `<tr><td style="padding: 8px 0; color: #6b7280; font-size: 13px;">Notes</td><td style="padding: 8px 0; font-size: 14px;">${registration.notes}</td></tr>` : ''}
+            ${registration.email ? `<tr><td style="padding: 8px 0; color: #6b7280; font-size: 13px;">Email</td><td style="padding: 8px 0; font-size: 14px;">${esc(registration.email)}</td></tr>` : ''}
+            ${registration.notes ? `<tr><td style="padding: 8px 0; color: #6b7280; font-size: 13px;">Notes</td><td style="padding: 8px 0; font-size: 14px;">${esc(registration.notes)}</td></tr>` : ''}
             <tr><td style="padding: 8px 0; color: #6b7280; font-size: 13px;">Status</td><td style="padding: 8px 0; font-size: 14px;"><span style="background: #fef3c7; color: #92400e; padding: 2px 8px; border-radius: 999px; font-size: 12px; font-weight: 600;">Pending</span></td></tr>
           </table>
           <div style="margin-top: 20px; padding-top: 16px; border-top: 1px solid #f3f4f6;">
@@ -94,7 +104,7 @@ serve(async (req) => {
       body: JSON.stringify({
         from: FROM_EMAIL,
         to: adminEmails,
-        subject: `New registration: ${playerName} — ${eventLabel}`,
+        subject: `New registration: ${`${registration.first_name} ${registration.last_name}`.trim()} — ${event.name ?? `Event #${event.event_number}`}`,
         html,
       }),
     })

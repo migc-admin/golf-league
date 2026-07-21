@@ -18,8 +18,21 @@ export default function ImageUpload({ bucket = 'media', path, currentUrl, onUplo
 
   async function handleFile(file) {
     if (!file) return
+
+    const ALLOWED_EXTS = ['jpg', 'jpeg', 'png', 'gif', 'webp']
+    const MAX_BYTES    = 5 * 1024 * 1024 // 5 MB
+
+    const ext = file.name.split('.').pop()?.toLowerCase() ?? ''
+    if (!ALLOWED_EXTS.includes(ext)) {
+      alert(`Invalid file type ".${ext}". Allowed: ${ALLOWED_EXTS.join(', ')}`)
+      return
+    }
+    if (file.size > MAX_BYTES) {
+      alert('File too large. Maximum size is 5 MB.')
+      return
+    }
+
     setUploading(true)
-    const ext = file.name.split('.').pop()
     const filePath = `${path}.${ext}`
     const { error } = await supabase.storage.from(bucket).upload(filePath, file, { upsert: true })
     if (error) { alert(error.message); setUploading(false); return }

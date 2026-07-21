@@ -61,9 +61,24 @@ serve(async (req) => {
 
     const { return_url } = await req.json().catch(() => ({}))
 
+    const FALLBACK_URL    = 'https://www.scorifygolf.com/admin/settings'
+    const ALLOWED_ORIGINS = ['scorifygolf.com', 'www.scorifygolf.com', 'app.scorifygolf.com']
+
+    let safeReturnUrl = FALLBACK_URL
+    if (return_url) {
+      try {
+        const parsed = new URL(return_url)
+        if (ALLOWED_ORIGINS.includes(parsed.hostname)) {
+          safeReturnUrl = return_url
+        }
+      } catch {
+        // invalid URL — fall through to default
+      }
+    }
+
     const session = await stripe.billingPortal.sessions.create({
       customer: org.stripe_customer_id,
-      return_url: return_url ?? 'https://www.scorifygolf.com/admin/settings',
+      return_url: safeReturnUrl,
     })
 
     return new Response(JSON.stringify({ url: session.url }), {

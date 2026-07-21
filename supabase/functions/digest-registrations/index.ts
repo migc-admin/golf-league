@@ -14,6 +14,16 @@ const supabase = createClient(
 const RESEND_API_KEY = Deno.env.get('RESEND_API_KEY') ?? ''
 const FROM_EMAIL     = 'notifications@scorifygolf.com'
 
+/** Escape user-supplied strings before embedding in HTML email templates. */
+function esc(str: unknown): string {
+  return String(str ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#x27;')
+}
+
 serve(async (_req) => {
   try {
     const since = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString()
@@ -59,19 +69,19 @@ serve(async (_req) => {
       if (!adminEmails.length) continue
 
       const rows = regs.map(r => {
-        const name      = `${r.first_name} ${r.last_name}`.trim()
-        const eventLabel = r.event?.name ?? `Event #${r.event?.event_number}`
-        const date      = r.event?.event_date
+        const name       = esc(`${r.first_name} ${r.last_name}`.trim())
+        const eventLabel = esc(r.event?.name ?? `Event #${r.event?.event_number}`)
+        const date       = r.event?.event_date
           ? new Date(r.event.event_date + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
           : ''
-        const status    = r.status ?? 'pending'
+        const status     = r.status === 'confirmed' ? 'confirmed' : 'pending' // whitelist
         const statusColor = status === 'confirmed' ? '#d1fae5' : '#fef3c7'
         const statusText  = status === 'confirmed' ? '#065f46' : '#92400e'
         return `
           <tr style="border-bottom: 1px solid #f3f4f6;">
             <td style="padding: 10px 8px; font-size: 13px; font-weight: 600;">${name}</td>
-            <td style="padding: 10px 8px; font-size: 13px; color: #4b5563;">${eventLabel}${date ? ` · ${date}` : ''}</td>
-            <td style="padding: 10px 8px; font-size: 13px; color: #4b5563;">${r.email ?? '—'}</td>
+            <td style="padding: 10px 8px; font-size: 13px; color: #4b5563;">${eventLabel}${date ? ` · ${esc(date)}` : ''}</td>
+            <td style="padding: 10px 8px; font-size: 13px; color: #4b5563;">${r.email ? esc(r.email) : '—'}</td>
             <td style="padding: 10px 8px;"><span style="background:${statusColor};color:${statusText};padding:2px 8px;border-radius:999px;font-size:11px;font-weight:600;">${status}</span></td>
           </tr>`
       }).join('')
