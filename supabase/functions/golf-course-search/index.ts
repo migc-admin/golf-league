@@ -9,10 +9,11 @@
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
-const SUPABASE_URL      = Deno.env.get('SUPABASE_URL')      ?? ''
-const SUPABASE_ANON_KEY = Deno.env.get('SUPABASE_ANON_KEY') ?? ''
-const GOLF_API_KEY      = Deno.env.get('GOLF_COURSE_API_KEY') ?? ''
-const GOLF_API_HOST     = 'golf-course-api.p.rapidapi.com'
+const SUPABASE_URL             = Deno.env.get('SUPABASE_URL')             ?? ''
+const SUPABASE_ANON_KEY        = Deno.env.get('SUPABASE_ANON_KEY')        ?? ''
+const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
+const GOLF_API_KEY             = Deno.env.get('GOLF_COURSE_API_KEY')      ?? ''
+const GOLF_API_HOST            = 'golf-course-api.p.rapidapi.com'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin':  '*',
@@ -33,6 +34,19 @@ serve(async (req) => {
   if (authError || !user) {
     return new Response(JSON.stringify({ error: 'Unauthorized' }), {
       status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    })
+  }
+
+  // Rate limit: 10 searches per user per minute
+  const serviceClient = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY)
+  const { data: allowed } = await serviceClient.rpc('check_rate_limit', {
+    p_key:            `golf-search:${user.id}`,
+    p_max_count:      10,
+    p_window_seconds: 60,
+  })
+  if (!allowed) {
+    return new Response(JSON.stringify({ error: 'Too many searches. Please wait a moment.' }), {
+      status: 429, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     })
   }
 

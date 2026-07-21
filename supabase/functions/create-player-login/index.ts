@@ -76,6 +76,18 @@ serve(async (req) => {
 
     const serviceClient = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY)
 
+    // Rate limit: 20 account creations per org per hour
+    const { data: allowed } = await serviceClient.rpc('check_rate_limit', {
+      p_key:            `create-login:${callerProfile.org_id}`,
+      p_max_count:      20,
+      p_window_seconds: 3600,
+    })
+    if (!allowed) {
+      return new Response(JSON.stringify({ error: 'Too many accounts created recently. Please wait before creating more.' }), {
+        status: 429, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      })
+    }
+
     // Create the auth user — email_confirm: true skips the confirmation email
     // since the admin is setting a temporary password they share directly
     const { data, error: createError } = await serviceClient.auth.admin.createUser({

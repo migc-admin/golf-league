@@ -64,8 +64,22 @@ serve(async (req) => {
       })
     }
 
-    // Check current admin count (Club plan: max 3)
     const serviceClient = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY)
+
+    // Rate limit: 5 invites per admin per hour (prevents email spam)
+    const { data: allowed } = await serviceClient.rpc('check_rate_limit', {
+      p_key:            `invite-admin:${user.id}`,
+      p_max_count:      5,
+      p_window_seconds: 3600,
+    })
+    if (!allowed) {
+      return new Response(JSON.stringify({ error: 'Too many invite attempts. Please wait before sending more invitations.' }), {
+        status: 429, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      })
+    }
+
+    // Check current admin count (Club plan: max 3)
+
     const { count } = await serviceClient
       .from('profiles')
       .select('*', { count: 'exact', head: true })

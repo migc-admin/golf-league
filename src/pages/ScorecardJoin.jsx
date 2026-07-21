@@ -21,6 +21,13 @@ export default function ScorecardJoin() {
   const [selectedGrp, setSelectedGrp] = useState(null)
   const [loading,     setLoading]     = useState(true)
   const [checking,    setChecking]    = useState(false)
+  const [lockoutUntil, setLockoutUntil] = useState(() => {
+    const stored = sessionStorage.getItem(`join_lockout_${eventId}`)
+    return stored ? parseInt(stored, 10) : 0
+  })
+  const [failedAttempts, setFailedAttempts] = useState(() => {
+    return parseInt(sessionStorage.getItem(`join_attempts_${eventId}`) ?? '0', 10)
+  })
 
   useEffect(() => {
     async function load() {
@@ -35,9 +42,14 @@ export default function ScorecardJoin() {
     load()
   }, [eventId])
 
+  const LOCKOUT_MS      = 5 * 60 * 1000  // 5 minutes
+  const MAX_ATTEMPTS    = 5
+  const isLockedOut     = Date.now() < lockoutUntil
+  const lockoutSecsLeft = isLockedOut ? Math.ceil((lockoutUntil - Date.now()) / 1000) : 0
+
   async function handleVerifyCode(e) {
     e.preventDefault()
-    if (!code.trim()) return
+    if (!code.trim() || isLockedOut) return
     setChecking(true)
     setCodeError('')
 
@@ -54,10 +66,25 @@ export default function ScorecardJoin() {
     }
 
     if (ev.access_code.trim().toLowerCase() !== code.trim().toLowerCase()) {
-      setCodeError('Incorrect access code. Try again.')
+      const next = failedAttempts + 1
+      setFailedAttempts(next)
+      sessionStorage.setItem(`join_attempts_${eventId}`, String(next))
+
+      if (next >= MAX_ATTEMPTS) {
+        const until = Date.now() + LOCKOUT_MS
+        setLockoutUntil(until)
+        sessionStorage.setItem(`join_lockout_${eventId}`, String(until))
+        setCodeError('Too many incorrect attempts. Please wait 5 minutes before trying again.')
+      } else {
+        setCodeError(`Incorrect access code. ${MAX_ATTEMPTS - next} attempt${MAX_ATTEMPTS - next !== 1 ? 's' : ''} remaining.`)
+      }
       setChecking(false)
       return
     }
+
+    // Success — clear attempt counters
+    sessionStorage.removeItem(`join_attempts_${eventId}`)
+    sessionStorage.removeItem(`join_lockout_${eventId}`)
 
     // Code valid — load groups
     const { data: eps } = await supabase
@@ -157,16 +184,21 @@ export default function ScorecardJoin() {
                   autoFocus
                   autoCapitalize="characters"
                 />
-                {codeError && (
+                {isLockedOut && (
+                  <p className="text-sm text-red-600 text-center font-medium">
+                    Too many attempts. Try again in {lockoutSecsLeft}s.
+                  </p>
+                )}
+                {!isLockedOut && codeError && (
                   <p className="text-sm text-red-600 text-center">{codeError}</p>
                 )}
                 <button
                   type="submit"
-                  disabled={checking || !code.trim()}
+                  disabled={checking || !code.trim() || isLockedOut}
                   className="w-full py-3 rounded-xl font-bold text-white transition-colors disabled:opacity-50"
                   style={{ background: '#1B4332' }}
                 >
-                  {checking ? 'Checking…' : 'Continue'}
+                  {checking ? 'Checking…' : isLockedOut ? `Locked (${lockoutSecsLeft}s)` : 'Continue'}
                 </button>
               </form>
             </>
