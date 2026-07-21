@@ -263,6 +263,7 @@ export default function Players() {
         open={loginModal}
         onClose={() => setLoginModal(false)}
         players={players}
+        orgId={orgId}
         onSaved={() => { setLoginModal(false); load() }}
       />
       <InviteAdminModal
@@ -283,7 +284,7 @@ export default function Players() {
   )
 }
 
-function CreateLoginModal({ open, onClose, players, onSaved }) {
+function CreateLoginModal({ open, onClose, players, orgId, onSaved }) {
   const [email,    setEmail]    = useState('')
   const [password, setPassword] = useState('')
   const [role,     setRole]     = useState('none')
@@ -302,44 +303,30 @@ function CreateLoginModal({ open, onClose, players, onSaved }) {
 
   async function handleSave(e) {
     e.preventDefault()
-    if (!email || !password) return
+    if (!email || !password || !orgId) return
+    if (password.length < 8) { toast.error('Password must be at least 8 characters'); return }
     setSaving(true)
 
-    // Save admin session before signUp replaces it
-    const { data: { session: adminSession } } = await supabase.auth.getSession()
-
-    // Create auth account
-    const { data, error } = await supabase.auth.signUp({
-      email:    email.trim(),
-      password: password,
-      options:  { data: { full_name: fullName.trim() } },
+    const { data: { session } } = await supabase.auth.getSession()
+    const res = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/create-player-login`, {
+      method: 'POST',
+      headers: {
+        'Content-Type':  'application/json',
+        'Authorization': `Bearer ${session?.access_token}`,
+        'apikey':        import.meta.env.VITE_SUPABASE_ANON_KEY,
+      },
+      body: JSON.stringify({ email: email.trim(), password, fullName: fullName.trim(), role, orgId }),
     })
 
-    // Restore admin session immediately so we don't get logged out
-    if (adminSession) {
-      await supabase.auth.setSession({
-        access_token:  adminSession.access_token,
-        refresh_token: adminSession.refresh_token,
-      })
-    }
+    const json = await res.json()
+    setSaving(false)
 
-    if (error) {
-      toast.error(error.message)
-      setSaving(false)
+    if (!res.ok || json.error) {
+      toast.error(json.error ?? 'Failed to create login')
       return
     }
 
-    // If a profile was created (email confirm off), set role immediately
-    if (data?.user?.id) {
-      await supabase.from('profiles').upsert({
-        id:        data.user.id,
-        full_name: fullName.trim() || email.trim(),
-        role,
-      }, { onConflict: 'id' })
-    }
-
-    setSaving(false)
-    toast.success(`Login created for ${email}. ${data?.user?.identities?.length === 0 ? 'Account already exists.' : 'They can now sign in.'}`)
+    toast.success(`Login created for ${email}. They can now sign in.`)
     onSaved()
   }
 
@@ -368,7 +355,7 @@ function CreateLoginModal({ open, onClose, players, onSaved }) {
           type="text"
           value={password}
           onChange={e => setPassword(e.target.value)}
-          placeholder="Min 6 characters"
+          placeholder="Min 8 characters"
           required
         />
         <div>
