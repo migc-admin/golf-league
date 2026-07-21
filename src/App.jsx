@@ -30,6 +30,7 @@ import Onboarding    from './pages/Onboarding'
 import Upgrade        from './pages/Upgrade'
 import ResetPassword  from './pages/ResetPassword'
 import FAQ            from './pages/FAQ'
+import Privacy        from './pages/Privacy'
 
 export default function App() {
   return (
@@ -62,7 +63,8 @@ export default function App() {
         {/* Public event registration — no auth required */}
         <Route path="/register/:eventId" element={<Register />} />
         <Route path="/reset-password" element={<ResetPassword />} />
-        <Route path="/faq" element={<FAQ />} />
+        <Route path="/faq"     element={<FAQ />} />
+        <Route path="/privacy" element={<Privacy />} />
 
         <Route path="/" element={<Navigate to="/home" replace />} />
 

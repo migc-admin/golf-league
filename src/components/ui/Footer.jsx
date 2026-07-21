@@ -1,3 +1,5 @@
+import { Link } from 'react-router-dom'
+
 const MENU_ITEMS = [
   {
     title: 'Product',
@@ -18,8 +20,7 @@ const MENU_ITEMS = [
   {
     title: 'Legal',
     links: [
-      { text: 'Terms & Conditions', url: '#terms'   },
-      { text: 'Privacy Policy',     url: '#privacy' },
+      { text: 'Privacy Policy', url: '/privacy' },
     ],
   },
   {
@@ -66,17 +67,29 @@ export default function Footer() {
               <ul className="space-y-3">
                 {section.links.map(link => (
                   <li key={link.text}>
-                    <a
-                      href={link.url}
-                      className="text-sm transition-colors"
-                      style={{ color: '#a1a1aa' }}
-                      onMouseEnter={e => e.currentTarget.style.color = '#ffffff'}
-                      onMouseLeave={e => e.currentTarget.style.color = '#a1a1aa'}
-                      target={link.url.startsWith('http') ? '_blank' : undefined}
-                      rel={link.url.startsWith('http') ? 'noopener noreferrer' : undefined}
-                    >
-                      {link.text}
-                    </a>
+                    {link.url.startsWith('/') ? (
+                      <Link
+                        to={link.url}
+                        className="text-sm transition-colors"
+                        style={{ color: '#a1a1aa' }}
+                        onMouseEnter={e => e.currentTarget.style.color = '#ffffff'}
+                        onMouseLeave={e => e.currentTarget.style.color = '#a1a1aa'}
+                      >
+                        {link.text}
+                      </Link>
+                    ) : (
+                      <a
+                        href={link.url}
+                        className="text-sm transition-colors"
+                        style={{ color: '#a1a1aa' }}
+                        onMouseEnter={e => e.currentTarget.style.color = '#ffffff'}
+                        onMouseLeave={e => e.currentTarget.style.color = '#a1a1aa'}
+                        target={link.url.startsWith('http') ? '_blank' : undefined}
+                        rel={link.url.startsWith('http') ? 'noopener noreferrer' : undefined}
+                      >
+                        {link.text}
+                      </a>
+                    )}
                   </li>
                 ))}
               </ul>
@@ -90,16 +103,11 @@ export default function Footer() {
             © 2026 Scorify Golf. All rights reserved.
           </p>
           <div className="flex gap-6">
-            <a href="#terms"   className="text-xs transition-colors" style={{ color: '#86868b' }}
-              onMouseEnter={e => e.currentTarget.style.color = '#ffffff'}
-              onMouseLeave={e => e.currentTarget.style.color = '#86868b'}>
-              Terms &amp; Conditions
-            </a>
-            <a href="#privacy" className="text-xs transition-colors" style={{ color: '#86868b' }}
+            <Link to="/privacy" className="text-xs transition-colors" style={{ color: '#86868b' }}
               onMouseEnter={e => e.currentTarget.style.color = '#ffffff'}
               onMouseLeave={e => e.currentTarget.style.color = '#86868b'}>
               Privacy Policy
-            </a>
+            </Link>
           </div>
         </div>
 
