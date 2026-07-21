@@ -8,17 +8,14 @@ import Modal from '../../components/ui/Modal'
 import Input from '../../components/ui/Input'
 import ImageUpload from '../../components/ui/ImageUpload'
 
-const GOLF_API_KEY  = import.meta.env.VITE_GOLF_COURSE_API_KEY
-const GOLF_API_HOST = 'golf-course-api.p.rapidapi.com'
-
 async function searchGolfCourses(query) {
+  const { data: { session } } = await supabase.auth.getSession()
   const res = await fetch(
-    `https://${GOLF_API_HOST}/search?name=${encodeURIComponent(query)}`,
+    `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/golf-course-search?name=${encodeURIComponent(query)}`,
     {
       headers: {
-        'Content-Type': 'application/json',
-        'x-rapidapi-host': GOLF_API_HOST,
-        'x-rapidapi-key':  GOLF_API_KEY,
+        'Authorization': `Bearer ${session?.access_token}`,
+        'apikey':        import.meta.env.VITE_SUPABASE_ANON_KEY,
       },
     }
   )
