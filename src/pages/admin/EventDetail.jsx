@@ -5,7 +5,7 @@ import toast from 'react-hot-toast'
 import { computePayouts, DEFAULT_PAYOUT_CONFIG, CATEGORY_LABELS, ctpLabel, activePayoutKeys } from '../../lib/engines/payouts'
 import { computeLeaderboards } from '../../lib/engines/scoring'
 import { computeAllSkins } from '../../lib/engines/skins'
-import { computeTGLEventResults } from '../../lib/engines/tgl'
+import { computeTGLEventResults, assignTGLPoints } from '../../lib/engines/tgl'
 import Card, { CardHeader } from '../../components/ui/Card'
 import { ExportScorecardsButton } from '../../components/ScorecardExport'
 import { useOrg, useFeatures } from '../../lib/OrgContext'
@@ -3005,15 +3005,23 @@ function TGLManager({ event, eventPlayers, allScores, course, tglTeams, tglMembe
     if (!course || !allScores.length || !tglTeams.length) return null
     try {
       const lb = computeLeaderboards(eventPlayers, allScores, course)
-      const ranked = lb.net?.ranked ?? lb.gross?.ranked ?? []
-      if (!ranked.length) return null
-      // Attach player info to ranked entries
       const epMap = Object.fromEntries(eventPlayers.map(ep => [ep.player_id, ep]))
-      const rankedWithPlayer = ranked.map(r => ({
-        ...r,
-        player: epMap[r.player_id]?.player ?? null,
-      }))
-      return computeTGLEventResults(rankedWithPlayer, tglSelections, tglTeams, tglMembers)
+
+      const attachPlayer = r => ({ ...r, player: epMap[r.player_id]?.player ?? null })
+
+      // Score TGL points per-flight so Flight A competes within Flight A, etc.
+      const rankedA = (lb.full?.A ?? []).map(attachPlayer)
+      const rankedB = (lb.full?.B ?? []).map(attachPlayer)
+
+      // Assign points within each flight independently (field size = flight size)
+      const pointsA = rankedA.length ? assignTGLPoints(rankedA, rankedA.length) : {}
+      const pointsB = rankedB.length ? assignTGLPoints(rankedB, rankedB.length) : {}
+      const combinedPoints = { ...pointsA, ...pointsB }
+
+      const allRanked = [...rankedA, ...rankedB]
+      if (!allRanked.length) return null
+
+      return computeTGLEventResults(allRanked, tglSelections, tglTeams, tglMembers, combinedPoints)
     } catch {
       return null
     }
