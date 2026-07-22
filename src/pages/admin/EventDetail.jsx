@@ -21,6 +21,26 @@ import { atLimit, getLimit, nextTier, TIER_LABELS } from '../../lib/features'
 // Collapsed from 7 → 4 tabs: Players = Registrations + Players & Flights; Payout = Config + Side Games + Summary
 const ALL_ADMIN_TABS = ['Overview', 'Players', 'Groups', 'Payout', 'Team Play']
 
+// Shared alpha sort for event_player rows (ep.player.first_name, ep.player.last_name)
+function epAlpha(a, b) {
+  const fa = (a.player?.first_name ?? '').toLowerCase()
+  const fb = (b.player?.first_name ?? '').toLowerCase()
+  if (fa !== fb) return fa < fb ? -1 : 1
+  const la = (a.player?.last_name ?? '').toLowerCase()
+  const lb = (b.player?.last_name ?? '').toLowerCase()
+  return la < lb ? -1 : 1
+}
+
+// Shared alpha sort for raw registration rows (first_name, last_name)
+function regAlpha(a, b) {
+  const fa = (a.first_name ?? '').toLowerCase()
+  const fb = (b.first_name ?? '').toLowerCase()
+  if (fa !== fb) return fa < fb ? -1 : 1
+  const la = (a.last_name ?? '').toLowerCase()
+  const lb = (b.last_name ?? '').toLowerCase()
+  return la < lb ? -1 : 1
+}
+
 
 export default function EventDetail() {
   const { orgSlug, leagueSlug, eventSlug } = useParams()
@@ -814,8 +834,8 @@ function TabFlights({ event, eventPlayers, course, allPlayers, onUpdated }) {
     else { toast.success('Player removed'); onUpdated() }
   }
 
-  const guests   = eventPlayers.filter(e => e.is_guest)
-  const nonGuests = eventPlayers.filter(e => !e.is_guest)
+  const guests   = eventPlayers.filter(e => e.is_guest).sort(epAlpha)
+  const nonGuests = eventPlayers.filter(e => !e.is_guest).sort(epAlpha)
   const flightA = nonGuests.filter(e => e.flight === 'A')
   const flightB = nonGuests.filter(e => e.flight === 'B')
   const unassigned = nonGuests.filter(e => !e.flight)
@@ -1035,7 +1055,7 @@ function TabFlights({ event, eventPlayers, course, allPlayers, onUpdated }) {
               <span className="text-sm font-semibold text-gray-700">Players ({eventPlayers.length})</span>
             </div>
             <div className="divide-y divide-gray-100">
-              {eventPlayers.map(ep => renderPlayerRow(ep))}
+              {[...eventPlayers].sort(epAlpha).map(ep => renderPlayerRow(ep))}
             </div>
           </Card>
         )
@@ -1567,7 +1587,7 @@ function TeamMatchSetup({ event, eventPlayers, onUpdated }) {
 }
 
 function TabGroups({ event, eventPlayers, onUpdated }) {
-  const ungrouped    = eventPlayers.filter(ep => !ep.group_number)
+  const ungrouped    = eventPlayers.filter(ep => !ep.group_number).sort(epAlpha)
   const maxGroup     = Math.max(0, ...eventPlayers.map(ep => ep.group_number ?? 0))
   const isShotgun    = event?.shotgun_start ?? false
 
@@ -1598,19 +1618,14 @@ function TabGroups({ event, eventPlayers, onUpdated }) {
     return init
   })
 
-  // Sorted members for a given group number — alpha by last name, then first name
+  // Sorted members for a given group number — alpha by first name, then last name
   function groupMembers(g) {
     return eventPlayers
       .filter(ep => ep.group_number === parseInt(g, 10))
       .sort((a, b) => {
         const orderDiff = (localOrder[a.id] ?? 0) - (localOrder[b.id] ?? 0)
         if (orderDiff !== 0) return orderDiff
-        const lastA = (a.player?.last_name ?? '').toLowerCase()
-        const lastB = (b.player?.last_name ?? '').toLowerCase()
-        if (lastA !== lastB) return lastA < lastB ? -1 : 1
-        const firstA = (a.player?.first_name ?? '').toLowerCase()
-        const firstB = (b.player?.first_name ?? '').toLowerCase()
-        return firstA < firstB ? -1 : 1
+        return epAlpha(a, b)
       })
   }
 
@@ -2821,12 +2836,8 @@ function TabRegistrations({ event, onUpdated, orgId }) {
     onUpdated()
   }
 
-  const pending   = regs.filter(r => r.status === 'pending')
-  const confirmed = regs.filter(r => r.status === 'confirmed').sort((a, b) => {
-    const last = (a.last_name ?? '').toLowerCase().localeCompare((b.last_name ?? '').toLowerCase())
-    if (last !== 0) return last
-    return (a.first_name ?? '').toLowerCase().localeCompare((b.first_name ?? '').toLowerCase())
-  })
+  const pending   = regs.filter(r => r.status === 'pending').sort(regAlpha)
+  const confirmed = regs.filter(r => r.status === 'confirmed').sort(regAlpha)
   const cancelled = regs.filter(r => r.status === 'cancelled')
 
   const STATUS_COLORS = {
