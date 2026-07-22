@@ -159,7 +159,7 @@ export default function Players() {
                 {filtered.map(p => (
                   <div key={p.id} className="flex items-center justify-between px-5 py-3.5">
                     <div>
-                      <div className="font-medium text-gray-900">{p.last_name}, {p.first_name}</div>
+                      <div className="font-medium text-gray-900">{p.first_name} {p.last_name}</div>
                       <div className="text-xs text-gray-500 flex items-center gap-3 mt-0.5">
                         {p.email && <span>{p.email}</span>}
                         {p.ghin_number && <span>GHIN: {p.ghin_number}</span>}

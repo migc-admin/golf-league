@@ -1761,7 +1761,7 @@ function GroupRow({ ep, maxGroup, isFirst, isLast, onSetGroup, onToggleSK, onMov
           </div>
         )}
         <span className="text-sm font-medium text-gray-900">
-          {ep.player?.last_name}, {ep.player?.first_name}
+          {ep.player?.first_name} {ep.player?.last_name}
         </span>
         {ep.flight && <FlightBadge flight={ep.flight} />}
         {ep.is_scorekeeper && <Badge variant="green">Scorekeeper</Badge>}

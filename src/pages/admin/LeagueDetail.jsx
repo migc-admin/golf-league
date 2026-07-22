@@ -661,7 +661,7 @@ function TGLTeamsModal({ open, onClose, league }) {
                         <label key={p.id} className="flex items-center gap-2 py-1 px-2 rounded hover:bg-white cursor-pointer text-sm">
                           <input type="checkbox" checked={mIds.has(p.id)} onChange={() => toggleMember(team.id, p.id)} className="rounded text-green-600 accent-green-600" />
                           <span className={mIds.has(p.id) ? 'font-medium text-gray-900' : 'text-gray-600'}>
-                            {p.last_name}, {p.first_name}
+                            {p.first_name} {p.last_name}
                           </span>
                         </label>
                       ))}
