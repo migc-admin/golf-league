@@ -572,7 +572,7 @@ function TGLTeamsModal({ open, onClose, league }) {
   async function load() {
     const [{ data: t }, { data: p }] = await Promise.all([
       supabase.from('tgl_teams').select('*').eq('league_id', league.id).order('name'),
-      supabase.from('players').select('id, first_name, last_name').order('last_name'),
+      supabase.from('players').select('id, first_name, last_name').order('first_name'),
     ])
     setTeams(t ?? [])
     setAllPlayers(p ?? [])

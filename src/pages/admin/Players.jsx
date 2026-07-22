@@ -33,7 +33,7 @@ export default function Players() {
     const currentOrgId = adminProfile?.org_id ?? null
 
     const [{ data: p }, { data: pr }] = await Promise.all([
-      supabase.from('players').select('*').order('last_name'),
+      supabase.from('players').select('*').order('first_name'),
       currentOrgId
         ? supabase.from('profiles').select('*').eq('org_id', currentOrgId).order('full_name')
         : Promise.resolve({ data: [] }),

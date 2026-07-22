@@ -83,7 +83,7 @@ export default function EventDetail() {
       supabase.from('event_players').select('*, player:players(*)').eq('event_id', id).order('flight').order('adjusted_handicap_index'),
       supabase.from('scores').select('*').eq('event_id', id),
       supabase.from('side_games').select('*, winner:players(first_name,last_name)').eq('event_id', id),
-      supabase.from('players').select('*').order('last_name'),
+      supabase.from('players').select('*').order('first_name'),
       supabase.from('score_audit_log').select('*, player:players(first_name,last_name)').eq('event_id', id).eq('is_conflict', true).order('hole_number'),
     ])
 
