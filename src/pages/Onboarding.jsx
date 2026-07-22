@@ -90,7 +90,7 @@ function slugify(str) {
 }
 
 export default function Onboarding() {
-  const { user } = useAuth()
+  const { user, loading: authLoading } = useAuth()
 
   const [step,     setStep]     = useState(1)
   const [tier,     setTier]     = useState('free')
@@ -101,7 +101,12 @@ export default function Onboarding() {
 
   async function handleSubmit(e) {
     e.preventDefault()
-    if (!orgName.trim() || !user) return
+    if (!orgName.trim()) return
+    if (!user) {
+      toast.error('Session expired — please sign in again.')
+      window.location.href = '/login'
+      return
+    }
     setSaving(true)
 
     try {
@@ -342,7 +347,7 @@ export default function Onboarding() {
 
               <button
                 type="submit"
-                disabled={saving || !orgName.trim() || (tier !== 'free' && !agreed)}
+                disabled={saving || authLoading || !orgName.trim() || (tier !== 'free' && !agreed)}
                 className="btn-primary btn-lg w-full"
               >
                 {saving ? (
