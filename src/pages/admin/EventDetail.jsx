@@ -3013,9 +3013,13 @@ function TGLManager({ event, eventPlayers, allScores, course, tglTeams, tglMembe
       const rankedA = (lb.full?.A ?? []).map(attachPlayer)
       const rankedB = (lb.full?.B ?? []).map(attachPlayer)
 
-      // Assign points within each flight independently (field size = flight size)
-      const pointsA = rankedA.length ? assignTGLPoints(rankedA, rankedA.length) : {}
-      const pointsB = rankedB.length ? assignTGLPoints(rankedB, rankedB.length) : {}
+      // Field size = enrolled players per flight, so missing/unassigned players
+      // don't shrink the denominator and deflate everyone else's points.
+      const hasFlights = eventPlayers.some(ep => ep.flight === 'A' || ep.flight === 'B')
+      const enrolledA = hasFlights ? eventPlayers.filter(ep => ep.flight === 'A').length : eventPlayers.length
+      const enrolledB = eventPlayers.filter(ep => ep.flight === 'B').length
+      const pointsA = rankedA.length ? assignTGLPoints(rankedA, Math.max(rankedA.length, enrolledA)) : {}
+      const pointsB = rankedB.length ? assignTGLPoints(rankedB, Math.max(rankedB.length, enrolledB)) : {}
       const combinedPoints = { ...pointsA, ...pointsB }
 
       const allRanked = [...rankedA, ...rankedB]

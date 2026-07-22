@@ -142,12 +142,17 @@ export default function Standings() {
           if (!eps.length || !scs.length || !sels.length) continue
           try {
             const lb     = computeLeaderboards(eps, scs, course)
-            // Assign TGL points within each flight separately, then merge
+            // Assign TGL points within each flight separately, then merge.
+            // Field size = total enrolled players per flight (not just those with 18 holes),
+            // so unassigned-flight or partially-scored players don't shrink the field.
+            const hasFlights = eps.some(ep => ep.flight === 'A' || ep.flight === 'B')
             const flightA = lb.full?.A ?? []
             const flightB = lb.full?.B ?? []
             if (!flightA.length && !flightB.length) continue
-            const ptsA = flightA.length ? assignTGLPoints(flightA, flightA.length) : {}
-            const ptsB = flightB.length ? assignTGLPoints(flightB, flightB.length) : {}
+            const fieldSizeA = hasFlights ? eps.filter(ep => ep.flight === 'A').length : eps.length
+            const fieldSizeB = eps.filter(ep => ep.flight === 'B').length
+            const ptsA = flightA.length ? assignTGLPoints(flightA, Math.max(flightA.length, fieldSizeA)) : {}
+            const ptsB = flightB.length ? assignTGLPoints(flightB, Math.max(flightB.length, fieldSizeB)) : {}
             const mergedPoints = { ...ptsA, ...ptsB }
             const allRanked = [...flightA, ...flightB]
             const epMap = Object.fromEntries(eps.map(ep => [ep.player_id, ep]))
