@@ -1598,11 +1598,20 @@ function TabGroups({ event, eventPlayers, onUpdated }) {
     return init
   })
 
-  // Sorted members for a given group number
+  // Sorted members for a given group number — alpha by last name, then first name
   function groupMembers(g) {
     return eventPlayers
       .filter(ep => ep.group_number === parseInt(g, 10))
-      .sort((a, b) => (localOrder[a.id] ?? 0) - (localOrder[b.id] ?? 0))
+      .sort((a, b) => {
+        const orderDiff = (localOrder[a.id] ?? 0) - (localOrder[b.id] ?? 0)
+        if (orderDiff !== 0) return orderDiff
+        const lastA = (a.player?.last_name ?? '').toLowerCase()
+        const lastB = (b.player?.last_name ?? '').toLowerCase()
+        if (lastA !== lastB) return lastA < lastB ? -1 : 1
+        const firstA = (a.player?.first_name ?? '').toLowerCase()
+        const firstB = (b.player?.first_name ?? '').toLowerCase()
+        return firstA < firstB ? -1 : 1
+      })
   }
 
   async function movePlayer(epId, groupNum, direction) {
@@ -2813,7 +2822,11 @@ function TabRegistrations({ event, onUpdated, orgId }) {
   }
 
   const pending   = regs.filter(r => r.status === 'pending')
-  const confirmed = regs.filter(r => r.status === 'confirmed')
+  const confirmed = regs.filter(r => r.status === 'confirmed').sort((a, b) => {
+    const last = (a.last_name ?? '').toLowerCase().localeCompare((b.last_name ?? '').toLowerCase())
+    if (last !== 0) return last
+    return (a.first_name ?? '').toLowerCase().localeCompare((b.first_name ?? '').toLowerCase())
+  })
   const cancelled = regs.filter(r => r.status === 'cancelled')
 
   const STATUS_COLORS = {
