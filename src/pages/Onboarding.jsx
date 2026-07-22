@@ -153,6 +153,9 @@ export default function Onboarding() {
   }
 
   const selectedTier = TIERS.find(t => t.id === tier)
+  const selectedPrice = tier === 'free' ? 'Free' : billing === 'yearly'
+    ? `${selectedTier?.yearlyPrice}${selectedTier?.yearlySub ?? ''}`
+    : `${selectedTier?.monthlyPrice}${selectedTier?.monthlySub ?? ''}`
 
   return (
     <div className="min-h-screen flex flex-col items-center justify-center p-6" style={{ background: '#fbfaf8' }}>
@@ -326,14 +329,13 @@ export default function Onboarding() {
                     checked={agreed}
                     onChange={e => setAgreed(e.target.checked)}
                     className="mt-0.5 shrink-0 rounded"
-                    required
                   />
                   <span className="text-xs leading-relaxed" style={{ color: '#6b7280' }}>
                     I have read and agree to the{' '}
                     <a href="/refund-policy" target="_blank" rel="noopener noreferrer" className="underline font-medium" style={{ color: GREEN }}>Refund Policy</a>
                     {' '}and{' '}
                     <a href="/privacy" target="_blank" rel="noopener noreferrer" className="underline font-medium" style={{ color: GREEN }}>Privacy Policy</a>.
-                    I understand that my subscription will begin after a 3-day free trial and I will be charged at the rate shown above.
+                    I understand that my subscription will begin after a 3-day free trial and I will be charged <strong>{selectedPrice}</strong> after the trial ends.
                   </span>
                 </label>
               )}
