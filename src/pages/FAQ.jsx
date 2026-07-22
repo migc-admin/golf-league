@@ -128,6 +128,91 @@ const FAQS = [
     ],
   },
   {
+    category: 'Scoring Formats',
+    intro: 'Each format below is available within Scorify Golf events. Expand any format to learn how it works and how Scorify calculates results.',
+    items: [
+      {
+        q: 'Stroke Play (Gross & Net)',
+        a: `The standard format. Every stroke on every hole counts toward the player's total score.
+
+Gross Score — the raw total strokes, no adjustments.
+Net Score — gross score minus the player's course handicap. This levels the field so players of different skill levels compete fairly.
+
+Scorify calculates course handicap automatically from each player's handicap index, the course slope, rating, and par. Leaderboards show both gross and net standings.
+
+Finish order: lowest score wins.`,
+      },
+      {
+        q: 'Stableford',
+        a: `A points-based format where players earn points on each hole relative to a fixed target (usually net par). Higher points are better — the player with the most points wins.
+
+Standard Stableford points:
+• Double eagle (−3): 5 points
+• Eagle (−2): 4 points
+• Birdie (−1): 3 points
+• Par (0): 2 points
+• Bogey (+1): 1 point
+• Double bogey or worse: 0 points
+
+Points are calculated on net score (after handicap strokes are applied per hole). This makes the format competitive across handicap levels and keeps all players engaged — a bad hole costs you 0 points rather than blowing up your round.`,
+      },
+      {
+        q: 'Match Points',
+        a: `A hole-by-hole competition format. Each hole is worth a set number of points, and the player (or team) with the lowest net score on that hole wins those points. Ties split the points.
+
+This format keeps every hole meaningful and is commonly used in leagues where players want head-to-head competition on each hole rather than cumulative scoring.
+
+Scorify totals the points per player across all 18 holes and ranks the leaderboard accordingly.`,
+      },
+      {
+        q: 'Low Putts',
+        a: `A side game or standalone format where players track only the number of putts per hole. The player with the fewest total putts across the round wins.
+
+Scorify collects putts separately from gross score during scoring. The Low Putts leaderboard is generated independently and can run alongside any primary scoring format.
+
+Ties are resolved by fewest putts on the back nine, then front nine.`,
+      },
+      {
+        q: 'Skins',
+        a: `A hole-by-hole competition where each hole has a cash value ("skin"). The player with the lowest net score on a hole wins that skin outright. If two or more players tie, the skin carries over and adds to the value of the next hole — creating large pots on contested holes.
+
+Scorify runs skins automatically from net scores. Carried-over skins are tracked hole by hole and the final skin payouts are calculated after all scores are in.
+
+Skins can be run as a standalone game or alongside any primary scoring format. Entry fee and per-skin value are configured in the Payout tab.`,
+      },
+      {
+        q: 'Team Play (Ryder Cup / League Format)',
+        a: `Team Play organizes players into standing teams that compete against each other across the season — similar to a Ryder Cup or fantasy league format.
+
+Setup:
+1. Admin creates teams in the League settings and assigns players to each team.
+2. For each event, the admin selects which players from each team are active for that round.
+3. After scoring, Scorify calculates team points based on the selected scoring method.
+
+Scoring methods available:
+• Match Points — each hole won by a team earns points; ties split.
+• Aggregate Net — the combined net score of active team members is compared.
+• Stableford — team points are summed from each active player's Stableford score.
+
+Season standings track cumulative team points across all events. The Team Play label can be renamed in league settings to match your format ("Ryder Cup," "TGL Teams," "League Cup," etc.).
+
+Team Play is available on Pro and Club plans.`,
+      },
+      {
+        q: 'Closest to the Pin (CTP)',
+        a: `A side game played on par-3 holes. The player whose tee shot lands and stays closest to the pin wins the CTP prize for that hole.
+
+Admins designate which par-3 holes have a CTP contest in the event's Payout settings. A printable CTP card is available from the Event Overview to track results on the course. The winner and payout amount are recorded manually by the admin after the round.`,
+      },
+      {
+        q: 'Long Drive',
+        a: `A side game typically played on one or more par-4 or par-5 holes. The player with the longest drive that stays in the fairway wins.
+
+Similar to CTP, the admin designates which holes have a Long Drive contest. A printable Long Drive card is available from the Event Overview. The winner is recorded manually after the round and reflected in the payout summary.`,
+      },
+    ],
+  },
+  {
     category: 'Online Registration',
     items: [
       {
@@ -159,7 +244,11 @@ function FAQItem({ q, a }) {
         </span>
       </button>
       {open && (
-        <p className="text-sm text-gray-600 leading-relaxed pb-5">{a}</p>
+        <div className="text-sm text-gray-600 leading-relaxed pb-5 space-y-2">
+          {a.split('\n\n').map((block, i) => (
+            <p key={i} style={{ whiteSpace: 'pre-line' }}>{block}</p>
+          ))}
+        </div>
       )}
     </div>
   )
@@ -215,9 +304,12 @@ export default function FAQ() {
             <div className="max-w-3xl mx-auto space-y-12">
               {FAQS.map(section => (
                 <div key={section.category}>
-                  <h2 className="text-xs font-bold uppercase tracking-widest mb-4" style={{ color: GREEN }}>
+                  <h2 className="text-xs font-bold uppercase tracking-widest mb-2" style={{ color: GREEN }}>
                     {section.category}
                   </h2>
+                  {section.intro && (
+                    <p className="text-sm text-gray-500 mb-4">{section.intro}</p>
+                  )}
                   <div className="bg-white rounded-2xl px-6 shadow-sm" style={{ border: '1px solid #ebe9e4' }}>
                     {section.items.map(item => (
                       <FAQItem key={item.q} q={item.q} a={item.a} />
