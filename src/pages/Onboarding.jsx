@@ -97,6 +97,7 @@ export default function Onboarding() {
   const [billing,  setBilling]  = useState('monthly') // 'monthly' | 'yearly'
   const [orgName,  setOrgName]  = useState('')
   const [saving,   setSaving]   = useState(false)
+  const [agreed,   setAgreed]   = useState(false)
 
   async function handleSubmit(e) {
     e.preventDefault()
@@ -318,9 +319,28 @@ export default function Onboarding() {
                 />
               </div>
 
+              {tier !== 'free' && (
+                <label className="flex items-start gap-3 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={agreed}
+                    onChange={e => setAgreed(e.target.checked)}
+                    className="mt-0.5 shrink-0 rounded"
+                    required
+                  />
+                  <span className="text-xs leading-relaxed" style={{ color: '#6b7280' }}>
+                    I have read and agree to the{' '}
+                    <a href="/refund-policy" target="_blank" rel="noopener noreferrer" className="underline font-medium" style={{ color: GREEN }}>Refund Policy</a>
+                    {' '}and{' '}
+                    <a href="/privacy" target="_blank" rel="noopener noreferrer" className="underline font-medium" style={{ color: GREEN }}>Privacy Policy</a>.
+                    I understand that my subscription will begin after a 3-day free trial and I will be charged at the rate shown above.
+                  </span>
+                </label>
+              )}
+
               <button
                 type="submit"
-                disabled={saving || !orgName.trim()}
+                disabled={saving || !orgName.trim() || (tier !== 'free' && !agreed)}
                 className="btn-primary btn-lg w-full"
               >
                 {saving ? (
@@ -336,9 +356,7 @@ export default function Onboarding() {
 
               {tier !== 'free' && (
                 <p className="text-xs text-center" style={{ color: '#9ca3af' }}>
-                  You'll be redirected to Stripe to complete payment. Your org is created first so your data is saved.{' '}
-                  By continuing you agree to our{' '}
-                  <a href="/refund-policy" target="_blank" rel="noopener noreferrer" className="underline hover:text-gray-600">refund policy</a>.
+                  You'll be redirected to Stripe to complete payment. Your org is created first so your data is saved.
                 </p>
               )}
             </form>
