@@ -207,8 +207,8 @@ export default function Settings() {
         <div className="px-6 py-4">
           <h2 className="text-sm font-bold text-ink">Plan Details</h2>
         </div>
-        <div className="px-6 py-2">
-          <table className="w-full text-sm">
+        <div className="px-6 py-2 overflow-x-auto">
+          <table className="w-full text-sm min-w-[340px]">
             <thead>
               <tr className="text-xs text-gray-400 uppercase tracking-wide">
                 <th className="text-left py-3 font-semibold">Feature</th>

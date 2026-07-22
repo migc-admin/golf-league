@@ -105,7 +105,7 @@ export default function Dashboard() {
       </div>
 
       {/* #7: Stats strip */}
-      <div className="bg-white rounded-xl border border-gray-200 shadow-[0_4px_20px_rgba(15,61,46,0.05)] divide-x divide-gray-100 flex overflow-hidden">
+      <div className="bg-white rounded-xl border border-gray-200 shadow-[0_4px_20px_rgba(15,61,46,0.05)] grid grid-cols-2 sm:flex sm:divide-x divide-gray-100 overflow-hidden">
         <StatStrip label="Total Players" value={stats.players} to="/admin/players" />
         <StatStrip label="Events on Record" value={stats.events ?? 0} />
         <StatStrip label="Leagues" value={stats.leagues} to="/admin/leagues" />
