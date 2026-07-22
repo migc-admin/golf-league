@@ -20,7 +20,8 @@ const MENU_ITEMS = [
   {
     title: 'Legal',
     links: [
-      { text: 'Privacy Policy', url: '/privacy' },
+      { text: 'Privacy Policy',  url: '/privacy'        },
+      { text: 'Refund Policy',   url: '/refund-policy'  },
     ],
   },
   {

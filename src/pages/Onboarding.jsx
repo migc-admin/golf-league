@@ -336,7 +336,9 @@ export default function Onboarding() {
 
               {tier !== 'free' && (
                 <p className="text-xs text-center" style={{ color: '#9ca3af' }}>
-                  You'll be redirected to Stripe to complete payment. Your org is created first so your data is saved.
+                  You'll be redirected to Stripe to complete payment. Your org is created first so your data is saved.{' '}
+                  By continuing you agree to our{' '}
+                  <a href="/refund-policy" target="_blank" rel="noopener noreferrer" className="underline hover:text-gray-600">refund policy</a>.
                 </p>
               )}
             </form>

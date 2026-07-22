@@ -31,6 +31,7 @@ import Upgrade        from './pages/Upgrade'
 import ResetPassword  from './pages/ResetPassword'
 import FAQ            from './pages/FAQ'
 import Privacy        from './pages/Privacy'
+import RefundPolicy   from './pages/RefundPolicy'
 
 export default function App() {
   return (
@@ -64,7 +65,8 @@ export default function App() {
         <Route path="/register/:eventId" element={<Register />} />
         <Route path="/reset-password" element={<ResetPassword />} />
         <Route path="/faq"     element={<FAQ />} />
-        <Route path="/privacy" element={<Privacy />} />
+        <Route path="/privacy"        element={<Privacy />} />
+        <Route path="/refund-policy"  element={<RefundPolicy />} />
 
         <Route path="/" element={<Navigate to="/home" replace />} />
 
