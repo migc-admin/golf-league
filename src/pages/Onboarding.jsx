@@ -12,10 +12,10 @@ const GREEN = '#1B4332'
 const INK   = '#1d1d1f'
 
 const STRIPE_LINKS = {
-  pro_monthly:  'https://buy.stripe.com/test_14AfZgco5eGV25dePm2cg05',
-  pro_yearly:   'https://buy.stripe.com/test_cNieVc1Jr9mB8tBaz62cg06',
-  club_monthly: 'https://buy.stripe.com/test_28E14mgElfKZ6ltaz62cg07',
-  club_yearly:  'https://buy.stripe.com/test_8x2fZgewdbuJdNV5eM2cg08',
+  pro_monthly:  'https://buy.stripe.com/5kQ4gy0L14BVfh8g5f0Jq06',
+  pro_yearly:   'https://buy.stripe.com/3cIbJ051hfgzb0S6uF0Jq05',
+  club_monthly: 'https://buy.stripe.com/4gM3cudxNfgz5GydX70Jq07',
+  club_yearly:  'https://buy.stripe.com/6oU3cu65l7O73yq1al0Jq08',
 }
 
 const TIERS = [
