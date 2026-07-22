@@ -44,7 +44,7 @@ export default function DisputeTemplate() {
   const orgName = org?.name ?? 'Scorify Golf Customer'
   const orgId   = org?.id   ?? '[org-id]'
 
-  const REASON_LABELS: Record<string, string> = {
+  const REASON_LABELS = {
     subscription_canceled:  'Subscription Canceled',
     credit_not_processed:   'Credit Not Processed',
     duplicate:              'Duplicate Charge',
