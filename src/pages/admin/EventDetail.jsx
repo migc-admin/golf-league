@@ -576,7 +576,7 @@ function AdminScoreEditor({ event, eventPlayers, allScores, course, onClose, onS
                       className="w-full text-left px-3 py-2.5 border-b border-gray-100 transition-colors"
                       style={{ background: isSelected ? '#1B4332' : 'transparent', color: isSelected ? '#fff' : '#212529' }}
                     >
-                      <div className="text-xs font-semibold truncate">{ep.player?.last_name}, {ep.player?.first_name}</div>
+                      <div className="text-xs font-semibold truncate">{ep.player?.first_name} {ep.player?.last_name}</div>
                       <div className="text-xs mt-0.5" style={{ color: isSelected ? 'rgba(255,255,255,0.6)' : '#6c757d' }}>
                         {entered}/18 holes · CH {ep.course_handicap ?? '—'}
                       </div>
@@ -870,7 +870,7 @@ function TabFlights({ event, eventPlayers, course, allPlayers, onUpdated }) {
         {/* Player info */}
         <div className="flex-1 min-w-0">
           <div className="font-medium text-sm text-gray-900">
-            {ep.player?.last_name}, {ep.player?.first_name}
+            {ep.player?.first_name} {ep.player?.last_name}
           </div>
           <div className="text-xs text-gray-500 flex items-center gap-2 mt-1 flex-wrap">
             {ep.is_guest
@@ -1009,7 +1009,7 @@ function TabFlights({ event, eventPlayers, course, allPlayers, onUpdated }) {
             {unassigned.map(ep => (
               <div key={ep.id} className="flex items-center justify-between px-5 py-3">
                 <div>
-                  <div className="font-medium text-sm text-gray-900">{ep.player?.last_name}, {ep.player?.first_name}</div>
+                  <div className="font-medium text-sm text-gray-900">{ep.player?.first_name} {ep.player?.last_name}</div>
                   <div className="text-xs text-gray-500 flex items-center gap-3 mt-0.5">
                     <span>HI: {ep.handicap_index}</span>
                     {ep.course_handicap != null && <span>CH: {ep.course_handicap}</span>}
@@ -2225,7 +2225,7 @@ function SideGameSelect({ players, value, onChange }) {
       <option value="">— No winner yet —</option>
       {players.map(ep => (
         <option key={ep.player_id} value={ep.player_id}>
-          {ep.player?.last_name}, {ep.player?.first_name}
+          {ep.player?.first_name} {ep.player?.last_name}
           {ep.flight ? ` (Flight ${ep.flight})` : ''}
         </option>
       ))}
