@@ -31,7 +31,8 @@ import Upgrade        from './pages/Upgrade'
 import ResetPassword  from './pages/ResetPassword'
 import FAQ            from './pages/FAQ'
 import Privacy        from './pages/Privacy'
-import RefundPolicy   from './pages/RefundPolicy'
+import RefundPolicy      from './pages/RefundPolicy'
+import DisputeTemplate  from './pages/admin/DisputeTemplate'
 
 export default function App() {
   return (
@@ -50,7 +51,8 @@ export default function App() {
           <Route path="courses"       element={<Courses />} />
           <Route path="players"       element={<Players />} />
           <Route path="import"        element={<Import />} />
-          <Route path="settings"      element={<Settings />} />
+          <Route path="settings"          element={<Settings />} />
+          <Route path="dispute-template" element={<DisputeTemplate />} />
           <Route path=":orgSlug/:leagueSlug"            element={<OrgRouteWrapper><Leagues /></OrgRouteWrapper>} />
           <Route path=":orgSlug/:leagueSlug/:eventSlug" element={<OrgRouteWrapper><EventDetail /></OrgRouteWrapper>} />
         </Route>

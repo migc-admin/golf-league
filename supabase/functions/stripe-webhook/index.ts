@@ -152,6 +152,110 @@ serve(async (req) => {
         break
       }
 
+      case 'charge.dispute.created': {
+        const dispute   = event.data.object as Stripe.Dispute
+        const chargeId  = typeof dispute.charge === 'string' ? dispute.charge : dispute.charge?.id
+        const customerId = typeof dispute.payment_intent === 'string' ? null : null // resolved below
+
+        // Look up org by stripe_customer_id from the charge
+        let orgName  = 'Unknown'
+        let orgId    = 'Unknown'
+        let orgEmail = 'Unknown'
+
+        try {
+          const charge = await stripe.charges.retrieve(chargeId ?? '')
+          const cid    = typeof charge.customer === 'string' ? charge.customer : charge.customer?.id ?? ''
+          if (cid) {
+            const { data: orgs } = await supabase
+              .from('organizations')
+              .select('id, name')
+              .eq('stripe_customer_id', cid)
+              .limit(1)
+            if (orgs?.[0]) {
+              orgName = orgs[0].name
+              orgId   = orgs[0].id
+            }
+            // Get admin email for this org
+            const { data: profiles } = await supabase
+              .from('profiles')
+              .select('id')
+              .eq('org_id', orgId)
+              .eq('role', 'admin')
+              .limit(1)
+            if (profiles?.[0]) {
+              const { data: { user } } = await supabase.auth.admin.getUserById(profiles[0].id)
+              if (user?.email) orgEmail = user.email
+            }
+          }
+        } catch (lookupErr) {
+          console.error('Dispute org lookup failed:', lookupErr.message)
+        }
+
+        const amount   = (dispute.amount / 100).toLocaleString('en-US', { style: 'currency', currency: dispute.currency?.toUpperCase() ?? 'USD' })
+        const reason   = dispute.reason ?? 'unspecified'
+        const deadline = dispute.evidence_details?.due_by
+          ? new Date(dispute.evidence_details.due_by * 1000).toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })
+          : 'Check Stripe dashboard'
+        const alertTime = new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit' })
+
+        const RESEND_API_KEY = Deno.env.get('RESEND_API_KEY') ?? ''
+        const html = `
+          <div style="font-family: sans-serif; max-width: 560px; margin: 0 auto;">
+            <div style="background: #7f1d1d; padding: 24px; border-radius: 12px 12px 0 0;">
+              <h1 style="color: #fca5a5; margin: 0; font-size: 20px;">⚠️ Chargeback Filed</h1>
+              <p style="color: rgba(255,255,255,0.75); margin: 6px 0 0; font-size: 13px;">Alert generated: ${alertTime}</p>
+            </div>
+            <div style="background: #fff7f7; border: 1px solid #fecaca; border-top: none; padding: 20px; border-radius: 0 0 12px 12px;">
+              <p style="color: #991b1b; font-size: 14px; font-weight: 600; margin: 0 0 16px;">
+                A payment dispute has been filed. You have until <strong>${deadline}</strong> to submit evidence to Stripe.
+              </p>
+              <table style="width: 100%; border-collapse: collapse; font-size: 13px;">
+                <tr style="border-bottom: 1px solid #fee2e2;"><td style="padding: 8px 0; color: #6b7280; width: 140px;">Dispute ID</td><td style="padding: 8px 0; font-weight: 600; font-family: monospace;">${dispute.id}</td></tr>
+                <tr style="border-bottom: 1px solid #fee2e2;"><td style="padding: 8px 0; color: #6b7280;">Charge ID</td><td style="padding: 8px 0; font-family: monospace;">${chargeId ?? '—'}</td></tr>
+                <tr style="border-bottom: 1px solid #fee2e2;"><td style="padding: 8px 0; color: #6b7280;">Amount</td><td style="padding: 8px 0; font-weight: 700; color: #991b1b;">${amount}</td></tr>
+                <tr style="border-bottom: 1px solid #fee2e2;"><td style="padding: 8px 0; color: #6b7280;">Reason</td><td style="padding: 8px 0; text-transform: capitalize;">${reason.replace(/_/g, ' ')}</td></tr>
+                <tr style="border-bottom: 1px solid #fee2e2;"><td style="padding: 8px 0; color: #6b7280;">Status</td><td style="padding: 8px 0;">${dispute.status}</td></tr>
+                <tr style="border-bottom: 1px solid #fee2e2;"><td style="padding: 8px 0; color: #6b7280;">Organization</td><td style="padding: 8px 0;">${orgName}</td></tr>
+                <tr style="border-bottom: 1px solid #fee2e2;"><td style="padding: 8px 0; color: #6b7280;">Org ID</td><td style="padding: 8px 0; font-family: monospace; font-size: 11px;">${orgId}</td></tr>
+                <tr><td style="padding: 8px 0; color: #6b7280;">Admin Email</td><td style="padding: 8px 0;">${orgEmail}</td></tr>
+              </table>
+              <div style="margin-top: 20px; padding: 14px; background: #fff; border: 1px solid #fca5a5; border-radius: 8px;">
+                <p style="margin: 0 0 8px; font-size: 13px; font-weight: 700; color: #7f1d1d;">⏱ Next Steps</p>
+                <ol style="margin: 0; padding-left: 18px; font-size: 13px; color: #374151; line-height: 1.8;">
+                  <li>Open <a href="https://dashboard.stripe.com/disputes/${dispute.id}" style="color: #1B4332;">Stripe Dispute Dashboard</a></li>
+                  <li>Open <a href="https://www.scorifygolf.com/admin/dispute-template" style="color: #1B4332;">Dispute Response Template</a> in Scorify Golf admin</li>
+                  <li>Pull security logs and transaction records for org: ${orgId}</li>
+                  <li>Submit evidence before: <strong>${deadline}</strong></li>
+                </ol>
+              </div>
+            </div>
+            <p style="color: #9ca3af; font-size: 11px; text-align: center; margin-top: 16px;">Scorify Golf · admin@scorifygolf.com</p>
+          </div>
+        `
+
+        await fetch('https://api.resend.com/emails', {
+          method: 'POST',
+          headers: { 'Authorization': `Bearer ${RESEND_API_KEY}`, 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            from: 'notifications@scorifygolf.com',
+            to:   'admin@scorifygolf.com',
+            subject: `⚠️ Chargeback Filed — ${amount} · Due ${deadline}`,
+            html,
+          }),
+        })
+
+        await supabase.rpc('log_security_event', {
+          p_event: 'chargeback_filed', p_severity: 'error',
+          p_org_id: orgId !== 'Unknown' ? orgId : null,
+          p_endpoint: 'stripe-webhook',
+          p_message: `Dispute ${dispute.id} filed for ${amount} — reason: ${reason}`,
+          p_metadata: { dispute_id: dispute.id, charge_id: chargeId, amount: dispute.amount, reason, deadline, status: dispute.status },
+        })
+
+        console.log(`[stripe-webhook] chargeback alert sent — dispute=${dispute.id} amount=${amount} deadline=${deadline}`)
+        break
+      }
+
       default:
         console.log(`Unhandled event type: ${event.type}`)
     }
