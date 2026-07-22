@@ -846,8 +846,9 @@ function TabFlights({ event, eventPlayers, course, allPlayers, onUpdated }) {
   // Shared player row renderer — called as renderPlayerRow(ep), NOT as <PlayerRow>
   function renderPlayerRow(ep) {
     return (
-      <div key={ep.id} className="flex items-center justify-between px-5 py-3">
-        <div>
+      <div key={ep.id} className="flex flex-col sm:flex-row sm:items-center sm:justify-between px-5 py-3 gap-2">
+        {/* Player info */}
+        <div className="flex-1 min-w-0">
           <div className="font-medium text-sm text-gray-900">
             {ep.player?.last_name}, {ep.player?.first_name}
           </div>
@@ -865,13 +866,14 @@ function TabFlights({ event, eventPlayers, course, allPlayers, onUpdated }) {
             {ep.tournament_wins_prior > 0 && (
               <span className="text-fairway-700 font-medium">{ep.tournament_wins_prior} win{ep.tournament_wins_prior !== 1 ? 's' : ''}</span>
             )}
-            <button
-              onClick={() => setEditingEp(ep)}
-              style={{ background: '#e5e7eb', color: '#374151', border: 'none', borderRadius: 4, padding: '1px 8px', fontSize: 11, cursor: 'pointer', fontWeight: 600 }}
-            >Edit</button>
           </div>
         </div>
-        <div className="flex items-center gap-2">
+        {/* Controls */}
+        <div className="flex items-center gap-2 flex-wrap">
+          <button
+            onClick={() => setEditingEp(ep)}
+            style={{ background: '#e5e7eb', color: '#374151', border: 'none', borderRadius: 4, padding: '4px 10px', fontSize: 11, cursor: 'pointer', fontWeight: 600 }}
+          >Edit</button>
           {courseTees.length > 0 && (
             <select
               value={ep.tee ?? ''}
@@ -896,7 +898,11 @@ function TabFlights({ event, eventPlayers, course, allPlayers, onUpdated }) {
               <option value="B">Flight B</option>
             </select>
           )}
-          <button onClick={() => removePlayer(ep.id)} className="text-red-400 hover:text-red-600 text-xs">✕</button>
+          <button
+            onClick={() => removePlayer(ep.id)}
+            aria-label="Remove player"
+            className="text-red-400 hover:text-red-600 p-1"
+          >✕</button>
         </div>
       </div>
     )
@@ -2818,25 +2824,28 @@ function TabRegistrations({ event, onUpdated, orgId }) {
 
   function RegRow({ reg }) {
     return (
-      <div className="flex items-start justify-between py-3 gap-3">
-        <div className="flex-1 min-w-0">
+      <div className="py-3 space-y-2">
+        {/* Player info */}
+        <div className="flex items-center gap-2 flex-wrap">
+          <span className={`text-xs px-2 py-0.5 rounded-full font-medium capitalize shrink-0 ${STATUS_COLORS[reg.status]}`}>
+            {reg.status}
+          </span>
           <p className="text-sm font-semibold text-gray-900">
             {reg.first_name} {reg.last_name}
             {reg.flight && <span className="ml-2 text-xs text-gray-400">Flight {reg.flight}</span>}
           </p>
-          <p className="text-xs text-gray-500">
-            {reg.email && <span className="mr-3">{reg.email}</span>}
-            {reg.handicap_index != null && <span>HI: {reg.handicap_index}</span>}
-          </p>
-          {reg.notes && <p className="text-xs text-gray-400 italic mt-0.5">"{reg.notes}"</p>}
-          <p className="text-xs text-gray-400 mt-0.5">
-            {new Date(reg.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })}
-          </p>
         </div>
-        <div className="flex items-center gap-2 shrink-0">
-          <span className={`text-xs px-2 py-0.5 rounded-full font-medium capitalize ${STATUS_COLORS[reg.status]}`}>
-            {reg.status}
-          </span>
+        {reg.email && <p className="text-xs text-gray-500">{reg.email}</p>}
+        {reg.notes && (
+          <p className="text-xs text-gray-400 italic">
+            "{reg.notes}"
+          </p>
+        )}
+        <p className="text-xs text-gray-400">
+          {new Date(reg.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })}
+        </p>
+        {/* Actions */}
+        <div className="flex items-center gap-2 flex-wrap">
           {reg.status === 'pending' && (
             <>
               <Button size="sm" variant="primary" onClick={() => addToRoster(reg)}>
