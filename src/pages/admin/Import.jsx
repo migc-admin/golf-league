@@ -1147,13 +1147,13 @@ function ImportPastResults() {
       const frontPars    = parPerHole?.slice(0, 9) ?? []
       const backPars     = parPerHole?.slice(9, 18) ?? []
 
-      // Check if event already exists
+      // Check if event already exists (match by league + date + course)
       const { data: existingEvent } = await supabase
         .from('events')
         .select('id')
         .eq('league_id', leagueId)
         .eq('event_date', eventDate)
-        .ilike('name', eventName)
+        .eq('course_id', course.id)
         .maybeSingle()
 
       let eventId = existingEvent?.id
@@ -1175,11 +1175,9 @@ function ImportPastResults() {
           .insert({
             league_id:    leagueId,
             course_id:    course.id,
-            name:         eventName,
             event_date:   eventDate,
             event_number: eventNumber,
-            status:      'complete',
-            use_flights: eventRows.some(r => r.flight?.trim()),
+            status:       'complete',
           })
           .select('id')
           .single()
@@ -1225,13 +1223,15 @@ function ImportPastResults() {
           playerId = newP.id
         }
 
-        // Upsert event_player
+        // Upsert event_player (handicap_index is NOT NULL — use ch or 0 as fallback)
         const { data: ep, error: epErr } = await supabase
           .from('event_players')
           .upsert({
-            event_id:        eventId,
-            player_id:       playerId,
-            course_handicap: ch,
+            event_id:                eventId,
+            player_id:               playerId,
+            handicap_index:          ch ?? 0,
+            adjusted_handicap_index: ch ?? 0,
+            course_handicap:         ch,
             flight,
           }, { onConflict: 'event_id,player_id' })
           .select('id').single()
@@ -1308,7 +1308,7 @@ function ImportPastResults() {
         />
         <div className="bg-gray-900 rounded-lg px-4 py-3 text-xs text-gray-300 font-mono overflow-x-auto">
           <div className="text-gray-500 mb-1"># past_results_template.csv</div>
-          <div>event_name,event_date,course_name,tee,league_name,player_first,player_last,flight,handicap_index,gross_front,gross_back,putts</div>
+          <div>event_name,event_date,course_name,tee,league_name,player_first,player_last,flight,course_handicap,gross_front,gross_back,putts</div>
           <div className="text-gray-500">Event 1 - Sample Course,2024-04-15,Sample Golf Club,Yellow,,John,Smith,A,10,34,37,31</div>
           <div className="text-gray-500">Event 1 - Sample Course,2024-04-15,Sample Golf Club,Yellow,,Mike,Johnson,A,15,36,38,32</div>
         </div>
