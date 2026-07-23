@@ -15,7 +15,7 @@ import Card, { CardHeader } from '../../components/ui/Card'
 import Button from '../../components/ui/Button'
 import toast from 'react-hot-toast'
 
-const TABS = ['Players', 'Course', 'Event Roster']
+const TABS = ['Players', 'Course', 'Event Roster', 'Past Results']
 
 export default function Import() {
   const [activeTab, setActiveTab] = useState('Players')
@@ -49,6 +49,7 @@ export default function Import() {
       {activeTab === 'Players'      && <ImportPlayers />}
       {activeTab === 'Course'       && <ImportCourse />}
       {activeTab === 'Event Roster' && <ImportRoster />}
+      {activeTab === 'Past Results' && <ImportPastResults />}
     </div>
   )
 }
@@ -1032,6 +1033,362 @@ function ImportRoster() {
         <div className="bg-fairway-50 border border-fairway-200 rounded-xl p-4 text-sm text-fairway-800 font-medium">
           ✓ Done. Review players in the event's Players &amp; Flights tab to verify handicaps and flights.
         </div>
+      )}
+    </div>
+  )
+}
+
+// ─── Tab 4: Import Past Results ───────────────────────────────────
+const PAST_RESULTS_TEMPLATE = `event_name,event_date,course_name,tee,league_name,player_first,player_last,flight,handicap_index,gross_front,gross_back,putts
+Event 1 - Coronado GC,2024-04-15,Coronado Golf Club,Yellow,,Spencer,Higgins,A,10,34,37,31
+Event 1 - Coronado GC,2024-04-15,Coronado Golf Club,Yellow,,Carlos,Bouloy,A,15,36,38,32
+Event 1 - Coronado GC,2024-04-15,Coronado Golf Club,Yellow,,Kevin,Vargas,A,7,34,42,29`
+
+/**
+ * Distribute a 9-hole total across 9 holes proportionally by par.
+ * Returns array of 9 integers that sum to the total.
+ */
+function distributeByPar(total, pars) {
+  const parSum = pars.reduce((a, b) => a + b, 0)
+  const scores = pars.map(p => Math.floor(total * p / parSum))
+  let remainder = total - scores.reduce((a, b) => a + b, 0)
+  // Add remainder to highest-par holes first
+  const indices = [...pars.map((p, i) => ({ p, i }))].sort((a, b) => b.p - a.p)
+  for (const { i } of indices) {
+    if (remainder <= 0) break
+    scores[i]++
+    remainder--
+  }
+  return scores
+}
+
+function ImportPastResults() {
+  const { user } = useAuth()
+  const [rows,      setRows]      = useState([])
+  const [headers,   setHeaders]   = useState([])
+  const [importing, setImporting] = useState(false)
+  const [done,      setDone]      = useState(false)
+  const [orgId,     setOrgId]     = useState(null)
+  const [leagues,   setLeagues]   = useState([])
+  const [leagueId,  setLeagueId]  = useState('')
+  const [results,   setResults]   = useState([]) // per-event import results
+
+  useEffect(() => {
+    async function load() {
+      if (!user) return
+      const { data: profile } = await supabase.from('profiles').select('org_id').eq('id', user.id).single()
+      if (profile?.org_id) {
+        setOrgId(profile.org_id)
+        const { data: lgs } = await supabase.from('leagues').select('id, name').eq('org_id', profile.org_id).order('name')
+        setLeagues(lgs ?? [])
+      }
+    }
+    load()
+  }, [user])
+
+  function handleFile(text) {
+    setDone(false)
+    setResults([])
+    const { headers, rows } = parseCSV(text)
+    setHeaders(headers)
+    setRows(rows.map(r => ({ ...r, _status: null, _message: null })))
+  }
+
+  async function runImport() {
+    if (!leagueId) { toast.error('Select a league first'); return }
+    setImporting(true)
+
+    // Group rows by event_name + event_date
+    const eventGroups = {}
+    for (const row of rows) {
+      const key = `${row.event_name?.trim()}||${row.event_date?.trim()}`
+      if (!eventGroups[key]) eventGroups[key] = []
+      eventGroups[key].push(row)
+    }
+
+    const eventResults = []
+
+    for (const [key, eventRows] of Object.entries(eventGroups)) {
+      const firstRow   = eventRows[0]
+      const eventName  = firstRow.event_name?.trim()
+      const eventDate  = firstRow.event_date?.trim()
+      const courseName = firstRow.course_name?.trim()
+      const teeName    = firstRow.tee?.trim() || null
+
+      if (!eventName || !eventDate || !courseName) {
+        eventResults.push({ event: eventName || '(unnamed)', status: 'error', message: 'Missing event_name, event_date, or course_name' })
+        continue
+      }
+
+      // Look up course
+      const { data: course } = await supabase
+        .from('courses')
+        .select('id, slope, rating, par, par_per_hole, stroke_index, tees')
+        .ilike('name', courseName)
+        .limit(1)
+        .maybeSingle()
+
+      if (!course) {
+        eventResults.push({ event: eventName, status: 'error', message: `Course "${courseName}" not found. Add it via Import → Course first.` })
+        continue
+      }
+
+      // Resolve tee slope/rating
+      let slope  = course.slope
+      let rating = course.rating
+      if (teeName && course.tees?.length) {
+        const tee = course.tees.find(t => t.name?.toLowerCase() === teeName.toLowerCase())
+        if (tee) { slope = tee.slope; rating = tee.rating }
+      }
+
+      const parPerHole   = course.par_per_hole   // array[18]
+      const strokeIndex  = course.stroke_index    // array[18]
+      const frontPars    = parPerHole?.slice(0, 9) ?? []
+      const backPars     = parPerHole?.slice(9, 18) ?? []
+
+      // Check if event already exists
+      const { data: existingEvent } = await supabase
+        .from('events')
+        .select('id')
+        .eq('league_id', leagueId)
+        .eq('event_date', eventDate)
+        .ilike('name', eventName)
+        .maybeSingle()
+
+      let eventId = existingEvent?.id
+
+      if (!eventId) {
+        // Get next event number for this league
+        const { data: lastEvent } = await supabase
+          .from('events')
+          .select('event_number')
+          .eq('league_id', leagueId)
+          .order('event_number', { ascending: false })
+          .limit(1)
+          .maybeSingle()
+
+        const eventNumber = (lastEvent?.event_number ?? 0) + 1
+
+        const { data: newEvent, error: evErr } = await supabase
+          .from('events')
+          .insert({
+            league_id:    leagueId,
+            course_id:    course.id,
+            name:         eventName,
+            event_date:   eventDate,
+            event_number: eventNumber,
+            status:       'complete',
+            is_imported:  true,
+            scoring_format: 'stroke',
+            use_flights:  eventRows.some(r => r.flight?.trim()),
+          })
+          .select('id')
+          .single()
+
+        if (evErr) {
+          eventResults.push({ event: eventName, status: 'error', message: evErr.message })
+          continue
+        }
+        eventId = newEvent.id
+      }
+
+      // Import each player row
+      let playerOk = 0, playerErr = 0
+      for (const row of eventRows) {
+        const first  = row.player_first?.trim()
+        const last   = row.player_last?.trim()
+        const flight = row.flight?.trim().toUpperCase() || null
+        const hi     = parseFloat(row.handicap_index)
+        const front  = parseInt(row.gross_front)
+        const back   = parseInt(row.gross_back)
+        const putts  = row.putts?.trim() ? parseInt(row.putts) : null
+
+        if (!first || !last || isNaN(front) || isNaN(back)) {
+          playerErr++
+          continue
+        }
+
+        // Match or create player
+        let playerId = null
+        const { data: match } = await supabase
+          .from('players').select('id')
+          .ilike('first_name', first).ilike('last_name', last)
+          .limit(1).maybeSingle()
+
+        if (match) {
+          playerId = match.id
+        } else {
+          const { data: newP, error: pErr } = await supabase
+            .from('players')
+            .insert({ first_name: first, last_name: last, org_id: orgId })
+            .select('id').single()
+          if (pErr) { playerErr++; continue }
+          playerId = newP.id
+        }
+
+        // Course handicap
+        const ch = !isNaN(hi) ? Math.round((hi * slope / 113) + (rating - course.par)) : null
+
+        // Upsert event_player
+        const { data: ep, error: epErr } = await supabase
+          .from('event_players')
+          .upsert({
+            event_id:                eventId,
+            player_id:               playerId,
+            handicap_index:          isNaN(hi) ? null : hi,
+            adjusted_handicap_index: isNaN(hi) ? null : hi,
+            course_handicap:         ch,
+            flight,
+          }, { onConflict: 'event_id,player_id' })
+          .select('id').single()
+
+        if (epErr) { playerErr++; continue }
+
+        // Delete any existing scores for this player/event (re-import safe)
+        await supabase.from('scores').delete()
+          .eq('event_id', eventId).eq('player_id', playerId)
+
+        // Distribute front/back totals across holes proportionally by par
+        const frontScores = frontPars.length === 9 ? distributeByPar(front, frontPars) : Array(9).fill(Math.round(front / 9))
+        const backScores  = backPars.length  === 9 ? distributeByPar(back, backPars)   : Array(9).fill(Math.round(back  / 9))
+        const allScores   = [...frontScores, ...backScores]
+
+        const scoreRows = allScores.map((gross, idx) => ({
+          event_id:   eventId,
+          player_id:  playerId,
+          hole_number: idx + 1,
+          gross_score: gross,
+          putts:       idx === 0 && putts != null ? putts : null, // store total putts on h1 for now
+        }))
+
+        const { error: scErr } = await supabase.from('scores').insert(scoreRows)
+        if (scErr) { playerErr++; continue }
+
+        playerOk++
+      }
+
+      eventResults.push({
+        event:   eventName,
+        date:    eventDate,
+        status:  playerErr === 0 ? 'imported' : playerOk > 0 ? 'partial' : 'error',
+        message: `${playerOk} players imported${playerErr > 0 ? `, ${playerErr} errors` : ''}`,
+        eventId,
+      })
+    }
+
+    setResults(eventResults)
+    setImporting(false)
+    setDone(true)
+    const ok = eventResults.filter(r => r.status !== 'error').length
+    toast.success(`Done — ${ok} of ${eventResults.length} event${eventResults.length !== 1 ? 's' : ''} imported`)
+  }
+
+  return (
+    <div className="space-y-5">
+
+      {/* What this does */}
+      <div className="rounded-xl px-5 py-4 text-sm" style={{ background: '#f0fdf4', border: '1px solid #bbf7d0' }}>
+        <p className="font-semibold text-green-900 mb-1">Import historical tournament results</p>
+        <p className="text-green-800 leading-relaxed">
+          Use this to bring in past events managed outside Scorify. Provide front 9 and back 9 gross totals per player —
+          hole-by-hole scores are not required. Imported events are marked complete and contribute to TGL standings and season stats.
+        </p>
+      </div>
+
+      {/* Template */}
+      <Card>
+        <CardHeader
+          title="Step 1 — Download the template"
+          subtitle="One row per player per event. Multiple events can be in a single file."
+          action={
+            <Button size="sm" variant="secondary"
+              onClick={() => downloadTemplate('past_results_template.csv', PAST_RESULTS_TEMPLATE)}>
+              ⬇ Template
+            </Button>
+          }
+        />
+        <div className="bg-gray-900 rounded-lg px-4 py-3 text-xs text-gray-300 font-mono overflow-x-auto">
+          <div className="text-gray-500 mb-1"># past_results_template.csv</div>
+          <div>event_name,event_date,course_name,tee,league_name,player_first,player_last,flight,handicap_index,gross_front,gross_back,putts</div>
+          <div className="text-gray-500">Event 1 - Coronado GC,2024-04-15,Coronado Golf Club,Yellow,,Spencer,Higgins,A,10,34,37,31</div>
+          <div className="text-gray-500">Event 1 - Coronado GC,2024-04-15,Coronado Golf Club,Yellow,,Carlos,Bouloy,A,15,36,38,32</div>
+        </div>
+        <ul className="mt-3 text-xs text-gray-500 space-y-1 list-disc list-inside">
+          <li><strong>event_name</strong> and <strong>event_date</strong> (YYYY-MM-DD) identify the event. Multiple players with the same event_name+date are grouped into one event.</li>
+          <li><strong>course_name</strong> must match a course already in Scorify (use Import → Course to add it first).</li>
+          <li><strong>tee</strong> — optional tee name (e.g. Yellow, White) for slope/rating lookup.</li>
+          <li><strong>flight</strong> — A or B. Leave blank if no flights used.</li>
+          <li><strong>handicap_index</strong> — used to calculate course handicap and net score.</li>
+          <li><strong>gross_front</strong> / <strong>gross_back</strong> — required. Scores are distributed proportionally across holes by par.</li>
+          <li><strong>putts</strong> — optional round total. Stored for stats but not distributed per hole.</li>
+          <li>Players not in your roster will be created automatically.</li>
+        </ul>
+      </Card>
+
+      {/* League select */}
+      <Card>
+        <CardHeader title="Step 2 — Select the league" subtitle="Imported events will be added to this league." />
+        {leagues.length === 0
+          ? <p className="text-sm text-gray-400">No leagues found. Create a league first.</p>
+          : (
+            <select value={leagueId} onChange={e => setLeagueId(e.target.value)} className="input bg-white">
+              <option value="">Select league…</option>
+              {leagues.map(lg => <option key={lg.id} value={lg.id}>{lg.name}</option>)}
+            </select>
+          )}
+      </Card>
+
+      {/* Upload */}
+      <Card>
+        <CardHeader title="Step 3 — Upload your CSV" />
+        <FileDropZone onFile={handleFile} />
+        {rows.length > 0 && (
+          <p className="mt-3 text-sm text-gray-500">{rows.length} player rows loaded.</p>
+        )}
+      </Card>
+
+      {/* Preview */}
+      {rows.length > 0 && !done && (
+        <Card>
+          <CardHeader
+            title={`Step 4 — Review & Import`}
+            subtitle={`${rows.length} player rows across ${new Set(rows.map(r => r.event_name?.trim() + r.event_date?.trim())).size} event(s)`}
+            action={
+              <Button onClick={runImport} loading={importing} disabled={!leagueId}>
+                Import Results
+              </Button>
+            }
+          />
+          {!leagueId && (
+            <p className="mb-3 text-sm text-orange-600">Select a league above before importing.</p>
+          )}
+          <PreviewTable headers={headers} rows={rows} />
+        </Card>
+      )}
+
+      {/* Results summary */}
+      {done && results.length > 0 && (
+        <Card>
+          <CardHeader title="Import complete" />
+          <div className="divide-y divide-gray-100">
+            {results.map((r, i) => (
+              <div key={i} className="flex items-start justify-between gap-4 py-3">
+                <div>
+                  <p className="text-sm font-medium text-gray-900">{r.event}</p>
+                  {r.date && <p className="text-xs text-gray-400">{formatDate(r.date)}</p>}
+                </div>
+                <div className="text-right shrink-0">
+                  {r.status === 'imported' && <span className="text-xs font-medium text-green-700">✓ {r.message}</span>}
+                  {r.status === 'partial'  && <span className="text-xs font-medium text-amber-600">⚠ {r.message}</span>}
+                  {r.status === 'error'    && <span className="text-xs font-medium text-red-600">✕ {r.message}</span>}
+                </div>
+              </div>
+            ))}
+          </div>
+          <p className="mt-4 text-xs text-gray-400">
+            Imported events appear in Admin → Leagues as completed events. Go to Team Play → lock each event to include in TGL standings.
+          </p>
+        </Card>
       )}
     </div>
   )
