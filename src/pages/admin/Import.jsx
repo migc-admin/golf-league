@@ -1179,7 +1179,6 @@ function ImportPastResults() {
             event_number: eventNumber,
             status:       'complete',
             is_imported:  true,
-            scoring_format: 'stroke',
             use_flights:  eventRows.some(r => r.flight?.trim()),
           })
           .select('id')
