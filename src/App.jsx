@@ -30,6 +30,7 @@ import Onboarding    from './pages/Onboarding'
 import Upgrade        from './pages/Upgrade'
 import ResetPassword  from './pages/ResetPassword'
 import FAQ            from './pages/FAQ'
+import Help           from './pages/Help'
 import Privacy        from './pages/Privacy'
 import RefundPolicy      from './pages/RefundPolicy'
 import DisputeTemplate  from './pages/admin/DisputeTemplate'
@@ -67,6 +68,7 @@ export default function App() {
         <Route path="/register/:eventId" element={<Register />} />
         <Route path="/reset-password" element={<ResetPassword />} />
         <Route path="/faq"     element={<FAQ />} />
+        <Route path="/help"    element={<Help />} />
         <Route path="/privacy"        element={<Privacy />} />
         <Route path="/refund-policy"  element={<RefundPolicy />} />
 

@@ -13,7 +13,8 @@ const MENU_ITEMS = [
     title: 'Company',
     links: [
       { text: 'About',    url: '#about'            },
-      { text: 'Blog',     url: '#blog'             },
+      { text: 'Help',     url: '/help'             },
+      { text: 'FAQ',      url: '/faq'              },
       { text: 'Contact',  url: 'mailto:admin@scorifygolf.com' },
     ],
   },
