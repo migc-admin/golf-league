@@ -165,10 +165,10 @@ function PreviewTable({ headers, rows, statusKey = '_status', messageKey = '_mes
 
 // ─── Tab 1: Import Players ─────────────────────────────────────────
 const PLAYERS_TEMPLATE = `first_name,last_name,email,handicap_index,course_handicap,flight,role
-Tony,Alvarez,tony@example.com,5.2,6,A,player
-Dave,Kowalski,dave@example.com,11.1,13,A,player
-Bob,Nguyen,bob@example.com,15.3,,B,player
-Sarah,Okonkwo,sarah@example.com,18.7,22,B,admin`
+John,Smith,john@example.com,5.2,6,A,player
+Mike,Johnson,mike@example.com,11.1,13,A,player
+Tom,Williams,tom@example.com,15.3,,B,player
+Chris,Davis,chris@example.com,18.7,22,B,admin`
 
 function ImportPlayers() {
   const { user } = useAuth()
@@ -331,9 +331,9 @@ function ImportPlayers() {
         <div className="bg-gray-900 rounded-lg px-4 py-3 text-xs text-gray-300 font-mono overflow-x-auto">
           <div className="text-gray-500 mb-1"># players_template.csv</div>
           <div>first_name,last_name,email,handicap_index,course_handicap,flight,role</div>
-          <div className="text-gray-500">Tony,Alvarez,tony@example.com,5.2,6,A,player</div>
-          <div className="text-gray-500">Dave,Kowalski,dave@example.com,11.1,13,A,admin</div>
-          <div className="text-gray-500">Bob,Nguyen,bob@example.com,15.3,,B,player</div>
+          <div className="text-gray-500">John,Smith,john@example.com,5.2,6,A,player</div>
+          <div className="text-gray-500">Mike,Johnson,mike@example.com,11.1,13,A,admin</div>
+          <div className="text-gray-500">Tom,Williams,tom@example.com,15.3,,B,player</div>
         </div>
         <ul className="mt-3 text-xs text-gray-500 space-y-1 list-disc list-inside">
           <li><strong>first_name</strong> and <strong>last_name</strong> are required</li>
@@ -679,10 +679,10 @@ function ImportCourse() {
 
 // ─── Tab 3: Import Event Roster ────────────────────────────────────
 const ROSTER_TEMPLATE = `first_name,last_name,handicap_index,flight,course_handicap
-Tony,Alvarez,5.2,A,6
-Dave,Kowalski,11.1,A,13
-Bob,Nguyen,15.3,B,18
-Sarah,Okonkwo,18.7,B,22`
+John,Smith,5.2,A,6
+Mike,Johnson,11.1,A,13
+Tom,Williams,15.3,B,18
+Chris,Davis,18.7,B,22`
 
 function ImportRoster() {
   const [events,       setEvents]       = useState([])
@@ -911,9 +911,9 @@ function ImportRoster() {
         <div className="bg-gray-900 rounded-lg px-4 py-3 text-xs text-gray-300 font-mono overflow-x-auto">
           <div className="text-gray-500 mb-1"># roster_template.csv</div>
           <div>first_name,last_name,handicap_index,flight,course_handicap</div>
-          <div className="text-gray-500">Tony,Alvarez,5.2,A,6</div>
-          <div className="text-gray-500">Dave,Kowalski,11.1,A,13</div>
-          <div className="text-gray-500">Bob,Nguyen,15.3,B,18</div>
+          <div className="text-gray-500">John,Smith,5.2,A,6</div>
+          <div className="text-gray-500">Mike,Johnson,11.1,A,13</div>
+          <div className="text-gray-500">Tom,Williams,15.3,B,18</div>
         </div>
         <ul className="mt-3 text-xs text-gray-500 space-y-1 list-disc list-inside">
           <li><strong>first_name</strong> and <strong>last_name</strong> are required</li>
@@ -1039,10 +1039,10 @@ function ImportRoster() {
 }
 
 // ─── Tab 4: Import Past Results ───────────────────────────────────
-const PAST_RESULTS_TEMPLATE = `event_name,event_date,course_name,tee,league_name,player_first,player_last,flight,handicap_index,gross_front,gross_back,putts
-Event 1 - Coronado GC,2024-04-15,Coronado Golf Club,Yellow,,Spencer,Higgins,A,10,34,37,31
-Event 1 - Coronado GC,2024-04-15,Coronado Golf Club,Yellow,,Carlos,Bouloy,A,15,36,38,32
-Event 1 - Coronado GC,2024-04-15,Coronado Golf Club,Yellow,,Kevin,Vargas,A,7,34,42,29`
+const PAST_RESULTS_TEMPLATE = `event_name,event_date,course_name,tee,league_name,player_first,player_last,flight,course_handicap,gross_front,gross_back,putts
+Event 1 - Sample Course,2024-04-15,Sample Golf Club,Yellow,,John,Smith,A,10,34,37,31
+Event 1 - Sample Course,2024-04-15,Sample Golf Club,Yellow,,Mike,Johnson,A,15,36,38,32
+Event 1 - Sample Course,2024-04-15,Sample Golf Club,Yellow,,Tom,Williams,A,7,34,42,29`
 
 /**
  * Distribute a 9-hole total across 9 holes proportionally by par.
@@ -1198,7 +1198,7 @@ function ImportPastResults() {
         const first  = row.player_first?.trim()
         const last   = row.player_last?.trim()
         const flight = row.flight?.trim().toUpperCase() || null
-        const hi     = parseFloat(row.handicap_index)
+        const ch     = row.course_handicap?.trim() ? parseInt(row.course_handicap) : null
         const front  = parseInt(row.gross_front)
         const back   = parseInt(row.gross_back)
         const putts  = row.putts?.trim() ? parseInt(row.putts) : null
@@ -1225,9 +1225,6 @@ function ImportPastResults() {
           if (pErr) { playerErr++; continue }
           playerId = newP.id
         }
-
-        // Course handicap
-        const ch = !isNaN(hi) ? Math.round((hi * slope / 113) + (rating - course.par)) : null
 
         // Upsert event_player
         const { data: ep, error: epErr } = await supabase
@@ -1310,15 +1307,15 @@ function ImportPastResults() {
         <div className="bg-gray-900 rounded-lg px-4 py-3 text-xs text-gray-300 font-mono overflow-x-auto">
           <div className="text-gray-500 mb-1"># past_results_template.csv</div>
           <div>event_name,event_date,course_name,tee,league_name,player_first,player_last,flight,handicap_index,gross_front,gross_back,putts</div>
-          <div className="text-gray-500">Event 1 - Coronado GC,2024-04-15,Coronado Golf Club,Yellow,,Spencer,Higgins,A,10,34,37,31</div>
-          <div className="text-gray-500">Event 1 - Coronado GC,2024-04-15,Coronado Golf Club,Yellow,,Carlos,Bouloy,A,15,36,38,32</div>
+          <div className="text-gray-500">Event 1 - Sample Course,2024-04-15,Sample Golf Club,Yellow,,John,Smith,A,10,34,37,31</div>
+          <div className="text-gray-500">Event 1 - Sample Course,2024-04-15,Sample Golf Club,Yellow,,Mike,Johnson,A,15,36,38,32</div>
         </div>
         <ul className="mt-3 text-xs text-gray-500 space-y-1 list-disc list-inside">
           <li><strong>event_name</strong> and <strong>event_date</strong> (YYYY-MM-DD) identify the event. Multiple players with the same event_name+date are grouped into one event.</li>
           <li><strong>course_name</strong> must match a course already in Scorify (use Import → Course to add it first).</li>
           <li><strong>tee</strong> — optional tee name (e.g. Yellow, White) for slope/rating lookup.</li>
           <li><strong>flight</strong> — A or B. Leave blank if no flights used.</li>
-          <li><strong>handicap_index</strong> — used to calculate course handicap and net score.</li>
+          <li><strong>course_handicap</strong> — the course handicap assigned for that tournament (not the USGA index). Used directly for net score calculation.</li>
           <li><strong>gross_front</strong> / <strong>gross_back</strong> — required. Scores are distributed proportionally across holes by par.</li>
           <li><strong>putts</strong> — optional round total. Stored for stats but not distributed per hole.</li>
           <li>Players not in your roster will be created automatically.</li>
