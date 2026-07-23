@@ -1097,6 +1097,7 @@ function ImportPastResults() {
   async function runImport() {
     if (!leagueId) { toast.error('Select a league first'); return }
     setImporting(true)
+    try {
 
     // Group rows by event_name + event_date
     const eventGroups = {}
@@ -1177,9 +1178,8 @@ function ImportPastResults() {
             name:         eventName,
             event_date:   eventDate,
             event_number: eventNumber,
-            status:       'complete',
-            is_imported:  true,
-            use_flights:  eventRows.some(r => r.flight?.trim()),
+            status:      'complete',
+            use_flights: eventRows.some(r => r.flight?.trim()),
           })
           .select('id')
           .single()
@@ -1229,11 +1229,9 @@ function ImportPastResults() {
         const { data: ep, error: epErr } = await supabase
           .from('event_players')
           .upsert({
-            event_id:                eventId,
-            player_id:               playerId,
-            handicap_index:          isNaN(hi) ? null : hi,
-            adjusted_handicap_index: isNaN(hi) ? null : hi,
-            course_handicap:         ch,
+            event_id:        eventId,
+            player_id:       playerId,
+            course_handicap: ch,
             flight,
           }, { onConflict: 'event_id,player_id' })
           .select('id').single()
@@ -1273,10 +1271,15 @@ function ImportPastResults() {
     }
 
     setResults(eventResults)
-    setImporting(false)
     setDone(true)
     const ok = eventResults.filter(r => r.status !== 'error').length
     toast.success(`Done — ${ok} of ${eventResults.length} event${eventResults.length !== 1 ? 's' : ''} imported`)
+    } catch (err) {
+      toast.error(err.message ?? 'Import failed — check console for details')
+      console.error('[PastResults import]', err)
+    } finally {
+      setImporting(false)
+    }
   }
 
   return (
