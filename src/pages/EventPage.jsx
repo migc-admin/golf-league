@@ -283,8 +283,9 @@ function GroupList({ eventPlayers, event }) {
     <div className="space-y-3">
       <h2 className="text-sm font-bold text-ink-muted uppercase tracking-widest">Pairings</h2>
       {sorted.map(([groupNum, members]) => {
-        const teeTime = computeTeeTime(event.start_time, event.shotgun_start ? 0 : (event.tee_time_interval_mins ?? 10), parseInt(groupNum))
-        const code = event.group_codes?.[groupNum] ?? null
+        const teeTime   = computeTeeTime(event.start_time, event.shotgun_start ? 0 : (event.tee_time_interval_mins ?? 10), parseInt(groupNum))
+        const code      = event.group_codes?.[groupNum] ?? null
+        const startHole = event.shotgun_start ? (event.group_hole_assignments?.[groupNum] ?? null) : null
         return (
           <div key={groupNum} className="card overflow-hidden p-0">
             <div className="flex items-center justify-between px-4 py-3" style={{ background: '#1B4332', color: '#fff' }}>
@@ -303,12 +304,20 @@ function GroupList({ eventPlayers, event }) {
                   </div>
                 )}
               </div>
-              {teeTime && (
-                <div className="text-right">
-                  <div className="font-bold text-base">{teeTime}</div>
-                  <div className="text-xs" style={{ color: 'rgba(255,255,255,0.6)' }}>Tee time</div>
-                </div>
-              )}
+              <div className="flex items-center gap-3">
+                {startHole && (
+                  <div className="text-right">
+                    <div className="font-bold text-base">Hole {startHole}</div>
+                    <div className="text-xs" style={{ color: 'rgba(255,255,255,0.6)' }}>Start hole</div>
+                  </div>
+                )}
+                {teeTime && (
+                  <div className="text-right">
+                    <div className="font-bold text-base">{teeTime}</div>
+                    <div className="text-xs" style={{ color: 'rgba(255,255,255,0.6)' }}>Tee time</div>
+                  </div>
+                )}
+              </div>
             </div>
             <div className="divide-y" style={{ borderColor: '#ebe9e4' }}>
               {members.map(ep => (
