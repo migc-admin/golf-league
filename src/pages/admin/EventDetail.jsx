@@ -2761,8 +2761,9 @@ function AccessCodeSection({ event, eventPlayers, onUpdated, orgSlug }) {
 
 // ─── Tab: Registrations ───────────────────────────────────────────
 function TabRegistrations({ event, onUpdated, orgId }) {
-  const [regs,    setRegs]    = useState([])
-  const [loading, setLoading] = useState(true)
+  const [regs,              setRegs]              = useState([])
+  const [loading,           setLoading]           = useState(true)
+  const [confirmedExpanded, setConfirmedExpanded] = useState(false)
 
   const regUrl = `${window.location.origin}/register/${event.id}`
 
@@ -2929,8 +2930,16 @@ function TabRegistrations({ event, onUpdated, orgId }) {
 
           {confirmed.length > 0 && (
             <Card>
-              <CardHeader title={`Confirmed (${confirmed.length})`} />
-              <div className="divide-y divide-gray-100 px-4">{confirmed.map(r => <RegRow key={r.id} reg={r} />)}</div>
+              <button
+                onClick={() => setConfirmedExpanded(v => !v)}
+                className="w-full flex items-center justify-between px-4 py-3 text-left hover:bg-gray-50 transition-colors"
+              >
+                <span className="text-sm font-semibold text-gray-900">Confirmed ({confirmed.length})</span>
+                <span className="text-gray-400 text-xs">{confirmedExpanded ? '▲ Hide' : '▼ Show'}</span>
+              </button>
+              {confirmedExpanded && (
+                <div className="divide-y divide-gray-100 px-4 pb-2">{confirmed.map(r => <RegRow key={r.id} reg={r} />)}</div>
+              )}
             </Card>
           )}
 
