@@ -412,7 +412,7 @@ function TabOverview({ event, eventPlayers, allScores, sideGames, course, confli
           <Row label="League"       value={event.league?.name} />
           <Row label="Format"       value={FORMAT_LABELS[event.format] ?? event.format ?? 'Net Stroke Play'} />
           <Row label="Start Time"   value={event.start_time ? formatTime(event.start_time) : '—'} />
-          <Row label="Tee Interval" value={`${event.tee_time_interval_mins ?? 10} min`} />
+          {!event.shotgun_start && <Row label="Tee Interval" value={`${event.tee_time_interval_mins ?? 10} min`} />}
           <Row label="Entry Fee"    value={`$${event.entry_fee}`} />
           {event.tournament_fee > 0 && <Row label="Tournament Entry Fee" value={`$${Number(event.tournament_fee).toFixed(2)}`} />}
           <Row label="Status"       value={<StatusBadge status={event.status} />} />
@@ -2590,7 +2590,7 @@ function EditEventModal({ open, onClose, event, onSaved }) {
           </div>
         </div>
 
-        <Input label="Tee Interval (min)" type="number" min="1" max="60" value={interval} onChange={e => setInterval(e.target.value)} />
+        {!shotgunStart && <Input label="Tee Interval (min)" type="number" min="1" max="60" value={interval} onChange={e => setInterval(e.target.value)} />}
 
         {/* Payout Basis */}
         <div>

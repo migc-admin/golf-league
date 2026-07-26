@@ -207,7 +207,7 @@ export default function Schedule() {
         )}
 
         {sortedGroups.map(([groupNum, members]) => {
-          const teeTime = computeTeeTime(event.start_time, event.tee_time_interval_mins ?? 10, parseInt(groupNum))
+          const teeTime = computeTeeTime(event.start_time, event.shotgun_start ? 0 : (event.tee_time_interval_mins ?? 10), parseInt(groupNum))
           const groupCode = event.group_codes?.[groupNum] ?? null
           return (
             <GroupCard

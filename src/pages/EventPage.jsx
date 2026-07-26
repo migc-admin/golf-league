@@ -283,7 +283,7 @@ function GroupList({ eventPlayers, event }) {
     <div className="space-y-3">
       <h2 className="text-sm font-bold text-ink-muted uppercase tracking-widest">Pairings</h2>
       {sorted.map(([groupNum, members]) => {
-        const teeTime = computeTeeTime(event.start_time, event.tee_time_interval_mins ?? 10, parseInt(groupNum))
+        const teeTime = computeTeeTime(event.start_time, event.shotgun_start ? 0 : (event.tee_time_interval_mins ?? 10), parseInt(groupNum))
         const code = event.group_codes?.[groupNum] ?? null
         return (
           <div key={groupNum} className="card overflow-hidden p-0">

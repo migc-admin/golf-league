@@ -277,7 +277,7 @@ function buildCard({ event, course, groupNum, players, code, qrDataUrl, ctpHoles
     hRight.appendChild(ftBlock)
   }
 
-  const teeTime = computeTeeTime(event.start_time, event.tee_time_interval_mins ?? 10, groupNum)
+  const teeTime = computeTeeTime(event.start_time, event.shotgun_start ? 0 : (event.tee_time_interval_mins ?? 10), groupNum)
 
   const groupBadge = el('div', {
     background: GOLD, color: '#1a1a1a',
