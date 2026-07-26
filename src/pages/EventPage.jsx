@@ -138,17 +138,6 @@ export default function EventPage() {
             <StatusBadge status={event.status} />
           </div>
 
-          {/* Live Scoring CTA */}
-          {event.status === 'active' && (
-            <div style={{ marginBottom: 20 }}>
-              <Link to={leaderboardUrl}
-                style={{ display: 'inline-flex', alignItems: 'center', gap: 8, background: '#fff', color: '#1B4332', fontWeight: 800, fontSize: 14, padding: '9px 20px', borderRadius: 999, textDecoration: 'none' }}>
-                <span style={{ width: 8, height: 8, borderRadius: '50%', background: '#16a34a', display: 'inline-block' }} />
-                Live Scoring ↗
-              </Link>
-            </div>
-          )}
-
           {/* Tab bar — attached to bottom of hero */}
           <div style={{ display: 'flex', gap: 2, overflowX: 'auto', scrollbarWidth: 'none' }}>
             {TABS.map(tab => (
@@ -214,10 +203,9 @@ function OverviewTab({ event, formats, sideGames, playerCount, leaderboardUrl })
     : (event.start_time ? formatTime(event.start_time) : '—')
 
   const stats = [
-    { label: 'Players',   value: playerCount ?? '—' },
-    { label: 'Format',    value: FORMAT_SHORT[primaryFormat] ?? primaryFormat ?? '—' },
-    { label: 'Start',     value: startLabel },
-    { label: 'Entry Fee', value: event.entry_fee ? `$${Number(event.entry_fee).toFixed(0)}` : '—' },
+    { label: 'Players', value: playerCount ?? '—' },
+    { label: 'Format',  value: 'Stroke Play' },
+    { label: 'Start',   value: startLabel },
   ]
 
   const visibleSideGames = sideGames.filter(s => s !== 'track_putts')
@@ -226,7 +214,7 @@ function OverviewTab({ event, formats, sideGames, playerCount, leaderboardUrl })
     <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
 
       {/* Stat grid */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 12 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12 }}>
         {stats.map(s => (
           <div key={s.label} style={{ background: '#fff', borderRadius: 14, padding: '16px 18px', border: '1px solid #e5e7eb' }}>
             <div style={{ fontSize: 10, fontWeight: 700, color: '#9ca3af', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 6 }}>{s.label}</div>
