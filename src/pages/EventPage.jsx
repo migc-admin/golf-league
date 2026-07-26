@@ -1,7 +1,6 @@
 /**
- * Public Event Page
- * Shareable landing page for a specific event — no login required.
- * Shows event details, links to Pairings and Leaderboard.
+ * Public Event Page — multi-tab microsite layout
+ * Tabs: Overview · Pairings · Leaderboard
  */
 
 import { useEffect, useState } from 'react'
@@ -12,23 +11,36 @@ const FORMAT_ORDER = ['net_stroke_front9', 'net_stroke_back9', 'net_stroke']
 const FORMAT_LABELS = {
   net_stroke_front9: 'Net Stroke Play (Front 9)',
   net_stroke_back9:  'Net Stroke Play (Back 9)',
-  net_stroke:        'Net Stroke Play (18-hole)',
+  net_stroke:        'Net Stroke Play',
   stableford:        'Stableford',
   match_points:      'Match Play Points',
   ryder_cup:         'Ryder Cup',
 }
-
-const SIDE_GAME_LABELS = {
-  skins:         'Skins',
-  skins_a:       'Skins — Flight A',
-  skins_b:       'Skins — Flight B',
-  long_drive:    'Long Drive',
-  long_drive_a:  'Long Drive — Flight A',
-  long_drive_b:  'Long Drive — Flight B',
-  low_putts:     'Low Putts',
-  ctp:           'Closest to Pin',
-  track_putts:   'Putts Tracked',
+const FORMAT_SHORT = {
+  net_stroke_front9: 'Net Stroke · Front 9',
+  net_stroke_back9:  'Net Stroke · Back 9',
+  net_stroke:        'Net Stroke',
+  stableford:        'Stableford',
+  match_points:      'Match Points',
+  ryder_cup:         'Ryder Cup',
 }
+const SIDE_GAME_LABELS = {
+  skins:        'Skins',
+  skins_a:      'Skins — Flight A',
+  skins_b:      'Skins — Flight B',
+  long_drive:   'Long Drive',
+  long_drive_a: 'Long Drive — Flight A',
+  long_drive_b: 'Long Drive — Flight B',
+  low_putts:    'Low Putts',
+  ctp:          'Closest to Pin',
+  track_putts:  'Putts Tracked',
+}
+
+const TABS = [
+  { key: 'overview',    label: 'Overview'     },
+  { key: 'pairings',   label: 'Pairings'     },
+  { key: 'leaderboard',label: 'Leaderboard'  },
+]
 
 export default function EventPage() {
   const { orgSlug, leagueSlug, eventSlug } = useParams()
@@ -39,46 +51,38 @@ export default function EventPage() {
   const [playerCount,  setPlayerCount]  = useState(null)
   const [eventPlayers, setEventPlayers] = useState([])
   const [loading,      setLoading]      = useState(true)
-  const [activeTab,    setActiveTab]    = useState('about')
+  const [activeTab,    setActiveTab]    = useState('overview')
 
   useEffect(() => {
     async function load() {
       try {
-      let ev = null
+        let ev = null
+        if (directEventId) {
+          const { data } = await supabase
+            .from('events')
+            .select('*, course:courses(name), league:leagues(name, season_year, slug, logo_url)')
+            .eq('id', directEventId).single()
+          ev = data
+        } else {
+          const { data: league } = await supabase.from('leagues').select('id').eq('slug', leagueSlug).single()
+          if (!league) { setLoading(false); return }
+          const { data } = await supabase
+            .from('events')
+            .select('*, course:courses(name), league:leagues(name, season_year, slug, logo_url)')
+            .eq('league_id', league.id).eq('slug', eventSlug).single()
+          ev = data
+        }
+        if (!ev) { setLoading(false); return }
+        setEvent(ev)
 
-      if (directEventId) {
-        const { data } = await supabase
-          .from('events')
-          .select('*, course:courses(name), league:leagues(name, season_year, slug, logo_url)')
-          .eq('id', directEventId)
-          .single()
-        ev = data
-      } else {
-        const { data: league } = await supabase
-          .from('leagues').select('id').eq('slug', leagueSlug).single()
-        if (!league) { setLoading(false); return }
-        const { data } = await supabase
-          .from('events')
-          .select('*, course:courses(name), league:leagues(name, season_year, slug, logo_url)')
-          .eq('league_id', league.id)
-          .eq('slug', eventSlug)
-          .single()
-        ev = data
-      }
-
-      if (!ev) { setLoading(false); return }
-      setEvent(ev)
-
-      const { data: eps, count } = await supabase
-        .from('event_players')
-        .select('*, player:players(first_name, last_name)', { count: 'exact' })
-        .eq('event_id', ev.id)
-        .order('group_number')
-        .order('flight')
-        .order('adjusted_handicap_index')
-      setEventPlayers(eps ?? [])
-      setPlayerCount(count ?? 0)
-      setLoading(false)
+        const { data: eps, count } = await supabase
+          .from('event_players')
+          .select('*, player:players(first_name, last_name)', { count: 'exact' })
+          .eq('event_id', ev.id)
+          .order('group_number').order('flight').order('adjusted_handicap_index')
+        setEventPlayers(eps ?? [])
+        setPlayerCount(count ?? 0)
+        setLoading(false)
       } catch (err) {
         console.error('EventPage load error:', err)
         setLoading(false)
@@ -88,266 +92,350 @@ export default function EventPage() {
   }, [directEventId, leagueSlug, eventSlug])
 
   if (loading) return <Skeleton />
-
   if (!event) return (
-    <div className="min-h-screen flex items-center justify-center" style={{ background: '#fbfaf8' }}>
+    <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#f5f4f0' }}>
       <p style={{ color: '#86868b' }}>Event not found.</p>
     </div>
   )
 
-  const eid = event.id
+  const eid            = event.id
   const leaderboardUrl = `/${orgSlug}/${event.league?.slug ?? leagueSlug}/${event.slug}/leaderboard?eid=${eid}`
-  const scheduleUrl    = `/${orgSlug}/${event.league?.slug ?? leagueSlug}/${event.slug}/schedule?eid=${eid}`
-  const formats  = event.formats ?? (event.format ? [event.format] : [])
-  const sideGames = event.side_game_options ?? []
+  const formats        = event.formats ?? (event.format ? [event.format] : [])
+  const sideGames      = event.side_game_options ?? []
+  const eventName      = event.name ?? `Event #${event.event_number}`
 
   return (
-    <div className="min-h-screen flex flex-col" style={{ background: '#fbfaf8' }}>
+    <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column', background: '#f5f4f0' }}>
 
-      {/* Hero header */}
-      <div style={{ background: '#1B4332' }}>
-        <div className="max-w-2xl mx-auto px-4 py-8 flex items-center gap-4">
-          {event.league?.logo_url ? (
-            <img
-              src={event.league.logo_url}
-              alt=""
-              className="w-16 h-16 rounded-full object-cover shrink-0"
-              style={{ background: '#1B4332' }}
-            />
-          ) : (
-            <div
-              className="w-16 h-16 rounded-xl shrink-0 flex items-center justify-center text-white font-black text-xl"
-              style={{ background: 'rgba(255,255,255,0.15)' }}
-            >
-              {(event.league?.name ?? leagueSlug ?? '').slice(0, 2).toUpperCase()}
+      {/* ── Hero ─────────────────────────────────────────────────────── */}
+      <div style={{ background: 'linear-gradient(150deg, #1a3d2e 0%, #1B4332 55%, #2d6a4f 100%)' }}>
+        <div style={{ maxWidth: 768, margin: '0 auto', padding: '36px 20px 0' }}>
+
+          {/* League identity */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 22 }}>
+            {event.league?.logo_url ? (
+              <img src={event.league.logo_url} alt=""
+                style={{ width: 44, height: 44, borderRadius: '50%', objectFit: 'cover', border: '2px solid rgba(255,255,255,0.25)', flexShrink: 0 }} />
+            ) : (
+              <div style={{ width: 44, height: 44, borderRadius: '50%', background: 'rgba(255,255,255,0.15)', border: '2px solid rgba(255,255,255,0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 900, fontSize: 15, color: '#fff', flexShrink: 0 }}>
+                {(event.league?.name ?? '').slice(0, 2).toUpperCase()}
+              </div>
+            )}
+            <span style={{ color: 'rgba(255,255,255,0.65)', fontSize: 13, fontWeight: 600 }}>
+              {event.league?.name}{event.league?.season_year ? ` · ${event.league.season_year}` : ''}
+            </span>
+          </div>
+
+          {/* Event name */}
+          <h1 style={{ color: '#fff', fontSize: 'clamp(22px, 5vw, 34px)', fontWeight: 900, letterSpacing: '-0.03em', lineHeight: 1.1, marginBottom: 14 }}>
+            {eventName}
+          </h1>
+
+          {/* Meta pills */}
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginBottom: 20 }}>
+            <HeroPill>📅 {shortDate(event.event_date)}</HeroPill>
+            <HeroPill>⛳ {event.course?.name ?? 'TBD'}</HeroPill>
+            <StatusBadge status={event.status} />
+          </div>
+
+          {/* Live Scoring CTA */}
+          {event.status === 'active' && (
+            <div style={{ marginBottom: 20 }}>
+              <Link to={leaderboardUrl}
+                style={{ display: 'inline-flex', alignItems: 'center', gap: 8, background: '#fff', color: '#1B4332', fontWeight: 800, fontSize: 14, padding: '9px 20px', borderRadius: 999, textDecoration: 'none' }}>
+                <span style={{ width: 8, height: 8, borderRadius: '50%', background: '#16a34a', display: 'inline-block' }} />
+                Live Scoring ↗
+              </Link>
             </div>
           )}
-          <div>
-            <div className="text-sm font-semibold mb-1" style={{ color: 'rgba(255,255,255,0.6)' }}>
-              {event.league?.name} · {event.league?.season_year}
-            </div>
-            <h1 className="text-2xl font-black text-white" style={{ letterSpacing: '-0.03em' }}>
-              {event.name ?? `Event #${event.event_number}`}
-            </h1>
-          </div>
-        </div>
 
-        {/* Tabs */}
-        <div className="max-w-2xl mx-auto px-4 flex gap-1 pb-0">
-          {[
-            { key: 'about',       label: 'About' },
-            { key: 'pairings',    label: 'Pairings' },
-            { key: 'leaderboard', label: 'Leaderboard' },
-          ].map(tab => (
-            <button
-              key={tab.key}
-              onClick={() => setActiveTab(tab.key)}
-              className="px-4 py-2.5 text-sm font-semibold rounded-t-lg transition-colors"
-              style={{
-                background: activeTab === tab.key ? '#fbfaf8' : 'transparent',
-                color: activeTab === tab.key ? '#1B4332' : 'rgba(255,255,255,0.7)',
-              }}
-            >
-              {tab.label}
-            </button>
-          ))}
+          {/* Tab bar — attached to bottom of hero */}
+          <div style={{ display: 'flex', gap: 2, overflowX: 'auto', scrollbarWidth: 'none' }}>
+            {TABS.map(tab => (
+              <button key={tab.key} onClick={() => setActiveTab(tab.key)}
+                style={{
+                  padding: '11px 22px',
+                  fontSize: 14,
+                  fontWeight: 700,
+                  whiteSpace: 'nowrap',
+                  border: 'none',
+                  cursor: 'pointer',
+                  borderRadius: '10px 10px 0 0',
+                  transition: 'all 0.15s',
+                  background: activeTab === tab.key ? '#f5f4f0' : 'transparent',
+                  color:      activeTab === tab.key ? '#1B4332'  : 'rgba(255,255,255,0.6)',
+                }}>
+                {tab.label}
+              </button>
+            ))}
+          </div>
         </div>
       </div>
 
-      {/* Tab content */}
-      <div className="max-w-2xl mx-auto w-full px-4 py-6 flex-1">
+      {/* ── Tab Content ──────────────────────────────────────────────── */}
+      <div style={{ maxWidth: 768, margin: '0 auto', width: '100%', padding: '24px 20px', flex: 1 }}>
 
-        {activeTab === 'about' && (
-          <div className="space-y-5">
-            {/* Status badge */}
-            <StatusPill status={event.status} />
-
-            {/* Detail cards */}
-            <div className="card p-0 overflow-hidden divide-y" style={{ borderColor: '#ebe9e4' }}>
-              <DetailRow icon="📅">
-                <span className="font-semibold text-ink">{formatDate(event.event_date)}</span>
-                {event.start_time && (
-                  <div className="text-sm text-ink-muted mt-0.5">First Tee Time — {formatTime(event.start_time)}</div>
-                )}
-              </DetailRow>
-
-              <DetailRow icon="⛳">
-                <span className="font-semibold text-ink">{event.course?.name ?? '—'}</span>
-              </DetailRow>
-
-              {formats.length > 0 && (
-                <DetailRow icon="🏌️" label="Format">
-                  <div className="space-y-0.5">
-                    {[...formats].sort((a, b) => {
-                      const ai = FORMAT_ORDER.indexOf(a), bi = FORMAT_ORDER.indexOf(b)
-                      return (ai === -1 ? 99 : ai) - (bi === -1 ? 99 : bi)
-                    }).map(f => (
-                      <div key={f} className="font-semibold text-ink">{FORMAT_LABELS[f] ?? f}</div>
-                    ))}
-                    {event.use_flights && (
-                      <div className="text-xs text-ink-muted mt-1">Flight A &amp; Flight B</div>
-                    )}
-                  </div>
-                </DetailRow>
-              )}
-
-              {sideGames.filter(s => s !== 'track_putts').length > 0 && (
-                <DetailRow icon="🎯" label="Side Games">
-                  <div className="flex flex-wrap gap-1.5">
-                    {sideGames.filter(s => s !== 'track_putts').map(s => (
-                      <span key={s} className="text-xs font-medium px-2.5 py-1 rounded-full" style={{ background: '#eceae5', color: '#1d1d1f' }}>
-                        {SIDE_GAME_LABELS[s] ?? s}
-                      </span>
-                    ))}
-                  </div>
-                </DetailRow>
-              )}
-
-              {playerCount !== null && (
-                <DetailRow icon="👥" label="Players">
-                  <span className="font-semibold text-ink">{playerCount} registered</span>
-                </DetailRow>
-              )}
-
-            </div>
-          </div>
+        {activeTab === 'overview' && (
+          <OverviewTab
+            event={event}
+            formats={formats}
+            sideGames={sideGames}
+            playerCount={playerCount}
+            leaderboardUrl={leaderboardUrl}
+          />
         )}
 
         {activeTab === 'pairings' && (
-          <div className="space-y-4">
-            <GroupList eventPlayers={eventPlayers} event={event} />
-          </div>
+          <GroupList eventPlayers={eventPlayers} event={event} />
         )}
 
         {activeTab === 'leaderboard' && (
-          <div className="space-y-4">
-            {event.status === 'upcoming' ? (
-              <div className="text-center py-16 text-ink-muted">
-                <div className="text-4xl mb-3">⏳</div>
-                <p className="font-semibold">Leaderboard not yet available</p>
-                <p className="text-sm mt-1">Check back once the event is underway.</p>
-              </div>
-            ) : (
-              <div className="card overflow-hidden p-0">
-                <div className="px-4 py-4 flex items-center justify-between" style={{ borderBottom: '1px solid #ebe9e4' }}>
-                  <span className="font-semibold text-ink text-sm">Live Leaderboard</span>
-                  <Link
-                    to={leaderboardUrl}
-                    className="text-xs font-semibold px-3 py-1.5 rounded-full"
-                    style={{ background: '#1B4332', color: '#ffffff' }}
-                  >
-                    Full view ↗
-                  </Link>
-                </div>
-                <div className="px-4 py-6 text-center text-ink-muted text-sm">
-                  <Link to={leaderboardUrl} className="font-semibold underline" style={{ color: '#1B4332' }}>
-                    Open full leaderboard →
-                  </Link>
-                </div>
-              </div>
-            )}
-          </div>
+          <LeaderboardTab event={event} leaderboardUrl={leaderboardUrl} />
         )}
       </div>
 
       {/* Footer */}
-      <div className="text-center text-xs py-6" style={{ color: '#c7c7cc' }}>
+      <div style={{ textAlign: 'center', fontSize: 12, color: '#c7c7cc', padding: '24px 0' }}>
         Powered by Scorify Golf
       </div>
     </div>
   )
 }
 
-// ─── Group List (used on both About and Pairings tabs) ───────────────────────
+// ─── Overview Tab ─────────────────────────────────────────────────────────────
+function OverviewTab({ event, formats, sideGames, playerCount, leaderboardUrl }) {
+  const primaryFormat = [...formats].sort((a, b) => {
+    const ai = FORMAT_ORDER.indexOf(a), bi = FORMAT_ORDER.indexOf(b)
+    return (ai === -1 ? 99 : ai) - (bi === -1 ? 99 : bi)
+  })[0]
+
+  const startLabel = event.shotgun_start
+    ? 'Shotgun'
+    : (event.start_time ? formatTime(event.start_time) : '—')
+
+  const stats = [
+    { label: 'Players',   value: playerCount ?? '—' },
+    { label: 'Format',    value: FORMAT_SHORT[primaryFormat] ?? primaryFormat ?? '—' },
+    { label: 'Start',     value: startLabel },
+    { label: 'Entry Fee', value: event.entry_fee ? `$${Number(event.entry_fee).toFixed(0)}` : '—' },
+  ]
+
+  const visibleSideGames = sideGames.filter(s => s !== 'track_putts')
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+
+      {/* Stat grid */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 12 }}>
+        {stats.map(s => (
+          <div key={s.label} style={{ background: '#fff', borderRadius: 14, padding: '16px 18px', border: '1px solid #e5e7eb' }}>
+            <div style={{ fontSize: 10, fontWeight: 700, color: '#9ca3af', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 6 }}>{s.label}</div>
+            <div style={{ fontSize: 20, fontWeight: 800, color: '#1d1d1f', letterSpacing: '-0.02em', lineHeight: 1.1 }}>{s.value}</div>
+          </div>
+        ))}
+      </div>
+
+      {/* Additional formats (if more than one) */}
+      {formats.length > 1 && (
+        <Section label="Scoring Formats">
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+            {[...formats].sort((a, b) => {
+              const ai = FORMAT_ORDER.indexOf(a), bi = FORMAT_ORDER.indexOf(b)
+              return (ai === -1 ? 99 : ai) - (bi === -1 ? 99 : bi)
+            }).map(f => (
+              <div key={f} style={{ fontSize: 14, fontWeight: 600, color: '#1d1d1f' }}>{FORMAT_LABELS[f] ?? f}</div>
+            ))}
+          </div>
+        </Section>
+      )}
+
+      {/* Flights */}
+      {event.use_flights && (
+        <Section label="Flights">
+          <div style={{ display: 'flex', gap: 8 }}>
+            <FlightBadge flight="A" />
+            <FlightBadge flight="B" />
+          </div>
+        </Section>
+      )}
+
+      {/* Side games */}
+      {visibleSideGames.length > 0 && (
+        <Section label="Side Games">
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+            {visibleSideGames.map(s => (
+              <span key={s} style={{ background: '#f0fdf4', color: '#166534', fontSize: 13, fontWeight: 600, padding: '5px 12px', borderRadius: 999, border: '1px solid #bbf7d0' }}>
+                {SIDE_GAME_LABELS[s] ?? s}
+              </span>
+            ))}
+          </div>
+        </Section>
+      )}
+
+      {/* Leaderboard CTA */}
+      {event.status !== 'upcoming' && (
+        <Link to={leaderboardUrl} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: '#1B4332', color: '#fff', borderRadius: 14, padding: '18px 22px', textDecoration: 'none' }}>
+          <div>
+            <div style={{ fontSize: 12, fontWeight: 600, color: 'rgba(255,255,255,0.6)', marginBottom: 3 }}>View results</div>
+            <div style={{ fontSize: 17, fontWeight: 900, letterSpacing: '-0.02em' }}>Full Leaderboard →</div>
+          </div>
+          {event.status === 'active' && (
+            <span style={{ background: '#4ade80', color: '#14532d', fontSize: 11, fontWeight: 800, padding: '5px 12px', borderRadius: 999, textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+              Live
+            </span>
+          )}
+        </Link>
+      )}
+    </div>
+  )
+}
+
+// ─── Leaderboard Tab ──────────────────────────────────────────────────────────
+function LeaderboardTab({ event, leaderboardUrl }) {
+  if (event.status === 'upcoming') {
+    return (
+      <div style={{ textAlign: 'center', paddingTop: 80, paddingBottom: 80 }}>
+        <div style={{ fontSize: 44, marginBottom: 12 }}>⏳</div>
+        <div style={{ fontSize: 17, fontWeight: 700, color: '#1d1d1f', marginBottom: 6 }}>Leaderboard not yet available</div>
+        <div style={{ fontSize: 14, color: '#86868b' }}>Check back once the event is underway.</div>
+      </div>
+    )
+  }
+  return (
+    <Link to={leaderboardUrl}
+      style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: '#1B4332', color: '#fff', borderRadius: 14, padding: '22px 24px', textDecoration: 'none' }}>
+      <div>
+        <div style={{ fontSize: 12, fontWeight: 600, color: 'rgba(255,255,255,0.6)', marginBottom: 4 }}>Official results</div>
+        <div style={{ fontSize: 20, fontWeight: 900, letterSpacing: '-0.02em' }}>Open Leaderboard ↗</div>
+      </div>
+      {event.status === 'active' && (
+        <span style={{ background: '#4ade80', color: '#14532d', fontSize: 11, fontWeight: 800, padding: '5px 12px', borderRadius: 999, textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+          Live
+        </span>
+      )}
+    </Link>
+  )
+}
+
+// ─── Group List (Pairings tab) ────────────────────────────────────────────────
 function GroupList({ eventPlayers, event }) {
+  const [search, setSearch] = useState('')
+
   const groups = {}
   for (const ep of eventPlayers) {
     const g = ep.group_number ?? 0
     if (!groups[g]) groups[g] = []
     groups[g].push(ep)
   }
-  const sorted = Object.entries(groups)
-    .filter(([k]) => k !== '0')
-    .sort(([a], [b]) => parseInt(a) - parseInt(b))
+  const sorted    = Object.entries(groups).filter(([k]) => k !== '0').sort(([a], [b]) => parseInt(a) - parseInt(b))
   const ungrouped = groups[0] ?? []
 
-  if (sorted.length === 0 && ungrouped.length === 0) return (
-    <div className="text-center py-12 text-ink-muted">
-      <div className="text-4xl mb-3">⛳</div>
-      <p className="font-semibold">Pairings not posted yet</p>
-      <p className="text-sm mt-1">Check back closer to the event.</p>
-    </div>
-  )
+  const q = search.toLowerCase().trim()
+  const filteredSorted = q
+    ? sorted.filter(([, members]) => members.some(ep => `${ep.player?.first_name ?? ''} ${ep.player?.last_name ?? ''}`.toLowerCase().includes(q)))
+    : sorted
+
+  if (sorted.length === 0 && ungrouped.length === 0) {
+    return (
+      <div style={{ textAlign: 'center', paddingTop: 80, paddingBottom: 80 }}>
+        <div style={{ fontSize: 44, marginBottom: 12 }}>⛳</div>
+        <div style={{ fontSize: 17, fontWeight: 700, color: '#1d1d1f', marginBottom: 6 }}>Pairings not posted yet</div>
+        <div style={{ fontSize: 14, color: '#86868b' }}>Check back closer to the event.</div>
+      </div>
+    )
+  }
+
+  const assignedCount = eventPlayers.filter(ep => ep.group_number).length
 
   return (
-    <div className="space-y-3">
-      <h2 className="text-sm font-bold text-ink-muted uppercase tracking-widest">Pairings</h2>
-      {sorted.map(([groupNum, members]) => {
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+
+      {/* Search */}
+      <div style={{ position: 'relative' }}>
+        <span style={{ position: 'absolute', left: 14, top: '50%', transform: 'translateY(-50%)', color: '#9ca3af', fontSize: 15, pointerEvents: 'none' }}>🔍</span>
+        <input
+          type="text"
+          placeholder="Search players…"
+          value={search}
+          onChange={e => setSearch(e.target.value)}
+          style={{ width: '100%', padding: '11px 16px 11px 42px', fontSize: 14, borderRadius: 12, border: '1px solid #d1d5db', background: '#fff', boxSizing: 'border-box', outline: 'none' }}
+        />
+      </div>
+
+      {/* Summary */}
+      <div style={{ fontSize: 13, color: '#9ca3af', fontWeight: 500 }}>
+        {q
+          ? `${filteredSorted.length} group${filteredSorted.length !== 1 ? 's' : ''} matching "${search}"`
+          : `${sorted.length} groups · ${assignedCount} players`}
+      </div>
+
+      {/* Group cards */}
+      {filteredSorted.map(([groupNum, members]) => {
         const teeTime   = computeTeeTime(event.start_time, event.shotgun_start ? 0 : (event.tee_time_interval_mins ?? 10), parseInt(groupNum))
         const code      = event.group_codes?.[groupNum] ?? null
         const startHole = event.shotgun_start ? (event.group_hole_assignments?.[groupNum] ?? null) : null
         return (
-          <div key={groupNum} className="card overflow-hidden p-0">
-            <div className="flex items-center justify-between px-4 py-3" style={{ background: '#1B4332', color: '#fff' }}>
-              <div className="flex items-center gap-3">
-                <div className="w-8 h-8 rounded-full flex items-center justify-center font-bold text-sm" style={{ background: 'rgba(255,255,255,0.2)' }}>
+          <div key={groupNum} style={{ background: '#fff', borderRadius: 14, overflow: 'hidden', border: '1px solid #e5e7eb' }}>
+            {/* Header */}
+            <div style={{ background: '#1B4332', color: '#fff', padding: '13px 18px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 11 }}>
+                <div style={{ width: 32, height: 32, borderRadius: '50%', background: 'rgba(255,255,255,0.18)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800, fontSize: 14, flexShrink: 0 }}>
                   {groupNum}
                 </div>
                 <div>
-                  <div className="font-bold text-sm">Group {groupNum}</div>
-                  <div className="text-xs" style={{ color: 'rgba(255,255,255,0.6)' }}>{members.length} players</div>
+                  <div style={{ fontWeight: 700, fontSize: 14 }}>Group {groupNum}</div>
+                  <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.55)' }}>{members.length} players</div>
                 </div>
                 {code && (
-                  <div className="rounded-lg px-2.5 py-1" style={{ background: 'rgba(255,255,255,0.15)' }}>
-                    <div className="text-xs leading-none mb-0.5" style={{ color: 'rgba(255,255,255,0.6)' }}>Code</div>
-                    <div className="font-bold text-sm tracking-widest">{code}</div>
+                  <div style={{ background: 'rgba(255,255,255,0.15)', borderRadius: 8, padding: '4px 10px', marginLeft: 4 }}>
+                    <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.55)', marginBottom: 1 }}>Code</div>
+                    <div style={{ fontWeight: 800, fontSize: 13, letterSpacing: '0.1em' }}>{code}</div>
                   </div>
                 )}
               </div>
-              <div className="flex items-center gap-3">
+              <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
                 {startHole && (
-                  <div className="text-right">
-                    <div className="font-bold text-base">Hole {startHole}</div>
-                    <div className="text-xs" style={{ color: 'rgba(255,255,255,0.6)' }}>Start hole</div>
+                  <div style={{ textAlign: 'right' }}>
+                    <div style={{ fontWeight: 800, fontSize: 16 }}>Hole {startHole}</div>
+                    <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.55)' }}>Start hole</div>
                   </div>
                 )}
                 {teeTime && (
-                  <div className="text-right">
-                    <div className="font-bold text-base">{teeTime}</div>
-                    <div className="text-xs" style={{ color: 'rgba(255,255,255,0.6)' }}>Tee time</div>
+                  <div style={{ textAlign: 'right' }}>
+                    <div style={{ fontWeight: 800, fontSize: 16 }}>{teeTime}</div>
+                    <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.55)' }}>Tee time</div>
                   </div>
                 )}
               </div>
             </div>
-            <div className="divide-y" style={{ borderColor: '#ebe9e4' }}>
-              {members.map(ep => (
-                <div key={ep.player_id} className="flex items-center justify-between px-4 py-2.5">
-                  <div className="flex items-center gap-2">
-                    {ep.flight && (
-                      <span className={`w-5 h-5 rounded-full flex items-center justify-center text-xs font-bold ${ep.flight === 'A' ? 'bg-blue-100 text-blue-700' : 'bg-purple-100 text-purple-700'}`}>
-                        {ep.flight}
-                      </span>
-                    )}
-                    <span className="text-sm font-semibold text-ink">
-                      {ep.player?.first_name} {ep.player?.last_name}
-                    </span>
-                    {ep.is_scorekeeper && (
-                      <span className="text-xs px-1.5 py-0.5 rounded font-medium" style={{ background: '#eceae5', color: '#1B4332' }}>SK</span>
-                    )}
-                  </div>
-                  <span className="text-xs text-ink-muted">CH {ep.course_handicap ?? ep.handicap_index}</span>
+            {/* Players */}
+            {members.map((ep, idx) => (
+              <div key={ep.player_id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '11px 18px', borderTop: idx > 0 ? '1px solid #f3f4f6' : 'none' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 9 }}>
+                  {ep.flight && <FlightBadge flight={ep.flight} small />}
+                  <span style={{ fontSize: 14, fontWeight: 600, color: '#1d1d1f' }}>
+                    {ep.player?.first_name} {ep.player?.last_name}
+                  </span>
+                  {ep.is_scorekeeper && (
+                    <span style={{ fontSize: 11, fontWeight: 700, padding: '2px 7px', borderRadius: 6, background: '#f0fdf4', color: '#1B4332' }}>SK</span>
+                  )}
                 </div>
-              ))}
-            </div>
+                <span style={{ fontSize: 12, color: '#9ca3af', fontWeight: 500 }}>
+                  CH {ep.course_handicap ?? ep.handicap_index ?? '—'}
+                </span>
+              </div>
+            ))}
           </div>
         )
       })}
-      {ungrouped.length > 0 && (
-        <div className="card p-4">
-          <p className="text-xs font-semibold text-ink-muted uppercase tracking-wide mb-3">Unassigned</p>
-          <div className="space-y-2">
+
+      {/* Ungrouped */}
+      {ungrouped.length > 0 && !q && (
+        <div style={{ background: '#fff', borderRadius: 14, padding: '16px 18px', border: '1px solid #e5e7eb' }}>
+          <div style={{ fontSize: 11, fontWeight: 700, color: '#9ca3af', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 10 }}>Unassigned</div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
             {ungrouped.map(ep => (
-              <div key={ep.player_id} className="text-sm text-ink">
+              <div key={ep.player_id} style={{ fontSize: 14, color: '#1d1d1f', fontWeight: 500 }}>
                 {ep.player?.first_name} {ep.player?.last_name}
               </div>
             ))}
@@ -358,60 +446,93 @@ function GroupList({ eventPlayers, event }) {
   )
 }
 
-// ─── Helpers ──────────────────────────────────────────────────────────────────
-function DetailRow({ icon, label, children }) {
+// ─── Shared small components ──────────────────────────────────────────────────
+
+function Section({ label, children }) {
   return (
-    <div className="flex items-start gap-4 px-4 py-3.5">
-      <span className="text-xl shrink-0 mt-0.5">{icon}</span>
-      <div className="flex-1 min-w-0">
-        {label && <div className="text-xs text-ink-muted mb-0.5">{label}</div>}
-        {children}
-      </div>
+    <div style={{ background: '#fff', borderRadius: 14, padding: '16px 18px', border: '1px solid #e5e7eb' }}>
+      <div style={{ fontSize: 10, fontWeight: 700, color: '#9ca3af', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 10 }}>{label}</div>
+      {children}
     </div>
   )
 }
 
-function StatusPill({ status }) {
-  const map = {
-    upcoming: { bg: '#fef9c3', color: '#854d0e', label: 'Upcoming' },
-    active:   { bg: '#dcfce7', color: '#166534', label: 'In Progress' },
-    complete: { bg: '#eceae5', color: '#86868b', label: 'Complete' },
-  }
-  const { bg, color, label } = map[status] ?? { bg: '#eceae5', color: '#86868b', label: status }
+function HeroPill({ children }) {
   return (
-    <span className="inline-block text-xs font-bold px-3 py-1.5 rounded-full" style={{ background: bg, color }}>
+    <span style={{ background: 'rgba(255,255,255,0.13)', color: 'rgba(255,255,255,0.88)', fontSize: 13, fontWeight: 600, padding: '5px 13px', borderRadius: 999 }}>
+      {children}
+    </span>
+  )
+}
+
+function StatusBadge({ status }) {
+  const map = {
+    upcoming: { bg: 'rgba(254,249,195,0.92)', color: '#854d0e',              label: 'Upcoming'    },
+    active:   { bg: 'rgba(74,222,128,0.92)',  color: '#14532d',              label: 'In Progress' },
+    complete: { bg: 'rgba(255,255,255,0.18)', color: 'rgba(255,255,255,0.8)', label: 'Complete'   },
+  }
+  const { bg, color, label } = map[status] ?? { bg: 'rgba(255,255,255,0.18)', color: 'rgba(255,255,255,0.8)', label: status }
+  return (
+    <span style={{ background: bg, color, fontSize: 12, fontWeight: 800, padding: '5px 12px', borderRadius: 999 }}>
       {label}
     </span>
   )
 }
 
+function FlightBadge({ flight, small }) {
+  const isA = flight === 'A'
+  return (
+    <span style={{
+      width:        small ? 22 : 'auto',
+      height:       small ? 22 : 'auto',
+      minWidth:     small ? 22 : 'auto',
+      borderRadius: small ? '50%' : 999,
+      padding:      small ? 0 : '4px 12px',
+      display:      'inline-flex',
+      alignItems:   'center',
+      justifyContent: 'center',
+      fontSize:     small ? 11 : 13,
+      fontWeight:   800,
+      background:   isA ? '#dbeafe' : '#ede9fe',
+      color:        isA ? '#1d4ed8' : '#6d28d9',
+    }}>
+      {small ? flight : `Flight ${flight}`}
+    </span>
+  )
+}
+
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+
 function computeTeeTime(startTime, intervalMins, groupNum) {
   if (!startTime) return null
   const [h, m] = startTime.split(':').map(Number)
-  const total = h * 60 + m + (groupNum - 1) * intervalMins
-  const hh = Math.floor(total / 60) % 24
-  const mm = total % 60
-  const ampm = hh >= 12 ? 'PM' : 'AM'
-  const h12 = hh % 12 || 12
+  const total  = h * 60 + m + (groupNum - 1) * intervalMins
+  const hh     = Math.floor(total / 60) % 24
+  const mm     = total % 60
+  const ampm   = hh >= 12 ? 'PM' : 'AM'
+  const h12    = hh % 12 || 12
   return `${h12}:${mm.toString().padStart(2, '0')} ${ampm}`
-}
-
-function formatDate(d) {
-  return new Date(d + 'T00:00:00').toLocaleDateString('en-US', {
-    weekday: 'long', month: 'long', day: 'numeric', year: 'numeric',
-  })
 }
 
 function formatTime(t) {
   return computeTeeTime(t, 0, 1) ?? t
 }
 
+function shortDate(d) {
+  return new Date(d + 'T00:00:00').toLocaleDateString('en-US', {
+    month: 'short', day: 'numeric', year: 'numeric',
+  })
+}
+
 function Skeleton() {
   return (
-    <div className="min-h-screen" style={{ background: '#fbfaf8' }}>
-      <div className="h-36 animate-pulse" style={{ background: '#1B4332', opacity: 0.7 }} />
-      <div className="max-w-2xl mx-auto px-4 py-6 space-y-4">
-        {[0,1,2].map(i => <div key={i} className="h-16 rounded-xl animate-pulse" style={{ background: '#eceae5' }} />)}
+    <div style={{ minHeight: '100vh', background: '#f5f4f0' }}>
+      <div style={{ height: 240, background: '#1B4332', opacity: 0.8 }} />
+      <div style={{ maxWidth: 768, margin: '0 auto', padding: '24px 20px', display: 'flex', flexDirection: 'column', gap: 14 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 12 }}>
+          {[0,1,2,3].map(i => <div key={i} style={{ height: 80, borderRadius: 14, background: '#e5e7eb', animation: 'pulse 1.5s infinite' }} />)}
+        </div>
+        {[0,1].map(i => <div key={i} style={{ height: 60, borderRadius: 14, background: '#e5e7eb', animation: 'pulse 1.5s infinite' }} />)}
       </div>
     </div>
   )
