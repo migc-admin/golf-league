@@ -198,9 +198,9 @@ function OverviewTab({ event, formats, sideGames, playerCount, leaderboardUrl })
     return (ai === -1 ? 99 : ai) - (bi === -1 ? 99 : bi)
   })[0]
 
-  const startLabel = event.shotgun_start
-    ? 'Shotgun'
-    : (event.start_time ? formatTime(event.start_time) : '—')
+  const startLabel = event.start_time
+    ? `${formatTime(event.start_time)}${event.shotgun_start ? ' · Shotgun' : ''}`
+    : (event.shotgun_start ? 'Shotgun' : '—')
 
   const stats = [
     { label: 'Players', value: playerCount ?? '—' },
