@@ -1672,11 +1672,189 @@ function TabGroups({ event, eventPlayers, onUpdated }) {
 
   const groupNums = [...new Set(eventPlayers.map(ep => ep.group_number).filter(Boolean))].sort((a,b) => a - b)
 
+  const [showAutoAssign, setShowAutoAssign] = useState(false)
+  const [autoMethod,     setAutoMethod]     = useState('random')
+  const [groupSize,      setGroupSize]      = useState(4)
+  const [autoLoading,    setAutoLoading]    = useState(false)
+
+  async function runAutoAssign() {
+    setAutoLoading(true)
+    try {
+      // Work on all enrolled players
+      let players = [...eventPlayers]
+
+      // Sort players based on method
+      if (autoMethod === 'alpha') {
+        players.sort(epAlpha)
+      } else if (autoMethod === 'handicap_balanced') {
+        players.sort((a, b) => (a.course_handicap ?? a.handicap_index ?? 99) - (b.course_handicap ?? b.handicap_index ?? 99))
+      } else if (autoMethod === 'handicap_grouped') {
+        players.sort((a, b) => (a.course_handicap ?? a.handicap_index ?? 99) - (b.course_handicap ?? b.handicap_index ?? 99))
+      } else if (autoMethod === 'by_flight') {
+        players.sort((a, b) => {
+          const fa = a.flight ?? 'Z', fb = b.flight ?? 'Z'
+          if (fa !== fb) return fa < fb ? -1 : 1
+          return epAlpha(a, b)
+        })
+      } else {
+        // random
+        for (let i = players.length - 1; i > 0; i--) {
+          const j = Math.floor(Math.random() * (i + 1));
+          [players[i], players[j]] = [players[j], players[i]]
+        }
+      }
+
+      // For balanced handicap: snake draft into groups
+      let assignments = {} // epId -> groupNumber
+      const size = parseInt(groupSize, 10)
+      const numGroups = Math.ceil(players.length / size)
+
+      if (autoMethod === 'handicap_balanced') {
+        // Create empty group buckets
+        const buckets = Array.from({ length: numGroups }, () => [])
+        players.forEach((ep, idx) => {
+          // Snake: go forward then backward across groups
+          const round = Math.floor(idx / numGroups)
+          const pos   = idx % numGroups
+          const groupIdx = round % 2 === 0 ? pos : numGroups - 1 - pos
+          buckets[groupIdx].push(ep)
+        })
+        buckets.forEach((bucket, gi) => {
+          bucket.forEach(ep => { assignments[ep.id] = gi + 1 })
+        })
+      } else {
+        // Sequential fill
+        players.forEach((ep, idx) => {
+          assignments[ep.id] = Math.floor(idx / size) + 1
+        })
+      }
+
+      // Persist all assignments in parallel
+      await Promise.all(
+        Object.entries(assignments).map(([id, group]) =>
+          supabase.from('event_players').update({ group_number: group }).eq('id', id)
+        )
+      )
+
+      // Auto-assign first player in each group as scorekeeper
+      const groupMap = {}
+      for (const [id, group] of Object.entries(assignments)) {
+        if (!groupMap[group]) groupMap[group] = id
+      }
+      await Promise.all(
+        Object.values(groupMap).map(id =>
+          supabase.from('event_players').update({ is_scorekeeper: true }).eq('id', id)
+        )
+      )
+
+      setShowAutoAssign(false)
+      onUpdated()
+      toast.success(`${players.length} players assigned to ${numGroups} groups`)
+    } catch (err) {
+      toast.error('Auto-assign failed: ' + err.message)
+    } finally {
+      setAutoLoading(false)
+    }
+  }
+
+  async function clearAllGroups() {
+    await Promise.all(
+      eventPlayers.map(ep =>
+        supabase.from('event_players').update({ group_number: null, is_scorekeeper: false }).eq('id', ep.id)
+      )
+    )
+    onUpdated()
+    toast.success('All group assignments cleared')
+  }
+
+  const AUTO_METHODS = [
+    { key: 'random',             label: 'Random',                    desc: 'Shuffle all players randomly into groups' },
+    { key: 'handicap_balanced',  label: 'Balanced by Handicap',      desc: 'Snake draft — each group gets a mix of low and high handicaps' },
+    { key: 'handicap_grouped',   label: 'Grouped by Handicap',       desc: 'Low handicaps together, high handicaps together' },
+    { key: 'by_flight',          label: 'By Flight',                 desc: 'Keep Flight A and Flight B players in separate groups' },
+    { key: 'alpha',              label: 'Alphabetical',              desc: 'Assign A–Z by first name, filling groups sequentially' },
+  ]
+
   return (
     <div className="space-y-4">
-      <p className="text-sm text-gray-600">
-        Assign players to groups (2–4 per group). Use the arrows to reorder players within a group. Mark one player per group as scorekeeper.
-      </p>
+      {/* Toolbar */}
+      <div className="flex items-center justify-between">
+        <p className="text-sm text-gray-600">
+          Assign players to groups (2–4 per group). Mark one player per group as scorekeeper.
+        </p>
+        <div className="flex items-center gap-2 shrink-0">
+          {eventPlayers.some(ep => ep.group_number) && (
+            <Button size="sm" variant="ghost" onClick={clearAllGroups}>
+              Clear All
+            </Button>
+          )}
+          <Button size="sm" onClick={() => setShowAutoAssign(true)}>
+            ⚡ Auto-Assign
+          </Button>
+        </div>
+      </div>
+
+      {/* Auto-assign modal */}
+      {showAutoAssign && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-6 space-y-5">
+            <div>
+              <h2 className="text-lg font-bold text-gray-900">Auto-Assign Groups</h2>
+              <p className="text-sm text-gray-500 mt-1">Choose a method and group size. This will overwrite all current assignments.</p>
+            </div>
+
+            {/* Method selector */}
+            <div className="space-y-2">
+              {AUTO_METHODS.map(m => (
+                <label key={m.key} className={`flex items-start gap-3 rounded-xl border-2 px-4 py-3 cursor-pointer transition-colors ${autoMethod === m.key ? 'border-fairway-600 bg-fairway-50' : 'border-gray-200 hover:border-gray-300'}`}>
+                  <input
+                    type="radio"
+                    name="autoMethod"
+                    value={m.key}
+                    checked={autoMethod === m.key}
+                    onChange={() => setAutoMethod(m.key)}
+                    className="mt-0.5 accent-fairway-600"
+                  />
+                  <div>
+                    <div className="text-sm font-semibold text-gray-900">{m.label}</div>
+                    <div className="text-xs text-gray-500 mt-0.5">{m.desc}</div>
+                  </div>
+                </label>
+              ))}
+            </div>
+
+            {/* Group size */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1.5">Players per group</label>
+              <div className="flex gap-2">
+                {[2, 3, 4].map(n => (
+                  <button
+                    key={n}
+                    onClick={() => setGroupSize(n)}
+                    className={`flex-1 py-2 rounded-lg text-sm font-semibold border-2 transition-colors ${groupSize === n ? 'border-fairway-600 bg-fairway-50 text-fairway-700' : 'border-gray-200 text-gray-600 hover:border-gray-300'}`}
+                  >
+                    {n}
+                  </button>
+                ))}
+              </div>
+              <p className="text-xs text-gray-400 mt-1.5">
+                {eventPlayers.length} players → {Math.ceil(eventPlayers.length / groupSize)} groups
+                {eventPlayers.length % groupSize !== 0 ? ` (last group has ${eventPlayers.length % groupSize})` : ''}
+              </p>
+            </div>
+
+            {/* Actions */}
+            <div className="flex gap-3 pt-1">
+              <Button variant="secondary" className="flex-1" onClick={() => setShowAutoAssign(false)}>
+                Cancel
+              </Button>
+              <Button className="flex-1" loading={autoLoading} onClick={runAutoAssign}>
+                Assign Groups
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {ungrouped.length > 0 && (
         <Card>
