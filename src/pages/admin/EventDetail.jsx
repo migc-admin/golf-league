@@ -2541,15 +2541,15 @@ function EventStatusControl({ event, onUpdated }) {
 // ─── Edit Event Modal ──────────────────────────────────────────────
 const EDIT_FORMAT_OPTIONS = [
   { group: 'Net Stroke Play', options: [
-    { value: 'net_stroke',        label: '18-Hole Overall Net' },
-    { value: 'net_stroke_front9', label: 'Front Nine Net' },
-    { value: 'net_stroke_back9',  label: 'Back Nine Net' },
+    { value: 'net_stroke',        label: '18-Hole Overall Net',  tip: 'Players complete all 18 holes. Net score = gross score minus course handicap. Lowest net score wins.' },
+    { value: 'net_stroke_front9', label: 'Front Nine Net',       tip: 'Only holes 1–9 count. Net score calculated using half the course handicap. Good for shorter events.' },
+    { value: 'net_stroke_back9',  label: 'Back Nine Net',        tip: 'Only holes 10–18 count. Net score calculated using half the course handicap. Good for shorter events.' },
   ]},
   { group: 'Other Formats', options: [
-    { value: 'stableford',   label: 'Stableford' },
-    { value: 'match_points',    label: 'Match Play (Head-to-Head)' },
-    { value: 'team_match_play', label: 'Match Play (Team Best Ball)' },
-    { value: 'ryder_cup',       label: 'Ryder Cup' },
+    { value: 'stableford',      label: 'Stableford',                 tip: 'Points awarded per hole based on net score vs par. Double bogey = 0 pts, bogey = 1, par = 2, birdie = 3, eagle = 4. Highest points wins.' },
+    { value: 'match_points',    label: 'Match Play (Head-to-Head)',   tip: 'Each player is paired against one opponent. Net score is compared hole-by-hole. Win a hole = 1 point. Most points after 18 wins.' },
+    { value: 'team_match_play', label: 'Match Play (Team Best Ball)', tip: 'Teams compete using the best net score among teammates on each hole. Scored hole-by-hole like match play.' },
+    { value: 'ryder_cup',       label: 'Ryder Cup',                  tip: 'Team format across multiple rounds. Players earn points for their team via match play results. Highest team total wins.' },
   ]},
 ]
 
@@ -2743,6 +2743,14 @@ function EditEventModal({ open, onClose, event, onSaved }) {
                     <label key={opt.value} className="flex items-center gap-2.5 cursor-pointer">
                       <input type="checkbox" checked={formats.has(opt.value)} onChange={() => toggleFormat(opt.value)} className="accent-fairway-600 w-4 h-4" />
                       <span className="text-sm text-gray-800">{opt.label}</span>
+                      {opt.tip && (
+                        <span className="relative group/tip shrink-0">
+                          <span className="text-gray-400 hover:text-fairway-600 cursor-default text-xs font-bold select-none">ⓘ</span>
+                          <span className="absolute left-5 top-1/2 -translate-y-1/2 z-50 hidden group-hover/tip:block w-64 bg-gray-900 text-white text-xs rounded-lg px-3 py-2 leading-relaxed shadow-xl pointer-events-none">
+                            {opt.tip}
+                          </span>
+                        </span>
+                      )}
                     </label>
                   ))}
                 </div>
