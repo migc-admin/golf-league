@@ -80,6 +80,16 @@ export default function Scorecard() {
     if (first) { first.focus(); first.select() }
   }, [currentHole])
 
+  // Focus first input after scorecard finishes loading
+  useEffect(() => {
+    if (loading) return
+    const t = setTimeout(() => {
+      const first = document.querySelectorAll('[data-player-gross]')[0]
+      if (first) { first.focus(); first.select() }
+    }, 150)
+    return () => clearTimeout(t)
+  }, [loading])
+
   useEffect(() => {
     // Wait for auth to resolve before loading
     if (authLoading || profile === undefined) return
@@ -262,11 +272,6 @@ export default function Scorecard() {
       }
 
       setLoading(false)
-      // Focus first score input after initial load
-      setTimeout(() => {
-        const first = document.querySelectorAll('[data-player-gross]')[0]
-        if (first) { first.focus(); first.select() }
-      }, 150)
     }
 
     load()
