@@ -1789,7 +1789,7 @@ function TabGroups({ event, eventPlayers, onUpdated }) {
       {/* Toolbar */}
       <div className="flex items-center justify-between">
         <p className="text-sm text-gray-600">
-          Assign players to groups (2–4 per group). Mark one player per group as scorekeeper.
+          Assign players to groups (2–4 per group). Any player in the group can keep score.
         </p>
         <div className="flex items-center gap-2 shrink-0">
           {eventPlayers.some(ep => ep.group_number) && (
@@ -1951,7 +1951,6 @@ function GroupRow({ ep, maxGroup, isFirst, isLast, onSetGroup, onToggleSK, onMov
           {ep.player?.first_name} {ep.player?.last_name}
         </span>
         {ep.flight && <FlightBadge flight={ep.flight} />}
-        {ep.is_scorekeeper && <Badge variant="green">Scorekeeper</Badge>}
       </div>
       <div className="flex items-center gap-2">
         <select
@@ -1962,16 +1961,6 @@ function GroupRow({ ep, maxGroup, isFirst, isLast, onSetGroup, onToggleSK, onMov
           <option value="">None</option>
           {groupOptions.map(g => <option key={g} value={g}>Group {g}</option>)}
         </select>
-        <button
-          onClick={() => onToggleSK(ep)}
-          className={`text-xs px-2 py-1 rounded-md font-medium transition-colors ${
-            ep.is_scorekeeper
-              ? 'bg-fairway-100 text-fairway-700 hover:bg-fairway-200'
-              : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-          }`}
-        >
-          {ep.is_scorekeeper ? '✓ Scorekeeper' : 'Set SK'}
-        </button>
       </div>
     </div>
   )
