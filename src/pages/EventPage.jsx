@@ -79,7 +79,7 @@ export default function EventPage() {
           .from('event_players')
           .select('*, player:players(first_name, last_name)', { count: 'exact' })
           .eq('event_id', ev.id)
-          .order('group_number').order('flight').order('adjusted_handicap_index')
+          .order('group_number').order('group_order', { nullsFirst: false }).order('flight')
         setEventPlayers(eps ?? [])
         setPlayerCount(count ?? 0)
         setLoading(false)
