@@ -315,6 +315,21 @@ function GroupList({ eventPlayers, event }) {
     if (!groups[g]) groups[g] = []
     groups[g].push(ep)
   }
+
+  // Sort members within each group: group_order first (nulls last), then alpha — mirrors admin Groups tab
+  for (const members of Object.values(groups)) {
+    members.sort((a, b) => {
+      const ao = a.group_order, bo = b.group_order
+      if (ao !== null && ao !== undefined && bo !== null && bo !== undefined) return ao - bo
+      if (ao !== null && ao !== undefined) return -1
+      if (bo !== null && bo !== undefined) return 1
+      const fa = (a.player?.first_name ?? '').toLowerCase()
+      const fb = (b.player?.first_name ?? '').toLowerCase()
+      if (fa !== fb) return fa < fb ? -1 : 1
+      return (a.player?.last_name ?? '').toLowerCase() < (b.player?.last_name ?? '').toLowerCase() ? -1 : 1
+    })
+  }
+
   const sorted    = Object.entries(groups).filter(([k]) => k !== '0').sort(([a], [b]) => parseInt(a) - parseInt(b))
   const ungrouped = groups[0] ?? []
 
