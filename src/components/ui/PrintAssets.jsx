@@ -307,6 +307,18 @@ const PAGE_SIZE = {
   cart_signs: '8.5in 5.5in landscape',
 }
 
+// Physical pixel dimensions at 96dpi (1in = 96px)
+const PREVIEW_DIMS = {
+  cart_signs: { w: 8.5 * 96, h: 5.5  * 96 },
+  cards:      { w: 4.72 * 96, h: 8.27 * 96 },
+  tee_sheet:  { w: 8.5 * 96, h: 11   * 96 },
+}
+const PREVIEW_SCALE = {
+  cart_signs: 0.72,
+  cards:      0.62,
+  tee_sheet:  0.68,
+}
+
 const TITLES = {
   cards:      'CTP & Long Drive Cards',
   tee_sheet:  'Tee Sheet',
@@ -475,12 +487,36 @@ export default function PrintAssets({ type, event, eventPlayers = [], onClose })
         </div>
 
         {/* Scrollable preview */}
-        <div className="flex-1 overflow-y-auto py-8 flex flex-col items-center gap-6">
-          {printNodes.map((node, i) => (
-            <div key={i} style={{ boxShadow: '0 4px 28px rgba(0,0,0,0.5)', borderRadius: 4, overflow: 'hidden' }}>
-              {node}
-            </div>
-          ))}
+        <div className="flex-1 overflow-y-auto py-8 flex flex-col items-center gap-8">
+          {printNodes.map((node, i) => {
+            const dims  = PREVIEW_DIMS[type]
+            const scale = PREVIEW_SCALE[type]
+            const outerW = dims.w * scale
+            const outerH = dims.h * scale
+            return (
+              <div key={i} style={{ position: 'relative', width: outerW, height: outerH, flexShrink: 0 }}>
+                {/* Label */}
+                <div style={{
+                  position: 'absolute', top: -24, left: 0,
+                  fontSize: 11, color: '#aaa', letterSpacing: '0.05em', textTransform: 'uppercase',
+                }}>
+                  {type === 'tee_sheet' ? 'Tee Sheet' : `${type === 'cards' ? 'Card' : 'Sign'} ${i + 1} of ${printNodes.length}`}
+                </div>
+                {/* Scaled card */}
+                <div style={{
+                  transformOrigin: 'top left',
+                  transform: `scale(${scale})`,
+                  width: dims.w,
+                  height: dims.h,
+                  boxShadow: '0 6px 32px rgba(0,0,0,0.55)',
+                  borderRadius: 4,
+                  overflow: 'hidden',
+                }}>
+                  {node}
+                </div>
+              </div>
+            )
+          })}
         </div>
       </div>
 
