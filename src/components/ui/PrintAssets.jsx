@@ -2,9 +2,9 @@
  * PrintAssets — Printable golf event assets
  *
  * Three asset types:
- *  'cards'      → CTP and Long Drive cards  (5.5" × 8.5" portrait)
+ *  'cards'      → CTP and Long Drive cards  (4.72" × 8.27" portrait / A5)
  *  'tee_sheet'  → Tee Sheet                 (8.5" × 11" portrait)
- *  'cart_signs' → Cart Signs                (5.5" × 8.5" portrait, 2 players / sign)
+ *  'cart_signs' → Cart Signs                (8.5" × 5.5" landscape)
  */
 
 import { useEffect } from 'react'
@@ -12,6 +12,7 @@ import { createPortal } from 'react-dom'
 
 const GOLD  = '#C9A84C'
 const GREEN = '#1B4332'
+const FONT  = "'Playfair Display', Georgia, serif"
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 function calcTeeTime(startTime, intervalMins, groupNum) {
@@ -20,9 +21,16 @@ function calcTeeTime(startTime, intervalMins, groupNum) {
   const total  = h * 60 + m + (groupNum - 1) * (intervalMins ?? 10)
   const hh     = Math.floor(total / 60) % 24
   const mm     = total % 60
-  const ampm   = hh >= 12 ? 'PM' : 'AM'
+  const ampm   = hh >= 12 ? 'p.m.' : 'a.m.'
   const hour   = hh % 12 || 12
   return `${hour}:${mm.toString().padStart(2, '0')} ${ampm}`
+}
+
+function shortDate(dateStr) {
+  if (!dateStr) return ''
+  return new Date(dateStr + 'T00:00:00').toLocaleDateString('en-US', {
+    month: 'long', day: 'numeric', year: 'numeric',
+  })
 }
 
 function formatEventDate(dateStr) {
@@ -49,95 +57,64 @@ function groupedPlayers(eventPlayers) {
 
 function epName(ep) {
   const p = ep?.player ?? {}
-  const first = p.first_name ?? ''
-  const last  = p.last_name  ?? ''
-  return last ? `${last}, ${first}` : first || '—'
+  return [p.first_name, p.last_name].filter(Boolean).join(' ') || '—'
 }
 
-// ─── Shared Logo Header ───────────────────────────────────────────────────────
-function LogoHeader({ logoUrl, leagueName, eventName, date, size = 'lg' }) {
-  const logoSize = size === 'sm' ? '0.8in'  : '1.1in'
-  const nameSz   = size === 'sm' ? '0.17in' : '0.2in'
-  const eventSz  = size === 'sm' ? '0.14in' : '0.16in'
-  const dateSz   = size === 'sm' ? '0.12in' : '0.14in'
-
+// ═══════════════════════════════════════════════════════════════════════════════
+// ASSET TYPE 1 — CTP / Long Drive Cards  (4.72" × 8.27" — A5 portrait)
+// ═══════════════════════════════════════════════════════════════════════════════
+function CtpLongDriveCard({ logoUrl, leagueName, eventName, date, competitionLine }) {
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.1in' }}>
+    <div style={{
+      width: '4.72in', height: '8.27in',
+      display: 'flex', flexDirection: 'column',
+      alignItems: 'center',
+      background: '#fff', color: '#111',
+      padding: '0.45in 0.55in 0.4in',
+      boxSizing: 'border-box',
+      pageBreakAfter: 'always',
+      fontFamily: FONT,
+    }}>
+      {/* Logo */}
       {logoUrl ? (
         <img src={logoUrl} alt="" style={{
-          width: logoSize, height: logoSize, borderRadius: '50%',
-          objectFit: 'cover', border: `2.5px solid ${GOLD}`,
+          width: '1.15in', height: '1.15in', borderRadius: '50%',
+          objectFit: 'cover', marginBottom: '0.18in',
         }} />
       ) : (
         <div style={{
-          width: logoSize, height: logoSize, borderRadius: '50%',
-          background: 'rgba(255,255,255,0.12)', border: `2.5px solid ${GOLD}`,
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-          fontSize: '0.38in', color: GOLD, fontWeight: 'bold', fontFamily: 'Georgia, serif',
+          width: '1.15in', height: '1.15in', borderRadius: '50%',
+          background: GREEN, display: 'flex', alignItems: 'center', justifyContent: 'center',
+          color: GOLD, fontWeight: 'bold', fontSize: '0.38in', marginBottom: '0.18in',
+          fontFamily: FONT,
         }}>
           {leagueName?.slice(0, 2)?.toUpperCase() ?? '⛳'}
         </div>
       )}
-      <div style={{ width: '1in', height: '1.5px', background: GOLD }} />
-      <div style={{ textAlign: 'center' }}>
-        <div style={{ fontSize: nameSz, fontWeight: 'bold', color: GOLD, letterSpacing: '0.04em', textTransform: 'uppercase', fontFamily: 'Georgia, serif' }}>
-          {leagueName}
-        </div>
-        <div style={{ fontSize: eventSz, color: 'rgba(255,255,255,0.8)', marginTop: '0.04in', fontFamily: 'Georgia, serif' }}>
-          {eventName}
-        </div>
-        <div style={{ fontSize: dateSz, color: 'rgba(255,255,255,0.5)', marginTop: '0.03in', fontFamily: 'Georgia, serif' }}>
-          {date}
-        </div>
-      </div>
-    </div>
-  )
-}
 
-// ─── Write-in Lines ───────────────────────────────────────────────────────────
-function WriteInLines({ count = 10 }) {
-  return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.22in', width: '100%' }}>
-      {Array.from({ length: count }).map((_, i) => (
-        <div key={i} style={{ borderBottom: '1px solid rgba(255,255,255,0.3)', width: '100%', paddingBottom: '0.05in' }} />
-      ))}
-    </div>
-  )
-}
-
-// ═══════════════════════════════════════════════════════════════════════════════
-// ASSET TYPE 1 — CTP / Long Drive Cards  (5.5" × 8.5")
-// ═══════════════════════════════════════════════════════════════════════════════
-function CtpLongDriveCard({ logoUrl, leagueName, eventName, date, competitionLine, sublabel }) {
-  return (
-    <div style={{
-      width: '5.5in', height: '8.5in',
-      display: 'flex', flexDirection: 'column',
-      alignItems: 'center', justifyContent: 'space-between',
-      background: GREEN, color: '#fff',
-      padding: '0.5in 0.5in 0.45in',
-      boxSizing: 'border-box',
-      pageBreakAfter: 'always',
-      fontFamily: 'Georgia, serif',
-    }}>
-      <LogoHeader logoUrl={logoUrl} leagueName={leagueName} eventName={eventName} date={date} />
-
-      <div style={{ textAlign: 'center' }}>
-        <div style={{ fontSize: '0.65in', fontWeight: 'bold', color: '#fff', lineHeight: 1.05 }}>
-          {competitionLine}
-        </div>
-        {sublabel && (
-          <div style={{ fontSize: '0.2in', color: GOLD, fontWeight: 'bold', letterSpacing: '0.06em', textTransform: 'uppercase', marginTop: '0.1in' }}>
-            {sublabel}
-          </div>
-        )}
+      {/* League name */}
+      <div style={{ fontSize: '0.24in', fontWeight: 'bold', color: '#111', textAlign: 'center', lineHeight: 1.2, marginBottom: '0.06in', fontFamily: FONT }}>
+        {leagueName}
       </div>
 
-      <div style={{ width: '100%', paddingTop: '0.15in' }}>
-        <div style={{ fontSize: '0.11in', color: 'rgba(255,255,255,0.35)', textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: '0.2in', textAlign: 'center' }}>
-          Results
-        </div>
-        <WriteInLines count={10} />
+      {/* Event / date */}
+      <div style={{ fontSize: '0.18in', color: '#333', textAlign: 'center', lineHeight: 1.3, marginBottom: '0.22in', fontFamily: FONT }}>
+        {eventName}{eventName && date ? ' / ' : ''}{date}
+      </div>
+
+      {/* Divider */}
+      <div style={{ width: '2.8in', height: '1px', background: '#bbb', marginBottom: '0.22in' }} />
+
+      {/* Competition label */}
+      <div style={{ fontSize: '0.26in', fontWeight: 'bold', color: '#111', textAlign: 'center', lineHeight: 1.2, marginBottom: '0.3in', fontFamily: FONT }}>
+        {competitionLine}
+      </div>
+
+      {/* Write-in lines */}
+      <div style={{ width: '100%', flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'space-around', paddingTop: '0.1in' }}>
+        {Array.from({ length: 8 }).map((_, i) => (
+          <div key={i} style={{ borderBottom: '1px solid #bbb', width: '100%' }} />
+        ))}
       </div>
     </div>
   )
@@ -160,7 +137,6 @@ function TeeSheetPage({ event, eventPlayers }) {
   const groups    = groupedPlayers(eventPlayers)
   const groupNums = Object.keys(groups).map(Number).sort((a, b) => a - b)
 
-  // Columns: Time 0.85in | Group 0.55in | Players flex | Hole 0.75in
   const cols = '0.85in 0.55in 4.5in 0.75in'
 
   return (
@@ -169,7 +145,7 @@ function TeeSheetPage({ event, eventPlayers }) {
       background: '#fff', color: '#111',
       padding: '0.5in 0.55in',
       boxSizing: 'border-box',
-      fontFamily: 'Georgia, serif',
+      fontFamily: FONT,
       pageBreakAfter: 'always',
     }}>
       {/* Page header */}
@@ -177,14 +153,14 @@ function TeeSheetPage({ event, eventPlayers }) {
         {logoUrl ? (
           <img src={logoUrl} alt="" style={{ width: '0.85in', height: '0.85in', borderRadius: '50%', objectFit: 'cover', border: `2px solid ${GOLD}`, flexShrink: 0 }} />
         ) : (
-          <div style={{ width: '0.85in', height: '0.85in', borderRadius: '50%', background: GREEN, display: 'flex', alignItems: 'center', justifyContent: 'center', color: GOLD, fontWeight: 'bold', fontSize: '0.28in', flexShrink: 0 }}>
+          <div style={{ width: '0.85in', height: '0.85in', borderRadius: '50%', background: GREEN, display: 'flex', alignItems: 'center', justifyContent: 'center', color: GOLD, fontWeight: 'bold', fontSize: '0.28in', flexShrink: 0, fontFamily: FONT }}>
             {leagueName?.slice(0, 2)?.toUpperCase() ?? '⛳'}
           </div>
         )}
         <div>
-          <div style={{ fontSize: '0.22in', fontWeight: 'bold', color: GREEN }}>{leagueName}</div>
-          <div style={{ fontSize: '0.17in', color: '#333', marginTop: '0.03in' }}>{eventName}</div>
-          <div style={{ fontSize: '0.12in', color: '#666', marginTop: '0.02in' }}>
+          <div style={{ fontSize: '0.22in', fontWeight: 'bold', color: GREEN, fontFamily: FONT }}>{leagueName}</div>
+          <div style={{ fontSize: '0.17in', color: '#333', marginTop: '0.03in', fontFamily: FONT }}>{eventName}</div>
+          <div style={{ fontSize: '0.12in', color: '#666', marginTop: '0.02in', fontFamily: FONT }}>
             {[
               date,
               courseName,
@@ -204,7 +180,7 @@ function TeeSheetPage({ event, eventPlayers }) {
         gap: '0 0.1in', padding: '0.07in 0.1in',
         background: GREEN, color: '#fff', borderRadius: '3px',
         fontSize: '0.12in', fontWeight: 'bold', letterSpacing: '0.04em', textTransform: 'uppercase',
-        marginBottom: '0.03in',
+        marginBottom: '0.03in', fontFamily: FONT,
       }}>
         <div>Time</div>
         <div>Group</div>
@@ -229,107 +205,92 @@ function TeeSheetPage({ event, eventPlayers }) {
             borderBottom: '1px solid #e8e8e4',
             alignItems: 'center',
           }}>
-            <div style={{ fontSize: '0.14in', fontWeight: 'bold', color: GREEN, whiteSpace: 'nowrap' }}>
+            <div style={{ fontSize: '0.14in', fontWeight: 'bold', color: GREEN, whiteSpace: 'nowrap', fontFamily: FONT }}>
               {teeTime ?? '—'}
             </div>
-            <div style={{ fontSize: '0.13in', color: '#555', fontWeight: 'bold' }}>#{g}</div>
-            <div style={{ fontSize: '0.13in', color: '#222', lineHeight: 1.3, wordBreak: 'break-word' }}>
+            <div style={{ fontSize: '0.13in', color: '#555', fontWeight: 'bold', fontFamily: FONT }}>#{g}</div>
+            <div style={{ fontSize: '0.13in', color: '#222', lineHeight: 1.3, wordBreak: 'break-word', fontFamily: FONT }}>
               {names || '—'}
             </div>
-            <div style={{ fontSize: '0.12in', color: '#888', whiteSpace: 'nowrap' }}>{hole}</div>
+            <div style={{ fontSize: '0.12in', color: '#888', whiteSpace: 'nowrap', fontFamily: FONT }}>{hole}</div>
           </div>
         )
       })}
 
       {groupNums.length === 0 && (
-        <div style={{ textAlign: 'center', padding: '0.5in', color: '#999', fontSize: '0.14in' }}>
+        <div style={{ textAlign: 'center', padding: '0.5in', color: '#999', fontSize: '0.14in', fontFamily: FONT }}>
           No groups assigned yet.
         </div>
       )}
 
       {/* Footer */}
       <div style={{ marginTop: '0.25in', borderTop: `1px solid ${GOLD}`, paddingTop: '0.1in', display: 'flex', justifyContent: 'space-between' }}>
-        <div style={{ fontSize: '0.1in', color: '#aaa' }}>
+        <div style={{ fontSize: '0.1in', color: '#aaa', fontFamily: FONT }}>
           {groupNums.length} group{groupNums.length !== 1 ? 's' : ''} · {eventPlayers.filter(ep => ep.group_number).length} players
         </div>
-        <div style={{ fontSize: '0.1in', color: '#aaa' }}>Printed {new Date().toLocaleDateString()}</div>
+        <div style={{ fontSize: '0.1in', color: '#aaa', fontFamily: FONT }}>Printed {new Date().toLocaleDateString()}</div>
       </div>
     </div>
   )
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// ASSET TYPE 3 — Cart Signs  (5.5" × 8.5", 2 players per card)
+// ASSET TYPE 3 — Cart Signs  (8.5" × 5.5" landscape)
 // ═══════════════════════════════════════════════════════════════════════════════
 function CartSignCard({ logoUrl, leagueName, eventName, date, groupNum, teeTime, holeLabel, players }) {
   return (
     <div style={{
-      width: '5.5in', height: '8.5in',
+      width: '8.5in', height: '5.5in',
       display: 'flex', flexDirection: 'column',
-      alignItems: 'center', justifyContent: 'space-between',
-      background: GREEN, color: '#fff',
-      padding: '0.45in 0.5in',
+      alignItems: 'center',
+      background: '#fff', color: '#111',
+      padding: '0.38in 0.65in',
       boxSizing: 'border-box',
       pageBreakAfter: 'always',
-      fontFamily: 'Georgia, serif',
+      fontFamily: FONT,
     }}>
-      <LogoHeader logoUrl={logoUrl} leagueName={leagueName} eventName={eventName} date={date} size="sm" />
-
-      {/* Group + Tee Time */}
-      <div style={{ textAlign: 'center', width: '100%' }}>
-        <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '0.3in', marginBottom: '0.12in' }}>
-          <div style={{ textAlign: 'center' }}>
-            <div style={{ fontSize: '0.11in', color: 'rgba(255,255,255,0.45)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Group</div>
-            <div style={{ fontSize: '0.42in', fontWeight: 'bold', color: '#fff', lineHeight: 1 }}>#{groupNum}</div>
+      {/* Logo + league + event/date */}
+      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.08in', marginBottom: '0.18in' }}>
+        {logoUrl ? (
+          <img src={logoUrl} alt="" style={{ width: '0.9in', height: '0.9in', borderRadius: '50%', objectFit: 'cover' }} />
+        ) : (
+          <div style={{ width: '0.9in', height: '0.9in', borderRadius: '50%', background: GREEN, display: 'flex', alignItems: 'center', justifyContent: 'center', color: GOLD, fontWeight: 'bold', fontSize: '0.3in', fontFamily: FONT }}>
+            {leagueName?.slice(0, 2)?.toUpperCase() ?? '⛳'}
           </div>
-          {teeTime && (
-            <>
-              <div style={{ width: '1px', height: '0.55in', background: 'rgba(255,255,255,0.2)' }} />
-              <div style={{ textAlign: 'center' }}>
-                <div style={{ fontSize: '0.11in', color: 'rgba(255,255,255,0.45)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Tee Time</div>
-                <div style={{ fontSize: '0.42in', fontWeight: 'bold', color: GOLD, lineHeight: 1 }}>{teeTime}</div>
-              </div>
-            </>
-          )}
-        </div>
-        <div style={{ fontSize: '0.13in', color: 'rgba(255,255,255,0.45)', letterSpacing: '0.04em' }}>
-          {holeLabel}
+        )}
+        <div style={{ textAlign: 'center' }}>
+          <div style={{ fontSize: '0.28in', fontWeight: 'bold', color: '#111', lineHeight: 1.15, fontFamily: FONT }}>
+            {leagueName}
+          </div>
+          <div style={{ fontSize: '0.22in', color: '#222', lineHeight: 1.2, fontFamily: FONT }}>
+            {eventName}{eventName && date ? ' / ' : ''}{date}
+          </div>
         </div>
       </div>
 
-      {/* Players */}
-      <div style={{ width: '100%' }}>
-        <div style={{ width: '2in', height: '1.5px', background: GOLD, margin: '0 auto 0.2in' }} />
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.16in' }}>
+      {/* Group number */}
+      <div style={{ fontSize: '0.3in', fontWeight: 'bold', color: '#111', marginBottom: '0.18in', fontFamily: FONT }}>
+        Group #{groupNum}
+      </div>
+
+      {/* Divider */}
+      <div style={{ width: '6in', height: '1px', background: '#ccc', marginBottom: '0.18in' }} />
+
+      {/* Players left / time+hole right */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', width: '100%' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.08in' }}>
           {players.map((ep, i) => (
-            <div key={ep?.id ?? i} style={{
-              background: 'rgba(255,255,255,0.08)',
-              border: '1px solid rgba(255,255,255,0.15)',
-              borderRadius: '6px',
-              padding: '0.14in 0.2in',
-              textAlign: 'center',
-            }}>
-              <div style={{ fontSize: '0.24in', fontWeight: 'bold', color: '#fff', lineHeight: 1.1 }}>
-                {epName(ep)}
-              </div>
-              {ep?.flight && (
-                <div style={{ fontSize: '0.12in', color: GOLD, marginTop: '0.04in', letterSpacing: '0.04em' }}>
-                  Flight {ep.flight}
-                </div>
-              )}
+            <div key={ep?.id ?? i} style={{ fontSize: '0.3in', color: '#111', fontFamily: FONT }}>
+              {epName(ep)}
             </div>
           ))}
-          {/* Blank slot if only 1 player */}
-          {players.length < 2 && (
-            <div style={{
-              background: 'rgba(255,255,255,0.03)',
-              border: '1px dashed rgba(255,255,255,0.1)',
-              borderRadius: '6px',
-              padding: '0.14in 0.2in',
-              textAlign: 'center',
-            }}>
-              <div style={{ fontSize: '0.18in', color: 'rgba(255,255,255,0.15)' }}>—</div>
-            </div>
+        </div>
+        <div style={{ textAlign: 'right', display: 'flex', flexDirection: 'column', gap: '0.08in' }}>
+          {teeTime && (
+            <div style={{ fontSize: '0.3in', color: '#111', fontFamily: FONT }}>{teeTime}</div>
+          )}
+          {holeLabel && (
+            <div style={{ fontSize: '0.3in', color: '#111', fontFamily: FONT }}>{holeLabel}</div>
           )}
         </div>
       </div>
@@ -341,9 +302,9 @@ function CartSignCard({ logoUrl, leagueName, eventName, date, groupNum, teeTime,
 // Main export
 // ═══════════════════════════════════════════════════════════════════════════════
 const PAGE_SIZE = {
-  cards:      '5.5in 8.5in',
+  cards:      '4.72in 8.27in',
   tee_sheet:  '8.5in 11in',
-  cart_signs: '5.5in 8.5in',
+  cart_signs: '8.5in 5.5in landscape',
 }
 
 const TITLES = {
@@ -357,7 +318,7 @@ export default function PrintAssets({ type, event, eventPlayers = [], onClose })
   const logoUrl    = league.logo_url ?? null
   const leagueName = league.name ?? ''
   const eventName  = event?.name ?? (event?.event_number ? `Event #${event.event_number}` : '')
-  const date       = formatEventDate(event?.event_date)
+  const date       = shortDate(event?.event_date)
   const interval   = event?.tee_time_interval_mins ?? 10
 
   let printNodes = []
@@ -367,9 +328,8 @@ export default function PrintAssets({ type, event, eventPlayers = [], onClose })
     const sideGames    = event?.side_game_options ?? []
     const payoutConfig = event?.payout_config ?? {}
 
-    // CTP: prefer holes from payout_config; fall back to a generic card if CTP enabled but no holes configured
-    const hasCtp    = sideGames.includes('ctp')
-    const ctpHoles  = Object.keys(payoutConfig)
+    const hasCtp   = sideGames.includes('ctp')
+    const ctpHoles = Object.keys(payoutConfig)
       .filter(k => k.startsWith('ctp_'))
       .map(k => parseInt(k.replace('ctp_', ''), 10))
       .sort((a, b) => a - b)
@@ -379,21 +339,19 @@ export default function PrintAssets({ type, event, eventPlayers = [], onClose })
         printNodes.push(
           <CtpLongDriveCard key={`ctp_${h}`}
             logoUrl={logoUrl} leagueName={leagueName} eventName={eventName} date={date}
-            competitionLine={`Hole ${h}`} sublabel="Closest to the Pin"
+            competitionLine={`Closest to Pin #${h}`}
           />
         )
       })
     } else if (hasCtp) {
-      // CTP enabled but no specific holes set yet — generic card
       printNodes.push(
         <CtpLongDriveCard key="ctp_generic"
           logoUrl={logoUrl} leagueName={leagueName} eventName={eventName} date={date}
-          competitionLine="Closest to the Pin" sublabel={null}
+          competitionLine="Closest to Pin"
         />
       )
     }
 
-    // Long Drive
     const hasLongDrive = sideGames.some(s => s.startsWith('long_drive'))
     const ldHole       = event?.long_drive_hole ?? null
 
@@ -401,8 +359,7 @@ export default function PrintAssets({ type, event, eventPlayers = [], onClose })
       printNodes.push(
         <CtpLongDriveCard key="long_drive"
           logoUrl={logoUrl} leagueName={leagueName} eventName={eventName} date={date}
-          competitionLine={ldHole ? `Hole ${ldHole}` : 'Long Drive'}
-          sublabel={ldHole ? 'Long Drive' : null}
+          competitionLine={ldHole ? `Longest Drive #${ldHole}` : 'Longest Drive'}
         />
       )
     }
@@ -426,9 +383,10 @@ export default function PrintAssets({ type, event, eventPlayers = [], onClose })
         ? calcTeeTime(event?.start_time, 0, 1)
         : calcTeeTime(event?.start_time, interval, g)
       const holeLabel = isShotgun
-        ? (holeMap[g] ? `Hole ${holeMap[g]}` : 'TBD')
+        ? (holeMap[g] ? `Hole #${holeMap[g]}` : null)
         : 'Hole 1'
 
+      // One sign per cart (2 players each side)
       const card1 = members.slice(0, 2)
       const card2 = members.slice(2, 4)
 
@@ -450,13 +408,12 @@ export default function PrintAssets({ type, event, eventPlayers = [], onClose })
   }
 
   // ── Print CSS ─────────────────────────────────────────────────────────────
-  // #print-assets-root is portaled directly onto <body> so body > * hides
-  // #root but the @media print rule can un-hide #print-assets-root.
   useEffect(() => {
     const size  = PAGE_SIZE[type] ?? '8.5in 11in'
     const style = document.createElement('style')
     style.id    = 'print-assets-style'
     style.textContent = `
+      @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;700;900&display=swap');
       @page { size: ${size}; margin: 0; }
       @media print {
         body > * { display: none !important; }
@@ -470,7 +427,7 @@ export default function PrintAssets({ type, event, eventPlayers = [], onClose })
   // ── Empty state ───────────────────────────────────────────────────────────
   if (printNodes.length === 0) {
     const hint = type === 'cards'
-      ? 'Enable CTP or Long Drive in the event\'s Side Games to generate cards.'
+      ? "Enable CTP or Long Drive in the event's Side Games to generate cards."
       : type === 'cart_signs'
       ? 'Assign players to groups in the Groups tab first.'
       : 'No data to print.'
@@ -489,11 +446,13 @@ export default function PrintAssets({ type, event, eventPlayers = [], onClose })
   const cardCount = printNodes.length
   const subtitle  = type === 'tee_sheet'
     ? '1 page · 8.5" × 11"'
-    : `${cardCount} ${type === 'cart_signs' ? 'sign' : 'card'}${cardCount !== 1 ? 's' : ''} · 5.5" × 8.5"`
+    : type === 'cart_signs'
+    ? `${cardCount} sign${cardCount !== 1 ? 's' : ''} · 8.5" × 5.5" landscape`
+    : `${cardCount} card${cardCount !== 1 ? 's' : ''} · 4.72" × 8.27"`
 
   return (
     <>
-      {/* ── Preview modal ── */}
+      {/* Preview modal */}
       <div className="fixed inset-0 z-50 flex flex-col" style={{ background: 'rgba(0,0,0,0.72)' }}>
         {/* Toolbar */}
         <div className="flex items-center justify-between px-6 py-3 bg-white shadow-md flex-shrink-0">
@@ -525,7 +484,7 @@ export default function PrintAssets({ type, event, eventPlayers = [], onClose })
         </div>
       </div>
 
-      {/* Print root portaled to <body> so body > * { display:none } + #print-assets-root { display:block } works */}
+      {/* Print portal */}
       {createPortal(
         <div id="print-assets-root" style={{ display: 'none' }}>
           {printNodes}
