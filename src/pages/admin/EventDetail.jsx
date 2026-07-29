@@ -1618,6 +1618,14 @@ function TabGroups({ event, eventPlayers, onUpdated }) {
     return init
   })
 
+  // On mount: normalize group_order in DB to match display order so public page stays in sync
+  useEffect(() => {
+    const updates = Object.entries(localOrder).map(([id, order]) =>
+      supabase.from('event_players').update({ group_order: order }).eq('id', id)
+    )
+    Promise.all(updates).catch(() => {})
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
+
   // Sorted members for a given group number — alpha by first name, then last name
   function groupMembers(g) {
     return eventPlayers
@@ -1640,11 +1648,12 @@ function TabGroups({ event, eventPlayers, onUpdated }) {
     const newOrder = { ...localOrder, [a.id]: swapIdx, [b.id]: idx }
     setLocalOrder(newOrder)
 
-    // Persist — requires group_order column (run migration if not yet done)
-    await Promise.all([
-      supabase.from('event_players').update({ group_order: swapIdx }).eq('id', a.id),
-      supabase.from('event_players').update({ group_order: idx }).eq('id', b.id),
-    ])
+    // Persist ALL positions in this group so DB stays fully in sync with display order
+    await Promise.all(
+      members.map(m =>
+        supabase.from('event_players').update({ group_order: newOrder[m.id] ?? localOrder[m.id] ?? 0 }).eq('id', m.id)
+      )
+    )
   }
 
   async function setGroup(epId, group) {
