@@ -70,13 +70,14 @@ export default function Scorecard() {
   const [loadTrigger,   setLoadTrigger]   = useState(0)
   // Prevent hole from resetting on auth re-renders after initial load
   const holeInitKey = useRef(null)
-  // Focus first score input whenever the hole changes (including initial load)
+  // Flag: focus first score input when hole advances after a save
+  const focusFirstOnHoleChange = useRef(false)
+
   useEffect(() => {
-    const t = setTimeout(() => {
-      const first = document.querySelectorAll('[data-player-gross]')[0]
-      if (first) { first.focus(); first.select() }
-    }, 80)
-    return () => clearTimeout(t)
+    if (!focusFirstOnHoleChange.current) return
+    focusFirstOnHoleChange.current = false
+    const first = document.querySelectorAll('[data-player-gross]')[0]
+    if (first) { first.focus(); first.select() }
   }, [currentHole])
 
   useEffect(() => {
@@ -261,6 +262,11 @@ export default function Scorecard() {
       }
 
       setLoading(false)
+      // Focus first score input after initial load
+      setTimeout(() => {
+        const first = document.querySelectorAll('[data-player-gross]')[0]
+        if (first) { first.focus(); first.select() }
+      }, 150)
     }
 
     load()
@@ -329,6 +335,7 @@ export default function Scorecard() {
     }
 
     if (allValid && currentHole < 18) {
+      focusFirstOnHoleChange.current = true
       setCurrentHole(h => h + 1)
       window.scrollTo({ top: 0, behavior: 'instant' })
     } else if (allValid && currentHole === 18) {
