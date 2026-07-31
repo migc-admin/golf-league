@@ -94,7 +94,14 @@ export function ExportScorecardsButton({ event, eventPlayers, course, orgName, o
         const holeAssignStr = (event.group_hole_assignments ?? {})[g] ?? null
         const startingHole = holeAssignStr ? parseInt(holeAssignStr, 10) || null : null
 
-        const pageEl = buildPage({ event, course, groupNum: g, players, code, qrDataUrl, ctpHoles, longDriveHole, orgName, startingHole, holeAssignStr, orgLogoUrl: logoDataUrl })
+        // Build flight→tee map from ALL event players so every flight label
+        // shows the correct tee even when a group has no player of that flight
+        const globalFlightTeeMap = {}
+        eventPlayers.forEach(ep => {
+          if (ep.flight && ep.tee) globalFlightTeeMap[ep.flight] = ep.tee
+        })
+
+        const pageEl = buildPage({ event, course, groupNum: g, players, code, qrDataUrl, ctpHoles, longDriveHole, orgName, startingHole, holeAssignStr, orgLogoUrl: logoDataUrl, globalFlightTeeMap })
         node.appendChild(pageEl)
 
         // Wait for images to load
@@ -175,7 +182,7 @@ export function ExportScorecardsButton({ event, eventPlayers, course, orgName, o
 }
 
 // ─── Page: two cards stacked ──────────────────────────────────────
-function buildPage({ event, course, groupNum, players, code, qrDataUrl, ctpHoles, longDriveHole, orgName, startingHole, holeAssignStr, orgLogoUrl }) {
+function buildPage({ event, course, groupNum, players, code, qrDataUrl, ctpHoles, longDriveHole, orgName, startingHole, holeAssignStr, orgLogoUrl, globalFlightTeeMap }) {
   const page = el('div', {
     width: PAGE_W + 'px', height: PAGE_H + 'px',
     background: '#ffffff',
@@ -185,14 +192,14 @@ function buildPage({ event, course, groupNum, players, code, qrDataUrl, ctpHoles
     boxSizing: 'border-box',
     fontFamily: 'Arial, Helvetica, sans-serif',
   })
-  const opts = { event, course, groupNum, players, code, qrDataUrl, ctpHoles, longDriveHole, orgName, startingHole, holeAssignStr, orgLogoUrl }
+  const opts = { event, course, groupNum, players, code, qrDataUrl, ctpHoles, longDriveHole, orgName, startingHole, holeAssignStr, orgLogoUrl, globalFlightTeeMap }
   page.appendChild(buildCard(opts))
   page.appendChild(buildCard(opts))
   return page
 }
 
 // ─── Card ─────────────────────────────────────────────────────────
-function buildCard({ event, course, groupNum, players, code, qrDataUrl, ctpHoles, longDriveHole, orgName, startingHole, holeAssignStr, orgLogoUrl }) {
+function buildCard({ event, course, groupNum, players, code, qrDataUrl, ctpHoles, longDriveHole, orgName, startingHole, holeAssignStr, orgLogoUrl, globalFlightTeeMap = {} }) {
   const parPerHole  = course.par_per_hole  ?? []
   const strokeIndex = course.stroke_index  ?? []
   const courseTees  = course.tees          ?? []
@@ -208,14 +215,13 @@ function buildCard({ event, course, groupNum, players, code, qrDataUrl, ctpHoles
   const groupTees  = courseTees.filter(t => playerTeeNames.includes(t.name))
   const teesToShow = groupTees.length > 0 ? groupTees : courseTees
 
-  // Per-flight tee labels: [{ flight: 'A', tee: 'Blue' }, { flight: 'B', tee: 'White' }]
-  const flightTeeMap = {}
-  players.forEach(p => {
-    if (p.flight) flightTeeMap[p.flight] = p.tee ?? null
-  })
-  // Lines like "Flight A - Blue Tees" or just "Flight A" if no tee
-  const flightTeeLines = Object.keys(flightTeeMap).sort().map(f => {
-    const t = flightTeeMap[f]
+  // Per-flight tee labels — built from this group's players, falling back to
+  // the event-wide globalFlightTeeMap so every flight shows the correct tee
+  // even when a group contains players of only one flight.
+  const groupFlightSet = new Set(players.map(p => p.flight).filter(Boolean))
+  const allFlights = new Set([...groupFlightSet, ...Object.keys(globalFlightTeeMap)])
+  const flightTeeLines = [...allFlights].sort().map(f => {
+    const t = players.find(p => p.flight === f && p.tee)?.tee ?? globalFlightTeeMap[f] ?? null
     return t ? `Flight ${f} - ${t} Tees` : `Flight ${f}`
   })
   // If no flights at all, fall back to tee names only
