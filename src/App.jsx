@@ -65,7 +65,7 @@ export default function App() {
         <Route path="/scorecard/me" element={<ProtectedRoute><Scorecard /></ProtectedRoute>} />
 
         {/* Public event registration — no auth required */}
-        <Route path="/register/:eventId" element={<Register />} />
+        <Route path="/register/:leagueSlug/:eventSlug" element={<Register />} />
         <Route path="/reset-password" element={<ResetPassword />} />
         <Route path="/faq"     element={<FAQ />} />
         <Route path="/help"    element={<Help />} />

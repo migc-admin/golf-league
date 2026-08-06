@@ -82,7 +82,7 @@ function PayPalButton({ link, amount, note }) {
 }
 
 export default function Register() {
-  const { eventId } = useParams()
+  const { leagueSlug, eventSlug } = useParams()
 
   const [event,     setEvent]     = useState(null)
   const [loading,   setLoading]   = useState(true)
@@ -100,15 +100,16 @@ export default function Register() {
   useEffect(() => {
     supabase
       .from('events')
-      .select('id, name, event_number, event_date, entry_fee, tournament_fee, status, venmo_handle, paypal_link, course:courses(name), league:leagues(name, org:organizations(logo_url)), use_flights')
-      .eq('id', eventId)
+      .select('id, name, slug, event_number, event_date, entry_fee, tournament_fee, status, venmo_handle, paypal_link, course:courses(name), league:leagues(name, slug, logo_url, org:organizations(logo_url)), use_flights')
+      .eq('slug', eventSlug)
+      .eq('league.slug', leagueSlug)
       .single()
       .then(({ data, error }) => {
         if (error || !data) setError('Event not found.')
         else setEvent(data)
         setLoading(false)
       })
-  }, [eventId])
+  }, [leagueSlug, eventSlug])
 
   async function handleSubmit(e) {
     e.preventDefault()
@@ -159,7 +160,7 @@ export default function Register() {
 
         {/* Header */}
         <div className="text-center mb-8">
-          <img src={event?.league?.org?.logo_url ?? '/logo.png'} alt="Golf League Logo"
+          <img src={event?.league?.logo_url ?? event?.league?.org?.logo_url ?? '/logo.png'} alt="Golf League Logo"
             className="w-20 h-20 rounded-full object-cover mx-auto mb-3 shadow-xl" />
           <h1 className="text-white font-bold text-2xl" style={{ fontFamily: "'Playfair Display', serif" }}>
             Event Registration

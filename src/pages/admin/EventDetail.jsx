@@ -3090,7 +3090,7 @@ function TabRegistrations({ event, onUpdated, orgId }) {
   const [loading,           setLoading]           = useState(true)
   const [confirmedExpanded, setConfirmedExpanded] = useState(false)
 
-  const regUrl = `${window.location.origin}/register/${event.id}`
+  const regUrl = `${window.location.origin}/register/${event.league?.slug ?? leagueSlug}/${event.slug ?? event.id}`
 
   async function load() {
     const { data } = await supabase
