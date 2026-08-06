@@ -7,7 +7,7 @@ import { computeLeaderboards } from '../../lib/engines/scoring'
 import { computeAllSkins } from '../../lib/engines/skins'
 import { computeTGLEventResults, assignTGLPoints } from '../../lib/engines/tgl'
 import Card, { CardHeader } from '../../components/ui/Card'
-import { ExportScorecardsButton, ExportSkinsGridButton, ExportResultsButton, ExportTeamPlayButton, ExportHandicapButton } from '../../components/ScorecardExport'
+import { ExportScorecardsButton, ExportSkinsGridButton, ExportResultsButton, ExportTeamPlayButton } from '../../components/ScorecardExport'
 import { useOrg, useFeatures } from '../../lib/OrgContext'
 import Button from '../../components/ui/Button'
 import Modal from '../../components/ui/Modal'
@@ -434,6 +434,81 @@ async function exportScoresCSV(event, eventPlayers, allScores, course, sideGames
   XLSX.writeFile(wb, `event_${event.event_number}_scores.xlsx`)
 }
 
+async function exportHandicapXLSX(event, eventPlayers, allScores, course) {
+  const XLSX = await import('xlsx')
+
+  const pars = course?.par_per_hole ?? Array(18).fill(0)
+  const sis  = course?.stroke_index ?? Array(18).fill(0)
+
+  const scoreMap = {}
+  for (const s of allScores) {
+    if (!scoreMap[s.player_id]) scoreMap[s.player_id] = {}
+    scoreMap[s.player_id][s.hole_number] = parseInt(s.gross_score) || null
+  }
+
+  const players = eventPlayers
+    .filter(ep => !ep.is_guest)
+    .sort((a, b) => {
+      const fa = (a.flight ?? '').localeCompare(b.flight ?? '')
+      return fa !== 0 ? fa : (a.adjusted_handicap_index ?? 999) - (b.adjusted_handicap_index ?? 999)
+    })
+
+  const holeHeaders = Array.from({ length: 18 }, (_, i) => `H${i + 1}`)
+  const headers = ['Player', 'Flight', 'CH', ...holeHeaders, 'Adj F9', 'Adj B9', 'Adj Total', 'Adjustments']
+
+  const parRow = ['Par', '', '', ...pars, pars.slice(0, 9).reduce((a, b) => a + b, 0), pars.slice(9).reduce((a, b) => a + b, 0), pars.reduce((a, b) => a + b, 0), '']
+  const siRow  = ['S.I.', '', '', ...sis, '', '', '', '']
+
+  const dataRows = players.map(ep => {
+    const ch = parseInt(ep.course_handicap) || parseInt(ep.adjusted_handicap_index) || 0
+    const scores = scoreMap[ep.player_id] ?? {}
+    const pName = [ep.player?.first_name, ep.player?.last_name].filter(Boolean).join(' ')
+
+    const adjScores = []
+    const cappedHoles = []
+
+    for (let h = 0; h < 18; h++) {
+      const gross = scores[h + 1] ?? null
+      if (gross === null) { adjScores.push(null); continue }
+      const full = Math.floor(ch / 18)
+      const rem  = ch % 18
+      const strokes = full + (sis[h] <= rem ? 1 : 0)
+      const cap = pars[h] + 2 + strokes
+      const adj = Math.min(gross, cap)
+      adjScores.push(adj)
+      if (adj < gross) cappedHoles.push(`H${h + 1}:${gross}→${adj}`)
+    }
+
+    const f9Vals = adjScores.slice(0, 9).filter(v => v !== null)
+    const b9Vals = adjScores.slice(9).filter(v => v !== null)
+    const adjF9  = f9Vals.length === 9 ? f9Vals.reduce((a, b) => a + b, 0) : ''
+    const adjB9  = b9Vals.length === 9 ? b9Vals.reduce((a, b) => a + b, 0) : ''
+    const adjTot = adjF9 !== '' && adjB9 !== '' ? adjF9 + adjB9 : ''
+
+    return [
+      pName, ep.flight ?? '', ch,
+      ...adjScores.map(v => v ?? ''),
+      adjF9, adjB9, adjTot,
+      cappedHoles.join(', ') || '',
+    ]
+  })
+
+  const wb = XLSX.utils.book_new()
+  const ws = XLSX.utils.aoa_to_sheet([headers, parRow, siRow, ...dataRows])
+
+  // Column widths
+  ws['!cols'] = [
+    { wch: 22 }, { wch: 6 }, { wch: 6 },
+    ...Array(18).fill({ wch: 5 }),
+    { wch: 8 }, { wch: 8 }, { wch: 9 },
+    { wch: 28 },
+  ]
+
+  XLSX.utils.book_append_sheet(wb, ws, 'Handicap Entry')
+  const evPart = (event.name ?? `event_${event.event_number}`).replace(/[^a-z0-9]/gi, '_').toLowerCase()
+  XLSX.writeFile(wb, `handicap_entry_${evPart}.xlsx`)
+}
+
 // ─── Tab: Overview ────────────────────────────────────────────────
 function TabOverview({ event, eventPlayers, allScores, sideGames, course, conflicts, onUpdated, orgName, orgSlug, onPrintAsset }) {
   const [editModal,   setEditModal]   = useState(false)
@@ -474,11 +549,6 @@ function TabOverview({ event, eventPlayers, allScores, sideGames, course, confli
           {event.tournament_fee > 0 && <Row label="Tournament Entry Fee" value={`$${Number(event.tournament_fee).toFixed(2)}`} />}
           <Row label="Status"       value={<StatusBadge status={event.status} />} />
         </dl>
-        <div className="grid grid-cols-3 gap-2 mt-4 pt-4 border-t border-gray-100">
-          <Button variant="secondary" size="sm" className="w-full justify-center" onClick={() => onPrintAsset('tee_sheet')}>🖨 Tee Sheet</Button>
-          <Button variant="secondary" size="sm" className="w-full justify-center" onClick={() => onPrintAsset('cart_signs')}>🖨 Cart Signs</Button>
-          <Button variant="secondary" size="sm" className="w-full justify-center" onClick={() => onPrintAsset('cards')}>🖨 Cards</Button>
-        </div>
       </Card>
 
       <div className="space-y-4">
@@ -877,9 +947,9 @@ function TabPostRound({ event, eventPlayers, allScores, course, sideGames, orgNa
             <div className="text-xs text-gray-400 mt-0.5">Tee sheet, cart signs, and scorecards for the round</div>
           </div>
           <div className="flex gap-2">
-            <Button size="sm" variant="secondary" onClick={() => onPrintAsset('tee_sheet')}>🖨 Tee Sheet</Button>
-            <Button size="sm" variant="secondary" onClick={() => onPrintAsset('cart_signs')}>🖨 Cart Signs</Button>
-            <Button size="sm" variant="secondary" onClick={() => onPrintAsset('cards')}>🖨 Cards</Button>
+            <Button size="sm" variant="secondary" onClick={() => onPrintAsset('tee_sheet')}>Tee Sheet</Button>
+            <Button size="sm" variant="secondary" onClick={() => onPrintAsset('cart_signs')}>Cart Signs</Button>
+            <Button size="sm" variant="secondary" onClick={() => onPrintAsset('cards')}>Cards</Button>
           </div>
         </div>
         <div className="flex items-center justify-between border-t border-gray-200 pt-3">
@@ -906,7 +976,7 @@ function TabPostRound({ event, eventPlayers, allScores, course, sideGames, orgNa
             <div className="text-sm font-medium text-gray-800">Edit Scores</div>
             <div className="text-xs text-gray-400 mt-0.5">Manually enter or correct hole-by-hole scores</div>
           </div>
-          <Button size="sm" variant="secondary" onClick={() => setScoreEditor(true)}>✎ Edit Scores</Button>
+          <Button size="sm" variant="secondary" onClick={() => setScoreEditor(true)}>Edit Scores</Button>
         </div>
         <div className="flex items-center justify-between border-t border-gray-200 pt-3">
           <div>
@@ -914,22 +984,17 @@ function TabPostRound({ event, eventPlayers, allScores, course, sideGames, orgNa
             <div className="text-xs text-gray-400 mt-0.5">All player scores, net, gross — one row per player per hole</div>
           </div>
           <Button size="sm" variant="secondary" onClick={() => exportScoresCSV(event, eventPlayers, allScores, course)}>
-            ⬇ Download
+            Download
           </Button>
         </div>
         <div className="flex items-center justify-between border-t border-gray-200 pt-3">
           <div>
-            <div className="text-sm font-medium text-gray-800">Handicap Entry (PNG)</div>
+            <div className="text-sm font-medium text-gray-800">Handicap Entry (Excel)</div>
             <div className="text-xs text-gray-400 mt-0.5">USGA adjusted scores per hole for handicap posting</div>
           </div>
-          <ExportHandicapButton
-            event={event}
-            eventPlayers={eventPlayers}
-            allScores={allScores}
-            course={course}
-            orgName={leagueName}
-            orgLogoUrl={logoUrl}
-          />
+          <Button size="sm" variant="secondary" onClick={() => exportHandicapXLSX(event, eventPlayers, allScores, course)}>
+            Download
+          </Button>
         </div>
       </div>
 
