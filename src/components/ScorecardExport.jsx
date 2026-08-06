@@ -13,6 +13,24 @@ import { computeSkinsForFlight, computeAllSkins } from '../lib/engines/skins'
 import { computePayouts } from '../lib/engines/payouts'
 import { computeTGLEventResults, assignTGLPoints } from '../lib/engines/tgl'
 
+// ─── Mobile-safe PNG download ─────────────────────────────────────
+// iOS Safari ignores <a download> — open in new tab instead so user can long-press save
+function downloadPng(dataUrl, filename) {
+  const isMobileSafari = /iphone|ipad|ipod/i.test(navigator.userAgent)
+  if (isMobileSafari) {
+    const w = window.open('', '_blank')
+    if (w) {
+      w.document.write(`<html><body style="margin:0;background:#000"><img src="${dataUrl}" style="max-width:100%;display:block"/></body></html>`)
+      w.document.close()
+    }
+  } else {
+    const link = document.createElement('a')
+    link.download = filename
+    link.href = dataUrl
+    link.click()
+  }
+}
+
 // ─── Layout constants ─────────────────────────────────────────────
 const PAGE_W    = 1100
 const PAGE_H    = 850
@@ -126,9 +144,7 @@ export function ExportScorecardsButton({ event, eventPlayers, course, orgName, o
         const link = document.createElement('a')
         const leaguePart = (event.league?.name ?? 'league').replace(/[^a-z0-9]/gi, '_').toLowerCase()
         const eventPart  = (event.name ?? `event_${event.event_number}`).replace(/[^a-z0-9]/gi, '_').toLowerCase()
-        link.download = `scorecard_${leaguePart}_${eventPart}_group${g}.png`
-        link.href = dataUrl
-        link.click()
+        downloadPng(dataUrl, `scorecard_${leaguePart}_${eventPart}_group${g}.png`)
         await new Promise(r => setTimeout(r, 250))
       }
     } catch (err) {
@@ -773,9 +789,7 @@ export function ExportSkinsGridButton({ event, eventPlayers, allScores, course, 
 
         const link = document.createElement('a')
         const evPart = (event.name ?? `event_${event.event_number}`).replace(/[^a-z0-9]/gi, '_').toLowerCase()
-        link.download = `skins_grid_${evPart}${flight ? `_flight${flight}` : ''}.png`
-        link.href = dataUrl
-        link.click()
+        downloadPng(dataUrl, `skins_grid_${evPart}${flight ? `_flight${flight}` : ''}.png`)
         await new Promise(r => setTimeout(r, 300))
       }
     } catch (err) {
@@ -1104,9 +1118,7 @@ export function ExportResultsButton({ event, eventPlayers, allScores, course, si
 
       const link = document.createElement('a')
       const evPart = (event.name ?? `event_${event.event_number}`).replace(/[^a-z0-9]/gi, '_').toLowerCase()
-      link.download = `results_${evPart}.png`
-      link.href = dataUrl
-      link.click()
+      downloadPng(dataUrl, `results_${evPart}.png`)
     } catch (err) {
       console.error('Results export failed:', err)
       setExportError(err?.message ?? 'Export failed')
@@ -1859,9 +1871,7 @@ export function ExportTeamPlayButton({ event, eventPlayers, allScores, course, t
 
       const link = document.createElement('a')
       const evPart = (event.name ?? `event_${event.event_number}`).replace(/[^a-z0-9]/gi, '_').toLowerCase()
-      link.download = `team_play_${evPart}.png`
-      link.href = dataUrl
-      link.click()
+      downloadPng(dataUrl, `team_play_${evPart}.png`)
     } catch (err) {
       console.error('Team Play export failed:', err)
       setExportError(err?.message ?? 'Export failed')
@@ -2098,9 +2108,7 @@ export function ExportHandicapButton({ event, eventPlayers, allScores, course, o
 
       const link = document.createElement('a')
       const evPart = (event.name ?? `event_${event.event_number}`).replace(/[^a-z0-9]/gi, '_').toLowerCase()
-      link.download = `handicap_entry_${evPart}.png`
-      link.href = dataUrl
-      link.click()
+      downloadPng(dataUrl, `handicap_entry_${evPart}.png`)
     } catch (err) {
       console.error('Handicap export failed:', err)
       setExportError(err?.message ?? 'Export failed')
