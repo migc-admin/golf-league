@@ -100,7 +100,7 @@ export default function Register() {
   useEffect(() => {
     supabase
       .from('events')
-      .select('id, name, event_number, event_date, entry_fee, tournament_fee, status, venmo_handle, paypal_link, course:courses(name), league:leagues(name), use_flights')
+      .select('id, name, event_number, event_date, entry_fee, tournament_fee, status, venmo_handle, paypal_link, course:courses(name), league:leagues(name, org:organizations(logo_url)), use_flights')
       .eq('id', eventId)
       .single()
       .then(({ data, error }) => {
@@ -159,7 +159,7 @@ export default function Register() {
 
         {/* Header */}
         <div className="text-center mb-8">
-          <img src="/logo.png" alt="Golf League Logo"
+          <img src={event?.league?.org?.logo_url ?? '/logo.png'} alt="Golf League Logo"
             className="w-20 h-20 rounded-full object-cover mx-auto mb-3 shadow-xl" />
           <h1 className="text-white font-bold text-2xl" style={{ fontFamily: "'Playfair Display', serif" }}>
             Event Registration
