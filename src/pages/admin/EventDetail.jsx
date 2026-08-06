@@ -261,7 +261,7 @@ export default function EventDetail() {
 
       {activeTab === 'Groups' && (
         <div className="space-y-6">
-          <TabGroups event={event} eventPlayers={eventPlayers} onUpdated={load} />
+          <TabGroups event={event} eventPlayers={eventPlayers} onUpdated={load} orgSlug={orgSlug} allScores={allScores} />
           {((event.formats ?? (event.format ? [event.format] : [])).includes('match_points') ||
             (event.formats ?? (event.format ? [event.format] : [])).includes('ryder_cup')) && (
             <div className="border-t border-gray-100 pt-6">
@@ -513,7 +513,6 @@ async function exportHandicapXLSX(event, eventPlayers, allScores, course) {
 function TabOverview({ event, eventPlayers, allScores, sideGames, course, conflicts, onUpdated, orgName, orgSlug, onPrintAsset }) {
   const [editModal,   setEditModal]   = useState(false)
   const [deleteModal, setDeleteModal] = useState(false)
-  const [scoreEditor, setScoreEditor] = useState(false)
 
   const holesEntered = new Set(allScores.map(s => `${s.player_id}-${s.hole_number}`)).size
   const nonGuests = eventPlayers.filter(e => !e.is_guest)
@@ -530,7 +529,6 @@ function TabOverview({ event, eventPlayers, allScores, sideGames, course, confli
           title="Event Details"
           action={
             <div className="flex gap-2 flex-wrap">
-              <Button size="sm" variant="secondary" onClick={() => setScoreEditor(true)}>✎ Scores</Button>
               <Button size="sm" variant="secondary" onClick={() => setEditModal(true)}>Edit</Button>
               {event.status !== 'complete' && (
                 <Button size="sm" variant="danger" onClick={() => setDeleteModal(true)}>Delete</Button>
@@ -563,13 +561,6 @@ function TabOverview({ event, eventPlayers, allScores, sideGames, course, confli
           </dl>
         </Card>
 
-        {/* Scoring Access — shown when active */}
-        {event.status === 'active' && (
-          <Card>
-            <CardHeader title="Scoring Access" subtitle="Share with players to enter scores" />
-            <AccessCodeSection event={event} eventPlayers={eventPlayers} onUpdated={onUpdated} orgSlug={orgSlug} />
-          </Card>
-        )}
       </div>
 
       {/* Score conflicts */}
@@ -595,22 +586,12 @@ function TabOverview({ event, eventPlayers, allScores, sideGames, course, confli
               </div>
             ))}
           </div>
-          <p className="text-xs text-red-500 mt-2">Use ✎ Scores to review and correct the final values.</p>
+          <p className="text-xs text-red-500 mt-2">Use Edit Scores in the Pre/Post Round tab to review and correct the final values.</p>
         </Card>
       )}
 
       <EditEventModal open={editModal} onClose={() => setEditModal(false)} event={event} onSaved={onUpdated} />
       <DeleteEventModal open={deleteModal} onClose={() => setDeleteModal(false)} event={event} />
-      {scoreEditor && (
-        <AdminScoreEditor
-          event={event}
-          eventPlayers={eventPlayers}
-          allScores={allScores}
-          course={course}
-          onClose={() => setScoreEditor(false)}
-          onSaved={onUpdated}
-        />
-      )}
     </div>
   )
 }
@@ -1849,7 +1830,7 @@ function TeamMatchSetup({ event, eventPlayers, onUpdated }) {
   )
 }
 
-function TabGroups({ event, eventPlayers, onUpdated }) {
+function TabGroups({ event, eventPlayers, onUpdated, orgSlug, allScores }) {
   const ungrouped    = eventPlayers.filter(ep => !ep.group_number).sort(epAlpha)
   const maxGroup     = Math.max(0, ...eventPlayers.map(ep => ep.group_number ?? 0))
   const isShotgun    = event?.shotgun_start ?? false
@@ -2047,8 +2028,30 @@ function TabGroups({ event, eventPlayers, onUpdated }) {
     { key: 'alpha',              label: 'Alphabetical',              desc: 'Assign A–Z by first name, filling groups sequentially' },
   ]
 
+  // Build scorer map: groupNumber → Set of entered_by values from scores
+  const scorerByGroup = (() => {
+    const groupMap = Object.fromEntries(eventPlayers.map(ep => [ep.player_id, ep.group_number]))
+    const map = {}
+    for (const s of (allScores ?? [])) {
+      if (!s.entered_by) continue
+      const g = groupMap[s.player_id]
+      if (!g) continue
+      if (!map[g]) map[g] = new Set()
+      map[g].add(s.entered_by)
+    }
+    return map
+  })()
+
   return (
     <div className="space-y-4">
+      {/* Scoring Access — shown when event is active */}
+      {event.status === 'active' && (
+        <Card>
+          <CardHeader title="Scoring Access" subtitle="Share with players to enter scores" />
+          <AccessCodeSection event={event} eventPlayers={eventPlayers} onUpdated={onUpdated} orgSlug={orgSlug} />
+        </Card>
+      )}
+
       {/* Toolbar */}
       <div className="flex items-center justify-between">
         <p className="text-sm text-gray-600">
@@ -2148,6 +2151,11 @@ function TabGroups({ event, eventPlayers, onUpdated }) {
               <div>
                 <div className="font-semibold text-gray-900">Group {g}</div>
                 <div className="text-xs text-gray-400 mt-0.5">{members.length} player{members.length !== 1 ? 's' : ''}</div>
+                {scorerByGroup[g] && (
+                  <div className="text-xs text-green-700 mt-0.5">
+                    Scored by: {[...scorerByGroup[g]].join(', ')}
+                  </div>
+                )}
               </div>
               {isShotgun && (
                 <div className="flex items-center gap-2">

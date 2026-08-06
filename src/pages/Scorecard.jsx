@@ -64,6 +64,7 @@ export default function Scorecard() {
   const [canEdit,       setCanEdit]       = useState(false)
   const [enteredBy,     setEnteredBy]     = useState(null)   // name/email of scorer
   const [conflicts,     setConflicts]     = useState([])     // conflicting holes detected
+  const [showReconcile, setShowReconcile] = useState(false)  // paper scorecard confirmation
   // Guest code entry state (shown when not logged in and no valid session)
   const [needsCode,     setNeedsCode]     = useState(false)
   const [codeEventId,   setCodeEventId]   = useState(null)
@@ -344,8 +345,7 @@ export default function Scorecard() {
       setCurrentHole(h => h + 1)
       window.scrollTo({ top: 0, behavior: 'instant' })
     } else if (allValid && currentHole === 18) {
-      toast.success('Round complete! All 18 holes saved.')
-      setShowScorecard(true)
+      setShowReconcile(true)
     }
   }, [event, course, currentHole, groupPlayers, scores, saveScore])
 
@@ -398,6 +398,47 @@ export default function Scorecard() {
     ? Math.max(0, ...groupPlayers.map(ep => Object.keys(scores[ep.player_id] ?? {}).length))
     : 0
   const isDirty = dirtyHoles.has(currentHole)
+
+  if (showReconcile) {
+    return (
+      <div className="min-h-screen flex flex-col items-center justify-center p-6" style={{ background: '#fbfaf8' }}>
+        <div className="w-full max-w-sm bg-white rounded-2xl shadow-xl p-6 space-y-5">
+          <div className="text-center">
+            <div className="text-4xl mb-3">📋</div>
+            <h2 className="text-xl font-bold text-gray-900">Verify Your Scorecard</h2>
+            <p className="text-sm text-gray-500 mt-2">
+              Before submitting, please confirm all scores match the paper scorecard signed by your group.
+            </p>
+          </div>
+          <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 text-sm text-amber-800">
+            <strong>Reconciliation required:</strong> Compare each hole's score on your device against the paper scorecard. Correct any discrepancies before confirming.
+          </div>
+          <div className="space-y-3">
+            <button
+              onClick={() => {
+                setShowReconcile(false)
+                toast.success('Round complete! Scores submitted.')
+                setShowScorecard(true)
+              }}
+              className="w-full py-3 rounded-xl font-bold text-white text-sm"
+              style={{ background: '#1B4332' }}
+            >
+              ✓ Scores confirmed — Submit Round
+            </button>
+            <button
+              onClick={() => {
+                setShowReconcile(false)
+                setCurrentHole(1)
+              }}
+              className="w-full py-3 rounded-xl font-semibold text-sm border border-gray-300 text-gray-700 bg-white"
+            >
+              ← Go back and review scores
+            </button>
+          </div>
+        </div>
+      </div>
+    )
+  }
 
   if (showScorecard) {
     return (
