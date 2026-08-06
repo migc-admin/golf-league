@@ -3440,6 +3440,60 @@ function TabRegistrations({ event, onUpdated, orgId }) {
               <div className="divide-y divide-gray-100 px-4">{cancelled.map(r => <RegRow key={r.id} reg={r} />)}</div>
             </Card>
           )}
+
+          {/* Notes & Guest Requests */}
+          {(() => {
+            const withNotes = regs.filter(r => r.notes && r.status !== 'cancelled')
+            if (withNotes.length === 0) return null
+
+            function parseNotes(raw) {
+              const parts = (raw ?? '').split(' | ').map(s => s.trim()).filter(Boolean)
+              const guestPart = parts.find(p => p.toLowerCase().startsWith('guest request:'))
+              const regularParts = parts.filter(p => !p.toLowerCase().startsWith('guest request:') && p !== 'No guest')
+              let guest = null
+              if (guestPart) {
+                const info = guestPart.replace(/^guest request:\s*/i, '')
+                const [name, email, ghin] = info.split(',').map(s => s.trim())
+                guest = { name, email: email ?? null, ghin: ghin ? ghin.replace(/^GHIN:\s*/i, '') : null }
+              }
+              return { guest, notes: regularParts.join(' | ') || null }
+            }
+
+            return (
+              <Card>
+                <CardHeader
+                  title={`Notes & Guest Requests (${withNotes.length})`}
+                  subtitle="Submitted by registrants"
+                />
+                <div className="divide-y divide-gray-100 px-4 pb-2">
+                  {withNotes.map(reg => {
+                    const { guest, notes } = parseNotes(reg.notes)
+                    const timestamp = new Date(reg.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })
+                    return (
+                      <div key={reg.id} className="py-3 space-y-2">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className="text-sm font-semibold text-gray-900">{reg.first_name} {reg.last_name}</span>
+                          <span className={`text-xs px-2 py-0.5 rounded-full font-medium capitalize ${STATUS_COLORS[reg.status]}`}>{reg.status}</span>
+                          <span className="text-xs text-gray-400 ml-auto">{timestamp}</span>
+                        </div>
+                        {guest && (
+                          <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 space-y-0.5">
+                            <p className="text-xs font-semibold text-amber-800 uppercase tracking-wide">Guest Request</p>
+                            <p className="text-sm font-medium text-gray-900">{guest.name}</p>
+                            {guest.email && <p className="text-xs text-gray-500">{guest.email}</p>}
+                            {guest.ghin && <p className="text-xs text-gray-500">GHIN: {guest.ghin}</p>}
+                          </div>
+                        )}
+                        {notes && (
+                          <p className="text-xs text-gray-500 italic">"{notes}"</p>
+                        )}
+                      </div>
+                    )
+                  })}
+                </div>
+              </Card>
+            )
+          })()}
         </>
       )}
     </div>
