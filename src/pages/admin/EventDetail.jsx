@@ -2,12 +2,12 @@ import { useEffect, useState, useCallback } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import { supabase } from '../../lib/supabase'
 import toast from 'react-hot-toast'
-import { computePayouts, DEFAULT_PAYOUT_CONFIG, CATEGORY_LABELS, ctpLabel, activePayoutKeys } from '../../lib/engines/payouts'
+import { computePayouts, DEFAULT_PAYOUT_CONFIG, getCategoryLabel, ctpLabel, activePayoutKeys, defaultForKey } from '../../lib/engines/payouts'
 import { computeLeaderboards } from '../../lib/engines/scoring'
 import { computeAllSkins } from '../../lib/engines/skins'
 import { computeTGLEventResults, assignTGLPoints } from '../../lib/engines/tgl'
 import Card, { CardHeader } from '../../components/ui/Card'
-import { ExportScorecardsButton } from '../../components/ScorecardExport'
+import { ExportScorecardsButton, ExportSkinsGridButton, ExportResultsButton } from '../../components/ScorecardExport'
 import { useOrg, useFeatures } from '../../lib/OrgContext'
 import Button from '../../components/ui/Button'
 import Modal from '../../components/ui/Modal'
@@ -19,7 +19,48 @@ import PrintAssets from '../../components/ui/PrintAssets'
 import { atLimit, getLimit, nextTier, TIER_LABELS } from '../../lib/features'
 
 // Collapsed from 7 → 4 tabs: Players = Registrations + Players & Flights; Payout = Config + Side Games + Summary
-const ALL_ADMIN_TABS = ['Overview', 'Players', 'Groups', 'Payout', 'Team Play']
+const ALL_ADMIN_TABS = ['Overview', 'Players', 'Groups', 'Payout', 'Post Round', 'Team Play']
+
+// ─── Side game helpers (shared between EditEventModal and elsewhere) ──────────
+const PER_FLIGHT_GAMES = [
+  { key: 'skins',      label: 'Skins' },
+  { key: 'long_drive', label: 'Long Drive' },
+  { key: 'low_putts',  label: 'Low Putts' },
+  { key: 'ctp',        label: 'Closest to Pin (par 3s)' },
+]
+const GROUP_GAMES = []
+const PER_FLIGHT_GAME_KEYS = new Set(PER_FLIGHT_GAMES.map(g => g.key))
+
+function buildSideGameOptions(enabledGames, gameScope, numFlights) {
+  const result = []
+  const letters = Array.from({ length: numFlights }, (_, i) => String.fromCharCode(65 + i))
+  for (const g of PER_FLIGHT_GAMES) {
+    if (!enabledGames.has(g.key)) continue
+    if (numFlights > 0 && (gameScope[g.key] ?? 'flight') === 'flight') {
+      letters.forEach(l => result.push(`${g.key}_${l.toLowerCase()}`))
+    } else {
+      result.push(g.key)
+    }
+  }
+  return result
+}
+function parseSideGameOptions(options) {
+  const games = new Set()
+  const scope = {}
+  for (const opt of options ?? []) {
+    // Match pattern: base_key_letter (e.g. skins_a, low_putts_a, ctp_b)
+    const m = opt.match(/^(.+)_([a-z])$/)
+    if (m && PER_FLIGHT_GAME_KEYS.has(m[1])) {
+      games.add(m[1]); scope[m[1]] = 'flight'
+    } else if (PER_FLIGHT_GAME_KEYS.has(opt)) {
+      games.add(opt); scope[opt] = 'group'
+    } else {
+      games.add(opt)
+    }
+  }
+  return { games, scope }
+}
+const PLACES_OPTIONS = [1,2,3,4,5,6,7,8,9,10]
 
 // Shared alpha sort for event_player rows (ep.player.first_name, ep.player.last_name)
 function epAlpha(a, b) {
@@ -256,6 +297,10 @@ export default function EventDetail() {
         </div>
       )}
 
+      {activeTab === 'Post Round' && (
+        <TabPostRound event={event} eventPlayers={eventPlayers} allScores={allScores} course={course} sideGames={sideGames} orgName={org?.name} orgLogoUrl={org?.logo_url ?? null} orgSlug={orgSlug} />
+      )}
+
       {activeTab === 'Team Play' && (
         <TGLManager
           event={event}
@@ -338,10 +383,8 @@ async function exportScoresCSV(event, eventPlayers, allScores, course, sideGames
 
   // ── Sheet 3: Payouts ──────────────────────────────────────────────
   const nonGuestEPs  = eventPlayers.filter(ep => !ep.is_guest)
-  const flightCounts = {
-    A: nonGuestEPs.filter(ep => ep.flight === 'A').length,
-    B: nonGuestEPs.filter(ep => ep.flight === 'B').length,
-  }
+  const flightCounts = {}
+  nonGuestEPs.forEach(ep => { if (ep.flight) flightCounts[ep.flight] = (flightCounts[ep.flight] ?? 0) + 1 })
   const leaderboards  = computeLeaderboards(nonGuestEPs, allScores, course)
   const skinsResults  = computeAllSkins(nonGuestEPs, allScores, sis)
   const { byCategory } = computePayouts(event, nonGuestEPs.length, leaderboards, sideGames, skinsResults, flightCounts)
@@ -396,8 +439,7 @@ function TabOverview({ event, eventPlayers, allScores, sideGames, course, confli
         <CardHeader
           title="Event Details"
           action={
-            <div className="flex gap-2">
-              <Button size="sm" variant="secondary" onClick={() => exportScoresCSV(event, eventPlayers, allScores, course, sideGames)}>⬇ Export</Button>
+            <div className="flex gap-2 flex-wrap">
               <Button size="sm" variant="secondary" onClick={() => setScoreEditor(true)}>✎ Scores</Button>
               <Button size="sm" variant="secondary" onClick={() => setEditModal(true)}>Edit</Button>
               {event.status !== 'complete' && (
@@ -441,9 +483,6 @@ function TabOverview({ event, eventPlayers, allScores, sideGames, course, confli
           <Card>
             <CardHeader title="Scoring Access" subtitle="Share with players to enter scores" />
             <AccessCodeSection event={event} eventPlayers={eventPlayers} onUpdated={onUpdated} orgSlug={orgSlug} />
-            <div className="mt-3 pt-3 border-t border-gray-100">
-              <ExportScorecardsButton event={event} eventPlayers={eventPlayers} course={course} orgName={event.league?.name ?? orgName} orgSlug={orgSlug} orgLogoUrl={event.league?.logo_url ?? null} />
-            </div>
           </Card>
         )}
       </div>
@@ -800,6 +839,71 @@ function EditHandicapModal({ ep, course, onClose, onSaved }) {
           </Button>
         </div>
       </div>
+    </div>
+  )
+}
+
+// ─── Tab: Post Round ──────────────────────────────────────────────
+function TabPostRound({ event, eventPlayers, allScores, course, sideGames, orgName, orgLogoUrl, orgSlug }) {
+  const hasSkins = (event?.side_game_options ?? []).some(s => s.startsWith('skins'))
+  const leagueName = event.league?.name ?? orgName
+  const logoUrl = event.league?.logo_url ?? orgLogoUrl ?? null
+
+  return (
+    <div className="space-y-6 max-w-xl">
+      <p className="text-sm text-gray-500">Download post-round reports and results exports.</p>
+
+      <div className="bg-gray-50 rounded-xl px-4 py-4 space-y-3">
+        <div className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2">Score Data</div>
+        <div className="flex items-center justify-between">
+          <div>
+            <div className="text-sm font-medium text-gray-800">Scores Export (CSV)</div>
+            <div className="text-xs text-gray-400 mt-0.5">All player scores, net, gross — one row per player per hole</div>
+          </div>
+          <Button size="sm" variant="secondary" onClick={() => exportScoresCSV(event, eventPlayers, allScores, course)}>
+            ⬇ Download
+          </Button>
+        </div>
+      </div>
+
+      <div className="bg-gray-50 rounded-xl px-4 py-4 space-y-3">
+        <div className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2">Results</div>
+        <div className="flex items-center justify-between">
+          <div>
+            <div className="text-sm font-medium text-gray-800">Tournament Results (PNG)</div>
+            <div className="text-xs text-gray-400 mt-0.5">Full results card — scoring, skins, long drive, CTP</div>
+          </div>
+          <ExportResultsButton
+            event={event}
+            eventPlayers={eventPlayers}
+            allScores={allScores}
+            course={course}
+            sideGames={sideGames ?? []}
+            orgName={leagueName}
+            orgLogoUrl={logoUrl}
+          />
+        </div>
+      </div>
+
+      {hasSkins && (
+        <div className="bg-gray-50 rounded-xl px-4 py-4 space-y-3">
+          <div className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2">Skins</div>
+          <div className="flex items-center justify-between">
+            <div>
+              <div className="text-sm font-medium text-gray-800">Export Skins Grid (PNG)</div>
+              <div className="text-xs text-gray-400 mt-0.5">Hole-by-hole skins results by flight, sorted by net score</div>
+            </div>
+            <ExportSkinsGridButton
+              event={event}
+              eventPlayers={eventPlayers}
+              allScores={allScores}
+              course={course}
+              orgName={leagueName}
+              orgLogoUrl={logoUrl}
+            />
+          </div>
+        </div>
+      )}
     </div>
   )
 }
@@ -1970,35 +2074,39 @@ function GroupRow({ ep, maxGroup, isFirst, isLast, onSetGroup, onToggleSK, onMov
 function TabPayoutConfig({ event, eventPlayers, course, onUpdated }) {
   const [config,         setConfig]         = useState({})
   const [saving,         setSaving]         = useState(false)
-  const [ctpHoles,       setCtpHoles]       = useState([])   // array of hole numbers
+  const [ctpHoles,       setCtpHoles]       = useState([])
   const [ctpInput,       setCtpInput]       = useState('')
   const [longDriveHole,  setLongDriveHole]  = useState(event.long_drive_hole ?? '')
   const [payoutBasis,    setPayoutBasis]    = useState(event.payout_basis ?? 'per_player')
   const [fixedTotal,     setFixedTotal]     = useState(event.payout_fixed_total ?? '')
 
   const nonGuestPlayers = eventPlayers.filter(e => !e.is_guest)
-  const flightA = nonGuestPlayers.filter(e => e.flight === 'A').length
-  const flightB = nonGuestPlayers.filter(e => e.flight === 'B').length
   const totalPlayers = nonGuestPlayers.length
+  const numFlights = event.num_flights ?? (event.use_flights ? 2 : 0)
+  const hasFlights = numFlights > 0
+  // Build flightCounts: { A: n, B: n, C: n, ... }
+  const flightLetters = hasFlights
+    ? Array.from({ length: numFlights }, (_, i) => String.fromCharCode(65 + i))
+    : []
+  const flightCounts = {}
+  flightLetters.forEach(l => {
+    flightCounts[l] = nonGuestPlayers.filter(e => e.flight === l).length
+  })
 
-  // Active keys driven by event's formats + side_game_options + use_flights
-  const eventActiveKeys = activePayoutKeys(event)
-
-  const hasCtp      = (event.side_game_options ?? []).includes('ctp')
+  const hasCtp       = (event.side_game_options ?? []).includes('ctp')
   const hasLongDrive = (event.side_game_options ?? []).some(s => s.startsWith('long_drive'))
 
-  // Rebuild config whenever event setup changes (formats, sides, use_flights)
+  // Rebuild config whenever event setup changes
   const eventConfigKey = [
     event.id,
     (event.formats ?? []).join(','),
     (event.side_game_options ?? []).join(','),
-    String(event.use_flights),
+    String(numFlights),
+    JSON.stringify(event.payout_places ?? {}),
   ].join('|')
 
   useEffect(() => {
     const existingConfig = event.payout_config ?? {}
-
-    // CTP holes only loaded when CTP is selected
     const existingCtpHoles = hasCtp
       ? Object.keys(existingConfig)
           .filter(k => k.startsWith('ctp_'))
@@ -2007,11 +2115,10 @@ function TabPayoutConfig({ event, eventPlayers, course, onUpdated }) {
       : []
     setCtpHoles(existingCtpHoles)
 
-    // Build config from active keys only — no extra keys shown
     const keys = activePayoutKeys(event)
     const next = {}
     for (const k of keys) {
-      next[k] = existingConfig[k] ?? DEFAULT_PAYOUT_CONFIG[k] ?? 0
+      next[k] = existingConfig[k] ?? defaultForKey(k)
     }
     for (const h of existingCtpHoles) {
       next[`ctp_${h}`] = existingConfig[`ctp_${h}`] ?? 0
@@ -2054,15 +2161,17 @@ function TabPayoutConfig({ event, eventPlayers, course, onUpdated }) {
     else { toast.success('Payout config saved'); onUpdated() }
   }
 
-  const useFlights = event.use_flights ?? false
-
   function getMultiplier(key) {
-    if (key === 'low_putts' || key.startsWith('ctp_')) return totalPlayers
-    if (key === 'skins' || key === 'long_drive') return totalPlayers
-    if (key === 'skins_b' || key.includes('_b_') || key === 'long_drive_b') return flightB
-    // No-flight net scoring keys (no _a_ or _b_ in name) → full field
-    if (!useFlights && (key.startsWith('18_net_') || key.startsWith('f9_') || key.startsWith('b9_'))) return totalPlayers
-    return flightA
+    // Full-field keys
+    if (key === 'low_putts' || key.startsWith('ctp_') || key === 'skins' || key === 'long_drive') return totalPlayers
+    if (!hasFlights && (key.startsWith('18_net_') || key.startsWith('f9_') || key.startsWith('b9_'))) return totalPlayers
+    // Per-flight: extract letter
+    const flMatch = key.match(/(?:skins|long_drive|low_putts|18_net|f9|b9)_([a-z])/)
+    if (flMatch) {
+      const fl = flMatch[1].toUpperCase()
+      return flightCounts[fl] ?? Math.round(totalPlayers / (numFlights || 1))
+    }
+    return totalPlayers
   }
 
   const totalPot = payoutBasis === 'fixed'
@@ -2072,25 +2181,24 @@ function TabPayoutConfig({ event, eventPlayers, course, onUpdated }) {
   const totalAllocated = Object.entries(config).reduce((sum, [k, v]) => sum + ((v || 0) * getMultiplier(k)), 0)
   const overBudget     = totalAllocated > totalPot
 
+  // Build rows — each row tagged with its flight letter (null = full field)
   const rows = Object.entries(config).map(([key, val]) => {
-    const isField   = key === 'low_putts' || key.startsWith('ctp_') || key === 'skins' || key === 'long_drive'
-                   || (!useFlights && (key.startsWith('18_net_') || key.startsWith('f9_') || key.startsWith('b9_')))
-    const isFlightB = !isField && (key === 'skins_b' || key.includes('_b_') || key === 'long_drive_b')
-    const isFlightA = !isField && !isFlightB
     const mult  = getMultiplier(key)
     const total = (val || 0) * mult
-    const label = key.startsWith('ctp_')
-      ? ctpLabel(parseInt(key.replace('ctp_', ''), 10))
-      : (CATEGORY_LABELS[key] ?? key)
-    return { key, val, label, isField, isFlightA, isFlightB, mult, total }
+    const label = getCategoryLabel(key)
+    // Determine flight letter
+    const flMatch = hasFlights && key.match(/(?:skins|long_drive|low_putts|18_net|f9|b9)_([a-z])(?:_|$)/)
+    const flLetter = flMatch ? flMatch[1].toUpperCase() : null
+    const isField = !flLetter
+    return { key, val, label, isField, flLetter, mult, total }
   })
 
   return (
     <div className="space-y-4">
       {/* Summary */}
       <div className="text-sm text-gray-600 space-y-0.5">
-        {useFlights
-          ? <p>Flight A: <strong>{flightA}</strong> · Flight B: <strong>{flightB}</strong> · Total: <strong>{totalPlayers} players</strong> · Pot: <strong className="tabular-nums">${totalPot.toFixed(2)}</strong></p>
+        {hasFlights
+          ? <p>{flightLetters.map(l => `Flight ${l}: ${flightCounts[l]}`).join(' · ')} · Total: <strong>{totalPlayers} players</strong> · Pot: <strong className="tabular-nums">${totalPot.toFixed(2)}</strong></p>
           : <p>Total: <strong>{totalPlayers} players</strong> · Pot: <strong className="tabular-nums">${totalPot.toFixed(2)}</strong></p>
         }
         <p className={`tabular-nums ${overBudget ? 'text-red-600 font-medium' : 'text-fairway-700 font-medium'}`}>
@@ -2125,8 +2233,7 @@ function TabPayoutConfig({ event, eventPlayers, course, onUpdated }) {
         )}
       </Card>
 
-      {/* CTP hole assignment — only when CTP is selected */}
-      {/* Long Drive hole — only when Long Drive is selected */}
+      {/* Long Drive hole */}
       {hasLongDrive && <Card>
         <CardHeader title="Long Drive Hole" subtitle="Designate which hole the Long Drive contest is on" />
         <div className="flex items-center gap-3">
@@ -2191,39 +2298,33 @@ function TabPayoutConfig({ event, eventPlayers, course, onUpdated }) {
         All values are <strong>$ per player</strong> × player count shown in each section.
       </p>
 
-      {/* Flight A — only shown when flights are on and there are A-specific rows */}
-      {useFlights && rows.some(r => r.isFlightA) && (
-        <Card className="overflow-hidden p-0">
-          <div className="px-4 py-2.5 bg-blue-50 border-b border-blue-100">
-            <h3 className="text-xs font-semibold text-blue-700">Flight A ({flightA} players)</h3>
-          </div>
-          <PayoutTable rows={rows.filter(r => r.isFlightA)} onChange={setVal} colLabel="$ per player (Flt A)" />
-        </Card>
-      )}
+      {/* Per-flight scoring & side games — one card per flight */}
+      {hasFlights && flightLetters.map(fl => {
+        const flRows = rows.filter(r => r.flLetter === fl)
+        if (flRows.length === 0) return null
+        return (
+          <Card key={fl} className="overflow-hidden p-0">
+            <div className="px-4 py-2.5 bg-blue-50 border-b border-blue-100">
+              <h3 className="text-xs font-semibold text-blue-700">Flight {fl} ({flightCounts[fl] ?? 0} players)</h3>
+            </div>
+            <PayoutTable rows={flRows} onChange={setVal} colLabel={`$ per player (Flt ${fl})`} />
+          </Card>
+        )
+      })}
 
-      {/* Flight B — only shown when flights are on and there are B-specific rows */}
-      {useFlights && rows.some(r => r.isFlightB) && (
-        <Card className="overflow-hidden p-0">
-          <div className="px-4 py-2.5 bg-purple-50 border-b border-purple-100">
-            <h3 className="text-xs font-semibold text-purple-700">Flight B ({flightB} players)</h3>
-          </div>
-          <PayoutTable rows={rows.filter(r => r.isFlightB)} onChange={setVal} colLabel="$ per player (Flt B)" />
-        </Card>
-      )}
-
-      {/* Full field — scoring results (no flights) + side games + CTP */}
+      {/* Full field — no-flight scoring + side games + CTP */}
       {rows.some(r => r.isField) && (
         <Card className="overflow-hidden p-0">
           <div className="px-4 py-2.5 bg-green-50 border-b border-green-100">
             <h3 className="text-xs font-semibold text-green-700">
-              {useFlights ? 'Full Field — Side Games & CTP' : 'All Players'} ({totalPlayers} players)
+              {hasFlights ? 'Full Field — Side Games & CTP' : 'All Players'} ({totalPlayers} players)
             </h3>
           </div>
           <PayoutTable rows={rows.filter(r => r.isField)} onChange={setVal} colLabel="$ per player (All)" />
         </Card>
       )}
 
-      {/* Save — at bottom after all config is filled out */}
+      {/* Save */}
       <div className="flex items-center justify-between pt-2 border-t border-gray-100">
         <p className={`text-sm tabular-nums ${overBudget ? 'text-red-600 font-medium' : 'text-fairway-700 font-medium'}`}>
           {overBudget ? `⚠ Over budget by $${(totalAllocated - totalPot).toFixed(2)}` : `$${totalAllocated.toFixed(2)} allocated of $${totalPot.toFixed(2)}`}
@@ -2416,7 +2517,8 @@ function TabPayoutSummary({ event, eventPlayers, allScores, sideGames, course })
   }
 
   const nonGuestEPs   = eventPlayers.filter(ep => !ep.is_guest)
-  const flightCounts  = { A: nonGuestEPs.filter(ep => ep.flight === 'A').length, B: nonGuestEPs.filter(ep => ep.flight === 'B').length }
+  const flightCounts  = {}
+  nonGuestEPs.forEach(ep => { if (ep.flight) flightCounts[ep.flight] = (flightCounts[ep.flight] ?? 0) + 1 })
   const leaderboards  = computeLeaderboards(nonGuestEPs, allScores, course)
   const skinsResults  = computeAllSkins(nonGuestEPs, allScores, course.stroke_index)
   const { totalPot, byCategory, byPlayer, totalAllocated } = computePayouts(
@@ -2551,17 +2653,6 @@ const EDIT_FORMAT_OPTIONS = [
   ]},
 ]
 
-const EDIT_SIDE_GAME_OPTIONS = [
-  { key: 'skins',         label: 'Skins',                  flightsOff: true,  flightsOn: false },
-  { key: 'skins_a',       label: 'Skins — Flight A',       flightsOff: false, flightsOn: true  },
-  { key: 'skins_b',       label: 'Skins — Flight B',       flightsOff: false, flightsOn: true  },
-  { key: 'long_drive',    label: 'Long Drive',             flightsOff: true,  flightsOn: false },
-  { key: 'long_drive_a',  label: 'Long Drive — Flight A',  flightsOff: false, flightsOn: true  },
-  { key: 'long_drive_b',  label: 'Long Drive — Flight B',  flightsOff: false, flightsOn: true  },
-  { key: 'low_putts',     label: 'Low Putts',              flightsOff: true,  flightsOn: true  },
-  { key: 'ctp',           label: 'Closest to Pin (par 3s)',flightsOff: true,  flightsOn: true  },
-  { key: 'track_putts',   label: 'Track Putts on Scorecard',flightsOff: true, flightsOn: true  },
-]
 
 function EditEventModal({ open, onClose, event, onSaved }) {
   const [eventDate,     setEventDate]     = useState('')
@@ -2573,9 +2664,11 @@ function EditEventModal({ open, onClose, event, onSaved }) {
   const [paypalLink,    setPaypalLink]    = useState('')
   const [startTime,   setStartTime]   = useState('')
   const [interval,    setInterval]    = useState(10)
-  const [formats,     setFormats]     = useState(new Set(['net_stroke']))
-  const [sideGames,   setSideGames]   = useState(new Set())
-  const [useFlights,   setUseFlights]   = useState(false)
+  const [formats,      setFormats]      = useState(new Set(['net_stroke']))
+  const [payoutPlaces, setPayoutPlaces] = useState({})
+  const [sideGames,    setSideGames]    = useState(new Set())
+  const [gameScope,    setGameScope]    = useState({})
+  const [numFlights,   setNumFlights]   = useState(0)
   const [shotgunStart, setShotgunStart] = useState(false)
   const [payoutBasis,  setPayoutBasis]  = useState('per_player')
   const [payoutFixed,  setPayoutFixed]  = useState('')
@@ -2595,8 +2688,11 @@ function EditEventModal({ open, onClose, event, onSaved }) {
       setStartTime(event.start_time ? event.start_time.slice(0, 5) : '')
       setInterval(event.tee_time_interval_mins ?? 10)
       setFormats(new Set(event.formats?.length ? event.formats : [event.format ?? 'net_stroke']))
-      setSideGames(new Set(event.side_game_options ?? []))
-      setUseFlights(event.use_flights ?? false)
+      setPayoutPlaces(event.payout_places ?? {})
+      const parsed = parseSideGameOptions(event.side_game_options)
+      setSideGames(parsed.games)
+      setGameScope(parsed.scope)
+      setNumFlights(event.num_flights ?? (event.use_flights ? 2 : 0))
       setShotgunStart(event.shotgun_start ?? false)
       setPayoutBasis(event.payout_basis ?? 'per_player')
       setPayoutFixed(event.payout_fixed_total ?? '')
@@ -2632,8 +2728,10 @@ function EditEventModal({ open, onClose, event, onSaved }) {
         tee_time_interval_mins: parseInt(interval, 10),
         format:                 formatsArr[0],
         formats:                formatsArr,
-        side_game_options:      [...sideGames],
-        use_flights:            useFlights,
+        side_game_options:      buildSideGameOptions(sideGames, gameScope, numFlights),
+        payout_places:          Object.keys(payoutPlaces).length > 0 ? payoutPlaces : null,
+        use_flights:            numFlights > 0,
+        num_flights:            numFlights > 0 ? numFlights : null,
         shotgun_start:          shotgunStart,
         payout_basis:           payoutBasis,
         payout_fixed_total:     payoutBasis === 'fixed' ? parseFloat(payoutFixed) || 0 : null,
@@ -2699,19 +2797,24 @@ function EditEventModal({ open, onClose, event, onSaved }) {
           </div>
         </div>
 
-        {/* Use Flights toggle */}
-        <div className="bg-gray-50 rounded-xl px-4 py-3 flex items-center justify-between">
-          <div>
-            <div className="text-sm font-medium text-gray-800">Use Flights (A &amp; B)?</div>
-            <div className="text-xs text-gray-400 mt-0.5">Enable if splitting players into two competitive flights</div>
+        {/* Number of Flights */}
+        <div className="bg-gray-50 rounded-xl px-4 py-3">
+          <div className="flex items-center justify-between">
+            <div>
+              <div className="text-sm font-medium text-gray-800">Number of Flights</div>
+              <div className="text-xs text-gray-400 mt-0.5">Flight A = highest/best players. "No flights" = single field.</div>
+            </div>
+            <select
+              value={numFlights}
+              onChange={e => setNumFlights(Number(e.target.value))}
+              className="input bg-white w-36"
+            >
+              <option value={0}>No flights</option>
+              {Array.from({ length: 24 }, (_, i) => i + 2).map(n => (
+                <option key={n} value={n}>{n} flights ({Array.from({ length: n }, (_, i) => String.fromCharCode(65 + i)).join(', ')})</option>
+              ))}
+            </select>
           </div>
-          <button
-            type="button"
-            onClick={() => setUseFlights(v => !v)}
-            className={`relative inline-flex h-6 w-11 shrink-0 rounded-full border-2 border-transparent transition-colors focus:outline-none ${useFlights ? 'bg-fairway-600' : 'bg-gray-300'}`}
-          >
-            <span className={`inline-block h-5 w-5 rounded-full bg-white shadow transition-transform ${useFlights ? 'translate-x-5' : 'translate-x-0'}`} />
-          </button>
         </div>
 
         {/* Shotgun Start toggle */}
@@ -2736,11 +2839,11 @@ function EditEventModal({ open, onClose, event, onSaved }) {
             {EDIT_FORMAT_OPTIONS.map(group => (
               <div key={group.group}>
                 <div className="text-xs text-gray-400 font-medium uppercase tracking-wide mb-1.5">{group.group}</div>
-                <div className="space-y-1.5">
+                <div className="space-y-2">
                   {group.options.map(opt => (
-                    <label key={opt.value} className="flex items-center gap-2.5 cursor-pointer">
-                      <input type="checkbox" checked={formats.has(opt.value)} onChange={() => toggleFormat(opt.value)} className="accent-fairway-600 w-4 h-4" />
-                      <span className="text-sm text-gray-800">{opt.label}</span>
+                    <div key={opt.value} className="flex items-center gap-2.5">
+                      <input type="checkbox" checked={formats.has(opt.value)} onChange={() => toggleFormat(opt.value)} className="accent-fairway-600 w-4 h-4 shrink-0 cursor-pointer" />
+                      <span className="text-sm text-gray-800 cursor-pointer" onClick={() => toggleFormat(opt.value)}>{opt.label}</span>
                       {opt.tip && (
                         <span className="relative group/tip shrink-0">
                           <span className="text-gray-400 hover:text-fairway-600 cursor-default text-xs font-bold select-none">ⓘ</span>
@@ -2749,7 +2852,19 @@ function EditEventModal({ open, onClose, event, onSaved }) {
                           </span>
                         </span>
                       )}
-                    </label>
+                      {formats.has(opt.value) && (
+                        <div className="ml-auto flex items-center gap-1.5 shrink-0">
+                          <span className="text-xs text-gray-400">Places to pay:</span>
+                          <select
+                            value={payoutPlaces[opt.value] ?? 1}
+                            onChange={e => setPayoutPlaces(prev => ({ ...prev, [opt.value]: Number(e.target.value) }))}
+                            className="text-xs border border-gray-300 rounded px-1.5 py-0.5 bg-white"
+                          >
+                            {PLACES_OPTIONS.map(n => <option key={n} value={n}>{n}</option>)}
+                          </select>
+                        </div>
+                      )}
+                    </div>
                   ))}
                 </div>
               </div>
@@ -2761,16 +2876,42 @@ function EditEventModal({ open, onClose, event, onSaved }) {
         {/* Side Games */}
         <div>
           <label className="label">Side Games / Competitions</label>
-          <div className="space-y-1.5 bg-gray-50 rounded-xl px-4 py-3">
-            {EDIT_SIDE_GAME_OPTIONS
-              .filter(opt => useFlights ? opt.flightsOn : opt.flightsOff)
-              .map(opt => (
-                <label key={opt.key} className="flex items-center gap-2.5 py-0.5 cursor-pointer">
-                  <input type="checkbox" checked={sideGames.has(opt.key)} onChange={() => toggleSideGame(opt.key)} className="accent-fairway-600 w-4 h-4" />
-                  <span className="text-sm text-gray-800">{opt.label}</span>
-                </label>
-              ))
-            }
+          <div className="space-y-3 bg-gray-50 rounded-xl px-4 py-3">
+            {PER_FLIGHT_GAMES.map(opt => {
+              const checked = sideGames.has(opt.key)
+              const scope = gameScope[opt.key] ?? 'flight'
+              const flightLetters = Array.from({ length: numFlights }, (_, i) => String.fromCharCode(65 + i))
+              return (
+                <div key={opt.key}>
+                  <label className="flex items-center gap-2.5 cursor-pointer">
+                    <input type="checkbox" checked={checked} onChange={() => toggleSideGame(opt.key)} className="accent-fairway-600 w-4 h-4" />
+                    <span className="text-sm text-gray-800">{opt.label}</span>
+                  </label>
+                  {checked && numFlights > 0 && (
+                    <div className="ml-6 mt-1.5 flex gap-4">
+                      <label className="flex items-center gap-1.5 cursor-pointer">
+                        <input type="radio" checked={scope === 'flight'}
+                          onChange={() => setGameScope(prev => ({ ...prev, [opt.key]: 'flight' }))}
+                          className="accent-fairway-600" />
+                        <span className="text-xs text-gray-600">Per flight ({flightLetters.join(', ')})</span>
+                      </label>
+                      <label className="flex items-center gap-1.5 cursor-pointer">
+                        <input type="radio" checked={scope === 'group'}
+                          onChange={() => setGameScope(prev => ({ ...prev, [opt.key]: 'group' }))}
+                          className="accent-fairway-600" />
+                        <span className="text-xs text-gray-600">Whole group</span>
+                      </label>
+                    </div>
+                  )}
+                </div>
+              )
+            })}
+            {GROUP_GAMES.map(opt => (
+              <label key={opt.key} className="flex items-center gap-2.5 cursor-pointer">
+                <input type="checkbox" checked={sideGames.has(opt.key)} onChange={() => toggleSideGame(opt.key)} className="accent-fairway-600 w-4 h-4" />
+                <span className="text-sm text-gray-800">{opt.label}</span>
+              </label>
+            ))}
           </div>
         </div>
 

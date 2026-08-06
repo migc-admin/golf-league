@@ -2,20 +2,11 @@
  * Payout Calculation Engine
  *
  * payout_config values are $ PER PLAYER with these multipliers:
- * - low_putts, ctp_N      → × total field (all players)
- * - _a_ / long_drive_a / skins_a → × Flight A player count
- * - _b_ / long_drive_b / skins_b → × Flight B player count
- *
- * Example:
- * {
- *   "18_net_a_1st": 3,   // $3 × flightA players
- *   "18_net_b_1st": 3,   // $3 × flightB players
- *   "ctp_5": 1,          // $1 × all players (greenie pays whole field)
- *   "low_putts": 1,      // $1 × all players
- *   "long_drive_a": 1,   // $1 × flightA players
- *   "long_drive_b": 1,   // $1 × flightB players
- *   "skins_a": 2,        // $2 × flightA players → skins pool
- * }
+ * - low_putts, ctp_N, no-flight scoring → × total field (all players)
+ * - skins_a / long_drive_a / 18_net_a_1st → × Flight A player count
+ * - skins_b / long_drive_b / 18_net_b_1st → × Flight B player count
+ * - skins_c / long_drive_c / 18_net_c_1st → × Flight C player count
+ * (any letter works — dynamic based on num_flights)
  */
 
 import { computeSkinsPayout } from './skins.js'
@@ -28,47 +19,70 @@ function getRankInfo(key) {
   return null
 }
 
-export const CATEGORY_LABELS = {
-  // With flights
-  '18_net_a_1st':  '18-Hole Net — Flight A, 1st',
-  '18_net_a_2nd':  '18-Hole Net — Flight A, 2nd',
-  '18_net_a_3rd':  '18-Hole Net — Flight A, 3rd',
-  '18_net_b_1st':  '18-Hole Net — Flight B, 1st',
-  '18_net_b_2nd':  '18-Hole Net — Flight B, 2nd',
-  '18_net_b_3rd':  '18-Hole Net — Flight B, 3rd',
-  'f9_a_1st':      'Front 9 Net — Flight A, 1st',
-  'f9_a_2nd':      'Front 9 Net — Flight A, 2nd',
-  'f9_b_1st':      'Front 9 Net — Flight B, 1st',
-  'f9_b_2nd':      'Front 9 Net — Flight B, 2nd',
-  'b9_a_1st':      'Back 9 Net — Flight A, 1st',
-  'b9_a_2nd':      'Back 9 Net — Flight A, 2nd',
-  'b9_b_1st':      'Back 9 Net — Flight B, 1st',
-  'b9_b_2nd':      'Back 9 Net — Flight B, 2nd',
-  'skins_a':       'Skins — Flight A',
-  'skins_b':       'Skins — Flight B',
-  'long_drive_a':  'Long Drive — Flight A',
-  'long_drive_b':  'Long Drive — Flight B',
-  // No flights (full field)
-  '18_net_1st':    '18-Hole Net — 1st',
-  '18_net_2nd':    '18-Hole Net — 2nd',
-  '18_net_3rd':    '18-Hole Net — 3rd',
-  'f9_1st':        'Front 9 Net — 1st',
-  'f9_2nd':        'Front 9 Net — 2nd',
-  'b9_1st':        'Back 9 Net — 1st',
-  'b9_2nd':        'Back 9 Net — 2nd',
-  'skins':         'Skins (Full Field)',
-  'long_drive':    'Long Drive (Full Field)',
-  // Full field regardless
-  'low_putts':     'Low Putts (Full Field)',
+/** Extract flight letter (uppercase) from a per-flight key, or null for full-field keys */
+function flightLetterOf(key) {
+  // skins_a, long_drive_b, low_putts_c
+  const sideMatch = key.match(/^(?:skins|long_drive|low_putts)_([a-z])$/)
+  if (sideMatch) return sideMatch[1].toUpperCase()
+  // 18_net_a_1st, f9_b_2nd, b9_c_3rd
+  const scoringMatch = key.match(/^(?:18_net|f9|b9)_([a-z])_(?:1st|2nd|3rd)$/)
+  if (scoringMatch) return scoringMatch[1].toUpperCase()
+  return null
 }
+
+/** Human-readable label for any payout key */
+export function getCategoryLabel(key) {
+  // CTP handled separately
+  if (key.startsWith('ctp_')) return `Closest to Pin — Hole ${key.replace('ctp_', '')} (Full Field)`
+
+  // Full-field side games
+  if (key === 'skins')      return 'Skins (Full Field)'
+  if (key === 'long_drive') return 'Long Drive (Full Field)'
+  if (key === 'low_putts')  return 'Low Putts (Full Field)'
+
+  // No-flight scoring
+  if (key === '18_net_1st') return '18-Hole Net — 1st'
+  if (key === '18_net_2nd') return '18-Hole Net — 2nd'
+  if (key === '18_net_3rd') return '18-Hole Net — 3rd'
+  if (key === 'f9_1st')     return 'Front 9 Net — 1st'
+  if (key === 'f9_2nd')     return 'Front 9 Net — 2nd'
+  if (key === 'b9_1st')     return 'Back 9 Net — 1st'
+  if (key === 'b9_2nd')     return 'Back 9 Net — 2nd'
+
+  // Per-flight patterns — any letter
+  const fl = flightLetterOf(key)
+  if (fl) {
+    if (key.startsWith('skins_'))      return `Skins — Flight ${fl}`
+    if (key.startsWith('long_drive_')) return `Long Drive — Flight ${fl}`
+    if (key.startsWith('low_putts_'))  return `Low Putts — Flight ${fl}`
+    if (key.startsWith('18_net_')) {
+      const rank = key.split('_').pop()
+      return `18-Hole Net — Flight ${fl}, ${rank}`
+    }
+    if (key.startsWith('f9_')) {
+      const rank = key.split('_').pop()
+      return `Front 9 Net — Flight ${fl}, ${rank}`
+    }
+    if (key.startsWith('b9_')) {
+      const rank = key.split('_').pop()
+      return `Back 9 Net — Flight ${fl}, ${rank}`
+    }
+  }
+  return key
+}
+
+// Legacy export kept for any remaining references
+export const CATEGORY_LABELS = new Proxy({}, {
+  get(_, key) { return getCategoryLabel(key) }
+})
 
 export function ctpLabel(holeNumber) {
   return `Closest to Pin — Hole ${holeNumber} (Full Field)`
 }
 
-/** Default per-player dollar amounts for each key */
+/** Default per-player dollar amounts */
 export const DEFAULT_PAYOUT_CONFIG = {
-  // Flight-based
+  // Per-flight (A/B defaults — applied to any letter)
   '18_net_a_1st': 3, '18_net_a_2nd': 2, '18_net_a_3rd': 1,
   '18_net_b_1st': 3, '18_net_b_2nd': 2, '18_net_b_3rd': 1,
   'f9_a_1st': 2, 'f9_a_2nd': 1,
@@ -87,77 +101,114 @@ export const DEFAULT_PAYOUT_CONFIG = {
   'low_putts': 0,
 }
 
+function defaultForKey(key) {
+  if (DEFAULT_PAYOUT_CONFIG[key] !== undefined) return DEFAULT_PAYOUT_CONFIG[key]
+  // For flights C+ use same defaults as A
+  const fl = flightLetterOf(key)
+  if (fl && fl !== 'A' && fl !== 'B') {
+    const aKey = key.replace(`_${fl.toLowerCase()}`, '_a')
+    return DEFAULT_PAYOUT_CONFIG[aKey] ?? 0
+  }
+  return 0
+}
+
 /**
  * Build the set of active payout keys for an event based on its formats/side games.
- * useFlights controls whether flight-split or full-field scoring keys are used.
+ * Uses num_flights (integer) for number of competitive flights.
+ * Uses payout_places (jsonb) for how many places to pay per format.
  */
 export function activePayoutKeys(event) {
-  const formats  = event.formats ?? (event.format ? [event.format] : ['net_stroke'])
-  const sides    = event.side_game_options ?? []
-  const flights  = event.use_flights ?? false
+  const formats    = event.formats ?? (event.format ? [event.format] : ['net_stroke'])
+  const sides      = event.side_game_options ?? []
+  const numFlights = event.num_flights ?? (event.use_flights ? 2 : 0)
+  const hasFlights = numFlights > 0
+  const flightLetters = hasFlights
+    ? Array.from({ length: numFlights }, (_, i) => String.fromCharCode(97 + i))  // ['a','b','c',...]
+    : []
+  const payoutPlaces = event.payout_places ?? {}
   const keys = []
 
   if (formats.includes('net_stroke')) {
-    keys.push(...(flights
-      ? ['18_net_a_1st','18_net_a_2nd','18_net_a_3rd','18_net_b_1st','18_net_b_2nd','18_net_b_3rd']
-      : ['18_net_1st','18_net_2nd','18_net_3rd']))
+    const places = Math.min(payoutPlaces.net_stroke ?? 3, 3)
+    const placeKeys = Array.from({ length: places }, (_, i) => ['1st','2nd','3rd'][i])
+    if (hasFlights) {
+      flightLetters.forEach(l => placeKeys.forEach(p => keys.push(`18_net_${l}_${p}`)))
+    } else {
+      placeKeys.forEach(p => keys.push(`18_net_${p}`))
+    }
   }
   if (formats.includes('net_stroke_front9')) {
-    keys.push(...(flights ? ['f9_a_1st','f9_a_2nd','f9_b_1st','f9_b_2nd'] : ['f9_1st','f9_2nd']))
+    const places = Math.min(payoutPlaces.net_stroke_front9 ?? 2, 2)
+    const placeKeys = Array.from({ length: places }, (_, i) => ['1st','2nd'][i])
+    if (hasFlights) {
+      flightLetters.forEach(l => placeKeys.forEach(p => keys.push(`f9_${l}_${p}`)))
+    } else {
+      placeKeys.forEach(p => keys.push(`f9_${p}`))
+    }
   }
   if (formats.includes('net_stroke_back9')) {
-    keys.push(...(flights ? ['b9_a_1st','b9_a_2nd','b9_b_1st','b9_b_2nd'] : ['b9_1st','b9_2nd']))
+    const places = Math.min(payoutPlaces.net_stroke_back9 ?? 2, 2)
+    const placeKeys = Array.from({ length: places }, (_, i) => ['1st','2nd'][i])
+    if (hasFlights) {
+      flightLetters.forEach(l => placeKeys.forEach(p => keys.push(`b9_${l}_${p}`)))
+    } else {
+      placeKeys.forEach(p => keys.push(`b9_${p}`))
+    }
   }
-  if (sides.includes('skins_a'))      keys.push('skins_a')
-  if (sides.includes('skins_b'))      keys.push('skins_b')
-  if (sides.includes('skins'))        keys.push('skins')
-  if (sides.includes('long_drive_a')) keys.push('long_drive_a')
-  if (sides.includes('long_drive_b')) keys.push('long_drive_b')
-  if (sides.includes('long_drive'))   keys.push('long_drive')
-  if (sides.includes('low_putts'))    keys.push('low_putts')
+
+  // Skins — any flight letter or whole-group (from side_game_options)
+  sides.filter(s => s === 'skins' || s.match(/^skins_[a-z]$/)).forEach(s => keys.push(s))
+  // Long Drive
+  sides.filter(s => s === 'long_drive' || s.match(/^long_drive_[a-z]$/)).forEach(s => keys.push(s))
+  // Low Putts — whole-group or per-flight
+  sides.filter(s => s === 'low_putts' || s.match(/^low_putts_[a-z]$/)).forEach(s => keys.push(s))
   // CTP keys are dynamic (added by hole number) — handled separately in TabPayoutConfig
 
   return keys
 }
 
 /**
- * Returns 'flight_a', 'flight_b', or 'field' (full player count).
- * No-flight keys and ctp_N / low_putts use full field.
+ * Returns 'field' or 'flight_X' (where X is the lowercase letter).
  */
 function keyMultiplier(key) {
-  if (key === 'low_putts' || key.startsWith('ctp_')) return 'field'
-  if (key === 'skins' || key === 'long_drive') return 'field'
-  if (key === 'skins_b' || key.includes('_b_') || key === 'long_drive_b') return 'flight_b'
-  // No-flight scoring keys (18_net_1st, f9_1st, b9_1st etc.) → full field
-  if (!key.includes('_a_') && !key.endsWith('_a') && !key.endsWith('_a_1st') && !key.endsWith('_a_2nd') && !key.endsWith('_a_3rd')) {
-    if (key.startsWith('18_net_') || key.startsWith('f9_') || key.startsWith('b9_')) return 'field'
-  }
-  return 'flight_a'
+  const fl = flightLetterOf(key)
+  if (fl) return `flight_${fl.toLowerCase()}`
+  return 'field'
 }
 
 // Returns array of player_ids (multiple when tied)
 function resolveWinners(key, leaderboards, sideGames) {
   const rankMap = { '1st': 1, '2nd': 2, '3rd': 3 }
 
-  if (key.startsWith('18_net_a_') || key.startsWith('18_net_b_') || key.startsWith('18_net_1st') || key.startsWith('18_net_2nd') || key.startsWith('18_net_3rd')) {
-    const flight = key.includes('_a_') ? 'A' : key.includes('_b_') ? 'B' : null
+  // 18-hole net (per-flight or full field)
+  if (key.startsWith('18_net_')) {
+    const fl = flightLetterOf(key)
     const suffix = key.split('_').pop()
-    const rank   = rankMap[suffix]
-    const list   = flight ? leaderboards.full[flight] : (leaderboards.full?.A ?? []).concat(leaderboards.full?.B ?? [])
-    return list?.filter(p => p.rank === rank).map(p => p.player_id) ?? []
+    const rank = rankMap[suffix]
+    const list = fl
+      ? (leaderboards.full?.[fl] ?? [])
+      : Object.values(leaderboards.full ?? {}).flat()
+    return list.filter(p => p.rank === rank).map(p => p.player_id)
   }
+  // Front 9
   if (key.startsWith('f9_')) {
-    const flight = key.includes('_a_') ? 'A' : key.includes('_b_') ? 'B' : null
-    const rank   = rankMap[key.split('_').pop()]
-    const list   = flight ? leaderboards.front9[flight] : (leaderboards.front9?.A ?? []).concat(leaderboards.front9?.B ?? [])
-    return list?.filter(p => p.rank === rank).map(p => p.player_id) ?? []
+    const fl = flightLetterOf(key)
+    const rank = rankMap[key.split('_').pop()]
+    const list = fl
+      ? (leaderboards.front9?.[fl] ?? [])
+      : Object.values(leaderboards.front9 ?? {}).flat()
+    return list.filter(p => p.rank === rank).map(p => p.player_id)
   }
+  // Back 9
   if (key.startsWith('b9_')) {
-    const flight = key.includes('_a_') ? 'A' : key.includes('_b_') ? 'B' : null
-    const rank   = rankMap[key.split('_').pop()]
-    const list   = flight ? leaderboards.back9[flight] : (leaderboards.back9?.A ?? []).concat(leaderboards.back9?.B ?? [])
-    return list?.filter(p => p.rank === rank).map(p => p.player_id) ?? []
+    const fl = flightLetterOf(key)
+    const rank = rankMap[key.split('_').pop()]
+    const list = fl
+      ? (leaderboards.back9?.[fl] ?? [])
+      : Object.values(leaderboards.back9 ?? {}).flat()
+    return list.filter(p => p.rank === rank).map(p => p.player_id)
   }
+  // Low Putts (full field)
   if (key === 'low_putts') {
     const manual = sideGames.find(g => g.game_type === 'low_putts')
     if (manual?.winner_player_id) return [manual.winner_player_id]
@@ -165,18 +216,15 @@ function resolveWinners(key, leaderboards, sideGames) {
     if (!top) return []
     return leaderboards.putts.filter(p => p.rank === top.rank).map(p => p.player_id)
   }
-  if (key === 'long_drive_a') {
-    const g = sideGames.find(g => g.game_type === 'long_drive' && g.flight === 'A')
+  // Long Drive — any flight letter or full field
+  if (key.startsWith('long_drive')) {
+    const fl = flightLetterOf(key)
+    const g = sideGames.find(g =>
+      g.game_type === 'long_drive' && (fl ? g.flight === fl : !g.flight || g.flight === 'overall')
+    )
     return g?.winner_player_id ? [g.winner_player_id] : []
   }
-  if (key === 'long_drive_b') {
-    const g = sideGames.find(g => g.game_type === 'long_drive' && g.flight === 'B')
-    return g?.winner_player_id ? [g.winner_player_id] : []
-  }
-  if (key === 'long_drive') {
-    const g = sideGames.find(g => g.game_type === 'long_drive' && !g.flight)
-    return g?.winner_player_id ? [g.winner_player_id] : []
-  }
+  // CTP
   if (key.startsWith('ctp_')) {
     const holeNum = parseInt(key.replace('ctp_', ''), 10)
     const g = sideGames.find(g => g.game_type === 'ctp' && g.hole_number === holeNum)
@@ -189,32 +237,38 @@ function resolveWinners(key, leaderboards, sideGames) {
  * Compute full payout summary for an event.
  *
  * @param {Object} event          — { entry_fee, payout_config }
- * @param {number} playerCount    — total players
+ * @param {number} playerCount    — total non-guest players
  * @param {Object} leaderboards   — from scoring.computeLeaderboards
  * @param {Array}  sideGames
- * @param {Object} skinsResults   — { A: skinsResult, B: skinsResult }
- * @param {Object} flightCounts   — { A: number, B: number }  (optional, defaults to split)
+ * @param {Object} skinsResults   — { A: skinsResult, B: skinsResult, ... }
+ * @param {Object} flightCounts   — { A: number, B: number, C: number, ... }
  */
 export function computePayouts(event, playerCount, leaderboards, sideGames, skinsResults, flightCounts) {
   const config   = event.payout_config ?? {}
   const totalPot = (event.payout_basis === 'fixed' && event.payout_fixed_total)
     ? event.payout_fixed_total
     : event.entry_fee * playerCount
-  const fcA = flightCounts?.A ?? Math.ceil(playerCount / 2)
-  const fcB = flightCounts?.B ?? Math.floor(playerCount / 2)
+
+  function getFlightCount(fl) {
+    if (!fl) return playerCount
+    // fl is uppercase letter
+    if (flightCounts?.[fl] !== undefined) return flightCounts[fl]
+    // Fallback: split evenly
+    const numFlights = Object.keys(flightCounts ?? {}).length || 2
+    return Math.round(playerCount / numFlights)
+  }
 
   const byCategory = []
   const byPlayer   = {}
 
-  // Separate ranked keys (1st/2nd/3rd) from standalone keys
-  // Ranked keys need tie-absorption (2nd+3rd money combined when 2nd is tied)
-  const rankedGroups = {}  // base → [{ key, rank, amount }]
+  const rankedGroups = {}
   const standaloneEntries = []
 
   for (const [key, dollarVal] of Object.entries(config)) {
     if (!dollarVal || dollarVal <= 0) continue
     const multiplier = keyMultiplier(key)
-    const count = multiplier === 'field' ? playerCount : multiplier === 'flight_b' ? fcB : fcA
+    const fl = multiplier.startsWith('flight_') ? multiplier.replace('flight_', '').toUpperCase() : null
+    const count = getFlightCount(fl)
     const amount = Math.round(dollarVal * count * 100) / 100
     const rankInfo = getRankInfo(key)
     if (rankInfo) {
@@ -232,13 +286,12 @@ export function computePayouts(event, playerCount, leaderboards, sideGames, skin
 
     for (let i = 0; i < places.length; i++) {
       const place = places[i]
-      if (absorbed.has(place.rank)) continue  // absorbed by a higher tie — skip silently
+      if (absorbed.has(place.rank)) continue
 
       const winners = resolveWinners(place.key, leaderboards, sideGames)
-      const label = CATEGORY_LABELS[place.key] ?? place.key
+      const label = getCategoryLabel(place.key)
 
       if (winners.length > 1) {
-        // Tie: absorb next (winners.length - 1) places and combine their money
         let combinedAmount = place.amount
         for (let j = 1; j < winners.length && i + j < places.length; j++) {
           absorbed.add(places[i + j].rank)
@@ -265,14 +318,15 @@ export function computePayouts(event, playerCount, leaderboards, sideGames, skin
 
   // Process standalone keys (skins, long drive, low putts, ctp)
   for (const { key, amount } of standaloneEntries) {
-    // Skins handled separately
-    if (key === 'skins_a' || key === 'skins_b') {
-      const flight      = key === 'skins_a' ? 'A' : 'B'
-      const skinsResult = skinsResults?.[flight]
+    // Skins — any flight letter
+    const skinsFlightMatch = key.match(/^skins_([a-z])$/)
+    if (key === 'skins' || skinsFlightMatch) {
+      const fl = skinsFlightMatch ? skinsFlightMatch[1].toUpperCase() : null
+      const skinsResult = fl ? skinsResults?.[fl] : skinsResults?.[''] ?? Object.values(skinsResults ?? {})[0]
       if (!skinsResult) continue
       const skinPayouts = computeSkinsPayout(skinsResult, amount)
       for (const sp of skinPayouts) {
-        const label = `${CATEGORY_LABELS[key]} (${sp.skinsWon} skin${sp.skinsWon !== 1 ? 's' : ''})`
+        const label = `${getCategoryLabel(key)} (${sp.skinsWon} skin${sp.skinsWon !== 1 ? 's' : ''})`
         byCategory.push({ key: `${key}_${sp.playerId}`, label, amount: sp.total, playerId: sp.playerId, isSkin: true })
         if (!byPlayer[sp.playerId]) byPlayer[sp.playerId] = { total: 0, items: [] }
         byPlayer[sp.playerId].total += sp.total
@@ -281,9 +335,7 @@ export function computePayouts(event, playerCount, leaderboards, sideGames, skin
       continue
     }
 
-    const label   = key.startsWith('ctp_')
-      ? ctpLabel(parseInt(key.replace('ctp_', ''), 10))
-      : (CATEGORY_LABELS[key] ?? key)
+    const label   = getCategoryLabel(key)
     const winners = resolveWinners(key, leaderboards, sideGames)
     const isTied  = winners.length > 1
     const split   = winners.length > 0 ? Math.round((amount / winners.length) * 100) / 100 : 0
@@ -305,3 +357,6 @@ export function computePayouts(event, playerCount, leaderboards, sideGames, skin
 
   return { totalPot, byCategory, byPlayer: byPlayerSorted, totalAllocated }
 }
+
+// Re-export for backwards compat
+export { defaultForKey }

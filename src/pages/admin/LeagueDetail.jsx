@@ -319,17 +319,49 @@ function LeagueModal({ open, onClose, editing, orgId, orgSlug, onSaved }) {
 }
 
 // ─── Event Modal ──────────────────────────────────────────────────────────────
-const SIDE_GAME_OPTIONS = [
-  { key: 'skins',         label: 'Skins',                flightsOff: true,  flightsOn: false, pro: true },
-  { key: 'skins_a',       label: 'Skins — Flight A',     flightsOff: false, flightsOn: true,  pro: true },
-  { key: 'skins_b',       label: 'Skins — Flight B',     flightsOff: false, flightsOn: true,  pro: true },
-  { key: 'long_drive',    label: 'Long Drive',           flightsOff: true,  flightsOn: false, pro: true },
-  { key: 'long_drive_a',  label: 'Long Drive — Flight A',flightsOff: false, flightsOn: true,  pro: true },
-  { key: 'long_drive_b',  label: 'Long Drive — Flight B',flightsOff: false, flightsOn: true,  pro: true },
-  { key: 'low_putts',     label: 'Low Putts',            flightsOff: true,  flightsOn: true,  pro: true },
-  { key: 'ctp',           label: 'Closest to Pin (par 3s)', flightsOff: true, flightsOn: true, pro: true },
-  { key: 'track_putts',   label: 'Track Putts on Scorecard', flightsOff: true, flightsOn: true, pro: false },
+
+// Side games that can apply per-flight OR to the whole group
+const PER_FLIGHT_GAMES = [
+  { key: 'skins',      label: 'Skins',                      pro: true },
+  { key: 'long_drive', label: 'Long Drive',                 pro: true },
+  { key: 'low_putts',  label: 'Low Putts',                  pro: true },
+  { key: 'ctp',        label: 'Closest to Pin (par 3s)',    pro: true },
 ]
+const GROUP_GAMES = []
+
+const PER_FLIGHT_GAME_KEYS = new Set(PER_FLIGHT_GAMES.map(g => g.key))
+
+/** Convert base game set + scope map + numFlights → side_game_options array for DB */
+function buildSideGameOptions(enabledGames, gameScope, numFlights) {
+  const result = []
+  const letters = Array.from({ length: numFlights }, (_, i) => String.fromCharCode(65 + i))
+  for (const g of PER_FLIGHT_GAMES) {
+    if (!enabledGames.has(g.key)) continue
+    if (numFlights > 0 && (gameScope[g.key] ?? 'flight') === 'flight') {
+      letters.forEach(l => result.push(`${g.key}_${l.toLowerCase()}`))
+    } else {
+      result.push(g.key)
+    }
+  }
+  return result
+}
+
+/** Parse existing side_game_options from DB back into { games: Set, scope: {} } */
+function parseSideGameOptions(options) {
+  const games = new Set()
+  const scope = {}
+  for (const opt of options ?? []) {
+    const m = opt.match(/^(.+)_([a-z])$/)
+    if (m && PER_FLIGHT_GAME_KEYS.has(m[1])) {
+      games.add(m[1]); scope[m[1]] = 'flight'
+    } else if (PER_FLIGHT_GAME_KEYS.has(opt)) {
+      games.add(opt); scope[opt] = 'group'
+    } else {
+      games.add(opt)
+    }
+  }
+  return { games, scope }
+}
 
 const FORMAT_OPTIONS = [
   { group: 'Net Stroke Play', options: [
@@ -345,6 +377,8 @@ const FORMAT_OPTIONS = [
   ]},
 ]
 
+const PLACES_OPTIONS = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
+
 function EventModal({ open, onClose, league, orgTier, onSaved }) {
   const canUsePro = checkFeature(orgTier ?? 'free', 'side_games')
 
@@ -357,8 +391,10 @@ function EventModal({ open, onClose, league, orgTier, onSaved }) {
   const [payoutBasis,  setPayoutBasis]  = useState('per_player')
   const [payoutFixed,  setPayoutFixed]  = useState('')
   const [formats,      setFormats]      = useState(new Set(['net_stroke']))
+  const [payoutPlaces, setPayoutPlaces] = useState({})   // { format_key: number }
   const [sideGames,    setSideGames]    = useState(new Set())
-  const [useFlights,   setUseFlights]   = useState(false)
+  const [gameScope,    setGameScope]    = useState({})   // { game_key: 'flight'|'group' }
+  const [numFlights,   setNumFlights]   = useState(0)   // 0 = no flights, 2–25 = number of flights
   const [startTime,    setStartTime]    = useState('')
   const [interval,     setInterval]     = useState(10)
   const [tournamentFee,  setTournamentFee]  = useState('')
@@ -376,8 +412,8 @@ function EventModal({ open, onClose, league, orgTier, onSaved }) {
     }
     setEventDate(''); setCourseId(''); setEventName(''); setEntryFee('20')
     setPayoutBasis('per_player'); setPayoutFixed('')
-    setFormats(new Set(['net_stroke'])); setSideGames(new Set())
-    setUseFlights(false); setStartTime(''); setInterval(10)
+    setFormats(new Set(['net_stroke'])); setPayoutPlaces({}); setSideGames(new Set()); setGameScope({})
+    setNumFlights(0); setStartTime(''); setInterval(10)
     setTournamentFee(''); setVenmoHandle(''); setPaypalLink(''); setShotgunStart(false)
   }, [open, league])
 
@@ -404,8 +440,10 @@ function EventModal({ open, onClose, league, orgTier, onSaved }) {
       payout_fixed_total:     payoutBasis === 'fixed' ? parseFloat(payoutFixed) || 0 : null,
       format:                 formatsArr[0],
       formats:                formatsArr,
-      use_flights:            useFlights,
-      side_game_options:      [...sideGames],
+      use_flights:            numFlights > 0,
+      num_flights:            numFlights > 0 ? numFlights : null,
+      side_game_options:      buildSideGameOptions(sideGames, gameScope, numFlights),
+      payout_places:          Object.keys(payoutPlaces).length > 0 ? payoutPlaces : null,
       start_time:             startTime || null,
       tee_time_interval_mins: parseInt(interval, 10),
       tournament_fee:         tournamentFee ? parseFloat(tournamentFee) : null,
@@ -435,22 +473,27 @@ function EventModal({ open, onClose, league, orgTier, onSaved }) {
           </select>
         </div>
 
-        <div className={`bg-gray-50 rounded-xl px-4 py-3 flex items-center justify-between ${!canUsePro ? 'opacity-50' : ''}`}>
-          <div>
-            <div className="text-sm font-medium text-gray-800 flex items-center gap-2">
-              Use Flights (A &amp; B)?
-              {!canUsePro && <span className="text-xs font-semibold px-1.5 py-0.5 rounded-full" style={{ background: '#eff6ff', color: '#1d4ed8' }}>Pro</span>}
+        <div className={`bg-gray-50 rounded-xl px-4 py-3 ${!canUsePro ? 'opacity-50' : ''}`}>
+          <div className="flex items-center justify-between">
+            <div>
+              <div className="text-sm font-medium text-gray-800 flex items-center gap-2">
+                Number of Flights
+                {!canUsePro && <span className="text-xs font-semibold px-1.5 py-0.5 rounded-full" style={{ background: '#eff6ff', color: '#1d4ed8' }}>Pro</span>}
+              </div>
+              <div className="text-xs text-gray-400 mt-0.5">Flight A = highest/best players. Leave at "No flights" for a single field.</div>
             </div>
-            <div className="text-xs text-gray-400 mt-0.5">Enable if splitting players into two competitive flights</div>
+            <select
+              value={numFlights}
+              onChange={e => canUsePro && setNumFlights(Number(e.target.value))}
+              disabled={!canUsePro}
+              className="input bg-white w-36"
+            >
+              <option value={0}>No flights</option>
+              {Array.from({ length: 24 }, (_, i) => i + 2).map(n => (
+                <option key={n} value={n}>{n} flights ({Array.from({ length: n }, (_, i) => String.fromCharCode(65 + i)).join(', ')})</option>
+              ))}
+            </select>
           </div>
-          <button
-            type="button"
-            onClick={() => canUsePro && setUseFlights(v => !v)}
-            disabled={!canUsePro}
-            className={`relative inline-flex h-6 w-11 shrink-0 rounded-full border-2 border-transparent transition-colors focus:outline-none ${!canUsePro ? 'cursor-not-allowed' : ''} ${useFlights && canUsePro ? 'bg-fairway-600' : 'bg-gray-300'}`}
-          >
-            <span className={`inline-block h-5 w-5 rounded-full bg-white shadow transition-transform ${useFlights && canUsePro ? 'translate-x-5' : 'translate-x-0'}`} />
-          </button>
         </div>
 
         <div className="bg-gray-50 rounded-xl px-4 py-3 flex items-center justify-between">
@@ -473,16 +516,29 @@ function EventModal({ open, onClose, league, orgTier, onSaved }) {
             {FORMAT_OPTIONS.map(group => (
               <div key={group.group}>
                 <div className="text-xs text-gray-400 font-medium uppercase tracking-wide mb-1.5">{group.group}</div>
-                <div className="space-y-1.5">
+                <div className="space-y-2">
                   {group.options.map(opt => {
                     const locked = opt.pro && !canUsePro
                     return (
-                      <label key={opt.value} className={`flex items-center gap-2.5 ${locked ? 'cursor-not-allowed opacity-50' : 'cursor-pointer'}`}>
-                        <input type="checkbox" checked={formats.has(opt.value)} onChange={() => !locked && toggleFormat(opt.value)}
-                          disabled={locked} className="accent-fairway-600 w-4 h-4" />
-                        <span className="text-sm text-gray-800">{opt.label}</span>
+                      <div key={opt.value} className={`flex items-center gap-2.5 ${locked ? 'opacity-50' : ''}`}>
+                        <input type="checkbox" checked={formats.has(opt.value)}
+                          onChange={() => !locked && toggleFormat(opt.value)}
+                          disabled={locked} className="accent-fairway-600 w-4 h-4 shrink-0 cursor-pointer" />
+                        <span className={`text-sm text-gray-800 ${locked ? '' : 'cursor-pointer'}`} onClick={() => !locked && toggleFormat(opt.value)}>{opt.label}</span>
                         {locked && <span className="text-xs font-semibold px-1.5 py-0.5 rounded-full" style={{ background: '#eff6ff', color: '#1d4ed8' }}>Pro</span>}
-                      </label>
+                        {formats.has(opt.value) && !locked && (
+                          <div className="ml-auto flex items-center gap-1.5 shrink-0">
+                            <span className="text-xs text-gray-400">Places to pay:</span>
+                            <select
+                              value={payoutPlaces[opt.value] ?? 1}
+                              onChange={e => setPayoutPlaces(prev => ({ ...prev, [opt.value]: Number(e.target.value) }))}
+                              className="text-xs border border-gray-300 rounded px-1.5 py-0.5 bg-white"
+                            >
+                              {PLACES_OPTIONS.map(n => <option key={n} value={n}>{n}</option>)}
+                            </select>
+                          </div>
+                        )}
+                      </div>
                     )
                   })}
                 </div>
@@ -494,12 +550,48 @@ function EventModal({ open, onClose, league, orgTier, onSaved }) {
 
         <div>
           <label className="label">Side Games / Competitions</label>
-          <div className="space-y-1.5 bg-gray-50 rounded-xl px-4 py-3">
-            {SIDE_GAME_OPTIONS.filter(opt => useFlights ? opt.flightsOn : opt.flightsOff).map(opt => {
+          <div className="space-y-3 bg-gray-50 rounded-xl px-4 py-3">
+            {/* Per-flight eligible games */}
+            {PER_FLIGHT_GAMES.map(opt => {
+              const locked = opt.pro && !canUsePro
+              const checked = sideGames.has(opt.key)
+              const scope = gameScope[opt.key] ?? 'flight'
+              const flightLetters = Array.from({ length: numFlights }, (_, i) => String.fromCharCode(65 + i))
+              return (
+                <div key={opt.key} className={locked ? 'opacity-50' : ''}>
+                  <label className="flex items-center gap-2.5 cursor-pointer">
+                    <input type="checkbox" checked={checked}
+                      onChange={() => !locked && toggleSideGame(opt.key)}
+                      disabled={locked} className="accent-fairway-600 w-4 h-4" />
+                    <span className="text-sm text-gray-800">{opt.label}</span>
+                    {locked && <span className="text-xs font-semibold px-1.5 py-0.5 rounded-full" style={{ background: '#eff6ff', color: '#1d4ed8' }}>Pro</span>}
+                  </label>
+                  {checked && numFlights > 0 && (
+                    <div className="ml-6 mt-1.5 flex gap-4">
+                      <label className="flex items-center gap-1.5 cursor-pointer">
+                        <input type="radio" checked={scope === 'flight'}
+                          onChange={() => setGameScope(prev => ({ ...prev, [opt.key]: 'flight' }))}
+                          className="accent-fairway-600" />
+                        <span className="text-xs text-gray-600">Per flight ({flightLetters.join(', ')})</span>
+                      </label>
+                      <label className="flex items-center gap-1.5 cursor-pointer">
+                        <input type="radio" checked={scope === 'group'}
+                          onChange={() => setGameScope(prev => ({ ...prev, [opt.key]: 'group' }))}
+                          className="accent-fairway-600" />
+                        <span className="text-xs text-gray-600">Whole group</span>
+                      </label>
+                    </div>
+                  )}
+                </div>
+              )
+            })}
+            {/* Always-group games */}
+            {GROUP_GAMES.map(opt => {
               const locked = opt.pro && !canUsePro
               return (
-                <label key={opt.key} className={`flex items-center gap-2.5 py-0.5 ${locked ? 'cursor-not-allowed opacity-50' : 'cursor-pointer'}`}>
-                  <input type="checkbox" checked={sideGames.has(opt.key)} onChange={() => !locked && toggleSideGame(opt.key)}
+                <label key={opt.key} className={`flex items-center gap-2.5 cursor-pointer ${locked ? 'opacity-50' : ''}`}>
+                  <input type="checkbox" checked={sideGames.has(opt.key)}
+                    onChange={() => !locked && toggleSideGame(opt.key)}
                     disabled={locked} className="accent-fairway-600 w-4 h-4" />
                   <span className="text-sm text-gray-800">{opt.label}</span>
                   {locked && <span className="text-xs font-semibold px-1.5 py-0.5 rounded-full" style={{ background: '#eff6ff', color: '#1d4ed8' }}>Pro</span>}

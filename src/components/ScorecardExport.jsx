@@ -8,7 +8,9 @@
 import { useRef, useState } from 'react'
 import { toPng } from 'html-to-image'
 import QRCode from 'qrcode'
-import { getStrokesOnHole } from '../lib/engines/scoring'
+import { getStrokesOnHole, computeLeaderboards } from '../lib/engines/scoring'
+import { computeSkinsForFlight, computeAllSkins } from '../lib/engines/skins'
+import { computePayouts } from '../lib/engines/payouts'
 
 // ─── Layout constants ─────────────────────────────────────────────
 const PAGE_W    = 1100
@@ -707,6 +709,991 @@ function buildTable({ parPerHole, strokeIndex, teesToShow, players, longDriveHol
   })
 
   return tbl
+}
+
+// ─── Skins Grid Export ────────────────────────────────────────────
+export function ExportSkinsGridButton({ event, eventPlayers, allScores, course, orgName, orgLogoUrl }) {
+  const [exporting, setExporting] = useState(false)
+  const [exportError, setExportError] = useState(null)
+  const containerRef = useRef(null)
+
+  const hasSkins = (event?.side_game_options ?? []).some(s => s.startsWith('skins'))
+  if (!hasSkins) return null
+
+  async function handleExport() {
+    setExportError(null)
+    if (!course) { setExportError('No course loaded.'); return }
+    setExporting(true)
+    try {
+      let logoDataUrl = null
+      if (orgLogoUrl) {
+        try {
+          const ctrl = new AbortController()
+          const timer = setTimeout(() => ctrl.abort(), 4000)
+          const resp = await fetch(orgLogoUrl, { signal: ctrl.signal })
+          clearTimeout(timer)
+          const blob = await resp.blob()
+          logoDataUrl = await new Promise((res, rej) => {
+            const reader = new FileReader()
+            reader.onload = () => res(reader.result)
+            reader.onerror = rej
+            reader.readAsDataURL(blob)
+          })
+        } catch { logoDataUrl = null }
+      }
+
+      const flights = [...new Set(eventPlayers.map(ep => ep.flight).filter(Boolean))].sort()
+      if (flights.length === 0) flights.push(null)
+
+      for (const flight of flights) {
+        const flightPlayers = flight
+          ? eventPlayers.filter(ep => ep.flight === flight)
+          : eventPlayers
+        flightPlayers.sort((a, b) => (a.course_handicap ?? 99) - (b.course_handicap ?? 99))
+
+        const node = containerRef.current
+        if (!node) continue
+        node.innerHTML = ''
+        const pageEl = buildSkinsGrid({ event, course, flightPlayers, allScores, flight, orgName, orgLogoUrl: logoDataUrl })
+        node.appendChild(pageEl)
+
+        await Promise.all(
+          [...pageEl.querySelectorAll('img')].map(
+            img => img.complete ? Promise.resolve() : new Promise(r => { img.onload = r; img.onerror = r })
+          )
+        )
+        await new Promise(r => setTimeout(r, 80))
+
+        const dataUrl = await toPng(pageEl, {
+          pixelRatio: 2,
+          cacheBust: true,
+          backgroundColor: '#ffffff',
+        })
+
+        const link = document.createElement('a')
+        const evPart = (event.name ?? `event_${event.event_number}`).replace(/[^a-z0-9]/gi, '_').toLowerCase()
+        link.download = `skins_grid_${evPart}${flight ? `_flight${flight}` : ''}.png`
+        link.href = dataUrl
+        link.click()
+        await new Promise(r => setTimeout(r, 300))
+      }
+    } catch (err) {
+      console.error('Skins grid export failed:', err)
+      setExportError(err?.message ?? 'Export failed')
+    } finally {
+      if (containerRef.current) containerRef.current.innerHTML = ''
+      setExporting(false)
+    }
+  }
+
+  return (
+    <>
+      <button
+        onClick={handleExport}
+        disabled={exporting}
+        style={{
+          display: 'inline-flex', alignItems: 'center', gap: 6,
+          padding: '6px 14px', borderRadius: 8,
+          border: '1px solid #d1d5db',
+          background: exporting ? '#f3f4f6' : '#ffffff',
+          color: '#374151', fontSize: 13, fontWeight: 600,
+          cursor: exporting ? 'not-allowed' : 'pointer',
+        }}
+      >
+        {exporting ? 'Exporting…' : '📊 Export Skins Grid'}
+      </button>
+      {exportError && <p style={{ marginTop: 6, fontSize: 12, color: '#dc2626' }}>{exportError}</p>}
+      <div ref={containerRef} style={{ position: 'fixed', top: -99999, left: -99999, pointerEvents: 'none', zIndex: -1 }} />
+    </>
+  )
+}
+
+function buildSkinsGrid({ event, course, flightPlayers, allScores, flight, orgName, orgLogoUrl }) {
+  const { par_per_hole: pars, stroke_index: sis } = course
+  const FONT = 'Arial, Helvetica, sans-serif'
+  const ROW_H = 28
+
+  // ── Sequential holes: H1–H9 front, H10–H18 back ─────────────────
+  const frontGroup = Array.from({ length: 9 }, (_, i) => ({ hole: i + 1,  si: sis[i],      par: pars[i] }))
+  const backGroup  = Array.from({ length: 9 }, (_, i) => ({ hole: i + 10, si: sis[i + 9],  par: pars[i + 9] }))
+
+  // ── Skins engine — identical to leaderboard ──────────────────────
+  const skinsResult = computeSkinsForFlight(flightPlayers, allScores, sis, flight)
+  const { holes: skinsHoles, playerSkins } = skinsResult
+  const skinWinnerByHole = {}
+  skinsHoles.forEach(r => { skinWinnerByHole[r.hole] = r.winner ?? null })
+
+  // ── Payout ───────────────────────────────────────────────────────
+  const payoutConfig   = event.payout_config ?? {}
+  const skinsKey       = flight ? `skins_${flight.toLowerCase()}` : 'skins'
+  const perPlayerEntry = payoutConfig[skinsKey] ?? 0
+  const skinsPot       = perPlayerEntry * flightPlayers.length
+  const totalSkins     = Object.values(playerSkins).reduce((a, b) => a + b, 0)
+  const perSkinValue   = totalSkins > 0 ? skinsPot / totalSkins : 0
+
+  // ── Per-player data ──────────────────────────────────────────────
+  const playerData = flightPlayers.map(ep => {
+    const ch = ep.course_handicap ?? 0
+    const grossByHole = {}
+    const netByHole   = {}
+    let frontGross = 0, frontNet = 0, backGross = 0, backNet = 0
+
+    for (let h = 1; h <= 18; h++) {
+      const s = allScores.find(x => x.player_id === ep.player_id && x.hole_number === h)
+      if (s) {
+        const gross   = s.gross_score
+        const strokes = getStrokesOnHole(ch, sis[h - 1])
+        const net     = gross - strokes
+        grossByHole[h] = gross
+        netByHole[h]   = net
+        if (h <= 9) { frontGross += gross; frontNet += net }
+        else        { backGross  += gross; backNet  += net }
+      }
+    }
+    const totalGross = frontGross + backGross
+    const totalNet   = frontNet + backNet
+    const skinsWon   = playerSkins[ep.player_id] ?? 0
+    const winAmt     = skinsWon > 0 ? Math.round(skinsWon * perSkinValue * 100) / 100 : 0
+    return { ep, grossByHole, netByHole, frontGross, frontNet, backGross, backNet, totalGross, totalNet, skinsWon, winAmt }
+  })
+  playerData.sort((a, b) => (a.totalGross || 999) - (b.totalGross || 999))
+
+  // ── DOM helpers ──────────────────────────────────────────────────
+  function mkTh(text, opts = {}) {
+    const th = document.createElement('th')
+    th.style.cssText = `
+      background:${opts.bg ?? GREEN};color:${opts.color ?? '#fff'};
+      font-weight:700;font-size:${opts.fs ?? '10px'};
+      text-align:${opts.align ?? 'center'};padding:4px 3px;
+      border:1px solid #6a8f7a;white-space:nowrap;
+    `
+    th.textContent = String(text ?? '')
+    if (opts.colspan) th.colSpan = opts.colspan
+    if (opts.rowspan) th.rowSpan = opts.rowspan
+    return th
+  }
+
+  function mkTd(text, opts = {}) {
+    const td = document.createElement('td')
+    td.style.cssText = `
+      background:${opts.bg ?? '#fff'};color:${opts.color ?? '#111'};
+      font-weight:${opts.bold ? '700' : '400'};font-size:${opts.fs ?? '11px'};
+      text-align:${opts.align ?? 'center'};padding:2px 4px;
+      border:1px solid #d4d4d0;height:${ROW_H}px;vertical-align:middle;white-space:nowrap;overflow:hidden;
+    `
+    td.textContent = String(text ?? '')
+    if (opts.colspan) td.colSpan = opts.colspan
+    return td
+  }
+
+  // ── Page wrapper (full width) ─────────────────────────────────────
+  const wrap = el('div', {
+    width: '1400px', background: '#ffffff',
+    fontFamily: FONT, padding: '16px', boxSizing: 'border-box',
+  })
+
+  // ── Header bar ───────────────────────────────────────────────────
+  const header = el('div', {
+    background: GREEN, borderRadius: '8px', padding: '10px 16px',
+    display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '12px',
+  })
+  const hLeft = el('div', {})
+  hLeft.appendChild(txt(orgName ?? 'Scorify Golf', { color: GOLD, fontSize: '16px', fontWeight: '700', display: 'block' }))
+  hLeft.appendChild(txt(
+    `Event #${event.event_number}${flight ? ` · Flight ${flight}` : ''} · Skins Results`,
+    { color: 'rgba(255,255,255,0.85)', fontSize: '12px', display: 'block', marginTop: '3px' }
+  ))
+  const eventDate = event.event_date
+    ? new Date(event.event_date + 'T00:00:00').toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' })
+    : ''
+  hLeft.appendChild(txt(`${course.name ?? ''} · ${eventDate}`, { color: 'rgba(255,255,255,0.6)', fontSize: '10px', display: 'block', marginTop: '3px' }))
+  header.appendChild(hLeft)
+  if (orgLogoUrl) {
+    const logoImg = document.createElement('img')
+    logoImg.src = orgLogoUrl
+    logoImg.style.cssText = `width:52px;height:52px;border-radius:50%;object-fit:cover;border:2px solid ${GOLD}`
+    header.appendChild(logoImg)
+  }
+  wrap.appendChild(header)
+
+  // ── Table ────────────────────────────────────────────────────────
+  // Columns: Name | Skins | Win$ | H1-H9 | Out | H10-H18 | In | Grs | HC | Net
+  // Count: 3 + 9 + 1 + 9 + 3 = 25
+  const COL_NAME  = 190
+  const COL_SKINS = 44
+  const COL_WIN   = 62
+  const COL_HOLE  = 26
+  const COL_SUM   = 42
+  const COL_HC    = 38
+
+  const TOTAL_COLS = 3 + 9 + 1 + 9 + 3  // 25
+
+  const tbl = document.createElement('table')
+  tbl.style.cssText = `border-collapse:collapse;font-size:11px;font-family:${FONT};width:100%;table-layout:fixed;`
+
+  const colgroup = document.createElement('colgroup')
+  const addCol = (w) => { const c = document.createElement('col'); c.style.width = w + 'px'; colgroup.appendChild(c) }
+  addCol(COL_NAME); addCol(COL_SKINS); addCol(COL_WIN)
+  for (let i = 0; i < 9; i++) addCol(COL_HOLE)
+  addCol(COL_SUM)                   // Out
+  for (let i = 0; i < 9; i++) addCol(COL_HOLE)
+  addCol(COL_SUM)                   // In
+  addCol(COL_SUM)                   // Grs
+  addCol(COL_HC)                    // HC
+  addCol(COL_SUM)                   // Net
+  tbl.appendChild(colgroup)
+
+  // Header row
+  const hr = document.createElement('tr')
+  hr.appendChild(mkTh('Name',  { align: 'left', fs: '11px' }))
+  hr.appendChild(mkTh('Skins'))
+  hr.appendChild(mkTh('Win $'))
+  frontGroup.forEach(({ hole }) => hr.appendChild(mkTh(hole, { bg: '#2D6A4F' })))
+  hr.appendChild(mkTh('Out', { bg: '#1a3d2a' }))
+  backGroup.forEach(({ hole })  => hr.appendChild(mkTh(hole, { bg: '#2D6A4F' })))
+  hr.appendChild(mkTh('In',  { bg: '#1a3d2a' }))
+  hr.appendChild(mkTh('Grs', { bg: '#1a3d2a' }))
+  hr.appendChild(mkTh('HC',  { bg: '#1a3d2a' }))
+  hr.appendChild(mkTh('Net', { bg: '#1a3d2a' }))
+  tbl.appendChild(hr)
+
+  // SI sub-row
+  const siRow = document.createElement('tr')
+  siRow.appendChild(mkTd('Flights by handicap', { bg: '#3a5a4a', color: '#cde', align: 'left', bold: true, fs: '9px' }))
+  siRow.appendChild(mkTd('', { bg: '#3a5a4a' }))
+  siRow.appendChild(mkTd('', { bg: '#3a5a4a' }))
+  frontGroup.forEach(({ hole }) => siRow.appendChild(mkTd(sis[hole - 1], { bg: '#3a5a4a', color: '#cde', fs: '9px' })))
+  siRow.appendChild(mkTd('', { bg: '#3a5a4a' }))
+  backGroup.forEach(({ hole })  => siRow.appendChild(mkTd(sis[hole - 1], { bg: '#3a5a4a', color: '#cde', fs: '9px' })))
+  siRow.appendChild(mkTd('', { bg: '#3a5a4a' }))
+  siRow.appendChild(mkTd('', { bg: '#3a5a4a' }))
+  siRow.appendChild(mkTd('', { bg: '#3a5a4a' }))
+  siRow.appendChild(mkTd('', { bg: '#3a5a4a' }))
+  tbl.appendChild(siRow)
+
+  // Flight section header
+  if (flight) {
+    const flightRow = document.createElement('tr')
+    const flightTd  = mkTd(`Flight ${flight}`, { bg: '#eaf1ec', bold: true, align: 'left', fs: '11px', color: GREEN })
+    flightTd.colSpan = TOTAL_COLS
+    flightRow.appendChild(flightTd)
+    tbl.appendChild(flightRow)
+  }
+
+  // Sort by Net (totalGross - courseHandicap) ascending
+  playerData.sort((a, b) => {
+    const netA = (a.totalGross || 999) - (a.ep.course_handicap ?? 0)
+    const netB = (b.totalGross || 999) - (b.ep.course_handicap ?? 0)
+    return netA - netB
+  })
+
+  const SKIN_BG    = '#dceee6'
+  const SKIN_COLOR = '#1B4332'
+
+  playerData.forEach((pd, rowIdx) => {
+    const { ep, grossByHole, frontGross, backGross, totalGross, skinsWon, winAmt } = pd
+    const ch    = ep.course_handicap ?? 0
+    const net   = totalGross ? totalGross - ch : ''
+    const name  = `${ep.player?.first_name ?? ''} ${ep.player?.last_name ?? ''}`.trim()
+    const rowBg = rowIdx % 2 === 0 ? '#ffffff' : '#f7f7f5'
+
+    const tr = document.createElement('tr')
+    tr.appendChild(mkTd(name, { bg: rowBg, align: 'left', bold: true, fs: '11px' }))
+    tr.appendChild(mkTd(skinsWon > 0 ? skinsWon : '', { bg: skinsWon > 0 ? SKIN_BG : rowBg, bold: skinsWon > 0, color: skinsWon > 0 ? SKIN_COLOR : '#111' }))
+    tr.appendChild(mkTd(skinsWon > 0 ? `$${winAmt.toFixed(0)}` : '', { bg: skinsWon > 0 ? '#eaf4ea' : rowBg, bold: skinsWon > 0, color: skinsWon > 0 ? SKIN_COLOR : '#111' }))
+
+    frontGroup.forEach(({ hole }) => {
+      const gross = grossByHole[hole]
+      const won   = skinWinnerByHole[hole] === ep.player_id
+      tr.appendChild(mkTd(gross ?? '', { bg: won ? SKIN_BG : rowBg, bold: won, color: won ? SKIN_COLOR : '#111' }))
+    })
+    tr.appendChild(mkTd(frontGross || '', { bg: '#e8f0e8', bold: true }))
+
+    backGroup.forEach(({ hole }) => {
+      const gross = grossByHole[hole]
+      const won   = skinWinnerByHole[hole] === ep.player_id
+      tr.appendChild(mkTd(gross ?? '', { bg: won ? SKIN_BG : rowBg, bold: won, color: won ? SKIN_COLOR : '#111' }))
+    })
+    tr.appendChild(mkTd(backGross || '', { bg: '#e8f0e8', bold: true }))
+    tr.appendChild(mkTd(totalGross || '', { bg: '#e8f0e8', bold: true }))
+    tr.appendChild(mkTd(ch || '—', { bg: '#e8f0e8' }))
+    tr.appendChild(mkTd(net !== '' ? net : '', { bg: '#dceee6', bold: true, color: GREEN }))
+
+    tbl.appendChild(tr)
+  })
+
+  wrap.appendChild(tbl)
+
+  // Footer
+  const footer = el('div', { marginTop: '10px' })
+  footer.appendChild(txt(
+    `Green highlight = hole where player won a skin. Net scores use course handicap; unresolved carryover after hole 18 awarded to first skin winner of the round.`,
+    { fontSize: '9px', color: '#888', display: 'block' }
+  ))
+  footer.appendChild(txt(
+    `${orgName} · ${course.name ?? ''} · ${event.event_date ?? ''}`,
+    { fontSize: '9px', color: '#aaa', display: 'block', marginTop: '3px' }
+  ))
+  wrap.appendChild(footer)
+
+  return wrap
+}
+
+// ─── Tournament Results Export ────────────────────────────────────
+export function ExportResultsButton({ event, eventPlayers, allScores, course, sideGames, orgName, orgLogoUrl }) {
+  const [exporting, setExporting] = useState(false)
+  const [exportError, setExportError] = useState(null)
+  const containerRef = useRef(null)
+
+  async function handleExport() {
+    setExportError(null)
+    if (!course) { setExportError('No course loaded.'); return }
+    setExporting(true)
+    try {
+      let logoDataUrl = null
+      if (orgLogoUrl) {
+        try {
+          const ctrl = new AbortController()
+          const timer = setTimeout(() => ctrl.abort(), 4000)
+          const resp = await fetch(orgLogoUrl, { signal: ctrl.signal })
+          clearTimeout(timer)
+          const blob = await resp.blob()
+          logoDataUrl = await new Promise((res, rej) => {
+            const reader = new FileReader()
+            reader.onload = () => res(reader.result)
+            reader.onerror = rej
+            reader.readAsDataURL(blob)
+          })
+        } catch { logoDataUrl = null }
+      }
+
+      const node = containerRef.current
+      if (!node) return
+      node.innerHTML = ''
+      const pageEl = buildResultsCard({ event, eventPlayers, allScores, course, sideGames, orgName, orgLogoUrl: logoDataUrl })
+      node.appendChild(pageEl)
+
+      await Promise.all(
+        [...pageEl.querySelectorAll('img')].map(
+          img => img.complete ? Promise.resolve() : new Promise(r => { img.onload = r; img.onerror = r })
+        )
+      )
+      await new Promise(r => setTimeout(r, 100))
+
+      const dataUrl = await toPng(pageEl, {
+        pixelRatio: 2,
+        cacheBust: true,
+        backgroundColor: '#f5f0e8',
+      })
+
+      const link = document.createElement('a')
+      const evPart = (event.name ?? `event_${event.event_number}`).replace(/[^a-z0-9]/gi, '_').toLowerCase()
+      link.download = `results_${evPart}.png`
+      link.href = dataUrl
+      link.click()
+    } catch (err) {
+      console.error('Results export failed:', err)
+      setExportError(err?.message ?? 'Export failed')
+    } finally {
+      if (containerRef.current) containerRef.current.innerHTML = ''
+      setExporting(false)
+    }
+  }
+
+  return (
+    <>
+      <button
+        onClick={handleExport}
+        disabled={exporting}
+        style={{
+          display: 'inline-flex', alignItems: 'center', gap: 6,
+          padding: '6px 14px', borderRadius: 8,
+          border: '1px solid #d1d5db',
+          background: exporting ? '#f3f4f6' : '#ffffff',
+          color: '#374151', fontSize: 13, fontWeight: 600,
+          cursor: exporting ? 'not-allowed' : 'pointer',
+        }}
+      >
+        {exporting ? 'Exporting…' : '🏆 Export Results'}
+      </button>
+      {exportError && <p style={{ marginTop: 6, fontSize: 12, color: '#dc2626' }}>{exportError}</p>}
+      <div ref={containerRef} style={{ position: 'fixed', top: -99999, left: -99999, pointerEvents: 'none', zIndex: -1 }} />
+    </>
+  )
+}
+
+const RES_W      = 900
+const RES_PAD    = 20
+const BONE_BG    = '#f5f0e8'
+const SEC_RADIUS = '10px'
+
+function buildResultsCard({ event, eventPlayers, allScores, course, sideGames, orgName, orgLogoUrl }) {
+  const FONT = 'Arial, Helvetica, sans-serif'
+  const nonGuests = eventPlayers.filter(ep => !ep.is_guest)
+  const sides = event.side_game_options ?? []
+  const flights = [...new Set(nonGuests.map(ep => ep.flight).filter(Boolean))].sort()
+  const hasFlights = flights.length > 0
+
+  // Leaderboards
+  const leaderboards = computeLeaderboards(nonGuests, allScores, course)
+
+  // Skins
+  const skinsResults = computeAllSkins(nonGuests, allScores, course.stroke_index)
+
+  const eventDate = event.event_date
+    ? new Date(event.event_date + 'T00:00:00').toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' })
+    : ''
+
+  const playerMap = {}
+  eventPlayers.forEach(ep => { playerMap[ep.player_id] = ep })
+
+  function playerName(pid) {
+    const ep = playerMap[pid]
+    if (!ep) return '—'
+    return `${ep.player?.first_name ?? ''} ${ep.player?.last_name ?? ''}`.trim() || '—'
+  }
+
+  // Compute payouts — build per-category per-player amount map
+  const flightCounts = {}
+  nonGuests.forEach(ep => { if (ep.flight) flightCounts[ep.flight] = (flightCounts[ep.flight] ?? 0) + 1 })
+  const { byCategory } = computePayouts(event, nonGuests.length, leaderboards, sideGames, skinsResults, flightCounts)
+
+  // catAmt[categoryKey][playerId] = amount for that specific result
+  const catAmt = {}
+  byCategory.forEach(cat => {
+    if (cat.isSkin) {
+      // key is like 'skins_a_pid123' — strip the player suffix to get base key
+      const baseKey = cat.key.replace(/_[^_]+$/, '')
+      if (!catAmt[baseKey]) catAmt[baseKey] = {}
+      catAmt[baseKey][cat.playerId] = cat.amount
+    } else if (cat.isTied && cat.playerIds?.length > 1) {
+      const split = Math.round(cat.amount / cat.playerIds.length)
+      if (!catAmt[cat.key]) catAmt[cat.key] = {}
+      cat.playerIds.forEach(pid => { catAmt[cat.key][pid] = split })
+    } else {
+      if (!catAmt[cat.key]) catAmt[cat.key] = {}
+      if (cat.playerId) catAmt[cat.key][cat.playerId] = cat.amount
+    }
+  })
+
+  // Display name + prize for a specific payout category key
+  function display(pid, categoryKey) {
+    const name = playerName(pid)
+    const amt = categoryKey ? catAmt[categoryKey]?.[pid] : undefined
+    return amt ? `${name} ($${Math.round(amt)})` : name
+  }
+
+  // ── Wrapper ──────────────────────────────────────────────────────
+  const wrap = el('div', {
+    width: RES_W + 'px',
+    background: BONE_BG,
+    fontFamily: FONT,
+    padding: RES_PAD + 'px',
+    boxSizing: 'border-box',
+  })
+
+  // ── Header ───────────────────────────────────────────────────────
+  const header = el('div', {
+    background: GREEN,
+    borderRadius: '12px',
+    padding: '14px 20px',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: '16px',
+  })
+  const hLeft = el('div', {})
+  hLeft.appendChild(txt(orgName ?? 'Scorify Golf', { color: GOLD, fontSize: '18px', fontWeight: '800', display: 'block', letterSpacing: '0.02em' }))
+  hLeft.appendChild(txt(`Event #${event.event_number} — Tournament Results`, { color: 'rgba(255,255,255,0.9)', fontSize: '13px', display: 'block', marginTop: '3px' }))
+  hLeft.appendChild(txt(`${course.name ?? ''} · ${eventDate}`, { color: 'rgba(255,255,255,0.55)', fontSize: '11px', display: 'block', marginTop: '3px' }))
+  header.appendChild(hLeft)
+  if (orgLogoUrl) {
+    const logoImg = document.createElement('img')
+    logoImg.src = orgLogoUrl
+    logoImg.style.cssText = `width:56px;height:56px;border-radius:50%;object-fit:cover;border:2px solid ${GOLD}`
+    header.appendChild(logoImg)
+  }
+  wrap.appendChild(header)
+
+  // ── Scoring results — table layout ───────────────────────────────
+  const formats = event.formats ?? []
+  const formatLabels = {
+    net_stroke:        '18-Hole Net',
+    net_stroke_front9: 'Front 9 Net',
+    net_stroke_back9:  'Back 9 Net',
+    stableford:        'Stableford',
+  }
+  const scoringFormats = formats.filter(f => formatLabels[f])
+  const payoutPlaces = event.payout_places ?? {}
+  const RANK_LABELS = ['1st Place', '2nd Place', '3rd Place']
+
+  // Shared row style constants — all sections use identical padding/font so rows align
+  const ROW_BG_ALT = '#f7faf8'
+
+  if (scoringFormats.length > 0) {
+    const sec = buildSection('Scoring Results', GREEN, GOLD)
+    const body = sec._body
+    const RANK_SUFF = ['1st', '2nd', '3rd']
+
+    if (hasFlights) {
+      // Single unified table — one set of columns for all formats
+      body.appendChild(buildAllFormatsTable(scoringFormats, formatLabels, leaderboards, flights, payoutPlaces, (pid, rank, fl, fmtPrefix) =>
+        display(pid, `${fmtPrefix}_${fl.toLowerCase()}_${RANK_SUFF[rank - 1]}`)
+      ))
+    } else {
+      // Full-field: each format is a sub-section but in a single table
+      body.appendChild(buildAllFormatsTableFullField(scoringFormats, formatLabels, leaderboards, payoutPlaces, (pid, rank, fmtPrefix) =>
+        display(pid, `${fmtPrefix}_${RANK_SUFF[rank - 1]}`)
+      ))
+    }
+
+    wrap.appendChild(sec._card)
+  }
+
+  // ── Long Drive ───────────────────────────────────────────────────
+  const ldSides = sides.filter(s => s === 'long_drive' || s.match(/^long_drive_[a-z]$/))
+  if (ldSides.length > 0) {
+    const sec = buildSection('Longest Drive', GREEN, GOLD)
+    const body = sec._body
+
+    const ldFlights = ldSides.map(k => k.match(/^long_drive_([a-z])$/) ? k.match(/^long_drive_([a-z])$/)[1].toUpperCase() : null)
+    const ldWinners = ldSides.map((key, i) => {
+      const fl = ldFlights[i]
+      const g = sideGames.find(g => g.game_type === 'long_drive' && (fl ? g.flight === fl : !g.flight || g.flight === 'overall'))
+      const ldKey = fl ? `long_drive_${fl.toLowerCase()}` : 'long_drive'
+      return { fl, name: g?.winner_player_id ? display(g.winner_player_id, ldKey) : '—' }
+    })
+
+    if (ldFlights.some(f => f)) {
+      body.appendChild(buildSideGameFlightRow(ldWinners))
+    } else {
+      body.appendChild(buildSingleWinnerRow(ldWinners[0]?.name ?? '—'))
+    }
+
+    wrap.appendChild(sec._card)
+  }
+
+  // ── Low Putts ────────────────────────────────────────────────────
+  const lpSides = sides.filter(s => s === 'low_putts' || s.match(/^low_putts_[a-z]$/))
+  if (lpSides.length > 0) {
+    const sec = buildSection('Fewest Putts', GREEN, GOLD)
+    const body = sec._body
+
+    const lpFlights = lpSides.map(k => k.match(/^low_putts_([a-z])$/) ? k.match(/^low_putts_([a-z])$/)[1].toUpperCase() : null)
+    const lpWinners = lpSides.map((key, i) => {
+      const fl = lpFlights[i]
+      const manual = sideGames.find(g => g.game_type === 'low_putts' && (fl ? g.flight === fl : true))?.winner_player_id
+      const lpKey = fl ? `low_putts_${fl.toLowerCase()}` : 'low_putts'
+      let name = '—'
+      if (manual) { name = display(manual, lpKey) }
+      else if (!fl && leaderboards.putts?.length > 0) {
+        const top = leaderboards.putts[0]
+        name = leaderboards.putts.filter(p => p.rank === top.rank).map(p => display(p.player_id, lpKey)).join(', ')
+      }
+      return { fl, name }
+    })
+
+    if (lpFlights.some(f => f)) {
+      body.appendChild(buildSideGameFlightRow(lpWinners))
+    } else {
+      body.appendChild(buildSingleWinnerRow(lpWinners[0]?.name ?? '—'))
+    }
+
+    wrap.appendChild(sec._card)
+  }
+
+  // ── CTP ──────────────────────────────────────────────────────────
+  const ctpHoles = Object.keys(event.payout_config ?? {})
+    .filter(k => k.startsWith('ctp_'))
+    .map(k => parseInt(k.replace('ctp_', ''), 10))
+    .sort((a, b) => a - b)
+  if (sides.includes('ctp') && ctpHoles.length > 0) {
+    const sec = buildSection('Closest to Pin (Greenies)', GREEN, GOLD)
+    const body = sec._body
+    const ctpData = ctpHoles.map(h => {
+      const g = sideGames.find(g => g.game_type === 'ctp' && g.hole_number === h)
+      return { label: `Hole ${h}`, name: g?.winner_player_id ? display(g.winner_player_id, `ctp_${h}`) : '—' }
+    })
+    body.appendChild(buildCtpGrid(ctpData))
+    wrap.appendChild(sec._card)
+  }
+
+  // ── Skins ────────────────────────────────────────────────────────
+  const skinsSides = sides.filter(s => s === 'skins' || s.match(/^skins_[a-z]$/))
+  if (skinsSides.length > 0) {
+    const sec = buildSection('Skins', GREEN, GOLD)
+    const body = sec._body
+
+    const skinFlights = skinsSides
+      .map(k => k.match(/^skins_([a-z])$/) ? k.match(/^skins_([a-z])$/)[1].toUpperCase() : null)
+      .filter(Boolean)
+
+    if (skinFlights.length > 1) {
+      body.appendChild(buildMultiFlightSkins(skinFlights, skinsResults, (pid, fl) =>
+        display(pid, fl ? `skins_${fl.toLowerCase()}` : 'skins')
+      ))
+    } else {
+      skinsSides.forEach(key => {
+        const fl = key.match(/^skins_([a-z])$/) ? key.match(/^skins_([a-z])$/)[1].toUpperCase() : null
+        const result = fl ? skinsResults?.[fl] : (skinsResults?.[''] ?? Object.values(skinsResults ?? {})[0])
+        if (!result) return
+        const { playerSkins } = result
+        const skinWinners = Object.entries(playerSkins).filter(([, n]) => n > 0).sort(([, a], [, b]) => b - a)
+        if (skinWinners.length === 0) {
+          const noSkins = el('div', { padding: '10px 14px', color: '#999', fontSize: '12px' })
+          noSkins.textContent = 'No skins won'
+          body.appendChild(noSkins)
+        } else {
+          body.appendChild(buildFullFieldGrid(
+            skinWinners.map(([pid, count]) => ({ player_id: pid, _suffix: ` · ${count} skin${count !== 1 ? 's' : ''}` })),
+            skinWinners.length, pid => display(pid, key),
+            GREEN, ROW_BG_ALT, true
+          ))
+        }
+      })
+    }
+
+    wrap.appendChild(sec._card)
+  }
+
+  // ── Footer ───────────────────────────────────────────────────────
+  const footer = el('div', { marginTop: '12px', textAlign: 'center' })
+  footer.appendChild(txt(`${orgName ?? 'Scorify Golf'} · ${course.name ?? ''} · ${eventDate}`, {
+    fontSize: '10px', color: '#aaa',
+  }))
+  wrap.appendChild(footer)
+
+  return wrap
+}
+
+function buildSection(title, headerBg, headerColor) {
+  const card = el('div', {
+    background: '#ffffff',
+    borderRadius: SEC_RADIUS,
+    overflow: 'hidden',
+    marginBottom: '12px',
+    boxShadow: '0 1px 3px rgba(0,0,0,0.10)',
+    border: '1px solid #d4e0d4',
+  })
+  const hdr = el('div', {
+    background: headerBg,
+    padding: '9px 14px',
+    display: 'flex',
+    alignItems: 'center',
+  })
+  hdr.appendChild(txt(title, { color: headerColor, fontSize: '13px', fontWeight: '800', letterSpacing: '0.05em', textTransform: 'uppercase' }))
+  card.appendChild(hdr)
+  const body = el('div', {})
+  card.appendChild(body)
+  card._body = body
+  card._card = card
+  return card
+}
+
+// Shared row constants used by all layout helpers
+const R_PAD   = '10px 14px'   // all data rows same padding
+const R_FS    = '13px'        // player name font size
+const R_LABEL = '10px'        // flight / place label font size
+const R_ODD   = '#f7faf8'     // alternating row tint
+const R_EVEN  = '#ffffff'
+const R_DIV   = '1px solid #e4ede4'  // row divider
+
+/** Single unified scoring table — all formats share one set of columns so widths stay locked */
+function buildAllFormatsTable(scoringFormats, formatLabels, leaderboards, flights, payoutPlaces, displayFn) {
+  const RANK_LABELS = ['1st Place', '2nd Place', '3rd Place']
+  const leaderKeyMap = { net_stroke: 'full', net_stroke_front9: 'front9', net_stroke_back9: 'back9' }
+  const fmtPrefixMap = { net_stroke: '18_net', net_stroke_front9: 'f9', net_stroke_back9: 'b9' }
+  const totalCols = 1 + flights.length
+
+  const tbl = document.createElement('table')
+  tbl.style.cssText = 'width:100%;border-collapse:collapse;font-size:12px;table-layout:fixed;'
+
+  // Fixed colgroup — Result col 22%, each flight col equal share of remainder
+  const cg = document.createElement('colgroup')
+  const resultPct = 22
+  const flightPct = (100 - resultPct) / flights.length
+  ;[resultPct, ...flights.map(() => flightPct)].forEach(pct => {
+    const c = document.createElement('col')
+    c.style.width = pct + '%'
+    cg.appendChild(c)
+  })
+  tbl.appendChild(cg)
+
+  // Single header row — appears once for all formats
+  const thead = document.createElement('thead')
+  const hr = document.createElement('tr')
+  ;['Result', ...flights.map(f => `Flight ${f}`)].forEach(h => {
+    const th = document.createElement('th')
+    th.style.cssText = `padding:7px 14px;text-align:left;background:#e4ede4;color:${GREEN};font-size:${R_LABEL};font-weight:800;border-bottom:${R_DIV};letter-spacing:0.04em;text-transform:uppercase;`
+    th.textContent = h
+    hr.appendChild(th)
+  })
+  thead.appendChild(hr)
+  tbl.appendChild(thead)
+
+  const tbody = document.createElement('tbody')
+
+  scoringFormats.forEach((fmt, fmtIdx) => {
+    const lb = leaderboards[leaderKeyMap[fmt]] ?? {}
+    const places = Math.min(payoutPlaces[fmt] ?? 3, 3)
+    const fmtPrefix = fmtPrefixMap[fmt] ?? '18_net'
+
+    // Format label row — spans all columns
+    const fmtTr = document.createElement('tr')
+    const fmtTd = document.createElement('td')
+    fmtTd.colSpan = totalCols
+    fmtTd.style.cssText = `padding:7px 14px;background:rgba(27,67,50,0.06);border-top:${fmtIdx > 0 ? '2px solid #d0ddd0' : 'none'};border-bottom:${R_DIV};font-size:11px;font-weight:800;color:${GREEN};text-transform:uppercase;letter-spacing:0.07em;`
+    fmtTd.textContent = formatLabels[fmt]
+    fmtTr.appendChild(fmtTd)
+    tbody.appendChild(fmtTr)
+
+    // Place rows
+    for (let rank = 1; rank <= places; rank++) {
+      const tr = document.createElement('tr')
+      const rowBg = rank % 2 === 0 ? R_ODD : R_EVEN
+
+      const tdLabel = document.createElement('td')
+      tdLabel.style.cssText = `padding:${R_PAD};font-weight:700;font-size:12px;color:#374151;background:${rowBg};border-bottom:${R_DIV};`
+      tdLabel.textContent = RANK_LABELS[rank - 1] ?? `${rank}th Place`
+      tr.appendChild(tdLabel)
+
+      flights.forEach(fl => {
+        const list = lb[fl] ?? []
+        const tied = list.filter(p => p.rank === rank)
+        const td = document.createElement('td')
+        td.style.cssText = `padding:${R_PAD};font-size:${R_FS};color:#111;background:${rowBg};border-bottom:${R_DIV};overflow:hidden;`
+        if (tied.length === 0) {
+          td.style.color = '#ccc'; td.textContent = '—'
+        } else if (tied.length === 1) {
+          td.textContent = displayFn(tied[0].player_id, rank, fl, fmtPrefix)
+          td.style.fontWeight = '700'
+        } else {
+          td.innerHTML = tied.map(p => `<strong>${displayFn(p.player_id, rank, fl, fmtPrefix)}</strong>`).join(' <span style="color:#aaa">/</span> ')
+          td.style.fontSize = '11px'
+        }
+        tr.appendChild(td)
+      })
+      tbody.appendChild(tr)
+    }
+  })
+
+  tbl.appendChild(tbody)
+  return tbl
+}
+
+/** Full-field (no flights): all formats in one table, 2-col layout per row */
+function buildAllFormatsTableFullField(scoringFormats, formatLabels, leaderboards, payoutPlaces, displayFn) {
+  const RANK_LABELS = ['1st Place', '2nd Place', '3rd Place']
+  const leaderKeyMap = { net_stroke: 'full', net_stroke_front9: 'front9', net_stroke_back9: 'back9' }
+  const fmtPrefixMap = { net_stroke: '18_net', net_stroke_front9: 'f9', net_stroke_back9: 'b9' }
+
+  const tbl = document.createElement('table')
+  tbl.style.cssText = 'width:100%;border-collapse:collapse;font-size:12px;table-layout:fixed;'
+
+  // 4-column layout: rank | name | rank | name
+  const cg = document.createElement('colgroup')
+  ;[16, 34, 16, 34].forEach(pct => {
+    const c = document.createElement('col'); c.style.width = pct + '%'; cg.appendChild(c)
+  })
+  tbl.appendChild(cg)
+
+  const tbody = document.createElement('tbody')
+
+  scoringFormats.forEach((fmt, fmtIdx) => {
+    const lb = leaderboards[leaderKeyMap[fmt]] ?? {}
+    const places = Math.min(payoutPlaces[fmt] ?? 3, 3)
+    const fmtPrefix = fmtPrefixMap[fmt] ?? '18_net'
+    const list = lb.A ?? lb[Object.keys(lb)[0]] ?? []
+    const items = list.filter(p => p.rank <= places)
+
+    // Format label spanning all 4 cols
+    const fmtTr = document.createElement('tr')
+    const fmtTd = document.createElement('td')
+    fmtTd.colSpan = 4
+    fmtTd.style.cssText = `padding:7px 14px;background:rgba(27,67,50,0.06);border-top:${fmtIdx > 0 ? '2px solid #d0ddd0' : 'none'};border-bottom:${R_DIV};font-size:11px;font-weight:800;color:${GREEN};text-transform:uppercase;letter-spacing:0.07em;`
+    fmtTd.textContent = formatLabels[fmt]
+    fmtTr.appendChild(fmtTd)
+    tbody.appendChild(fmtTr)
+
+    // Pair items 2-across
+    const padded = [...items]
+    if (padded.length % 2 !== 0) padded.push(null)
+    for (let i = 0; i < padded.length; i += 2) {
+      const tr = document.createElement('tr')
+      const rowBg = Math.floor(i / 2) % 2 === 0 ? R_ODD : R_EVEN
+      ;[padded[i], padded[i + 1]].forEach((item, col) => {
+        const tdRank = document.createElement('td')
+        tdRank.style.cssText = `padding:${R_PAD};font-size:${R_LABEL};font-weight:800;color:${GREEN};background:${rowBg};border-bottom:${R_DIV};border-left:${col === 1 ? R_DIV : 'none'};`
+        const tdName = document.createElement('td')
+        tdName.style.cssText = `padding:${R_PAD};font-size:${R_FS};font-weight:700;color:#111;background:${rowBg};border-bottom:${R_DIV};`
+        if (item) {
+          tdRank.textContent = RANK_LABELS[item.rank - 1] ?? `${item.rank}th`
+          tdName.textContent = displayFn(item.player_id, item.rank, fmtPrefix)
+        }
+        tr.appendChild(tdRank)
+        tr.appendChild(tdName)
+      })
+      tbody.appendChild(tr)
+    }
+  })
+
+  tbl.appendChild(tbody)
+  return tbl
+}
+
+/** Full-field: 2-across grid — rank badge + name */
+function buildFullFieldGrid(list, places, displayFn, accentColor = GREEN, bgColor = R_ODD, rawList = false) {
+  const RANK_LABELS = ['1st Place', '2nd Place', '3rd Place', '4th Place', '5th Place', '6th Place']
+  const grid = el('div', { display: 'grid', gridTemplateColumns: '1fr 1fr' })
+
+  const items = rawList
+    ? list.slice(0, Math.min(places, list.length))
+    : list.filter(p => p.rank <= places).slice(0, places)
+  const padded = [...items]
+  if (padded.length % 2 !== 0) padded.push(null)
+
+  padded.forEach((item, i) => {
+    const cellBg = Math.floor(i / 2) % 2 === 0 ? bgColor : R_EVEN
+    const cell = el('div', {
+      padding: R_PAD,
+      background: cellBg,
+      borderBottom: R_DIV,
+      borderRight: i % 2 === 0 ? R_DIV : 'none',
+      display: 'flex', alignItems: 'center', gap: '8px',
+    })
+    if (!item) { grid.appendChild(cell); return }
+
+    const rank = rawList ? i + 1 : item.rank
+    if (!rawList) {
+      const badge = el('span', {
+        background: accentColor, color: '#fff',
+        fontSize: '9px', fontWeight: '800',
+        padding: '2px 7px', borderRadius: '20px',
+        whiteSpace: 'nowrap', flexShrink: '0',
+      })
+      badge.textContent = RANK_LABELS[rank - 1] ?? `${rank}th`
+      cell.appendChild(badge)
+    }
+    const nameEl = el('span', { fontSize: R_FS, fontWeight: '700', color: '#111' })
+    nameEl.textContent = displayFn(item.player_id, item.rank ?? rank) + (item._suffix ?? '')
+    cell.appendChild(nameEl)
+    grid.appendChild(cell)
+  })
+  return grid
+}
+
+/** Side game with per-flight columns: Flight A | Flight B | ... */
+function buildSideGameFlightRow(winners) {
+  const row = el('div', {
+    display: 'grid',
+    gridTemplateColumns: winners.map(() => '1fr').join(' '),
+  })
+  winners.forEach(({ fl, name }, i) => {
+    const cell = el('div', {
+      padding: R_PAD,
+      background: i % 2 === 0 ? R_ODD : R_EVEN,
+      borderRight: i < winners.length - 1 ? R_DIV : 'none',
+      borderBottom: R_DIV,
+    })
+    if (fl) {
+      cell.appendChild(txt(`Flight ${fl}`, {
+        display: 'block', fontSize: R_LABEL, fontWeight: '800',
+        color: GREEN, textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '3px',
+      }))
+    }
+    cell.appendChild(txt(name, { display: 'block', fontSize: R_FS, fontWeight: '700', color: '#111' }))
+    row.appendChild(cell)
+  })
+  return row
+}
+
+/** Single winner row (full-field, no flights) */
+function buildSingleWinnerRow(name) {
+  const row = el('div', { padding: R_PAD, background: R_ODD, borderBottom: R_DIV })
+  row.appendChild(txt(name, { fontSize: R_FS, fontWeight: '700', color: '#111' }))
+  return row
+}
+
+/** 2-across grid for CTP holes */
+function buildCtpGrid(ctpData) {
+  const grid = el('div', {
+    display: 'grid',
+    gridTemplateColumns: ctpData.length === 1 ? '1fr' : '1fr 1fr',
+  })
+  const padded = [...ctpData]
+  if (padded.length % 2 !== 0) padded.push(null)
+  padded.forEach((item, i) => {
+    const cellBg = Math.floor(i / 2) % 2 === 0 ? R_ODD : R_EVEN
+    const cell = el('div', {
+      padding: R_PAD,
+      background: cellBg,
+      borderBottom: R_DIV,
+      borderRight: i % 2 === 0 ? R_DIV : 'none',
+    })
+    if (!item) { grid.appendChild(cell); return }
+    cell.appendChild(txt(item.label, {
+      display: 'block', fontSize: R_LABEL, fontWeight: '800',
+      color: GREEN, textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '3px',
+    }))
+    cell.appendChild(txt(item.name, { display: 'block', fontSize: R_FS, fontWeight: '700', color: '#111' }))
+    grid.appendChild(cell)
+  })
+  return grid
+}
+
+/** Multi-flight skins: one column per flight */
+function buildMultiFlightSkins(skinFlights, skinsResults, displayFn) {
+  const grid = el('div', {
+    display: 'grid',
+    gridTemplateColumns: skinFlights.map(() => '1fr').join(' '),
+  })
+  skinFlights.forEach((fl, i) => {
+    const result = skinsResults?.[fl]
+    const cell = el('div', {
+      padding: R_PAD,
+      background: i % 2 === 0 ? R_ODD : R_EVEN,
+      borderRight: i < skinFlights.length - 1 ? R_DIV : 'none',
+      borderBottom: R_DIV,
+    })
+    cell.appendChild(txt(`Flight ${fl}`, {
+      display: 'block', fontSize: R_LABEL, fontWeight: '800',
+      color: GREEN, textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '4px',
+    }))
+    if (!result) {
+      cell.appendChild(txt('—', { fontSize: '12px', color: '#bbb' }))
+    } else {
+      const { playerSkins } = result
+      const winners = Object.entries(playerSkins).filter(([, n]) => n > 0).sort(([, a], [, b]) => b - a)
+      if (winners.length === 0) {
+        cell.appendChild(txt('No skins won', { fontSize: '12px', color: '#bbb' }))
+      } else {
+        winners.forEach(([pid, count]) => {
+          const line = el('div', { fontSize: '12px', fontWeight: '700', color: '#111', marginBottom: '2px' })
+          line.textContent = `${displayFn(pid, fl)} · ${count} skin${count !== 1 ? 's' : ''}`
+          cell.appendChild(line)
+        })
+      }
+    }
+    grid.appendChild(cell)
+  })
+  return grid
+}
+
+function buildResultRow(name, label, accentColor = GREEN, rowBg = R_ODD) {
+  const row = el('div', {
+    display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+    padding: R_PAD, background: rowBg, borderBottom: R_DIV,
+  })
+  row.appendChild(txt(name, { fontSize: R_FS, fontWeight: '700', color: '#111' }))
+  const badge = el('span', {
+    background: accentColor, color: '#fff',
+    fontSize: R_LABEL, fontWeight: '800',
+    padding: '2px 8px', borderRadius: '20px',
+    letterSpacing: '0.03em', whiteSpace: 'nowrap',
+  })
+  badge.textContent = label
+  row.appendChild(badge)
+  return row
 }
 
 // ─── Helpers ─────────────────────────────────────────────────────

@@ -1066,16 +1066,18 @@ function PlayerScorecardModal({ player, allScores, course, onClose }) {
   const { par_per_hole: pars, stroke_index: sis } = course
   const ch = player.course_handicap ?? 0
   const playerScores = allScores.filter(s => s.player_id === player.player_id)
-  const scoreMap = Object.fromEntries(playerScores.map(s => [s.hole_number, s.gross_score]))
+  const scoreMap = Object.fromEntries(playerScores.map(s => [s.hole_number, { gross: s.gross_score, putts: s.putts ?? null }]))
+  const hasPutts = playerScores.some(s => s.putts != null)
 
   const holes = Array.from({ length: 18 }, (_, i) => {
     const h = i + 1
-    const g = scoreMap[h] ?? null
+    const g = scoreMap[h]?.gross ?? null
+    const putts = scoreMap[h]?.putts ?? null
     const si = sis[i]
     const strokes = Math.floor(ch / 18) + (si <= (ch % 18) ? 1 : 0)
     const net = g != null ? g - strokes : null
     const netVsPar = net != null ? net - pars[i] : null
-    return { h, g, net, netVsPar, par: pars[i], strokes }
+    return { h, g, putts, net, netVsPar, par: pars[i], strokes }
   })
 
   function netColor(netVsPar) {
@@ -1091,6 +1093,8 @@ function PlayerScorecardModal({ player, allScores, course, onClose }) {
   const backGross  = backHoles.reduce((s, h) => h.g != null ? s + h.g : s, 0)
   const frontNet   = frontHoles.reduce((s, h) => h.net != null ? s + h.net : s, 0)
   const backNet    = backHoles.reduce((s, h) => h.net != null ? s + h.net : s, 0)
+  const frontPutts = frontHoles.reduce((s, h) => h.putts != null ? s + h.putts : s, 0)
+  const backPutts  = backHoles.reduce((s, h) => h.putts != null ? s + h.putts : s, 0)
   const totalVsPar = holes.reduce((s, h) => h.netVsPar != null ? s + h.netVsPar : s, 0)
   const holesPlayed = playerScores.length
   const name = `${player.player?.first_name ?? ''} ${player.player?.last_name ?? ''}`.trim()
@@ -1131,15 +1135,16 @@ function PlayerScorecardModal({ player, allScores, course, onClose }) {
                 <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">{label}</span>
               </div>
               {/* Column headers */}
-              <div className="grid grid-cols-[1.5rem_1.5rem_2rem_2rem] gap-0 px-3 py-1.5 border-b border-gray-100">
+              <div className={`grid ${hasPutts ? 'grid-cols-[1.5rem_1.5rem_2rem_2rem_2rem]' : 'grid-cols-[1.5rem_1.5rem_2rem_2rem]'} gap-0 px-3 py-1.5 border-b border-gray-100`}>
                 <span className="text-[10px] font-bold text-gray-400 uppercase">Hole</span>
                 <span className="text-[10px] font-bold text-gray-400 uppercase text-center">Par</span>
                 <span className="text-[10px] font-bold text-gray-400 uppercase text-center">Grs</span>
                 <span className="text-[10px] font-bold text-gray-400 uppercase text-center">Net</span>
+                {hasPutts && <span className="text-[10px] font-bold text-gray-400 uppercase text-center">Pts</span>}
               </div>
               {/* Hole rows */}
-              {holeList.map(({ h, g, net, netVsPar, par, strokes }, i) => (
-                <div key={h} className={`grid grid-cols-[1.5rem_1.5rem_2rem_2rem] gap-0 px-3 py-1.5 ${i % 2 === 1 ? 'bg-[rgba(27,67,50,0.025)]' : ''}`}>
+              {holeList.map(({ h, g, putts, net, netVsPar, par, strokes }, i) => (
+                <div key={h} className={`grid ${hasPutts ? 'grid-cols-[1.5rem_1.5rem_2rem_2rem_2rem]' : 'grid-cols-[1.5rem_1.5rem_2rem_2rem]'} gap-0 px-3 py-1.5 ${i % 2 === 1 ? 'bg-[rgba(27,67,50,0.025)]' : ''}`}>
                   <span className="text-xs font-semibold text-gray-400 tabular-nums">{h}</span>
                   <span className="text-xs text-gray-400 text-center tabular-nums">{par}</span>
                   <span className="text-xs font-semibold text-gray-700 text-center tabular-nums">
@@ -1148,13 +1153,19 @@ function PlayerScorecardModal({ player, allScores, course, onClose }) {
                   <span className={`text-xs text-center tabular-nums ${netColor(netVsPar)}`}>
                     {net != null ? net : <span className="text-gray-200">—</span>}
                   </span>
+                  {hasPutts && (
+                    <span className="text-xs text-center tabular-nums text-gray-600">
+                      {putts != null ? putts : <span className="text-gray-200">—</span>}
+                    </span>
+                  )}
                 </div>
               ))}
               {/* Subtotal */}
-              <div className="grid grid-cols-[1.5rem_1.5rem_2rem_2rem] gap-0 px-3 py-2 bg-[#012d1d]/5 border-t border-gray-200 mt-0.5">
+              <div className={`grid ${hasPutts ? 'grid-cols-[1.5rem_1.5rem_2rem_2rem_2rem]' : 'grid-cols-[1.5rem_1.5rem_2rem_2rem]'} gap-0 px-3 py-2 bg-[#012d1d]/5 border-t border-gray-200 mt-0.5`}>
                 <span className="text-[10px] font-bold text-gray-500 uppercase col-span-2">Tot</span>
                 <span className="text-xs font-black text-gray-800 text-center tabular-nums">{grossTotal || '—'}</span>
                 <span className="text-xs font-black text-gray-800 text-center tabular-nums">{netTotal || '—'}</span>
+                {hasPutts && <span className="text-xs font-black text-gray-800 text-center tabular-nums">{(label === 'Front 9' ? frontPutts : backPutts) || '—'}</span>}
               </div>
             </div>
           ))}
@@ -1162,7 +1173,7 @@ function PlayerScorecardModal({ player, allScores, course, onClose }) {
 
         {/* Overall totals footer */}
         <div className="flex items-center justify-between px-5 py-3 rounded-b-2xl flex-shrink-0" style={{ borderTop: '1px solid #ebe9e4', background: '#f4f3f0' }}>
-          <div className="grid grid-cols-2 gap-6 text-center">
+          <div className={`grid ${hasPutts ? 'grid-cols-3' : 'grid-cols-2'} gap-6 text-center`}>
             <div>
               <div className="text-[10px] text-ink-muted uppercase tracking-wide font-bold">Gross</div>
               <div className="text-lg font-black text-ink tabular-nums">{frontGross + backGross || '—'}</div>
@@ -1171,6 +1182,12 @@ function PlayerScorecardModal({ player, allScores, course, onClose }) {
               <div className="text-[10px] text-ink-muted uppercase tracking-wide font-bold">Net</div>
               <div className="text-lg font-black text-ink tabular-nums">{frontNet + backNet || '—'}</div>
             </div>
+            {hasPutts && (
+              <div>
+                <div className="text-[10px] text-ink-muted uppercase tracking-wide font-bold">Putts</div>
+                <div className="text-lg font-black text-ink tabular-nums">{frontPutts + backPutts || '—'}</div>
+              </div>
+            )}
           </div>
           <div className="text-right">
             <div className="text-[10px] text-ink-muted uppercase tracking-wide font-bold mb-0.5">Net vs Par</div>
