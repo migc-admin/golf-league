@@ -11,6 +11,7 @@ import QRCode from 'qrcode'
 import { getStrokesOnHole, computeLeaderboards } from '../lib/engines/scoring'
 import { computeSkinsForFlight, computeAllSkins } from '../lib/engines/skins'
 import { computePayouts } from '../lib/engines/payouts'
+import { computeTGLEventResults, assignTGLPoints } from '../lib/engines/tgl'
 
 // ─── Layout constants ─────────────────────────────────────────────
 const PAGE_W    = 1100
@@ -1809,4 +1810,572 @@ function hexWithAlpha(hex, alpha) {
   const g = parseInt(hex.slice(3, 5), 16)
   const b = parseInt(hex.slice(5, 7), 16)
   return `rgba(${r},${g},${b},${alpha})`
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// ExportTeamPlayButton — Team Play Results PNG
+// ═══════════════════════════════════════════════════════════════════
+
+export function ExportTeamPlayButton({ event, eventPlayers, allScores, course, tglTeams, tglMembers, tglSelections, orgName, orgLogoUrl }) {
+  const [exporting, setExporting] = useState(false)
+  const [exportError, setExportError] = useState(null)
+  const containerRef = useRef(null)
+
+  async function handleExport() {
+    setExportError(null)
+    if (!tglTeams?.length) { setExportError('No teams configured.'); return }
+    setExporting(true)
+    try {
+      let logoDataUrl = null
+      if (orgLogoUrl) {
+        try {
+          const ctrl = new AbortController()
+          const timer = setTimeout(() => ctrl.abort(), 4000)
+          const resp = await fetch(orgLogoUrl, { signal: ctrl.signal })
+          clearTimeout(timer)
+          const blob = await resp.blob()
+          logoDataUrl = await new Promise((res, rej) => {
+            const reader = new FileReader()
+            reader.onload = () => res(reader.result)
+            reader.onerror = rej
+            reader.readAsDataURL(blob)
+          })
+        } catch { logoDataUrl = null }
+      }
+
+      const node = containerRef.current
+      if (!node) return
+      node.innerHTML = ''
+      const pageEl = buildTeamPlayCard({ event, eventPlayers, allScores, course, tglTeams, tglMembers, tglSelections, orgName, orgLogoUrl: logoDataUrl })
+      node.appendChild(pageEl)
+
+      await new Promise(r => setTimeout(r, 100))
+
+      const dataUrl = await toPng(pageEl, {
+        pixelRatio: 2,
+        cacheBust: true,
+        backgroundColor: '#f5f0e8',
+      })
+
+      const link = document.createElement('a')
+      const evPart = (event.name ?? `event_${event.event_number}`).replace(/[^a-z0-9]/gi, '_').toLowerCase()
+      link.download = `team_play_${evPart}.png`
+      link.href = dataUrl
+      link.click()
+    } catch (err) {
+      console.error('Team Play export failed:', err)
+      setExportError(err?.message ?? 'Export failed')
+    } finally {
+      if (containerRef.current) containerRef.current.innerHTML = ''
+      setExporting(false)
+    }
+  }
+
+  return (
+    <>
+      <button
+        onClick={handleExport}
+        disabled={exporting}
+        style={{
+          display: 'inline-flex', alignItems: 'center', gap: 6,
+          padding: '6px 14px', borderRadius: 8,
+          border: '1px solid #d1d5db',
+          background: exporting ? '#f3f4f6' : '#ffffff',
+          color: '#111827', fontSize: 13, fontWeight: 600,
+          cursor: exporting ? 'not-allowed' : 'pointer',
+        }}
+      >
+        {exporting ? 'Exporting…' : '🏌 Team Play'}
+      </button>
+      {exportError && <p style={{ marginTop: 6, fontSize: 12, color: '#dc2626' }}>{exportError}</p>}
+      <div ref={containerRef} style={{ position: 'fixed', top: -99999, left: -99999, pointerEvents: 'none', zIndex: -1 }} />
+    </>
+  )
+}
+
+function buildTeamPlayCard({ event, eventPlayers, allScores, course, tglTeams, tglMembers, tglSelections, orgName, orgLogoUrl }) {
+  const FONT = 'Arial, Helvetica, sans-serif'
+  const W = 900
+  const PAD_CARD = 28
+  const BONE = '#f5f0e8'
+
+  // Compute TGL results same way TGLManager does
+  const epMap = Object.fromEntries(eventPlayers.map(ep => [ep.player_id, ep]))
+  const attachPlayer = r => ({ ...r, player: epMap[r.player_id]?.player ?? null })
+
+  let teamResults = []
+  if (allScores.length && course) {
+    try {
+      const lb = computeLeaderboards(eventPlayers, allScores, course)
+      const rankedA = (lb.full?.A ?? []).map(attachPlayer)
+      const rankedB = (lb.full?.B ?? []).map(attachPlayer)
+      const hasFlights = eventPlayers.some(ep => ep.flight === 'A' || ep.flight === 'B')
+      const enrolledA = hasFlights ? eventPlayers.filter(ep => ep.flight === 'A').length : eventPlayers.length
+      const enrolledB = eventPlayers.filter(ep => ep.flight === 'B').length
+      const pointsA = rankedA.length ? assignTGLPoints(rankedA, Math.max(rankedA.length, enrolledA)) : {}
+      const pointsB = rankedB.length ? assignTGLPoints(rankedB, Math.max(rankedB.length, enrolledB)) : {}
+      const combinedPoints = { ...pointsA, ...pointsB }
+      const allRanked = [...rankedA, ...rankedB]
+      const results = computeTGLEventResults(allRanked, tglSelections, tglTeams, tglMembers, combinedPoints)
+      teamResults = results.teamResults
+    } catch { /* no scores yet */ }
+  }
+
+  function playerName(pid) {
+    const ep = epMap[pid]
+    if (!ep) return '—'
+    return `${ep.player?.first_name ?? ''} ${ep.player?.last_name ?? ''}`.trim() || '—'
+  }
+
+  const eventDate = event.event_date
+    ? new Date(event.event_date + 'T00:00:00').toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' })
+    : ''
+
+  // ── Outer wrapper ────────────────────────────────────────────────
+  const wrap = el('div', {
+    width: `${W}px`, fontFamily: FONT,
+    background: BONE, padding: `${PAD_CARD}px`,
+    boxSizing: 'border-box',
+  })
+
+  // ── Header ───────────────────────────────────────────────────────
+  const hdr = el('div', {
+    display: 'flex', alignItems: 'center', gap: '16px',
+    marginBottom: '20px', paddingBottom: '16px',
+    borderBottom: `3px solid ${GOLD}`,
+  })
+  if (orgLogoUrl) {
+    const logo = document.createElement('img')
+    logo.src = orgLogoUrl
+    Object.assign(logo.style, { width: '52px', height: '52px', borderRadius: '50%', objectFit: 'cover', flexShrink: '0' })
+    hdr.appendChild(logo)
+  }
+  const hdrText = el('div', { flex: '1' })
+  hdrText.appendChild(txt(orgName ?? event.league?.name ?? '', {
+    display: 'block', fontSize: '13px', fontWeight: '700',
+    color: GOLD, textTransform: 'uppercase', letterSpacing: '0.06em',
+  }))
+  hdrText.appendChild(txt(event.name ?? `Event #${event.event_number}`, {
+    display: 'block', fontSize: '22px', fontWeight: '800', color: GREEN, lineHeight: '1.15',
+  }))
+  hdrText.appendChild(txt(`Team Play Results · ${eventDate}`, {
+    display: 'block', fontSize: '12px', color: '#6b7280', marginTop: '2px',
+  }))
+  hdr.appendChild(hdrText)
+  wrap.appendChild(hdr)
+
+  // ── Teams ─────────────────────────────────────────────────────────
+  if (teamResults.length === 0) {
+    const empty = el('div', { padding: '32px', textAlign: 'center', color: '#9ca3af', fontSize: '14px' })
+    empty.textContent = 'No scores available yet'
+    wrap.appendChild(empty)
+  } else {
+    teamResults.forEach((tr, i) => {
+      const isFirst = i === 0
+      const teamCard = el('div', {
+        background: isFirst ? hexWithAlpha(GREEN, 0.06) : '#ffffff',
+        border: `1px solid ${isFirst ? GREEN : '#e5e7eb'}`,
+        borderRadius: '10px',
+        marginBottom: '12px',
+        overflow: 'hidden',
+      })
+
+      // Team header row
+      const teamHdr = el('div', {
+        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+        padding: '12px 16px',
+        background: isFirst ? GREEN : '#f9fafb',
+        borderBottom: `1px solid ${isFirst ? GOLD : '#e5e7eb'}`,
+      })
+      const rankBadge = el('span', {
+        background: isFirst ? GOLD : '#e5e7eb',
+        color: isFirst ? '#1a1a1a' : '#374151',
+        fontSize: '10px', fontWeight: '800',
+        padding: '2px 8px', borderRadius: '20px',
+        marginRight: '10px', flexShrink: '0',
+      })
+      rankBadge.textContent = `#${tr.rank}`
+      const teamNameEl = el('span', {
+        fontSize: '15px', fontWeight: '800',
+        color: isFirst ? '#ffffff' : GREEN,
+        flex: '1',
+      })
+      teamNameEl.textContent = tr.team.name
+      const teamPtsEl = el('span', {
+        fontSize: '18px', fontWeight: '800',
+        color: isFirst ? GOLD : GREEN,
+      })
+      teamPtsEl.textContent = `${tr.teamPoints % 1 === 0 ? tr.teamPoints : tr.teamPoints.toFixed(1)} pts`
+      teamHdr.appendChild(rankBadge)
+      teamHdr.appendChild(teamNameEl)
+      teamHdr.appendChild(teamPtsEl)
+      teamCard.appendChild(teamHdr)
+
+      // Player rows
+      const playerGrid = el('div', {
+        display: 'grid',
+        gridTemplateColumns: tr.selectedPlayers.length > 1 ? '1fr 1fr' : '1fr',
+      })
+      tr.selectedPlayers.forEach((sp, pi) => {
+        const playerRow = el('div', {
+          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+          padding: '10px 16px',
+          background: pi % 2 === 0 ? '#ffffff' : '#f9fafb',
+          borderRight: pi % 2 === 0 && tr.selectedPlayers.length > 1 ? `1px solid #e5e7eb` : 'none',
+        })
+        const pName = el('span', { fontSize: '13px', fontWeight: '600', color: '#111827' })
+        pName.textContent = playerName(sp.player_id)
+        const pMeta = el('div', { textAlign: 'right' })
+        const pRank = el('span', { fontSize: '11px', color: '#6b7280', display: 'block' })
+        pRank.textContent = sp.rank ? `Rank #${sp.rank}` : '—'
+        const pPts = el('span', { fontSize: '13px', fontWeight: '700', color: GREEN, display: 'block' })
+        pPts.textContent = `${sp.points % 1 === 0 ? sp.points : sp.points.toFixed(1)} pts`
+        pMeta.appendChild(pRank)
+        pMeta.appendChild(pPts)
+        playerRow.appendChild(pName)
+        playerRow.appendChild(pMeta)
+        playerGrid.appendChild(playerRow)
+      })
+      teamCard.appendChild(playerGrid)
+      wrap.appendChild(teamCard)
+    })
+  }
+
+  // ── Footer ───────────────────────────────────────────────────────
+  const footer = el('div', { marginTop: '16px', textAlign: 'center' })
+  footer.appendChild(txt('Powered by Scorify Golf', {
+    fontSize: '10px', color: '#9ca3af', letterSpacing: '0.05em',
+  }))
+  wrap.appendChild(footer)
+
+  return wrap
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// ExportHandicapButton — USGA Adjusted Scores PNG
+// ═══════════════════════════════════════════════════════════════════
+
+export function ExportHandicapButton({ event, eventPlayers, allScores, course, orgName, orgLogoUrl }) {
+  const [exporting, setExporting] = useState(false)
+  const [exportError, setExportError] = useState(null)
+  const containerRef = useRef(null)
+
+  async function handleExport() {
+    setExportError(null)
+    if (!course) { setExportError('No course loaded.'); return }
+    setExporting(true)
+    try {
+      let logoDataUrl = null
+      if (orgLogoUrl) {
+        try {
+          const ctrl = new AbortController()
+          const timer = setTimeout(() => ctrl.abort(), 4000)
+          const resp = await fetch(orgLogoUrl, { signal: ctrl.signal })
+          clearTimeout(timer)
+          const blob = await resp.blob()
+          logoDataUrl = await new Promise((res, rej) => {
+            const reader = new FileReader()
+            reader.onload = () => res(reader.result)
+            reader.onerror = rej
+            reader.readAsDataURL(blob)
+          })
+        } catch { logoDataUrl = null }
+      }
+
+      const node = containerRef.current
+      if (!node) return
+      node.innerHTML = ''
+      const pageEl = buildHandicapCard({ event, eventPlayers, allScores, course, orgName, orgLogoUrl: logoDataUrl })
+      node.appendChild(pageEl)
+
+      await new Promise(r => setTimeout(r, 100))
+
+      const dataUrl = await toPng(pageEl, {
+        pixelRatio: 2,
+        cacheBust: true,
+        backgroundColor: '#f5f0e8',
+      })
+
+      const link = document.createElement('a')
+      const evPart = (event.name ?? `event_${event.event_number}`).replace(/[^a-z0-9]/gi, '_').toLowerCase()
+      link.download = `handicap_entry_${evPart}.png`
+      link.href = dataUrl
+      link.click()
+    } catch (err) {
+      console.error('Handicap export failed:', err)
+      setExportError(err?.message ?? 'Export failed')
+    } finally {
+      if (containerRef.current) containerRef.current.innerHTML = ''
+      setExporting(false)
+    }
+  }
+
+  return (
+    <>
+      <button
+        onClick={handleExport}
+        disabled={exporting}
+        style={{
+          display: 'inline-flex', alignItems: 'center', gap: 6,
+          padding: '6px 14px', borderRadius: 8,
+          border: '1px solid #d1d5db',
+          background: exporting ? '#f3f4f6' : '#ffffff',
+          color: '#111827', fontSize: 13, fontWeight: 600,
+          cursor: exporting ? 'not-allowed' : 'pointer',
+        }}
+      >
+        {exporting ? 'Exporting…' : '📋 Handicap Entry'}
+      </button>
+      {exportError && <p style={{ marginTop: 6, fontSize: 12, color: '#dc2626' }}>{exportError}</p>}
+      <div ref={containerRef} style={{ position: 'fixed', top: -99999, left: -99999, pointerEvents: 'none', zIndex: -1 }} />
+    </>
+  )
+}
+
+function buildHandicapCard({ event, eventPlayers, allScores, course, orgName, orgLogoUrl }) {
+  const FONT = 'Arial, Helvetica, sans-serif'
+  const BONE = '#f5f0e8'
+  const CAP_BG = '#fef9c3'  // yellow
+  const CAP_COLOR = '#dc2626' // red
+
+  const holes = course.holes ?? []
+  const par = holes.map(h => h.par ?? 0)
+  const si  = holes.map(h => h.stroke_index ?? h.handicap ?? 0)
+
+  // Score map: player_id → { [hole_number]: gross }
+  const scoreMap = {}
+  for (const s of allScores) {
+    if (!scoreMap[s.player_id]) scoreMap[s.player_id] = {}
+    scoreMap[s.player_id][s.hole_number] = s.gross_score ?? s.score ?? null
+  }
+
+  const players = eventPlayers
+    .filter(ep => !ep.is_guest)
+    .sort((a, b) => {
+      const fa = (a.flight ?? '').localeCompare(b.flight ?? '')
+      if (fa !== 0) return fa
+      return (a.adjusted_handicap_index ?? 999) - (b.adjusted_handicap_index ?? 999)
+    })
+
+  const eventDate = event.event_date
+    ? new Date(event.event_date + 'T00:00:00').toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' })
+    : ''
+
+  // Table layout — wide enough to fit 18 hole cols
+  const W = 1300
+  const PAD_CARD = 24
+  const TH_BG = GREEN
+  const TH_COLOR = '#ffffff'
+  const FIXED_COL = 44  // CH, Adj F9, Adj B9, Adj Total, Adjustments
+  const HOLE_W = 34
+
+  const wrap = el('div', {
+    width: `${W}px`, fontFamily: FONT,
+    background: BONE, padding: `${PAD_CARD}px`,
+    boxSizing: 'border-box',
+  })
+
+  // ── Header ───────────────────────────────────────────────────────
+  const hdr = el('div', {
+    display: 'flex', alignItems: 'center', gap: '16px',
+    marginBottom: '20px', paddingBottom: '16px',
+    borderBottom: `3px solid ${GOLD}`,
+  })
+  if (orgLogoUrl) {
+    const logo = document.createElement('img')
+    logo.src = orgLogoUrl
+    Object.assign(logo.style, { width: '48px', height: '48px', borderRadius: '50%', objectFit: 'cover', flexShrink: '0' })
+    hdr.appendChild(logo)
+  }
+  const hdrText = el('div', { flex: '1' })
+  hdrText.appendChild(txt(orgName ?? event.league?.name ?? '', {
+    display: 'block', fontSize: '12px', fontWeight: '700',
+    color: GOLD, textTransform: 'uppercase', letterSpacing: '0.06em',
+  }))
+  hdrText.appendChild(txt(event.name ?? `Event #${event.event_number}`, {
+    display: 'block', fontSize: '20px', fontWeight: '800', color: GREEN, lineHeight: '1.15',
+  }))
+  hdrText.appendChild(txt(`Handicap Entry · Adjusted Scores · ${eventDate}`, {
+    display: 'block', fontSize: '11px', color: '#6b7280', marginTop: '2px',
+  }))
+  hdr.appendChild(hdrText)
+  wrap.appendChild(hdr)
+
+  // ── Table ─────────────────────────────────────────────────────────
+  const tbl = document.createElement('table')
+  Object.assign(tbl.style, {
+    width: '100%', borderCollapse: 'collapse', fontSize: '11px', tableLayout: 'fixed',
+  })
+
+  // colgroup
+  const cg = document.createElement('colgroup')
+  // Player col
+  const cPlayer = document.createElement('col')
+  cPlayer.style.width = '130px'
+  cg.appendChild(cPlayer)
+  // Flight
+  const cFlight = document.createElement('col')
+  cFlight.style.width = '38px'
+  cg.appendChild(cFlight)
+  // CH
+  const cCH = document.createElement('col')
+  cCH.style.width = `${FIXED_COL}px`
+  cg.appendChild(cCH)
+  // H1-H18
+  for (let h = 0; h < 18; h++) {
+    const c = document.createElement('col')
+    c.style.width = `${HOLE_W}px`
+    cg.appendChild(c)
+  }
+  // Adj F9, B9, Total
+  for (let i = 0; i < 3; i++) {
+    const c = document.createElement('col')
+    c.style.width = `${FIXED_COL + 4}px`
+    cg.appendChild(c)
+  }
+  // Adjustments
+  const cAdj = document.createElement('col')
+  cAdj.style.width = '110px'
+  cg.appendChild(cAdj)
+  tbl.appendChild(cg)
+
+  const thead = document.createElement('thead')
+
+  function thCell(text, styles = {}) {
+    const td = document.createElement('th')
+    Object.assign(td.style, {
+      background: TH_BG, color: TH_COLOR,
+      padding: '5px 3px', fontWeight: '700',
+      textAlign: 'center', fontSize: '10px',
+      border: '1px solid #145230',
+      ...styles,
+    })
+    td.textContent = text
+    return td
+  }
+
+  // Row 1: header labels
+  const hRow = document.createElement('tr')
+  hRow.appendChild(thCell('Player', { textAlign: 'left', padding: '5px 6px' }))
+  hRow.appendChild(thCell('Flt'))
+  hRow.appendChild(thCell('CH'))
+  for (let h = 1; h <= 18; h++) hRow.appendChild(thCell(String(h)))
+  hRow.appendChild(thCell('F9'))
+  hRow.appendChild(thCell('B9'))
+  hRow.appendChild(thCell('Tot'))
+  hRow.appendChild(thCell('Adjustments', { textAlign: 'left', padding: '5px 6px' }))
+  thead.appendChild(hRow)
+
+  // Row 2: Par
+  const parRow = document.createElement('tr')
+  parRow.appendChild(thCell('Par', { textAlign: 'left', padding: '5px 6px', background: hexWithAlpha(GREEN, 0.7) }))
+  parRow.appendChild(thCell('', { background: hexWithAlpha(GREEN, 0.7) }))
+  parRow.appendChild(thCell('', { background: hexWithAlpha(GREEN, 0.7) }))
+  par.forEach(p => parRow.appendChild(thCell(String(p), { background: hexWithAlpha(GREEN, 0.7) })))
+  parRow.appendChild(thCell(String(par.slice(0, 9).reduce((a, b) => a + b, 0)), { background: hexWithAlpha(GREEN, 0.7) }))
+  parRow.appendChild(thCell(String(par.slice(9).reduce((a, b) => a + b, 0)), { background: hexWithAlpha(GREEN, 0.7) }))
+  parRow.appendChild(thCell(String(par.reduce((a, b) => a + b, 0)), { background: hexWithAlpha(GREEN, 0.7) }))
+  parRow.appendChild(thCell('', { background: hexWithAlpha(GREEN, 0.7) }))
+  thead.appendChild(parRow)
+
+  // Row 3: SI
+  const siRow = document.createElement('tr')
+  siRow.appendChild(thCell('S.I.', { textAlign: 'left', padding: '5px 6px', background: hexWithAlpha(GREEN, 0.5) }))
+  siRow.appendChild(thCell('', { background: hexWithAlpha(GREEN, 0.5) }))
+  siRow.appendChild(thCell('', { background: hexWithAlpha(GREEN, 0.5) }))
+  si.forEach(s => siRow.appendChild(thCell(String(s), { background: hexWithAlpha(GREEN, 0.5) })))
+  siRow.appendChild(thCell('', { background: hexWithAlpha(GREEN, 0.5) }))
+  siRow.appendChild(thCell('', { background: hexWithAlpha(GREEN, 0.5) }))
+  siRow.appendChild(thCell('', { background: hexWithAlpha(GREEN, 0.5) }))
+  siRow.appendChild(thCell('', { background: hexWithAlpha(GREEN, 0.5) }))
+  thead.appendChild(siRow)
+
+  tbl.appendChild(thead)
+  const tbody = document.createElement('tbody')
+
+  players.forEach((ep, rowIdx) => {
+    const ch = ep.course_handicap ?? ep.adjusted_handicap_index ?? 0
+    const scores = scoreMap[ep.player_id] ?? {}
+    const pName = `${ep.player?.first_name ?? ''} ${ep.player?.last_name ?? ''}`.trim() || '—'
+    const flight = ep.flight ?? '—'
+    const rowBg = rowIdx % 2 === 0 ? '#ffffff' : '#f9fafb'
+
+    const adjScores = []
+    const cappedHoles = [] // { holeNum, gross, adj }
+
+    for (let h = 0; h < 18; h++) {
+      const gross = scores[h + 1] ?? null
+      if (gross === null) { adjScores.push(null); continue }
+      const strokes = getStrokesOnHole(ch, si[h])
+      const cap = par[h] + 2 + strokes
+      const adj = Math.min(gross, cap)
+      adjScores.push(adj)
+      if (adj < gross) cappedHoles.push({ holeNum: h + 1, gross, adj })
+    }
+
+    const adjF9  = adjScores.slice(0, 9).reduce((sum, v) => sum + (v ?? 0), 0)
+    const adjB9  = adjScores.slice(9).reduce((sum, v) => sum + (v ?? 0), 0)
+    const adjTot = adjF9 + adjB9
+    const adjNotes = cappedHoles.map(c => `H${c.holeNum}:${c.gross}→${c.adj}`).join(', ')
+
+    const tr = document.createElement('tr')
+
+    function td(text, styles = {}) {
+      const cell = document.createElement('td')
+      Object.assign(cell.style, {
+        padding: '4px 3px', textAlign: 'center',
+        border: '1px solid #e5e7eb',
+        background: rowBg,
+        fontSize: '11px', color: '#111827',
+        ...styles,
+      })
+      cell.textContent = text
+      return cell
+    }
+
+    tr.appendChild(td(pName, { textAlign: 'left', padding: '4px 6px', fontWeight: '600' }))
+    tr.appendChild(td(flight))
+    tr.appendChild(td(String(ch), { fontWeight: '700', color: GREEN }))
+
+    adjScores.forEach((adj, h) => {
+      const gross = scores[h + 1] ?? null
+      const isCapped = gross !== null && adj !== null && adj < gross
+      tr.appendChild(td(adj !== null ? String(adj) : '—', {
+        background: isCapped ? CAP_BG : rowBg,
+        color: isCapped ? CAP_COLOR : '#111827',
+        fontWeight: isCapped ? '700' : '400',
+      }))
+    })
+
+    const hasAllF9 = adjScores.slice(0, 9).every(v => v !== null)
+    const hasAllB9 = adjScores.slice(9).every(v => v !== null)
+    tr.appendChild(td(hasAllF9 ? String(adjF9) : '—', { fontWeight: '700', background: hexWithAlpha(GREEN, 0.07) }))
+    tr.appendChild(td(hasAllB9 ? String(adjB9) : '—', { fontWeight: '700', background: hexWithAlpha(GREEN, 0.07) }))
+    tr.appendChild(td(hasAllF9 && hasAllB9 ? String(adjTot) : '—', { fontWeight: '800', color: GREEN, background: hexWithAlpha(GREEN, 0.1) }))
+    tr.appendChild(td(adjNotes || '—', { textAlign: 'left', padding: '4px 6px', fontSize: '10px', color: '#6b7280' }))
+
+    tbody.appendChild(tr)
+  })
+
+  tbl.appendChild(tbody)
+  wrap.appendChild(tbl)
+
+  // ── Legend + Footer ──────────────────────────────────────────────
+  const legend = el('div', { marginTop: '12px', display: 'flex', gap: '20px', alignItems: 'center' })
+  const capSwatch = el('span', {
+    display: 'inline-block', width: '14px', height: '14px',
+    background: CAP_BG, border: `1px solid ${CAP_COLOR}`,
+    borderRadius: '3px', verticalAlign: 'middle', marginRight: '5px',
+  })
+  const capLegend = el('span', { fontSize: '10px', color: '#6b7280' })
+  capLegend.textContent = 'Capped score (USGA ESC adjustment applied)'
+  legend.appendChild(capSwatch)
+  legend.appendChild(capLegend)
+
+  const spacer = el('div', { flex: '1' })
+  legend.appendChild(spacer)
+  legend.appendChild(txt('Powered by Scorify Golf', { fontSize: '10px', color: '#9ca3af' }))
+  wrap.appendChild(legend)
+
+  return wrap
 }

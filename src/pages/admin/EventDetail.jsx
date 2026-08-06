@@ -7,7 +7,7 @@ import { computeLeaderboards } from '../../lib/engines/scoring'
 import { computeAllSkins } from '../../lib/engines/skins'
 import { computeTGLEventResults, assignTGLPoints } from '../../lib/engines/tgl'
 import Card, { CardHeader } from '../../components/ui/Card'
-import { ExportScorecardsButton, ExportSkinsGridButton, ExportResultsButton } from '../../components/ScorecardExport'
+import { ExportScorecardsButton, ExportSkinsGridButton, ExportResultsButton, ExportTeamPlayButton, ExportHandicapButton } from '../../components/ScorecardExport'
 import { useOrg, useFeatures } from '../../lib/OrgContext'
 import Button from '../../components/ui/Button'
 import Modal from '../../components/ui/Modal'
@@ -19,7 +19,7 @@ import PrintAssets from '../../components/ui/PrintAssets'
 import { atLimit, getLimit, nextTier, TIER_LABELS } from '../../lib/features'
 
 // Collapsed from 7 → 4 tabs: Players = Registrations + Players & Flights; Payout = Config + Side Games + Summary
-const ALL_ADMIN_TABS = ['Overview', 'Players', 'Groups', 'Payout', 'Post Round', 'Team Play']
+const ALL_ADMIN_TABS = ['Overview', 'Players', 'Groups', 'Payout', 'Pre/Post Round', 'Team Play']
 
 // ─── Side game helpers (shared between EditEventModal and elsewhere) ──────────
 const PER_FLIGHT_GAMES = [
@@ -297,8 +297,23 @@ export default function EventDetail() {
         </div>
       )}
 
-      {activeTab === 'Post Round' && (
-        <TabPostRound event={event} eventPlayers={eventPlayers} allScores={allScores} course={course} sideGames={sideGames} orgName={org?.name} orgLogoUrl={org?.logo_url ?? null} orgSlug={orgSlug} />
+      {activeTab === 'Pre/Post Round' && (
+        <TabPostRound
+          event={event}
+          eventPlayers={eventPlayers}
+          allScores={allScores}
+          course={course}
+          sideGames={sideGames}
+          orgName={org?.name}
+          orgLogoUrl={org?.logo_url ?? null}
+          orgSlug={orgSlug}
+          onPrintAsset={setPrintAsset}
+          onUpdated={load}
+          tglTeams={tglTeams}
+          tglMembers={tglMembers}
+          tglSelections={tglSelections}
+          hasTgl={hasFeature('tgl') && tglTeams.length > 0}
+        />
       )}
 
       {activeTab === 'Team Play' && (
@@ -843,19 +858,57 @@ function EditHandicapModal({ ep, course, onClose, onSaved }) {
   )
 }
 
-// ─── Tab: Post Round ──────────────────────────────────────────────
-function TabPostRound({ event, eventPlayers, allScores, course, sideGames, orgName, orgLogoUrl, orgSlug }) {
+// ─── Tab: Pre/Post Round ──────────────────────────────────────────
+function TabPostRound({ event, eventPlayers, allScores, course, sideGames, orgName, orgLogoUrl, orgSlug, onPrintAsset, onUpdated, tglTeams, tglMembers, tglSelections, hasTgl }) {
+  const [scoreEditor, setScoreEditor] = useState(false)
   const hasSkins = (event?.side_game_options ?? []).some(s => s.startsWith('skins'))
   const leagueName = event.league?.name ?? orgName
   const logoUrl = event.league?.logo_url ?? orgLogoUrl ?? null
 
   return (
     <div className="space-y-6 max-w-xl">
-      <p className="text-sm text-gray-500">Download post-round reports and results exports.</p>
 
+      {/* ── Pre-Round ─────────────────────────────────────────── */}
       <div className="bg-gray-50 rounded-xl px-4 py-4 space-y-3">
-        <div className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2">Score Data</div>
+        <div className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2">Pre-Round</div>
         <div className="flex items-center justify-between">
+          <div>
+            <div className="text-sm font-medium text-gray-800">Print Assets</div>
+            <div className="text-xs text-gray-400 mt-0.5">Tee sheet, cart signs, and scorecards for the round</div>
+          </div>
+          <div className="flex gap-2">
+            <Button size="sm" variant="secondary" onClick={() => onPrintAsset('tee_sheet')}>🖨 Tee Sheet</Button>
+            <Button size="sm" variant="secondary" onClick={() => onPrintAsset('cart_signs')}>🖨 Cart Signs</Button>
+            <Button size="sm" variant="secondary" onClick={() => onPrintAsset('cards')}>🖨 Cards</Button>
+          </div>
+        </div>
+        <div className="flex items-center justify-between border-t border-gray-200 pt-3">
+          <div>
+            <div className="text-sm font-medium text-gray-800">Export Scorecards (PNG)</div>
+            <div className="text-xs text-gray-400 mt-0.5">Printable scorecards with QR codes, one per group</div>
+          </div>
+          <ExportScorecardsButton
+            event={event}
+            eventPlayers={eventPlayers}
+            course={course}
+            orgName={leagueName}
+            orgSlug={orgSlug}
+            orgLogoUrl={logoUrl}
+          />
+        </div>
+      </div>
+
+      {/* ── Scoring ───────────────────────────────────────────── */}
+      <div className="bg-gray-50 rounded-xl px-4 py-4 space-y-3">
+        <div className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2">Scoring</div>
+        <div className="flex items-center justify-between">
+          <div>
+            <div className="text-sm font-medium text-gray-800">Edit Scores</div>
+            <div className="text-xs text-gray-400 mt-0.5">Manually enter or correct hole-by-hole scores</div>
+          </div>
+          <Button size="sm" variant="secondary" onClick={() => setScoreEditor(true)}>✎ Edit Scores</Button>
+        </div>
+        <div className="flex items-center justify-between border-t border-gray-200 pt-3">
           <div>
             <div className="text-sm font-medium text-gray-800">Scores Export (CSV)</div>
             <div className="text-xs text-gray-400 mt-0.5">All player scores, net, gross — one row per player per hole</div>
@@ -864,8 +917,23 @@ function TabPostRound({ event, eventPlayers, allScores, course, sideGames, orgNa
             ⬇ Download
           </Button>
         </div>
+        <div className="flex items-center justify-between border-t border-gray-200 pt-3">
+          <div>
+            <div className="text-sm font-medium text-gray-800">Handicap Entry (PNG)</div>
+            <div className="text-xs text-gray-400 mt-0.5">USGA adjusted scores per hole for handicap posting</div>
+          </div>
+          <ExportHandicapButton
+            event={event}
+            eventPlayers={eventPlayers}
+            allScores={allScores}
+            course={course}
+            orgName={leagueName}
+            orgLogoUrl={logoUrl}
+          />
+        </div>
       </div>
 
+      {/* ── Results ───────────────────────────────────────────── */}
       <div className="bg-gray-50 rounded-xl px-4 py-4 space-y-3">
         <div className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2">Results</div>
         <div className="flex items-center justify-between">
@@ -883,12 +951,8 @@ function TabPostRound({ event, eventPlayers, allScores, course, sideGames, orgNa
             orgLogoUrl={logoUrl}
           />
         </div>
-      </div>
-
-      {hasSkins && (
-        <div className="bg-gray-50 rounded-xl px-4 py-4 space-y-3">
-          <div className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2">Skins</div>
-          <div className="flex items-center justify-between">
+        {hasSkins && (
+          <div className="flex items-center justify-between border-t border-gray-200 pt-3">
             <div>
               <div className="text-sm font-medium text-gray-800">Scoring Summary (PNG)</div>
               <div className="text-xs text-gray-400 mt-0.5">Hole-by-hole skins results by flight, sorted by net score</div>
@@ -902,7 +966,37 @@ function TabPostRound({ event, eventPlayers, allScores, course, sideGames, orgNa
               orgLogoUrl={logoUrl}
             />
           </div>
-        </div>
+        )}
+        {hasTgl && (
+          <div className="flex items-center justify-between border-t border-gray-200 pt-3">
+            <div>
+              <div className="text-sm font-medium text-gray-800">Team Play Results (PNG)</div>
+              <div className="text-xs text-gray-400 mt-0.5">Team participants and points totals for this event</div>
+            </div>
+            <ExportTeamPlayButton
+              event={event}
+              eventPlayers={eventPlayers}
+              allScores={allScores}
+              course={course}
+              tglTeams={tglTeams}
+              tglMembers={tglMembers}
+              tglSelections={tglSelections}
+              orgName={leagueName}
+              orgLogoUrl={logoUrl}
+            />
+          </div>
+        )}
+      </div>
+
+      {scoreEditor && (
+        <AdminScoreEditor
+          event={event}
+          eventPlayers={eventPlayers}
+          allScores={allScores}
+          course={course}
+          onClose={() => setScoreEditor(false)}
+          onSaved={onUpdated}
+        />
       )}
     </div>
   )
