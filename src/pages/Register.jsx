@@ -93,9 +93,12 @@ export default function Register() {
   // Form fields
   const [firstName,     setFirstName]     = useState('')
   const [lastName,      setLastName]      = useState('')
-  const [email,         setEmail]         = useState('')
   const [notes,         setNotes]         = useState('')
   const [interestedGuest, setInterestedGuest] = useState('')
+  // Guest info (shown when interestedGuest === 'Yes')
+  const [guestName,  setGuestName]  = useState('')
+  const [guestEmail, setGuestEmail] = useState('')
+  const [guestGhin,  setGuestGhin]  = useState('')
 
   useEffect(() => {
     supabase
@@ -116,16 +119,16 @@ export default function Register() {
     setSaving(true)
     setError(null)
 
-    const fullNotes = [
-      notes.trim(),
-      interestedGuest ? `Interested in guest spot: ${interestedGuest}` : '',
-    ].filter(Boolean).join(' | ')
+    const guestNote = interestedGuest === 'Yes'
+      ? `Guest request: ${guestName.trim()}${guestEmail.trim() ? `, ${guestEmail.trim()}` : ''}${guestGhin.trim() ? `, GHIN: ${guestGhin.trim()}` : ''}`
+      : interestedGuest === 'No' ? 'No guest' : ''
+
+    const fullNotes = [notes.trim(), guestNote].filter(Boolean).join(' | ')
 
     const { error: insErr } = await supabase.from('registrations').insert({
-      event_id:   eventId,
+      event_id:   event.id,
       first_name: firstName.trim(),
       last_name:  lastName.trim(),
-      email:      email.trim() || null,
       notes:      fullNotes || null,
       status:     'pending',
     })
@@ -227,21 +230,10 @@ export default function Register() {
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-gray-600 mb-1">Email</label>
-                <input
-                  type="email"
-                  value={email}
-                  onChange={e => setEmail(e.target.value)}
-                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-600"
-                  placeholder="optional"
-                />
-              </div>
-
-              <div>
                 <label className="block text-xs font-semibold text-gray-600 mb-1">Interested in inviting a guest? <span className="font-normal text-gray-400">(based on availability)</span></label>
                 <select
                   value={interestedGuest}
-                  onChange={e => setInterestedGuest(e.target.value)}
+                  onChange={e => { setInterestedGuest(e.target.value); setGuestName(''); setGuestEmail(''); setGuestGhin('') }}
                   className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-600"
                 >
                   <option value="">— Select —</option>
@@ -249,6 +241,42 @@ export default function Register() {
                   <option value="No">No</option>
                 </select>
               </div>
+
+              {interestedGuest === 'Yes' && (
+                <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 space-y-3">
+                  <p className="text-xs font-semibold text-amber-800 uppercase tracking-wide">Guest Information</p>
+                  <div>
+                    <label className="block text-xs font-semibold text-gray-600 mb-1">Guest Name *</label>
+                    <input
+                      required
+                      value={guestName}
+                      onChange={e => setGuestName(e.target.value)}
+                      className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-600 bg-white"
+                      placeholder="Full name"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-semibold text-gray-600 mb-1">Guest Email *</label>
+                    <input
+                      required
+                      type="email"
+                      value={guestEmail}
+                      onChange={e => setGuestEmail(e.target.value)}
+                      className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-600 bg-white"
+                      placeholder="email@example.com"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-semibold text-gray-600 mb-1">Guest GHIN # <span className="font-normal text-gray-400">(if applicable)</span></label>
+                    <input
+                      value={guestGhin}
+                      onChange={e => setGuestGhin(e.target.value)}
+                      className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-600 bg-white"
+                      placeholder="Optional"
+                    />
+                  </div>
+                </div>
+              )}
 
               <div>
                 <label className="block text-xs font-semibold text-gray-600 mb-1">Notes</label>
