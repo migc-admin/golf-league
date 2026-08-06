@@ -434,8 +434,7 @@ async function exportScoresCSV(event, eventPlayers, allScores, course, sideGames
   XLSX.writeFile(wb, `event_${event.event_number}_scores.xlsx`)
 }
 
-async function exportHandicapXLSX(event, eventPlayers, allScores, course) {
-  const XLSX = await import('xlsx')
+function exportHandicapCSV(event, eventPlayers, allScores, course) {
 
   const pars = course?.par_per_hole ?? Array(18).fill(0)
   const sis  = course?.stroke_index ?? Array(18).fill(0)
@@ -493,20 +492,22 @@ async function exportHandicapXLSX(event, eventPlayers, allScores, course) {
     ]
   })
 
-  const wb = XLSX.utils.book_new()
-  const ws = XLSX.utils.aoa_to_sheet([headers, parRow, siRow, ...dataRows])
+  const allRows = [headers, parRow, siRow, ...dataRows]
+  const csv = allRows.map(row =>
+    row.map(cell => {
+      const s = String(cell ?? '')
+      return s.includes(',') || s.includes('"') || s.includes('\n') ? `"${s.replace(/"/g, '""')}"` : s
+    }).join(',')
+  ).join('\n')
 
-  // Column widths
-  ws['!cols'] = [
-    { wch: 22 }, { wch: 6 }, { wch: 6 },
-    ...Array(18).fill({ wch: 5 }),
-    { wch: 8 }, { wch: 8 }, { wch: 9 },
-    { wch: 28 },
-  ]
-
-  XLSX.utils.book_append_sheet(wb, ws, 'Handicap Entry')
+  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' })
+  const url = URL.createObjectURL(blob)
+  const link = document.createElement('a')
   const evPart = (event.name ?? `event_${event.event_number}`).replace(/[^a-z0-9]/gi, '_').toLowerCase()
-  XLSX.writeFile(wb, `handicap_entry_${evPart}.xlsx`)
+  link.download = `handicap_entry_${evPart}.csv`
+  link.href = url
+  link.click()
+  URL.revokeObjectURL(url)
 }
 
 // ─── Tab: Overview ────────────────────────────────────────────────
@@ -970,10 +971,10 @@ function TabPostRound({ event, eventPlayers, allScores, course, sideGames, orgNa
         </div>
         <div className="flex items-center justify-between border-t border-gray-200 pt-3">
           <div>
-            <div className="text-sm font-medium text-gray-800">Handicap Entry (Excel)</div>
+            <div className="text-sm font-medium text-gray-800">Handicap Entry (CSV)</div>
             <div className="text-xs text-gray-400 mt-0.5">USGA adjusted scores per hole for handicap posting</div>
           </div>
-          <Button size="sm" variant="secondary" onClick={() => exportHandicapXLSX(event, eventPlayers, allScores, course)}>
+          <Button size="sm" variant="secondary" onClick={() => exportHandicapCSV(event, eventPlayers, allScores, course)}>
             Download
           </Button>
         </div>
