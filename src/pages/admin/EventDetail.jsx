@@ -890,7 +890,7 @@ function TabPostRound({ event, eventPlayers, allScores, course, sideGames, orgNa
           <div className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2">Skins</div>
           <div className="flex items-center justify-between">
             <div>
-              <div className="text-sm font-medium text-gray-800">Export Skins Grid (PNG)</div>
+              <div className="text-sm font-medium text-gray-800">Scoring Summary (PNG)</div>
               <div className="text-xs text-gray-400 mt-0.5">Hole-by-hole skins results by flight, sorted by net score</div>
             </div>
             <ExportSkinsGridButton

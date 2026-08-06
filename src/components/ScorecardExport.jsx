@@ -800,7 +800,7 @@ export function ExportSkinsGridButton({ event, eventPlayers, allScores, course, 
           cursor: exporting ? 'not-allowed' : 'pointer',
         }}
       >
-        {exporting ? 'Exporting…' : '📊 Export Skins Grid'}
+        {exporting ? 'Exporting…' : '📊 Scoring Summary'}
       </button>
       {exportError && <p style={{ marginTop: 6, fontSize: 12, color: '#dc2626' }}>{exportError}</p>}
       <div ref={containerRef} style={{ position: 'fixed', top: -99999, left: -99999, pointerEvents: 'none', zIndex: -1 }} />
@@ -837,6 +837,7 @@ function buildSkinsGrid({ event, course, flightPlayers, allScores, flight, orgNa
     const grossByHole = {}
     const netByHole   = {}
     let frontGross = 0, frontNet = 0, backGross = 0, backNet = 0
+    let totalPutts = 0, hasPutts = false
 
     for (let h = 1; h <= 18; h++) {
       const s = allScores.find(x => x.player_id === ep.player_id && x.hole_number === h)
@@ -848,13 +849,14 @@ function buildSkinsGrid({ event, course, flightPlayers, allScores, flight, orgNa
         netByHole[h]   = net
         if (h <= 9) { frontGross += gross; frontNet += net }
         else        { backGross  += gross; backNet  += net }
+        if (s.putts != null) { totalPutts += s.putts; hasPutts = true }
       }
     }
     const totalGross = frontGross + backGross
     const totalNet   = frontNet + backNet
     const skinsWon   = playerSkins[ep.player_id] ?? 0
     const winAmt     = skinsWon > 0 ? Math.round(skinsWon * perSkinValue * 100) / 100 : 0
-    return { ep, grossByHole, netByHole, frontGross, frontNet, backGross, backNet, totalGross, totalNet, skinsWon, winAmt }
+    return { ep, grossByHole, netByHole, frontGross, frontNet, backGross, backNet, totalGross, totalNet, totalPutts: hasPutts ? totalPutts : null, skinsWon, winAmt }
   })
   playerData.sort((a, b) => (a.totalGross || 999) - (b.totalGross || 999))
 
@@ -917,16 +919,17 @@ function buildSkinsGrid({ event, course, flightPlayers, allScores, flight, orgNa
   wrap.appendChild(header)
 
   // ── Table ────────────────────────────────────────────────────────
-  // Columns: Name | Skins | Win$ | H1-H9 | Out | H10-H18 | In | Grs | HC | Net
-  // Count: 3 + 9 + 1 + 9 + 3 = 25
-  const COL_NAME  = 190
-  const COL_SKINS = 44
-  const COL_WIN   = 62
+  // Columns: Name | Skins | Win$ | H1-H9 | Out | Out Net | H10-H18 | In | In Net | Grs | HC | Net | Putts
+  // Count: 3 + 9 + 2 + 9 + 2 + 3 + 1 = 29
+  const COL_NAME  = 180
+  const COL_SKINS = 40
+  const COL_WIN   = 56
   const COL_HOLE  = 26
-  const COL_SUM   = 42
-  const COL_HC    = 38
+  const COL_SUM   = 40
+  const COL_HC    = 36
+  const COL_PUTTS = 44
 
-  const TOTAL_COLS = 3 + 9 + 1 + 9 + 3  // 25
+  const TOTAL_COLS = 3 + 9 + 2 + 9 + 2 + 3 + 1  // 29
 
   const tbl = document.createElement('table')
   tbl.style.cssText = `border-collapse:collapse;font-size:11px;font-family:${FONT};width:100%;table-layout:fixed;`
@@ -936,25 +939,31 @@ function buildSkinsGrid({ event, course, flightPlayers, allScores, flight, orgNa
   addCol(COL_NAME); addCol(COL_SKINS); addCol(COL_WIN)
   for (let i = 0; i < 9; i++) addCol(COL_HOLE)
   addCol(COL_SUM)                   // Out
+  addCol(COL_SUM)                   // Out Net
   for (let i = 0; i < 9; i++) addCol(COL_HOLE)
   addCol(COL_SUM)                   // In
+  addCol(COL_SUM)                   // In Net
   addCol(COL_SUM)                   // Grs
   addCol(COL_HC)                    // HC
   addCol(COL_SUM)                   // Net
+  addCol(COL_PUTTS)                 // Putts
   tbl.appendChild(colgroup)
 
   // Header row
   const hr = document.createElement('tr')
-  hr.appendChild(mkTh('Name',  { align: 'left', fs: '11px' }))
+  hr.appendChild(mkTh('Name',    { align: 'left', fs: '11px' }))
   hr.appendChild(mkTh('Skins'))
   hr.appendChild(mkTh('Win $'))
   frontGroup.forEach(({ hole }) => hr.appendChild(mkTh(hole, { bg: '#2D6A4F' })))
-  hr.appendChild(mkTh('Out', { bg: '#1a3d2a' }))
+  hr.appendChild(mkTh('Out',    { bg: '#1a3d2a' }))
+  hr.appendChild(mkTh('Out Net',{ bg: '#1a3d2a' }))
   backGroup.forEach(({ hole })  => hr.appendChild(mkTh(hole, { bg: '#2D6A4F' })))
-  hr.appendChild(mkTh('In',  { bg: '#1a3d2a' }))
-  hr.appendChild(mkTh('Grs', { bg: '#1a3d2a' }))
-  hr.appendChild(mkTh('HC',  { bg: '#1a3d2a' }))
-  hr.appendChild(mkTh('Net', { bg: '#1a3d2a' }))
+  hr.appendChild(mkTh('In',     { bg: '#1a3d2a' }))
+  hr.appendChild(mkTh('In Net', { bg: '#1a3d2a' }))
+  hr.appendChild(mkTh('Grs',   { bg: '#1a3d2a' }))
+  hr.appendChild(mkTh('HC',    { bg: '#1a3d2a' }))
+  hr.appendChild(mkTh('Net',   { bg: '#1a3d2a' }))
+  hr.appendChild(mkTh('Putts', { bg: '#1a3d2a' }))
   tbl.appendChild(hr)
 
   // SI sub-row
@@ -964,7 +973,10 @@ function buildSkinsGrid({ event, course, flightPlayers, allScores, flight, orgNa
   siRow.appendChild(mkTd('', { bg: '#3a5a4a' }))
   frontGroup.forEach(({ hole }) => siRow.appendChild(mkTd(sis[hole - 1], { bg: '#3a5a4a', color: '#cde', fs: '9px' })))
   siRow.appendChild(mkTd('', { bg: '#3a5a4a' }))
+  siRow.appendChild(mkTd('', { bg: '#3a5a4a' }))
   backGroup.forEach(({ hole })  => siRow.appendChild(mkTd(sis[hole - 1], { bg: '#3a5a4a', color: '#cde', fs: '9px' })))
+  siRow.appendChild(mkTd('', { bg: '#3a5a4a' }))
+  siRow.appendChild(mkTd('', { bg: '#3a5a4a' }))
   siRow.appendChild(mkTd('', { bg: '#3a5a4a' }))
   siRow.appendChild(mkTd('', { bg: '#3a5a4a' }))
   siRow.appendChild(mkTd('', { bg: '#3a5a4a' }))
@@ -991,7 +1003,7 @@ function buildSkinsGrid({ event, course, flightPlayers, allScores, flight, orgNa
   const SKIN_COLOR = '#1B4332'
 
   playerData.forEach((pd, rowIdx) => {
-    const { ep, grossByHole, frontGross, backGross, totalGross, skinsWon, winAmt } = pd
+    const { ep, grossByHole, frontGross, frontNet, backGross, backNet, totalGross, totalPutts, skinsWon, winAmt } = pd
     const ch    = ep.course_handicap ?? 0
     const net   = totalGross ? totalGross - ch : ''
     const name  = `${ep.player?.first_name ?? ''} ${ep.player?.last_name ?? ''}`.trim()
@@ -1008,6 +1020,7 @@ function buildSkinsGrid({ event, course, flightPlayers, allScores, flight, orgNa
       tr.appendChild(mkTd(gross ?? '', { bg: won ? SKIN_BG : rowBg, bold: won, color: won ? SKIN_COLOR : '#111' }))
     })
     tr.appendChild(mkTd(frontGross || '', { bg: '#e8f0e8', bold: true }))
+    tr.appendChild(mkTd(frontNet   || '', { bg: '#dceee6', bold: true, color: GREEN }))
 
     backGroup.forEach(({ hole }) => {
       const gross = grossByHole[hole]
@@ -1015,9 +1028,11 @@ function buildSkinsGrid({ event, course, flightPlayers, allScores, flight, orgNa
       tr.appendChild(mkTd(gross ?? '', { bg: won ? SKIN_BG : rowBg, bold: won, color: won ? SKIN_COLOR : '#111' }))
     })
     tr.appendChild(mkTd(backGross || '', { bg: '#e8f0e8', bold: true }))
+    tr.appendChild(mkTd(backNet   || '', { bg: '#dceee6', bold: true, color: GREEN }))
     tr.appendChild(mkTd(totalGross || '', { bg: '#e8f0e8', bold: true }))
     tr.appendChild(mkTd(ch || '—', { bg: '#e8f0e8' }))
     tr.appendChild(mkTd(net !== '' ? net : '', { bg: '#dceee6', bold: true, color: GREEN }))
+    tr.appendChild(mkTd(totalPutts !== null ? totalPutts : '—', { bg: rowBg }))
 
     tbl.appendChild(tr)
   })
@@ -1398,37 +1413,74 @@ const R_ODD   = '#f7faf8'     // alternating row tint
 const R_EVEN  = '#ffffff'
 const R_DIV   = '1px solid #e4ede4'  // row divider
 
+/** Returns [outNet, inNet, putts] for a leaderboard entry based on scoring format */
+function getScoreVals(fmt, entry) {
+  if (!entry) return [null, null, null]
+  switch (fmt) {
+    case 'net_stroke':        return [entry.netF9 ?? null, entry.netB9 ?? null, entry.totalPutts ?? null]
+    case 'net_stroke_front9': return [entry.netF9 ?? null, null, null]
+    case 'net_stroke_back9':  return [null, entry.netB9 ?? null, null]
+    default:                  return [null, null, null]
+  }
+}
+
 /** Single unified scoring table — all formats share one set of columns so widths stay locked */
 function buildAllFormatsTable(scoringFormats, formatLabels, leaderboards, flights, payoutPlaces, displayFn) {
   const RANK_LABELS = ['1st Place', '2nd Place', '3rd Place']
   const leaderKeyMap = { net_stroke: 'full', net_stroke_front9: 'front9', net_stroke_back9: 'back9' }
   const fmtPrefixMap = { net_stroke: '18_net', net_stroke_front9: 'f9', net_stroke_back9: 'b9' }
-  const totalCols = 1 + flights.length
+
+  const SCORE_LABELS = ['Out', 'In', 'Putts']
+  const colsPerFlight = 1 + SCORE_LABELS.length  // player + Out + In + Putts
+  const totalCols = 1 + flights.length * colsPerFlight
 
   const tbl = document.createElement('table')
   tbl.style.cssText = 'width:100%;border-collapse:collapse;font-size:12px;table-layout:fixed;'
 
-  // Fixed colgroup — Result col 22%, each flight col equal share of remainder
+  // Fixed colgroup
   const cg = document.createElement('colgroup')
-  const resultPct = 22
-  const flightPct = (100 - resultPct) / flights.length
-  ;[resultPct, ...flights.map(() => flightPct)].forEach(pct => {
-    const c = document.createElement('col')
-    c.style.width = pct + '%'
-    cg.appendChild(c)
+  const resultPct = 13
+  const playerPct = flights.length === 1 ? 47 : 18
+  const scorePct  = flights.length === 1 ? 13 : 7
+  const resultCol = document.createElement('col'); resultCol.style.width = resultPct + '%'; cg.appendChild(resultCol)
+  flights.forEach(() => {
+    const pc = document.createElement('col'); pc.style.width = playerPct + '%'; cg.appendChild(pc)
+    SCORE_LABELS.forEach(() => {
+      const sc = document.createElement('col'); sc.style.width = scorePct + '%'; cg.appendChild(sc)
+    })
   })
   tbl.appendChild(cg)
 
-  // Single header row — appears once for all formats
+  // 2-row header — Row 1: Result (rowspan=2) + Flight spans; Row 2: Player | Out | In | Putts per flight
   const thead = document.createElement('thead')
-  const hr = document.createElement('tr')
-  ;['Result', ...flights.map(f => `Flight ${f}`)].forEach(h => {
-    const th = document.createElement('th')
-    th.style.cssText = `padding:7px 14px;text-align:left;background:#e4ede4;color:${GREEN};font-size:${R_LABEL};font-weight:800;border-bottom:${R_DIV};letter-spacing:0.04em;text-transform:uppercase;`
-    th.textContent = h
-    hr.appendChild(th)
+  const HDR_BG = '#e4ede4'
+  const HDR_STYLE = `padding:7px 14px;text-align:left;background:${HDR_BG};color:${GREEN};font-size:${R_LABEL};font-weight:800;letter-spacing:0.04em;text-transform:uppercase;`
+
+  const hr1 = document.createElement('tr')
+  const thResult = document.createElement('th')
+  thResult.rowSpan = 2
+  thResult.style.cssText = HDR_STYLE + `border-bottom:${R_DIV};vertical-align:bottom;`
+  thResult.textContent = 'Result'
+  hr1.appendChild(thResult)
+  flights.forEach(fl => {
+    const thFl = document.createElement('th')
+    thFl.colSpan = colsPerFlight
+    thFl.style.cssText = HDR_STYLE + `border-bottom:1px solid #d4e0d4;border-left:2px solid #c8d8c8;`
+    thFl.textContent = `Flight ${fl}`
+    hr1.appendChild(thFl)
   })
-  thead.appendChild(hr)
+  thead.appendChild(hr1)
+
+  const hr2 = document.createElement('tr')
+  flights.forEach(() => {
+    ;['Player', ...SCORE_LABELS].forEach((label, i) => {
+      const th = document.createElement('th')
+      th.style.cssText = `padding:4px 14px;text-align:${i === 0 ? 'left' : 'center'};background:${HDR_BG};color:#6b7280;font-size:9px;font-weight:700;border-bottom:${R_DIV};letter-spacing:0.04em;text-transform:uppercase;${i === 0 ? 'border-left:2px solid #c8d8c8;' : ''}`
+      th.textContent = label
+      hr2.appendChild(th)
+    })
+  })
+  thead.appendChild(hr2)
   tbl.appendChild(thead)
 
   const tbody = document.createElement('tbody')
@@ -1438,7 +1490,7 @@ function buildAllFormatsTable(scoringFormats, formatLabels, leaderboards, flight
     const places = Math.min(payoutPlaces[fmt] ?? 3, 3)
     const fmtPrefix = fmtPrefixMap[fmt] ?? '18_net'
 
-    // Format label row — spans all columns
+    // Format label row
     const fmtTr = document.createElement('tr')
     const fmtTd = document.createElement('td')
     fmtTd.colSpan = totalCols
@@ -1457,21 +1509,33 @@ function buildAllFormatsTable(scoringFormats, formatLabels, leaderboards, flight
       tdLabel.textContent = RANK_LABELS[rank - 1] ?? `${rank}th Place`
       tr.appendChild(tdLabel)
 
-      flights.forEach(fl => {
+      flights.forEach((fl, flIdx) => {
         const list = lb[fl] ?? []
         const tied = list.filter(p => p.rank === rank)
-        const td = document.createElement('td')
-        td.style.cssText = `padding:${R_PAD};font-size:${R_FS};color:#111;background:${rowBg};border-bottom:${R_DIV};overflow:hidden;`
+        const entry = tied[0] ?? null
+
+        // Player name cell
+        const tdPlayer = document.createElement('td')
+        tdPlayer.style.cssText = `padding:${R_PAD};font-size:${R_FS};color:#111;background:${rowBg};border-bottom:${R_DIV};overflow:hidden;border-left:2px solid #d0ddd0;`
         if (tied.length === 0) {
-          td.style.color = '#ccc'; td.textContent = '—'
+          tdPlayer.style.color = '#ccc'; tdPlayer.textContent = '—'
         } else if (tied.length === 1) {
-          td.textContent = displayFn(tied[0].player_id, rank, fl, fmtPrefix)
-          td.style.fontWeight = '700'
+          tdPlayer.textContent = displayFn(tied[0].player_id, rank, fl, fmtPrefix)
+          tdPlayer.style.fontWeight = '700'
         } else {
-          td.innerHTML = tied.map(p => `<strong>${displayFn(p.player_id, rank, fl, fmtPrefix)}</strong>`).join(' <span style="color:#aaa">/</span> ')
-          td.style.fontSize = '11px'
+          tdPlayer.innerHTML = tied.map(p => `<strong>${displayFn(p.player_id, rank, fl, fmtPrefix)}</strong>`).join(' <span style="color:#aaa">/</span> ')
+          tdPlayer.style.fontSize = '11px'
         }
-        tr.appendChild(td)
+        tr.appendChild(tdPlayer)
+
+        // Score cells: Out | In | Putts
+        const scoreVals = getScoreVals(fmt, entry)
+        scoreVals.forEach(val => {
+          const tdScore = document.createElement('td')
+          tdScore.style.cssText = `padding:${R_PAD};font-size:12px;color:${val !== null ? '#374151' : '#d1d5db'};background:${rowBg};border-bottom:${R_DIV};text-align:center;font-weight:600;`
+          tdScore.textContent = val !== null ? String(val) : '—'
+          tr.appendChild(tdScore)
+        })
       })
       tbody.appendChild(tr)
     }
@@ -1481,7 +1545,7 @@ function buildAllFormatsTable(scoringFormats, formatLabels, leaderboards, flight
   return tbl
 }
 
-/** Full-field (no flights): all formats in one table, 2-col layout per row */
+/** Full-field (no flights): Result | Player | Out | In | Putts */
 function buildAllFormatsTableFullField(scoringFormats, formatLabels, leaderboards, payoutPlaces, displayFn) {
   const RANK_LABELS = ['1st Place', '2nd Place', '3rd Place']
   const leaderKeyMap = { net_stroke: 'full', net_stroke_front9: 'front9', net_stroke_back9: 'back9' }
@@ -1490,12 +1554,24 @@ function buildAllFormatsTableFullField(scoringFormats, formatLabels, leaderboard
   const tbl = document.createElement('table')
   tbl.style.cssText = 'width:100%;border-collapse:collapse;font-size:12px;table-layout:fixed;'
 
-  // 4-column layout: rank | name | rank | name
+  // 5-column layout: Result | Player | Out | In | Putts
   const cg = document.createElement('colgroup')
-  ;[16, 34, 16, 34].forEach(pct => {
+  ;[18, 46, 12, 12, 12].forEach(pct => {
     const c = document.createElement('col'); c.style.width = pct + '%'; cg.appendChild(c)
   })
   tbl.appendChild(cg)
+
+  // Header row
+  const thead = document.createElement('thead')
+  const hr = document.createElement('tr')
+  ;['Result', 'Player', 'Out', 'In', 'Putts'].forEach((h, i) => {
+    const th = document.createElement('th')
+    th.style.cssText = `padding:7px 14px;text-align:${i <= 1 ? 'left' : 'center'};background:#e4ede4;color:${GREEN};font-size:${R_LABEL};font-weight:800;border-bottom:${R_DIV};letter-spacing:0.04em;text-transform:uppercase;`
+    th.textContent = h
+    hr.appendChild(th)
+  })
+  thead.appendChild(hr)
+  tbl.appendChild(thead)
 
   const tbody = document.createElement('tbody')
 
@@ -1506,35 +1582,40 @@ function buildAllFormatsTableFullField(scoringFormats, formatLabels, leaderboard
     const list = lb.A ?? lb[Object.keys(lb)[0]] ?? []
     const items = list.filter(p => p.rank <= places)
 
-    // Format label spanning all 4 cols
+    // Format label spanning all 5 cols
     const fmtTr = document.createElement('tr')
     const fmtTd = document.createElement('td')
-    fmtTd.colSpan = 4
+    fmtTd.colSpan = 5
     fmtTd.style.cssText = `padding:7px 14px;background:rgba(27,67,50,0.06);border-top:${fmtIdx > 0 ? '2px solid #d0ddd0' : 'none'};border-bottom:${R_DIV};font-size:11px;font-weight:800;color:${GREEN};text-transform:uppercase;letter-spacing:0.07em;`
     fmtTd.textContent = formatLabels[fmt]
     fmtTr.appendChild(fmtTd)
     tbody.appendChild(fmtTr)
 
-    // Pair items 2-across
-    const padded = [...items]
-    if (padded.length % 2 !== 0) padded.push(null)
-    for (let i = 0; i < padded.length; i += 2) {
+    items.forEach((item, idx) => {
       const tr = document.createElement('tr')
-      const rowBg = Math.floor(i / 2) % 2 === 0 ? R_ODD : R_EVEN
-      ;[padded[i], padded[i + 1]].forEach((item, col) => {
-        const tdRank = document.createElement('td')
-        tdRank.style.cssText = `padding:${R_PAD};font-size:${R_LABEL};font-weight:800;color:${GREEN};background:${rowBg};border-bottom:${R_DIV};border-left:${col === 1 ? R_DIV : 'none'};`
-        const tdName = document.createElement('td')
-        tdName.style.cssText = `padding:${R_PAD};font-size:${R_FS};font-weight:700;color:#111;background:${rowBg};border-bottom:${R_DIV};`
-        if (item) {
-          tdRank.textContent = RANK_LABELS[item.rank - 1] ?? `${item.rank}th`
-          tdName.textContent = displayFn(item.player_id, item.rank, fmtPrefix)
-        }
-        tr.appendChild(tdRank)
-        tr.appendChild(tdName)
+      const rowBg = idx % 2 === 0 ? R_ODD : R_EVEN
+
+      const tdRank = document.createElement('td')
+      tdRank.style.cssText = `padding:${R_PAD};font-size:12px;font-weight:700;color:#374151;background:${rowBg};border-bottom:${R_DIV};`
+      tdRank.textContent = RANK_LABELS[item.rank - 1] ?? `${item.rank}th Place`
+
+      const tdName = document.createElement('td')
+      tdName.style.cssText = `padding:${R_PAD};font-size:${R_FS};font-weight:700;color:#111;background:${rowBg};border-bottom:${R_DIV};`
+      tdName.textContent = displayFn(item.player_id, item.rank, fmtPrefix)
+
+      tr.appendChild(tdRank)
+      tr.appendChild(tdName)
+
+      const scoreVals = getScoreVals(fmt, item)
+      scoreVals.forEach(val => {
+        const tdScore = document.createElement('td')
+        tdScore.style.cssText = `padding:${R_PAD};font-size:12px;color:${val !== null ? '#374151' : '#d1d5db'};background:${rowBg};border-bottom:${R_DIV};text-align:center;font-weight:600;`
+        tdScore.textContent = val !== null ? String(val) : '—'
+        tr.appendChild(tdScore)
       })
+
       tbody.appendChild(tr)
-    }
+    })
   })
 
   tbl.appendChild(tbody)
