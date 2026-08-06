@@ -195,13 +195,13 @@ export default function EventDetail() {
           </p>
         </div>
         <div className="flex gap-2 shrink-0 flex-wrap justify-end">
-          <a href={`/${orgSlug}/${event.league?.slug}/${event.slug}/event?eid=${event.id}`} target="_blank" rel="noopener noreferrer" className="btn-secondary btn-sm btn">
+          <a href={`/${orgSlug}/${event.league?.slug}/${event.slug}/event`} target="_blank" rel="noopener noreferrer" className="btn-secondary btn-sm btn">
             Event Page ↗
           </a>
-          <Link to={`/${orgSlug}/${event.league?.slug}/${event.slug}/schedule?eid=${event.id}`} className="btn-secondary btn-sm btn">
+          <Link to={`/${orgSlug}/${event.league?.slug}/${event.slug}/schedule`} className="btn-secondary btn-sm btn">
             Pairings ↗
           </Link>
-          <Link to={`/${orgSlug}/${event.league?.slug}/${event.slug}/leaderboard?eid=${event.id}`} className="btn-secondary btn-sm btn">
+          <Link to={`/${orgSlug}/${event.league?.slug}/${event.slug}/leaderboard`} className="btn-secondary btn-sm btn">
             Leaderboard ↗
           </Link>
           <EventStatusControl event={event} onUpdated={load} />
@@ -923,16 +923,14 @@ function TabPostRound({ event, eventPlayers, allScores, course, sideGames, orgNa
       {/* ── Pre-Round ─────────────────────────────────────────── */}
       <div className="bg-gray-50 rounded-xl px-4 py-4 space-y-3">
         <div className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2">Pre-Round</div>
-        <div className="flex items-center justify-between">
-          <div>
-            <div className="text-sm font-medium text-gray-800">Print Assets</div>
-            <div className="text-xs text-gray-400 mt-0.5">Tee sheet, cart signs, and scorecards for the round</div>
-          </div>
-          <div className="flex gap-2">
+        <div>
+          <div className="text-sm font-medium text-gray-800 mb-2">Print Assets</div>
+          <div className="flex gap-2 flex-wrap">
             <Button size="sm" variant="secondary" onClick={() => onPrintAsset('tee_sheet')}>Tee Sheet</Button>
             <Button size="sm" variant="secondary" onClick={() => onPrintAsset('cart_signs')}>Cart Signs</Button>
-            <Button size="sm" variant="secondary" onClick={() => onPrintAsset('cards')}>Cards</Button>
+            <Button size="sm" variant="secondary" onClick={() => onPrintAsset('cards')}>Side Game Signs</Button>
           </div>
+          <div className="text-xs text-gray-400 mt-1.5">Tee sheet, cart signs, and side game cards for the round</div>
         </div>
         <div className="flex items-center justify-between border-t border-gray-200 pt-3">
           <div>
