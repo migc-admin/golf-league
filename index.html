@@ -2,7 +2,7 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
@@ -23,11 +23,56 @@
     <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>⛳</text></svg>" />
   </head>
   <body>
-    <!-- Static hero for crawlers — hidden once React mounts -->
-    <h1 style="position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap">
-      Run your golf league the right way — Digital scoring, live leaderboards, handicap tracking, payout management, and printable scorecards built for the way your golf league actually plays.
-    </h1>
     <div id="root"></div>
+    <noscript>
+      <style>
+        body { font-family: sans-serif; max-width: 860px; margin: 0 auto; padding: 2rem 1rem; color: #1a1a1a; }
+        h1 { font-size: 2rem; margin-bottom: 0.5rem; }
+        h2 { font-size: 1.25rem; margin-top: 2rem; }
+        p { line-height: 1.6; }
+        ul { line-height: 2; }
+        blockquote { border-left: 3px solid #4a7c59; padding-left: 1rem; margin: 1rem 0; color: #444; }
+      </style>
+
+      <h1>Run your golf league the right way</h1>
+      <p>Live leaderboards, digital scorecards, handicap tracking, and payouts — everything to run league night, free to start.</p>
+      <p>Free to start. No credit card required. Payouts powered by your own Venmo or PayPal link. We don't sell your data.</p>
+
+      <h2>What Scorify Golf does</h2>
+      <ul>
+        <li>Online registration — players sign up and pay through your own Venmo or PayPal link</li>
+        <li>Group and tee sheet management — build groups, print tee sheets and cart signs</li>
+        <li>Live digital scoring — players enter scores hole-by-hole on their phones</li>
+        <li>Automatic leaderboards — standings update in real time, no spreadsheet needed</li>
+        <li>Skins calculation — gross and net skins computed automatically</li>
+        <li>Handicap tracking — USGA-adjusted scores and course handicap built in</li>
+        <li>Payout management — track and distribute winnings at the end of every round</li>
+        <li>Printable scorecards, cart signs, and side game sheets</li>
+        <li>Team play and TGL points tracking across a full season</li>
+      </ul>
+
+      <h2>Who it's for</h2>
+      <p>Golf league directors and organizers running weekly, monthly, or seasonal leagues — typically 10 to 60 players. If you have been managing your league in a spreadsheet or group chat, Scorify replaces all of it.</p>
+
+      <h2>Pricing</h2>
+      <p>Free to start. No per-player fees. No transaction fees. Paid plans available for larger leagues that want premium features. You are never charged to run a round.</p>
+
+      <h2>Common questions</h2>
+      <p><strong>Is free-to-start really free?</strong> Yes. You can run your entire league season without paying anything. No credit card required to sign up.</p>
+      <p><strong>Are there per-player or transaction fees?</strong> No. Scorify does not process payments. You collect dues through your own Venmo or PayPal — we never touch the money.</p>
+      <p><strong>Can I use my own scoring format — skins, flights, Stableford?</strong> Yes. Scorify supports gross and net skins, flight-based leaderboards, team play, and points-based season standings.</p>
+      <p><strong>Is my course in the database?</strong> Scorify uses course data including par and stroke index for handicap calculations. If your course is not yet listed, you can enter the details manually.</p>
+
+      <h2>What league organizers say</h2>
+      <blockquote>"The post-round process is a breeze compared to manually checking scorecards."</blockquote>
+      <blockquote>"The ability to enter scores during the round and keep track of the competition is a game changer!"</blockquote>
+      <blockquote>"The online registration, payment, and organization has made the pre-tournament setup way more efficient."</blockquote>
+
+      <h2>About Scorify Golf</h2>
+      <p>Scorify was built by Kevin V, a business operations professional who ran golf leagues and got tired of being stuck at the scoring table after every round while everyone else socialized. Existing tools were either too complicated, too expensive, or built for golf facilities — not independent organizers. Scorify delivers an affordable, modern platform so any league director can run their league like a pro.</p>
+
+      <p>Get started free at scorifygolf.com</p>
+    </noscript>
     <script type="module" src="/src/main.jsx"></script>
   </body>
 </html>

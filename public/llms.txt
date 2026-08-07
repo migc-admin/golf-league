@@ -1,0 +1,47 @@
+# Scorify Golf
+
+> Golf league management software for independent organizers. Free to start.
+
+Scorify Golf is a web application that helps golf league directors run their leagues — from online registration through live scoring to final payouts — without spreadsheets, group chats, or expensive enterprise software.
+
+## What Scorify does
+
+- **Online registration**: Players sign up for events through a registration page; organizers collect payment via their own Venmo or PayPal link (Scorify does not process payments)
+- **Group and tee sheet management**: Build playing groups, print tee sheets and cart signs
+- **Live digital scoring**: Players enter scores hole-by-hole on their phones; no app download required
+- **Real-time leaderboards**: Standings update automatically as scores come in
+- **Skins calculation**: Gross and net skins computed automatically per event
+- **Handicap tracking**: USGA course handicap and ESC-adjusted scoring built in
+- **Payout management**: Track and distribute winnings at the end of every round
+- **Printable assets**: Scorecards, cart signs, and side game (CTP/long drive) signs
+- **Team play and season standings**: TGL-style points tracking across a full season
+- **Flight management**: Split leagues into flights for more competitive groupings
+
+## Who uses Scorify
+
+Independent golf league directors and organizers running weekly, monthly, or seasonal leagues — typically 10 to 60 players. Common use cases: Wednesday night leagues, monthly member-guest events, annual club championships, and casual skins games with a regular group.
+
+## Pricing
+
+Free to start. No credit card required. No per-player fees. No transaction fees. Paid plans available for larger leagues wanting advanced features. Organizers collect player dues through their own payment links.
+
+## Key differentiators
+
+- Simpler than Golf Genius or Golf League Tracker — no 250-option configuration screens
+- Built for independent leagues, not golf facilities or country clubs
+- Mobile-first scoring and leaderboards
+- No payment processing lock-in — use your own Venmo or PayPal
+- Affordable — free tier covers most small leagues entirely
+
+## About the founder
+
+Built by Kevin V, a business operations professional who ran golf leagues and got tired of being stuck at the scoring table after every round while everyone else socialized. He built Scorify to eliminate that bottleneck and give any league director the tools to run their league like a pro.
+
+## Key pages
+
+- Homepage: https://scorifygolf.com/
+- Pricing: https://scorifygolf.com/pricing
+- Features: https://scorifygolf.com/features
+- About: https://scorifygolf.com/about
+- FAQ: https://scorifygolf.com/faq
+- Login: https://scorifygolf.com/login
