@@ -420,6 +420,9 @@ export default function Home() {
                 See features →
               </a>
             </div>
+            <p className="mt-4 text-xs" style={{ color: 'rgba(255,255,255,0.45)' }}>
+              Free to start · No credit card required · Payouts use your own Venmo or PayPal
+            </p>
           </div>
 
           {/* Decorative divider */}
@@ -518,6 +521,85 @@ export default function Home() {
           </div>
         </section>
 
+        {/* ── Trust ─────────────────────────────────────────────────── */}
+        <section id="trust" className="py-24" style={{ background: '#fbfaf8' }}>
+          <div className="max-w-5xl mx-auto px-6">
+
+            {/* Social proof bar */}
+            <div className="flex flex-col sm:flex-row items-center justify-center gap-8 mb-16">
+              <div className="text-center">
+                <div className="text-4xl font-bold" style={{ fontFamily: "'Playfair Display', serif", color: GREEN }}>4</div>
+                <div className="text-sm mt-1" style={{ color: '#6b7280' }}>Active leagues this season</div>
+              </div>
+              <div className="hidden sm:block w-px h-10" style={{ background: '#e5e7eb' }} />
+              <div className="text-center">
+                <div className="text-4xl font-bold" style={{ fontFamily: "'Playfair Display', serif", color: GREEN }}>100+</div>
+                <div className="text-sm mt-1" style={{ color: '#6b7280' }}>Rounds scored on platform</div>
+              </div>
+              <div className="hidden sm:block w-px h-10" style={{ background: '#e5e7eb' }} />
+              <div className="text-center">
+                <div className="text-4xl font-bold" style={{ fontFamily: "'Playfair Display', serif", color: GREEN }}>$0</div>
+                <div className="text-sm mt-1" style={{ color: '#6b7280' }}>To get started</div>
+              </div>
+            </div>
+
+            {/* Testimonials */}
+            <div className="text-center mb-10">
+              <p className="text-xs font-bold uppercase tracking-widest mb-2" style={{ color: GREEN }}>What organizers are saying</p>
+              <h2 className="text-3xl font-bold" style={{ fontFamily: "'Playfair Display', serif", color: INK }}>
+                Real feedback from the fairway
+              </h2>
+            </div>
+
+            <div className="grid sm:grid-cols-3 gap-6">
+              {[
+                {
+                  quote: 'The post-round process is a breeze compared to manually checking scorecards. What used to take an hour is done before everyone leaves the clubhouse.',
+                  author: 'League Organizer',
+                  detail: "Mulligan's Island Golf Club · San Diego, CA",
+                },
+                {
+                  quote: 'The ability to enter scores during the round and keep track of the competition is a game changer! Everyone is checking the leaderboard on the back nine.',
+                  author: 'League Member',
+                  detail: "Mulligan's Island Golf Club · San Diego, CA",
+                },
+                {
+                  quote: 'Online registration, payment collection, and player organization has made the pre-tournament setup way more efficient. Our director can actually enjoy the round now.',
+                  author: 'League Administrator',
+                  detail: "Mulligan's Island Golf Club · San Diego, CA",
+                },
+              ].map((t, i) => (
+                <div key={i} className="bg-white rounded-2xl p-6 flex flex-col gap-4" style={{ border: '1px solid #ebe9e4', boxShadow: '0 1px 4px rgba(0,0,0,0.05)' }}>
+                  {/* Stars */}
+                  <div className="flex gap-0.5">
+                    {[...Array(5)].map((_, s) => (
+                      <svg key={s} width="14" height="14" viewBox="0 0 24 24" fill={GOLD}>
+                        <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" />
+                      </svg>
+                    ))}
+                  </div>
+                  <p className="text-sm leading-relaxed flex-1" style={{ color: '#374151' }}>"{t.quote}"</p>
+                  <div>
+                    <div className="text-sm font-semibold" style={{ color: INK }}>{t.author}</div>
+                    <div className="text-xs mt-0.5" style={{ color: '#9ca3af' }}>{t.detail}</div>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            {/* Money-handling trust note */}
+            <div className="mt-10 rounded-2xl px-6 py-4 flex flex-col sm:flex-row items-center gap-4 text-center sm:text-left" style={{ background: '#f0fdf4', border: '1px solid #bbf7d0' }}>
+              <svg width="24" height="24" fill="none" stroke="#16a34a" strokeWidth="2" viewBox="0 0 24 24" className="shrink-0">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
+              </svg>
+              <p className="text-sm" style={{ color: '#15803d' }}>
+                <strong>Payments stay between you and your players.</strong> Scorify connects to Venmo and PayPal links you control — we never hold or process your league funds.
+              </p>
+            </div>
+
+          </div>
+        </section>
+
         {/* ── Contact ────────────────────────────────────────────────── */}
         <section id="contact" className="py-24" style={{ background: '#ffffff' }}>
           <div className="max-w-2xl mx-auto px-6 text-center">
@@ -545,16 +627,21 @@ export default function Home() {
           <div className="max-w-3xl mx-auto px-6 text-center">
             <p className="text-xs font-bold uppercase tracking-widest mb-3" style={{ color: GREEN }}>About</p>
             <h2 className="text-3xl md:text-4xl font-bold mb-6" style={{ fontFamily: "'Playfair Display', serif", color: INK }}>
-              Built by golfers, for golfers
+              Built by a league director, for league directors
             </h2>
             <p className="text-base leading-relaxed mb-4" style={{ color: '#6b7280' }}>
-              Scorify Golf was built out of frustration with spreadsheets, group chats, and paper scorecards that
-              go missing before anyone can settle the skins game. We wanted software that felt as good as the
-              courses we play — clean, fast, and out of the way.
+              Scorify was built by Kevin V, a business operations professional who was that guy — stuck at the
+              scoring table entering results while everyone else had a beer after the round. The bottleneck was
+              always the same: one person manually reconciling paper scorecards while the rest of the group waited.
+            </p>
+            <p className="text-base leading-relaxed mb-4" style={{ color: '#6b7280' }}>
+              Existing tools were either too complicated, too expensive, or built for golf facilities — not the
+              independent organizer running a Wednesday night league out of a group chat. Scorify delivers an
+              affordable, modern platform so any league director can run their league like a pro.
             </p>
             <p className="text-base leading-relaxed mb-10" style={{ color: '#6b7280' }}>
-              Whether you run a weekly nine-hole group or a full 18-event season league, Scorify handles the
-              admin so you can focus on the game.
+              Questions or feedback? Reach out directly at{' '}
+              <a href="mailto:admin@scorifygolf.com" style={{ color: GREEN, fontWeight: 600 }}>admin@scorifygolf.com</a>.
             </p>
             <Link to="/login"
               className="inline-block px-8 py-3.5 rounded-full font-bold text-sm text-white transition-opacity hover:opacity-90"
