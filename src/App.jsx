@@ -34,6 +34,7 @@ import Help           from './pages/Help'
 import Privacy        from './pages/Privacy'
 import RefundPolicy      from './pages/RefundPolicy'
 import DisputeTemplate  from './pages/admin/DisputeTemplate'
+import Roadmap          from './pages/Roadmap'
 
 export default function App() {
   return (
@@ -67,7 +68,8 @@ export default function App() {
         {/* Public event registration — no auth required */}
         <Route path="/register/:leagueSlug/:eventSlug" element={<Register />} />
         <Route path="/reset-password" element={<ResetPassword />} />
-        <Route path="/faq"     element={<FAQ />} />
+        <Route path="/faq"      element={<FAQ />} />
+        <Route path="/roadmap"  element={<Roadmap />} />
         <Route path="/help"    element={<Help />} />
         <Route path="/privacy"        element={<Privacy />} />
         <Route path="/refund-policy"  element={<RefundPolicy />} />

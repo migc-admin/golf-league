@@ -66,6 +66,33 @@ const FEATURES = [
     title: 'Printable Scorecards',
     body: 'Export pro-quality scorecards for every group with QR codes, tee times, and course details pre-filled.',
   },
+  {
+    icon: (
+      <svg width="28" height="28" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24">
+        <path d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" />
+      </svg>
+    ),
+    title: 'Auto Group Scheduling',
+    body: 'Automatically assign players to groups by handicap, flight, or randomly — one click builds your whole tee sheet.',
+  },
+  {
+    icon: (
+      <svg width="28" height="28" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24">
+        <path d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
+      </svg>
+    ),
+    title: 'Online Registration',
+    body: 'Players sign up for events through a shareable registration link. Guest requests, notes, and GHIN numbers collected automatically.',
+  },
+  {
+    icon: (
+      <svg width="28" height="28" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24">
+        <path d="M8.111 16.404a5.5 5.5 0 017.778 0M12 20h.01m-7.08-7.071c3.904-3.905 10.236-3.905 14.141 0M1.394 9.393c5.857-5.857 15.355-5.857 21.213 0" />
+      </svg>
+    ),
+    title: 'Offline Scoring',
+    body: 'Lost signal on the back nine? Scores save locally and sync automatically the moment connectivity returns.',
+  },
 ]
 
 // ─── Pricing ─────────────────────────────────────────────────────────────────
@@ -220,6 +247,7 @@ export default function Home() {
   const NAV_LINKS = [
     { label: 'Features', href: '#features' },
     { label: 'Pricing',  href: '#pricing'  },
+    { label: 'Roadmap',  href: '/roadmap'  },
     { label: 'FAQ',      href: '/faq'      },
     { label: 'Contact',  href: '#contact'  },
     { label: 'About',    href: '#about'    },
@@ -429,6 +457,49 @@ export default function Home() {
           <div className="absolute bottom-0 left-0 right-0 h-16" style={{ background: 'linear-gradient(to bottom, transparent, #fbfaf8)' }} />
         </section>
 
+        {/* ── How it works ───────────────────────────────────────────── */}
+        <section className="py-20" style={{ background: '#ffffff' }}>
+          <div className="max-w-5xl mx-auto px-6">
+            <div className="text-center mb-14">
+              <p className="text-xs font-bold uppercase tracking-widest mb-3" style={{ color: GREEN }}>How it works</p>
+              <h2 className="text-3xl md:text-4xl font-bold" style={{ fontFamily: "'Playfair Display', serif", color: INK }}>
+                Set up in minutes. Score from any phone.
+              </h2>
+              <p className="mt-4 text-base max-w-xl mx-auto" style={{ color: '#6b7280' }}>
+                No app download required. Works on any browser, any device.
+              </p>
+            </div>
+            <div className="grid md:grid-cols-3 gap-8">
+              {[
+                {
+                  step: '1',
+                  title: 'Set up your event',
+                  body: 'Add players in advance or let them register themselves. Set your format, flights, side games, and entry fees. Build groups manually or let Scorify auto-assign.',
+                },
+                {
+                  step: '2',
+                  title: 'Share the link',
+                  body: 'Send players a link, invite code, or QR code printed on the cart sign. They tap it, find their name, and start scoring — no download or account required.',
+                },
+                {
+                  step: '3',
+                  title: 'Play',
+                  body: 'Scores update hole-by-hole from every phone simultaneously. The live leaderboard refreshes in real time so everyone follows along from the fairway.',
+                },
+              ].map(s => (
+                <div key={s.step} className="flex flex-col items-center text-center">
+                  <div className="w-12 h-12 rounded-full flex items-center justify-center text-white font-bold text-lg mb-5 shrink-0"
+                    style={{ background: GREEN }}>
+                    {s.step}
+                  </div>
+                  <h3 className="font-bold text-base mb-2" style={{ color: INK }}>{s.title}</h3>
+                  <p className="text-sm leading-relaxed" style={{ color: '#6b7280' }}>{s.body}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+        </section>
+
         {/* ── Features ───────────────────────────────────────────────── */}
         <section id="features" className="py-24" style={{ background: '#fbfaf8' }}>
           <div className="max-w-6xl mx-auto px-6">
@@ -619,6 +690,49 @@ export default function Home() {
               admin@scorifygolf.com
             </a>
             <p className="text-xs mt-6" style={{ color: '#9ca3af' }}>We typically respond within one business day.</p>
+          </div>
+        </section>
+
+        {/* ── Roadmap ────────────────────────────────────────────────── */}
+        <section id="roadmap" className="py-24" style={{ background: '#ffffff' }}>
+          <div className="max-w-4xl mx-auto px-6">
+            <div className="text-center mb-12">
+              <p className="text-xs font-bold uppercase tracking-widest mb-3" style={{ color: GREEN }}>What's next</p>
+              <h2 className="text-3xl md:text-4xl font-bold mb-4" style={{ fontFamily: "'Playfair Display', serif", color: INK }}>
+                Built with your league in mind
+              </h2>
+              <p className="text-base max-w-xl mx-auto" style={{ color: '#6b7280' }}>
+                Scorify is actively developed. Here's what's on the roadmap — and we want your input on what comes next.
+              </p>
+            </div>
+            <div className="grid sm:grid-cols-2 gap-4 mb-10">
+              {[
+                { label: 'Leaderboard embed for your club website', status: 'planned' },
+                { label: 'Sponsor logos on print assets and leaderboard', status: 'planned' },
+                { label: 'Stripe-powered online payment collection', status: 'planned' },
+                { label: 'Text message scoring reminders (Twilio)', status: 'planned' },
+                { label: 'Multi-day trip scoring across multiple courses', status: 'planned' },
+                { label: 'Public event website with live leaderboard', status: 'planned' },
+              ].map(item => (
+                <div key={item.label} className="flex items-start gap-3 rounded-xl p-4" style={{ background: '#fbfaf8', border: '1px solid #ebe9e4' }}>
+                  <span className="mt-0.5 shrink-0 w-4 h-4 rounded-full border-2 flex items-center justify-center" style={{ borderColor: GREEN }}>
+                    <span className="w-1.5 h-1.5 rounded-full" style={{ background: GOLD }} />
+                  </span>
+                  <span className="text-sm" style={{ color: '#374151' }}>{item.label}</span>
+                </div>
+              ))}
+            </div>
+            <div className="rounded-2xl p-8 text-center" style={{ background: `linear-gradient(135deg, #0b2318, ${GREEN})` }}>
+              <h3 className="text-xl font-bold text-white mb-2">Have an idea?</h3>
+              <p className="text-sm mb-6" style={{ color: 'rgba(255,255,255,0.7)' }}>
+                Tell us what would make Scorify work better for your league. We read every submission.
+              </p>
+              <Link to="/roadmap"
+                className="inline-block px-7 py-3 rounded-full font-bold text-sm transition-opacity hover:opacity-90"
+                style={{ background: GOLD, color: '#1a1a1a' }}>
+                Submit an idea →
+              </Link>
+            </div>
           </div>
         </section>
 
