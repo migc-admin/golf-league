@@ -261,7 +261,7 @@ export default function EventDetail() {
 
       {activeTab === 'Groups' && (
         <div className="space-y-6">
-          <TabGroups event={event} eventPlayers={eventPlayers} onUpdated={load} orgSlug={orgSlug} allScores={allScores} />
+          <TabGroups event={event} eventPlayers={eventPlayers} onUpdated={load} orgSlug={orgSlug} allScores={allScores} course={course} />
           {((event.formats ?? (event.format ? [event.format] : [])).includes('match_points') ||
             (event.formats ?? (event.format ? [event.format] : [])).includes('ryder_cup')) && (
             <div className="border-t border-gray-100 pt-6">
@@ -1829,10 +1829,65 @@ function TeamMatchSetup({ event, eventPlayers, onUpdated }) {
   )
 }
 
-function TabGroups({ event, eventPlayers, onUpdated, orgSlug, allScores }) {
+// ─── No-show helpers ─────────────────────────────────────────────
+const NO_SHOW_TAG = 'no_show'
+
+function isPlayerNoShow(playerId, allScores) {
+  const playerScores = allScores.filter(s => s.player_id === playerId)
+  return playerScores.length > 0 && playerScores.every(s => s.entered_by === NO_SHOW_TAG)
+}
+
+async function markNoShow(playerId, eventId, course) {
+  const pars = course?.par_per_hole ?? Array(18).fill(4)
+  const rows = pars.map((par, i) => ({
+    event_id: eventId,
+    player_id: playerId,
+    hole_number: i + 1,
+    gross_score: par + 2,
+    putts: null,
+    entered_by: NO_SHOW_TAG,
+  }))
+  const { error } = await supabase
+    .from('scores')
+    .upsert(rows, { onConflict: 'event_id,player_id,hole_number' })
+  return error
+}
+
+async function clearNoShow(playerId, eventId) {
+  const { error } = await supabase
+    .from('scores')
+    .delete()
+    .eq('event_id', eventId)
+    .eq('player_id', playerId)
+    .eq('entered_by', NO_SHOW_TAG)
+  return error
+}
+
+function TabGroups({ event, eventPlayers, onUpdated, orgSlug, allScores, course }) {
   const ungrouped    = eventPlayers.filter(ep => !ep.group_number).sort(epAlpha)
   const maxGroup     = Math.max(0, ...eventPlayers.map(ep => ep.group_number ?? 0))
   const isShotgun    = event?.shotgun_start ?? false
+  const [noShowLoading, setNoShowLoading] = useState(null) // player_id being processed
+
+  async function handleNoShow(ep) {
+    if (!window.confirm(`Mark ${ep.player?.first_name} ${ep.player?.last_name} as a no-show? This will record par+2 for all 18 holes.`)) return
+    setNoShowLoading(ep.player_id)
+    const error = await markNoShow(ep.player_id, event.id, course)
+    setNoShowLoading(null)
+    if (error) { toast.error(error.message); return }
+    toast.success(`${ep.player?.first_name} marked as no-show`)
+    onUpdated()
+  }
+
+  async function handleClearNoShow(ep) {
+    if (!window.confirm(`Remove no-show for ${ep.player?.first_name} ${ep.player?.last_name}? Their scores will be deleted.`)) return
+    setNoShowLoading(ep.player_id)
+    const error = await clearNoShow(ep.player_id, event.id)
+    setNoShowLoading(null)
+    if (error) { toast.error(error.message); return }
+    toast.success(`No-show cleared for ${ep.player?.first_name}`)
+    onUpdated()
+  }
 
   // Hole assignments: { [groupNum]: holeNum }
   const [holeAssignments, setHoleAssignments] = useState(event?.group_hole_assignments ?? {})
@@ -2135,7 +2190,12 @@ function TabGroups({ event, eventPlayers, onUpdated, orgSlug, allScores }) {
           <CardHeader title="Ungrouped Players" subtitle="Assign these players to a group" />
           <div className="space-y-2">
             {ungrouped.map(ep => (
-              <GroupRow key={ep.id} ep={ep} maxGroup={maxGroup} onSetGroup={setGroup} onToggleSK={toggleScorekeeper} />
+              <GroupRow key={ep.id} ep={ep} maxGroup={maxGroup} onSetGroup={setGroup} onToggleSK={toggleScorekeeper}
+                isNoShow={isPlayerNoShow(ep.player_id, allScores)}
+                noShowLoading={noShowLoading === ep.player_id}
+                onNoShow={() => handleNoShow(ep)}
+                onClearNoShow={() => handleClearNoShow(ep)}
+              />
             ))}
           </div>
         </Card>
@@ -2184,6 +2244,10 @@ function TabGroups({ event, eventPlayers, onUpdated, orgSlug, allScores }) {
                   onSetGroup={setGroup}
                   onToggleSK={toggleScorekeeper}
                   onMove={dir => movePlayer(ep.id, g, dir)}
+                  isNoShow={isPlayerNoShow(ep.player_id, allScores)}
+                  noShowLoading={noShowLoading === ep.player_id}
+                  onNoShow={() => handleNoShow(ep)}
+                  onClearNoShow={() => handleClearNoShow(ep)}
                 />
               ))}
             </div>
@@ -2194,39 +2258,64 @@ function TabGroups({ event, eventPlayers, onUpdated, orgSlug, allScores }) {
   )
 }
 
-function GroupRow({ ep, maxGroup, isFirst, isLast, onSetGroup, onToggleSK, onMove }) {
+function GroupRow({ ep, maxGroup, isFirst, isLast, onSetGroup, onToggleSK, onMove, isNoShow, noShowLoading, onNoShow, onClearNoShow }) {
   const groupOptions = Array.from({ length: Math.max(maxGroup + 1, 5) }, (_, i) => i + 1)
 
   return (
-    <div className="flex items-center justify-between py-2 px-1">
+    <div className={`flex items-center justify-between py-2 px-1 ${isNoShow ? 'opacity-60' : ''}`}>
       <div className="flex items-center gap-2">
         {/* Up/down only shown when inside a group */}
         {onMove && (
           <div className="flex flex-col gap-0.5">
             <button
               onClick={() => onMove(-1)}
-              disabled={isFirst}
+              disabled={isFirst || isNoShow}
               className="text-gray-400 hover:text-gray-700 disabled:opacity-20 leading-none px-1"
               title="Move up"
             >▲</button>
             <button
               onClick={() => onMove(1)}
-              disabled={isLast}
+              disabled={isLast || isNoShow}
               className="text-gray-400 hover:text-gray-700 disabled:opacity-20 leading-none px-1"
               title="Move down"
             >▼</button>
           </div>
         )}
-        <span className="text-sm font-medium text-gray-900">
-          {ep.player?.first_name} {ep.player?.last_name}
-        </span>
-        {ep.flight && <FlightBadge flight={ep.flight} />}
+        <div>
+          <span className="text-sm font-medium text-gray-900">
+            {ep.player?.first_name} {ep.player?.last_name}
+          </span>
+          {isNoShow && (
+            <span className="ml-2 text-xs font-semibold px-2 py-0.5 rounded-full" style={{ background: '#fef3c7', color: '#92400e' }}>
+              No Show
+            </span>
+          )}
+          {ep.flight && !isNoShow && <span className="ml-1"><FlightBadge flight={ep.flight} /></span>}
+        </div>
       </div>
       <div className="flex items-center gap-2">
+        {isNoShow ? (
+          <button
+            onClick={onClearNoShow}
+            disabled={noShowLoading}
+            className="text-xs font-medium px-2 py-1 rounded-lg border border-gray-300 text-gray-600 hover:bg-gray-50 disabled:opacity-50"
+          >
+            {noShowLoading ? '…' : 'Undo'}
+          </button>
+        ) : (
+          <button
+            onClick={onNoShow}
+            disabled={noShowLoading}
+            className="text-xs font-medium px-2 py-1 rounded-lg border border-amber-300 text-amber-700 hover:bg-amber-50 disabled:opacity-50"
+          >
+            {noShowLoading ? '…' : 'No Show'}
+          </button>
+        )}
         <select
           value={ep.group_number ?? ''}
           onChange={e => onSetGroup(ep.id, e.target.value)}
           className="input py-1 text-xs w-24"
+          disabled={isNoShow}
         >
           <option value="">None</option>
           {groupOptions.map(g => <option key={g} value={g}>Group {g}</option>)}

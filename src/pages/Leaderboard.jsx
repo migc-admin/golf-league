@@ -398,18 +398,31 @@ function NetLeaderboard({ complete, inProgress, flight, vsParKey = 'netVsPar', g
     return vs < 0 ? 'text-status-active-text font-bold' : vs === 0 ? 'text-ink' : 'text-ink-muted'
   }
 
+  // Detect no-show players: all their scores have entered_by === 'no_show'
+  const noShowPlayerIds = new Set(
+    [...new Set(allScores.map(s => s.player_id))].filter(pid => {
+      const playerScores = allScores.filter(s => s.player_id === pid)
+      return playerScores.length > 0 && playerScores.every(s => s.entered_by === 'no_show')
+    })
+  )
+
   // Merge all players and sort by score — lowest net score wins regardless of holes played
-  const allPlayers = [
+  // No-show players are separated and shown at the bottom
+  const merged = [
     ...(allComplete ?? []).map(p => ({ ...p, finished: true })),
     ...(inProgress  ?? []).map(p => ({ ...p, finished: false })),
-  ].sort((a, b) => {
+  ]
+  const competitive = merged.filter(p => !noShowPlayerIds.has(p.player_id))
+  const noShows     = merged.filter(p => noShowPlayerIds.has(p.player_id))
+
+  competitive.sort((a, b) => {
     const aVs = a[vsParKey] ?? 999
     const bVs = b[vsParKey] ?? 999
     return aVs - bVs
   })
 
-  // Assign display ranks across merged list (ties share rank)
-  const withRanks = allPlayers.map((p, _, arr) => {
+  // Assign display ranks across competitive list only (ties share rank)
+  const withRanks = competitive.map((p, _, arr) => {
     const vs = p[vsParKey]
     const rank = arr.filter(x => (x[vsParKey] ?? 999) < (vs ?? 999)).length + 1
     const tied = arr.filter(x => x[vsParKey] === vs).length > 1
@@ -462,6 +475,31 @@ function NetLeaderboard({ complete, inProgress, flight, vsParKey = 'netVsPar', g
           </div>
         )
       })}
+      {/* No-show players — shown at bottom, outside competitive rankings */}
+      {noShows.length > 0 && (
+        <>
+          <div className="px-4 py-1.5 text-[10px] font-bold uppercase tracking-widest" style={{ background: '#fef9ec', color: '#92400e' }}>
+            No Show
+          </div>
+          {noShows.map((p, i) => (
+            <div
+              key={p.player_id}
+              className="grid grid-cols-[2.5rem_1fr_3.5rem_3rem] items-center px-4 py-3"
+              style={{ background: '#fffbeb', borderBottom: '1px solid #ebe9e4', opacity: 0.7 }}
+            >
+              <span className="text-xs text-amber-600 font-semibold">—</span>
+              <div>
+                <div className="font-semibold text-sm text-ink leading-tight">
+                  {p.player?.last_name}, {p.player?.first_name}
+                </div>
+                <div className="text-[10px] text-amber-600 mt-0.5">No Show</div>
+              </div>
+              <span className="text-xs text-ink-muted text-right">—</span>
+              <span className="text-xs text-ink-muted text-right">—</span>
+            </div>
+          ))}
+        </>
+      )}
       {scorecardPlayer && course && (
         <PlayerScorecardModal
           player={scorecardPlayer}
