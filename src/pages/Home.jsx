@@ -249,8 +249,8 @@ export default function Home() {
   const NAV_LINKS = [
     { label: 'Features', href: '#features' },
     { label: 'Pricing',  href: '#pricing'  },
-    { label: 'Roadmap',  href: '/roadmap'  },
-    { label: 'FAQ',      href: '/faq'      },
+    { label: 'Roadmap',  href: '#roadmap'  },
+    { label: 'FAQ',      href: '#faq'      },
     { label: 'Contact',  href: '#contact'  },
     { label: 'About',    href: '#about'    },
   ]
@@ -428,7 +428,6 @@ export default function Home() {
           subtitle="Digital scoring, live leaderboards, handicap tracking, payout management, and printable scorecards — built for the way your golf league actually plays."
           primaryCta={{ text: 'Get started free', href: '/login' }}
           secondaryCta={{ text: 'See features →', href: '#features' }}
-          backgroundImage="/course.jpeg"
           contactInfo={[
             { label: 'scorifygolf.com' },
             { label: 'Mulligan\'s Island Golf Club, San Diego CA' },
@@ -573,28 +572,6 @@ export default function Home() {
         {/* ── Testimonials ───────────────────────────────────────────── */}
         <TestimonialsScroll />
 
-        {/* ── Contact ────────────────────────────────────────────────── */}
-        <section id="contact" className="py-24" style={{ background: '#ffffff' }}>
-          <div className="max-w-2xl mx-auto px-6 text-center">
-            <p className="text-xs font-bold uppercase tracking-widest mb-3" style={{ color: GREEN }}>Contact</p>
-            <h2 className="text-3xl md:text-4xl font-bold mb-4" style={{ fontFamily: "'Playfair Display', serif", color: INK }}>
-              Get in touch
-            </h2>
-            <p className="text-base mb-10" style={{ color: '#6b7280' }}>
-              Questions about pricing, setting up your league, or anything else? We're happy to help.
-            </p>
-            <a href="mailto:admin@scorifygolf.com"
-              className="inline-flex items-center gap-3 px-8 py-4 rounded-2xl font-bold text-base text-white transition-opacity hover:opacity-90"
-              style={{ background: GREEN }}>
-              <svg width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
-              </svg>
-              admin@scorifygolf.com
-            </a>
-            <p className="text-xs mt-6" style={{ color: '#9ca3af' }}>We typically respond within one business day.</p>
-          </div>
-        </section>
-
         {/* ── Roadmap ────────────────────────────────────────────────── */}
         <section id="roadmap" className="py-24" style={{ background: '#ffffff' }}>
           <div className="max-w-4xl mx-auto px-6">
@@ -635,6 +612,57 @@ export default function Home() {
                 Submit an idea →
               </Link>
             </div>
+          </div>
+        </section>
+
+        {/* ── FAQ ────────────────────────────────────────────────────── */}
+        <section id="faq" className="py-24" style={{ background: '#fbfaf8' }}>
+          <div className="max-w-3xl mx-auto px-6">
+            <div className="text-center mb-12">
+              <p className="text-xs font-bold uppercase tracking-widest mb-3" style={{ color: GREEN }}>FAQ</p>
+              <h2 className="text-3xl md:text-4xl font-bold" style={{ fontFamily: "'Playfair Display', serif", color: INK }}>
+                Common questions
+              </h2>
+            </div>
+            <div className="divide-y" style={{ borderColor: '#e5e7eb' }}>
+              {[
+                { q: 'Do players need to download an app?', a: 'No. Scorify runs entirely in the browser. Players join a scorecard by scanning a QR code or entering a group code — no account or app required.' },
+                { q: 'How does digital scoring work?', a: 'The admin creates groups before the round. On the day, each group scans a QR code or enters a group code to access their digital scorecard. Scores sync to the live leaderboard hole-by-hole in real time.' },
+                { q: 'What scoring formats are supported?', a: 'Stroke play, Stableford, Match Points, Low Putts, and Skins. Net scoring with handicap adjustments is included on all plans.' },
+                { q: 'Can Scorify calculate payouts?', a: 'Yes. Configure prize amounts for overall finishers, flights, skins, CTP, and long drive — Scorify calculates the breakdown automatically.' },
+                { q: 'Can I try it before paying?', a: 'Yes. All plans start with a free trial. No credit card required to get started.' },
+              ].map(({ q, a }) => (
+                <div key={q} className="py-5">
+                  <p className="font-semibold text-sm mb-2" style={{ color: INK }}>{q}</p>
+                  <p className="text-sm leading-relaxed" style={{ color: '#6b7280' }}>{a}</p>
+                </div>
+              ))}
+            </div>
+            <div className="mt-8 text-center">
+              <a href="/faq" className="text-sm font-semibold" style={{ color: GREEN }}>See all FAQs →</a>
+            </div>
+          </div>
+        </section>
+
+        {/* ── Contact ────────────────────────────────────────────────── */}
+        <section id="contact" className="py-24" style={{ background: '#ffffff' }}>
+          <div className="max-w-2xl mx-auto px-6 text-center">
+            <p className="text-xs font-bold uppercase tracking-widest mb-3" style={{ color: GREEN }}>Contact</p>
+            <h2 className="text-3xl md:text-4xl font-bold mb-4" style={{ fontFamily: "'Playfair Display', serif", color: INK }}>
+              Get in touch
+            </h2>
+            <p className="text-base mb-10" style={{ color: '#6b7280' }}>
+              Questions about pricing, setting up your league, or anything else? We're happy to help.
+            </p>
+            <a href="mailto:admin@scorifygolf.com"
+              className="inline-flex items-center gap-3 px-8 py-4 rounded-2xl font-bold text-base text-white transition-opacity hover:opacity-90"
+              style={{ background: GREEN }}>
+              <svg width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+              </svg>
+              admin@scorifygolf.com
+            </a>
+            <p className="text-xs mt-6" style={{ color: '#9ca3af' }}>We typically respond within one business day.</p>
           </div>
         </section>
 

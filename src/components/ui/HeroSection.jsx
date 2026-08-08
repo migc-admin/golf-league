@@ -136,17 +136,24 @@ export default function HeroSection({
         )}
       </div>
 
-      {/* ── Right: Image with clip-path reveal ── */}
+      {/* ── Right: Video with clip-path reveal ── */}
       <motion.div
-        className="w-full bg-cover bg-center md:w-1/2 lg:w-2/5"
-        style={{
-          backgroundImage: `url(${backgroundImage})`,
-          minHeight: 320,
-        }}
+        className="w-full md:w-1/2 lg:w-2/5 overflow-hidden relative"
+        style={{ minHeight: 320 }}
         initial={{ clipPath: 'polygon(100% 0, 100% 0, 100% 100%, 100% 100%)' }}
         animate={{ clipPath: 'polygon(15% 0, 100% 0, 100% 100%, 0% 100%)' }}
         transition={{ duration: 1.2, ease: 'circOut' }}
-      />
+      >
+        <video
+          autoPlay
+          muted
+          loop
+          playsInline
+          style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }}
+        >
+          <source src="/Intro_screenshots.mp4" type="video/mp4" />
+        </video>
+      </motion.div>
     </motion.section>
   )
 }
