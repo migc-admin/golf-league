@@ -28,17 +28,14 @@ const MENU_ITEMS = [
   {
     title: 'Social',
     links: [
-      { text: 'Twitter / X', url: 'https://twitter.com/scorifygolf'   },
-      { text: 'Instagram',   url: 'https://instagram.com/scorifygolf' },
-      { text: 'LinkedIn',    url: 'https://linkedin.com/company/scorifygolf' },
-      { text: 'Facebook',    url: 'https://facebook.com/scorifygolf'  },
+      { text: 'Instagram', url: 'https://instagram.com/scorifygolf' },
     ],
   },
 ]
 
 export default function Footer() {
   return (
-    <footer style={{ background: '#1d1d1f', color: '#f5f5f7' }}>
+    <footer style={{ background: '#01503a', color: '#f5f5f7' }}>
       <div className="max-w-6xl mx-auto px-6 pt-16 pb-8">
 
         {/* Top grid */}
@@ -47,11 +44,7 @@ export default function Footer() {
           {/* Brand */}
           <div className="col-span-2">
             <div className="flex items-center gap-2.5 mb-4">
-              <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: '#1B4332' }}>
-                <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
-                  <path d="M8 1L10.5 5.5H15L11.5 8.5L13 13L8 10L3 13L4.5 8.5L1 5.5H5.5L8 1Z" fill="#ffffff" />
-                </svg>
-              </div>
+              <img src="/WhiteLogo.jpg" alt="Scorify Golf" className="w-8 h-8 rounded-lg object-contain" />
               <span className="font-bold text-white text-lg" style={{ letterSpacing: '-0.02em' }}>Scorify Golf</span>
             </div>
             <p className="text-sm leading-relaxed" style={{ color: '#86868b' }}>
