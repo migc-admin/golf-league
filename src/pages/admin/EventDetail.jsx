@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from 'react'
+import { useEffect, useState, useCallback, useRef } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import { supabase } from '../../lib/supabase'
 import toast from 'react-hot-toast'
@@ -562,6 +562,30 @@ function TabOverview({ event, eventPlayers, allScores, sideGames, course, confli
           </dl>
         </Card>
 
+        <Card>
+          <CardHeader title="Event Cover Photo" subtitle="Shown on the public event page" />
+          <ImageUpload
+            bucket="media"
+            path={`events/${event.id}/cover`}
+            currentUrl={event.cover_image_url ?? null}
+            shape="rect"
+            label="Recommended: 1200 × 800px JPG"
+            onUploaded={async (url) => {
+              await supabase.from('events').update({ cover_image_url: url }).eq('id', event.id)
+              onUpdated()
+            }}
+            onRemoved={async () => {
+              await supabase.from('events').update({ cover_image_url: null }).eq('id', event.id)
+              onUpdated()
+            }}
+          />
+        </Card>
+
+        <Card className="sm:col-span-2">
+          <CardHeader title="Public Event Page" subtitle="Additional details shown to players" />
+          <EventPublicFields event={event} onUpdated={onUpdated} />
+        </Card>
+
       </div>
 
       {/* Score conflicts */}
@@ -598,6 +622,115 @@ function TabOverview({ event, eventPlayers, allScores, sideGames, course, confli
 }
 
 // ─── Admin Score Editor ────────────────────────────────────────────
+// ─── Public Event Fields (description, spots, sponsors) ───────────────────────
+function EventPublicFields({ event, onUpdated }) {
+  const [description, setDescription] = useState(event.description ?? '')
+  const [spots,       setSpots]       = useState(event.registration_spots ?? '')
+  const [sponsors,    setSponsors]    = useState(event.sponsors ?? [])
+  const [saving,      setSaving]      = useState(false)
+  const [sponsorName, setSponsorName] = useState('')
+  const [uploading,   setUploading]   = useState(false)
+  const fileRef = useRef(null)
+
+  async function save() {
+    setSaving(true)
+    await supabase.from('events').update({
+      description:        description.trim() || null,
+      registration_spots: spots !== '' ? parseInt(spots) : null,
+      sponsors:           sponsors.length > 0 ? sponsors : null,
+    }).eq('id', event.id)
+    setSaving(false)
+    toast.success('Saved')
+    onUpdated()
+  }
+
+  async function uploadSponsorLogo(file, idx) {
+    if (!file) return
+    setUploading(true)
+    const ext = file.name.split('.').pop()?.toLowerCase()
+    const path = `events/${event.id}/sponsors/sponsor_${idx}.${ext}`
+    const { error } = await supabase.storage.from('media').upload(path, file, { upsert: true })
+    if (error) { toast.error(error.message); setUploading(false); return }
+    const { data } = supabase.storage.from('media').getPublicUrl(path)
+    setSponsors(prev => prev.map((s, i) => i === idx ? { ...s, logo_url: data.publicUrl } : s))
+    setUploading(false)
+  }
+
+  function addSponsor() {
+    if (!sponsorName.trim()) return
+    setSponsors(prev => [...prev, { name: sponsorName.trim(), logo_url: null }])
+    setSponsorName('')
+  }
+
+  function removeSponsor(idx) {
+    setSponsors(prev => prev.filter((_, i) => i !== idx))
+  }
+
+  return (
+    <div className="space-y-4">
+      {/* Description */}
+      <div>
+        <label className="label">Tournament Description</label>
+        <textarea
+          className="input w-full"
+          rows={4}
+          placeholder="Describe the event — format, rules, prizes, anything players should know…"
+          value={description}
+          onChange={e => setDescription(e.target.value)}
+          style={{ resize: 'vertical' }}
+        />
+      </div>
+
+      {/* Registration spots */}
+      <div className="w-40">
+        <Input
+          label="Total Registration Spots"
+          type="number"
+          min="1"
+          placeholder="e.g. 40"
+          value={spots}
+          onChange={e => setSpots(e.target.value)}
+        />
+      </div>
+
+      {/* Sponsors */}
+      <div>
+        <label className="label">Sponsors</label>
+        <div className="space-y-2 mb-3">
+          {sponsors.map((s, idx) => (
+            <div key={idx} className="flex items-center gap-3 bg-gray-50 rounded-xl px-3 py-2 border border-gray-200">
+              {s.logo_url ? (
+                <img src={s.logo_url} alt={s.name} style={{ height: 32, maxWidth: 80, objectFit: 'contain' }} />
+              ) : (
+                <div className="text-xs text-gray-400 w-20 text-center">No logo</div>
+              )}
+              <span className="text-sm font-semibold flex-1">{s.name}</span>
+              <label className="text-xs text-fairway-600 cursor-pointer underline">
+                {uploading ? 'Uploading…' : 'Upload logo'}
+                <input type="file" accept="image/*" className="hidden"
+                  onChange={e => uploadSponsorLogo(e.target.files[0], idx)} />
+              </label>
+              <button type="button" onClick={() => removeSponsor(idx)} className="text-red-400 hover:text-red-600 text-xs">✕</button>
+            </div>
+          ))}
+        </div>
+        <div className="flex gap-2">
+          <input
+            className="input flex-1"
+            placeholder="Sponsor name…"
+            value={sponsorName}
+            onChange={e => setSponsorName(e.target.value)}
+            onKeyDown={e => e.key === 'Enter' && (e.preventDefault(), addSponsor())}
+          />
+          <Button size="sm" variant="secondary" onClick={addSponsor} type="button">Add</Button>
+        </div>
+      </div>
+
+      <Button onClick={save} disabled={saving}>{saving ? 'Saving…' : 'Save'}</Button>
+    </div>
+  )
+}
+
 function AdminScoreEditor({ event, eventPlayers, allScores, course, onClose, onSaved }) {
   const [selectedId, setSelectedId] = useState(eventPlayers[0]?.player_id ?? null)
   const [scores,     setScores]     = useState(() => {

@@ -1,25 +1,19 @@
 /**
- * Public Event Page — multi-tab microsite layout
- * Tabs: Overview · Pairings · Leaderboard
+ * Public Event Page — redesigned with split hero, cover photo, registration CTA,
+ * tournament description, sponsor scroll bar, mobile optimized.
  */
 
 import { useEffect, useState } from 'react'
 import { useParams, useSearchParams, Link } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 
-const FORMAT_ORDER = ['net_stroke_front9', 'net_stroke_back9', 'net_stroke']
+const GREEN = '#1B4332'
+const GOLD  = '#D4AF37'
+
 const FORMAT_LABELS = {
-  net_stroke_front9: 'Net Stroke Play (Front 9)',
-  net_stroke_back9:  'Net Stroke Play (Back 9)',
-  net_stroke:        'Net Stroke Play',
-  stableford:        'Stableford',
-  match_points:      'Match Play Points',
-  ryder_cup:         'Ryder Cup',
-}
-const FORMAT_SHORT = {
   net_stroke_front9: 'Net Stroke · Front 9',
   net_stroke_back9:  'Net Stroke · Back 9',
-  net_stroke:        'Net Stroke',
+  net_stroke:        'Net Stroke Play',
   stableford:        'Stableford',
   match_points:      'Match Points',
   ryder_cup:         'Ryder Cup',
@@ -33,13 +27,11 @@ const SIDE_GAME_LABELS = {
   long_drive_b: 'Long Drive — Flight B',
   low_putts:    'Low Putts',
   ctp:          'Closest to Pin',
-  track_putts:  'Putts Tracked',
 }
 
 const TABS = [
-  { key: 'overview',    label: 'Overview'     },
-  { key: 'pairings',   label: 'Pairings'     },
-  { key: 'leaderboard',label: 'Leaderboard'  },
+  { key: 'overview',    label: 'Overview'    },
+  { key: 'pairings',   label: 'Pairings'    },
 ]
 
 export default function EventPage() {
@@ -60,7 +52,7 @@ export default function EventPage() {
         if (directEventId) {
           const { data } = await supabase
             .from('events')
-            .select('*, course:courses(name), league:leagues(name, season_year, slug, logo_url)')
+            .select('*, course:courses(name, address), league:leagues(name, season_year, slug, logo_url)')
             .eq('id', directEventId).single()
           ev = data
         } else {
@@ -68,7 +60,7 @@ export default function EventPage() {
           if (!league) { setLoading(false); return }
           const { data } = await supabase
             .from('events')
-            .select('*, course:courses(name), league:leagues(name, season_year, slug, logo_url)')
+            .select('*, course:courses(name, address), league:leagues(name, season_year, slug, logo_url)')
             .eq('league_id', league.id).eq('slug', eventSlug).single()
           ev = data
         }
@@ -93,182 +85,239 @@ export default function EventPage() {
 
   if (loading) return <Skeleton />
   if (!event) return (
-    <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#f5f4f0' }}>
+    <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#f9f8f5' }}>
       <p style={{ color: '#86868b' }}>Event not found.</p>
     </div>
   )
 
   const eid            = event.id
   const leaderboardUrl = `/${orgSlug}/${event.league?.slug ?? leagueSlug}/${event.slug}/leaderboard?eid=${eid}`
+  const regUrl         = event.league?.slug && event.slug ? `/register/${event.league.slug}/${event.slug}` : null
   const formats        = event.formats ?? (event.format ? [event.format] : [])
   const sideGames      = event.side_game_options ?? []
   const eventName      = event.name ?? `Event #${event.event_number}`
+  const coverImage     = event.cover_image_url ?? null
+  const sponsors       = event.sponsors ?? []
+  const description    = event.description ?? null
+  const courseAddress  = event.course?.address ?? null
+  const mapsUrl        = courseAddress
+    ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(courseAddress)}`
+    : `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(event.course?.name ?? '')}`
+
+  const startLabel = event.start_time
+    ? `${formatTime(event.start_time)}${event.shotgun_start ? ' · Shotgun' : ''}`
+    : (event.shotgun_start ? 'Shotgun Start' : null)
+
+  const spotsLeft = event.registration_spots != null
+    ? Math.max(0, event.registration_spots - (playerCount ?? 0))
+    : null
 
   return (
-    <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column', background: '#f5f4f0' }}>
+    <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column', background: '#f9f8f5', fontFamily: 'system-ui, -apple-system, sans-serif' }}>
 
-      {/* ── Hero ─────────────────────────────────────────────────────── */}
-      <div style={{ background: 'linear-gradient(150deg, #1a3d2e 0%, #1B4332 55%, #2d6a4f 100%)' }}>
-        <div style={{ maxWidth: 768, margin: '0 auto', padding: '36px 20px 0' }}>
+      {/* ── Hero ──────────────────────────────────────────────────────────────── */}
+      <div style={{ background: '#fff', borderBottom: '1px solid #e5e7eb' }}>
+        <div style={{
+          maxWidth: 1100, margin: '0 auto', width: '100%',
+          display: 'grid',
+          gridTemplateColumns: coverImage ? 'minmax(0,1fr) min(420px,45%)' : '1fr',
+        }}>
 
-          {/* League identity */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 22 }}>
-            {event.league?.logo_url ? (
-              <img src={event.league.logo_url} alt=""
-                style={{ width: 44, height: 44, borderRadius: '50%', objectFit: 'cover', border: '2px solid rgba(255,255,255,0.25)', flexShrink: 0 }} />
-            ) : (
-              <div style={{ width: 44, height: 44, borderRadius: '50%', background: 'rgba(255,255,255,0.15)', border: '2px solid rgba(255,255,255,0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 900, fontSize: 15, color: '#fff', flexShrink: 0 }}>
-                {(event.league?.name ?? '').slice(0, 2).toUpperCase()}
+          {/* Left panel */}
+          <div style={{ padding: 'clamp(24px,4vw,44px) clamp(20px,4vw,44px) 0', display: 'flex', flexDirection: 'column', minHeight: coverImage ? 360 : 'auto' }}>
+
+            {/* League identity */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 18 }}>
+              {event.league?.logo_url ? (
+                <img src={event.league.logo_url} alt="" style={{ width: 34, height: 34, borderRadius: 8, objectFit: 'cover', border: '1px solid #e5e7eb', flexShrink: 0 }} />
+              ) : (
+                <div style={{ width: 34, height: 34, borderRadius: 8, background: GREEN, display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 900, fontSize: 12, color: '#fff', flexShrink: 0 }}>
+                  {(event.league?.name ?? '').slice(0, 2).toUpperCase()}
+                </div>
+              )}
+              <span style={{ color: '#6b7280', fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em' }}>
+                Hosted by {event.league?.name}
+              </span>
+            </div>
+
+            {/* Title */}
+            <h1 style={{ fontSize: 'clamp(22px, 4vw, 40px)', fontWeight: 900, color: '#111827', letterSpacing: '-0.03em', lineHeight: 1.1, marginBottom: 8 }}>
+              {eventName}
+            </h1>
+            <div style={{ width: 44, height: 4, background: GOLD, borderRadius: 2, marginBottom: 20 }} />
+
+            {/* Date + Course */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 20 }}>
+              <MetaRow icon={
+                <svg width="15" height="15" fill="none" stroke="#374151" strokeWidth="2" viewBox="0 0 24 24">
+                  <rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/>
+                </svg>
+              }>
+                <div style={{ fontSize: 14, fontWeight: 700, color: '#111827' }}>{longDate(event.event_date)}</div>
+                {startLabel && <div style={{ fontSize: 12, color: '#6b7280' }}>{startLabel}</div>}
+              </MetaRow>
+
+              <MetaRow icon={
+                <svg width="15" height="15" fill="none" stroke="#374151" strokeWidth="2" viewBox="0 0 24 24">
+                  <path d="M21 10c0 7-9 13-9 13S3 17 3 10a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/>
+                </svg>
+              }>
+                <div>
+                  <div style={{ fontSize: 14, fontWeight: 700, color: '#111827' }}>{event.course?.name ?? 'TBD'}</div>
+                  {courseAddress && <div style={{ fontSize: 12, color: '#6b7280', marginTop: 2 }}>{courseAddress}</div>}
+                </div>
+              </MetaRow>
+            </div>
+
+            {/* Registration CTA — only if upcoming and reg is available */}
+            {event.status === 'upcoming' && regUrl && (
+              <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 20, background: '#f9fafb', border: '1px solid #e5e7eb', borderRadius: 14, padding: '14px 18px' }}>
+                <div style={{ flex: 1 }}>
+                  {event.tournament_fee > 0 && (
+                    <div style={{ fontSize: 22, fontWeight: 900, color: '#111827', letterSpacing: '-0.02em' }}>
+                      ${Number(event.tournament_fee).toFixed(0)}<span style={{ fontSize: 13, fontWeight: 500, color: '#6b7280' }}>/player</span>
+                    </div>
+                  )}
+                  {spotsLeft !== null && (
+                    <div style={{ fontSize: 12, color: spotsLeft <= 5 ? '#dc2626' : '#6b7280', fontWeight: 600, marginTop: 2 }}>
+                      {spotsLeft > 0 ? `${spotsLeft} spot${spotsLeft !== 1 ? 's' : ''} remaining` : 'Event full'}
+                    </div>
+                  )}
+                </div>
+                {(!spotsLeft || spotsLeft > 0) && (
+                  <Link to={regUrl}
+                    style={{ background: GREEN, color: '#fff', fontWeight: 800, fontSize: 14, padding: '12px 22px', borderRadius: 10, textDecoration: 'none', whiteSpace: 'nowrap', flexShrink: 0 }}>
+                    Register →
+                  </Link>
+                )}
               </div>
             )}
-            <span style={{ color: 'rgba(255,255,255,0.65)', fontSize: 13, fontWeight: 600 }}>
-              {event.league?.name}{event.league?.season_year ? ` · ${event.league.season_year}` : ''}
-            </span>
-          </div>
 
-          {/* Event name */}
-          <h1 style={{ color: '#fff', fontSize: 'clamp(22px, 5vw, 34px)', fontWeight: 900, letterSpacing: '-0.03em', lineHeight: 1.1, marginBottom: 14 }}>
-            {eventName}
-          </h1>
+            {/* Spacer */}
+            <div style={{ flex: 1 }} />
 
-          {/* Meta pills */}
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginBottom: 20 }}>
-            <HeroPill>📅 {shortDate(event.event_date)}</HeroPill>
-            <HeroPill>⛳ {event.course?.name ?? 'TBD'}</HeroPill>
-            <StatusBadge status={event.status} />
-          </div>
-
-          {/* Tab bar — attached to bottom of hero */}
-          <div style={{ display: 'flex', gap: 2, overflowX: 'auto', scrollbarWidth: 'none' }}>
-            {TABS.map(tab => (
-              <button key={tab.key} onClick={() => setActiveTab(tab.key)}
+            {/* Tab bar */}
+            <div style={{ display: 'flex', borderTop: '1px solid #e5e7eb', marginLeft: 'clamp(-20px,-4vw,-44px)', marginRight: coverImage ? 0 : 'clamp(-20px,-4vw,-44px)', overflowX: 'auto', scrollbarWidth: 'none' }}>
+              {TABS.map(tab => (
+                <button key={tab.key} onClick={() => setActiveTab(tab.key)}
+                  style={{
+                    padding: '13px 24px',
+                    fontSize: 13, fontWeight: 700,
+                    border: 'none', cursor: 'pointer',
+                    background: 'transparent',
+                    color: activeTab === tab.key ? GREEN : '#9ca3af',
+                    borderBottom: activeTab === tab.key ? `3px solid ${GREEN}` : '3px solid transparent',
+                    transition: 'all 0.15s',
+                    whiteSpace: 'nowrap',
+                    flexShrink: 0,
+                  }}>
+                  {tab.label}
+                </button>
+              ))}
+              <Link to={leaderboardUrl}
                 style={{
-                  padding: '11px 22px',
-                  fontSize: 14,
-                  fontWeight: 700,
+                  padding: '13px 24px',
+                  fontSize: 13, fontWeight: 700,
+                  color: '#9ca3af',
+                  borderBottom: '3px solid transparent',
                   whiteSpace: 'nowrap',
-                  border: 'none',
-                  cursor: 'pointer',
-                  borderRadius: '10px 10px 0 0',
-                  transition: 'all 0.15s',
-                  background: activeTab === tab.key ? '#f5f4f0' : 'transparent',
-                  color:      activeTab === tab.key ? '#1B4332'  : 'rgba(255,255,255,0.6)',
+                  flexShrink: 0,
+                  textDecoration: 'none',
+                  display: 'flex', alignItems: 'center',
                 }}>
-                {tab.label}
-              </button>
-            ))}
+                Leaderboard ↗
+              </Link>
+            </div>
           </div>
+
+          {/* Right: Cover photo — hidden on mobile */}
+          {coverImage && (
+            <div style={{ position: 'relative', overflow: 'hidden', display: 'none' }} className="event-cover-photo">
+              <img src={coverImage} alt={eventName}
+                style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block', minHeight: 360 }} />
+            </div>
+          )}
         </div>
       </div>
 
-      {/* ── Tab Content ──────────────────────────────────────────────── */}
-      <div style={{ maxWidth: 768, margin: '0 auto', width: '100%', padding: '24px 20px', flex: 1 }}>
+      {/* ── Tab Content ───────────────────────────────────────────────────────── */}
+      <div style={{ maxWidth: 1100, margin: '0 auto', width: '100%', padding: 'clamp(20px,4vw,32px) clamp(16px,4vw,40px)', flex: 1, boxSizing: 'border-box' }}>
 
         {activeTab === 'overview' && (
-          <OverviewTab
-            event={event}
-            formats={formats}
-            sideGames={sideGames}
-            playerCount={playerCount}
-            leaderboardUrl={leaderboardUrl}
-          />
+          <OverviewTab event={event} leaderboardUrl={leaderboardUrl} description={description} />
         )}
 
         {activeTab === 'pairings' && (
-          <GroupList eventPlayers={eventPlayers} event={event} />
+          <GroupList eventPlayers={eventPlayers} event={event} orgSlug={orgSlug} />
         )}
 
-        {activeTab === 'leaderboard' && (
-          <LeaderboardTab event={event} leaderboardUrl={leaderboardUrl} />
-        )}
+
       </div>
 
+      {/* ── Sponsor Scroll Bar ────────────────────────────────────────────────── */}
+      {sponsors.length > 0 && (
+        <SponsorBar sponsors={sponsors} />
+      )}
+
       {/* Footer */}
-      <div style={{ textAlign: 'center', fontSize: 12, color: '#c7c7cc', padding: '24px 0' }}>
-        Powered by Scorify Golf
+      <div style={{ textAlign: 'center', fontSize: 12, color: '#c7c7cc', padding: '20px 0', borderTop: '1px solid #f3f4f6' }}>
+        Powered by <strong style={{ color: '#9ca3af' }}>Scorify Golf</strong>
+      </div>
+
+      {/* Responsive styles */}
+      <style>{`
+        @media (min-width: 768px) {
+          .event-cover-photo { display: block !important; }
+        }
+      `}</style>
+    </div>
+  )
+}
+
+// ─── Sponsor tiles ────────────────────────────────────────────────────────────
+function SponsorBar({ sponsors }) {
+  return (
+    <div style={{ background: '#fff', borderTop: '1px solid #e5e7eb', padding: '24px clamp(16px,4vw,40px)' }}>
+      <div style={{ maxWidth: 1100, margin: '0 auto' }}>
+        <div style={{ fontSize: 10, fontWeight: 700, color: '#9ca3af', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: 16 }}>
+          Sponsored by
+        </div>
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 12 }}>
+          {sponsors.map((s, i) => (
+            <div key={i} style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#f9f8f5', border: '1px solid #e5e7eb', borderRadius: 12, padding: '12px 20px', minWidth: 120 }}>
+              {s.logo_url ? (
+                <img src={s.logo_url} alt={s.name ?? 'Sponsor'} style={{ height: 36, maxWidth: 120, objectFit: 'contain' }} />
+              ) : (
+                <span style={{ fontSize: 13, fontWeight: 700, color: '#374151' }}>{s.name}</span>
+              )}
+            </div>
+          ))}
+        </div>
       </div>
     </div>
   )
 }
 
 // ─── Overview Tab ─────────────────────────────────────────────────────────────
-function OverviewTab({ event, formats, sideGames, playerCount, leaderboardUrl }) {
-  const primaryFormat = [...formats].sort((a, b) => {
-    const ai = FORMAT_ORDER.indexOf(a), bi = FORMAT_ORDER.indexOf(b)
-    return (ai === -1 ? 99 : ai) - (bi === -1 ? 99 : bi)
-  })[0]
-
-  const startLabel = event.start_time
-    ? `${formatTime(event.start_time)}${event.shotgun_start ? ' · Shotgun' : ''}`
-    : (event.shotgun_start ? 'Shotgun' : '—')
-
-  const stats = [
-    { label: 'Players', value: playerCount ?? '—' },
-    { label: 'Format',  value: 'Stroke Play' },
-    { label: 'Start',   value: startLabel },
-  ]
-
-  const visibleSideGames = sideGames.filter(s => s !== 'track_putts')
-
+function OverviewTab({ event, leaderboardUrl, description }) {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
 
-      {/* Stat grid */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12 }}>
-        {stats.map(s => (
-          <div key={s.label} style={{ background: '#fff', borderRadius: 14, padding: '16px 18px', border: '1px solid #e5e7eb' }}>
-            <div style={{ fontSize: 10, fontWeight: 700, color: '#9ca3af', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 6 }}>{s.label}</div>
-            <div style={{ fontSize: 20, fontWeight: 800, color: '#1d1d1f', letterSpacing: '-0.02em', lineHeight: 1.1 }}>{s.value}</div>
-          </div>
-        ))}
-      </div>
-
-      {/* Additional formats (if more than one) */}
-      {formats.length > 1 && (
-        <Section label="Scoring Formats">
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-            {[...formats].sort((a, b) => {
-              const ai = FORMAT_ORDER.indexOf(a), bi = FORMAT_ORDER.indexOf(b)
-              return (ai === -1 ? 99 : ai) - (bi === -1 ? 99 : bi)
-            }).map(f => (
-              <div key={f} style={{ fontSize: 14, fontWeight: 600, color: '#1d1d1f' }}>{FORMAT_LABELS[f] ?? f}</div>
-            ))}
-          </div>
-        </Section>
+      {description && (
+        <div style={{ background: '#fff', borderRadius: 16, padding: '20px 24px', border: '1px solid #e5e7eb' }}>
+          <div style={{ fontSize: 10, fontWeight: 700, color: '#9ca3af', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 10 }}>About this Event</div>
+          <p style={{ fontSize: 14, lineHeight: 1.7, color: '#374151', whiteSpace: 'pre-line', margin: 0 }}>{description}</p>
+        </div>
       )}
 
-      {/* Flights */}
-      {event.use_flights && (
-        <Section label="Flights">
-          <div style={{ display: 'flex', gap: 8 }}>
-            <FlightBadge flight="A" />
-            <FlightBadge flight="B" />
-          </div>
-        </Section>
-      )}
-
-      {/* Side games */}
-      {visibleSideGames.length > 0 && (
-        <Section label="Side Games">
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
-            {visibleSideGames.map(s => (
-              <span key={s} style={{ background: '#f0fdf4', color: '#166534', fontSize: 13, fontWeight: 600, padding: '5px 12px', borderRadius: 999, border: '1px solid #bbf7d0' }}>
-                {SIDE_GAME_LABELS[s] ?? s}
-              </span>
-            ))}
-          </div>
-        </Section>
-      )}
-
-      {/* Leaderboard CTA */}
       {event.status !== 'upcoming' && (
-        <Link to={leaderboardUrl} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: '#1B4332', color: '#fff', borderRadius: 14, padding: '18px 22px', textDecoration: 'none' }}>
+        <Link to={leaderboardUrl} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: GREEN, color: '#fff', borderRadius: 16, padding: '20px 24px', textDecoration: 'none', gridColumn: '1 / -1' }}>
           <div>
-            <div style={{ fontSize: 12, fontWeight: 600, color: 'rgba(255,255,255,0.6)', marginBottom: 3 }}>View results</div>
-            <div style={{ fontSize: 17, fontWeight: 900, letterSpacing: '-0.02em' }}>Full Leaderboard →</div>
+            <div style={{ fontSize: 12, fontWeight: 600, color: 'rgba(255,255,255,0.6)', marginBottom: 4 }}>View results</div>
+            <div style={{ fontSize: 18, fontWeight: 900, letterSpacing: '-0.02em' }}>Full Leaderboard →</div>
           </div>
           {event.status === 'active' && (
-            <span style={{ background: '#4ade80', color: '#14532d', fontSize: 11, fontWeight: 800, padding: '5px 12px', borderRadius: 999, textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+            <span style={{ background: '#4ade80', color: '#14532d', fontSize: 11, fontWeight: 800, padding: '6px 14px', borderRadius: 999, textTransform: 'uppercase', letterSpacing: '0.06em' }}>
               Live
             </span>
           )}
@@ -278,34 +327,7 @@ function OverviewTab({ event, formats, sideGames, playerCount, leaderboardUrl })
   )
 }
 
-// ─── Leaderboard Tab ──────────────────────────────────────────────────────────
-function LeaderboardTab({ event, leaderboardUrl }) {
-  if (event.status === 'upcoming') {
-    return (
-      <div style={{ textAlign: 'center', paddingTop: 80, paddingBottom: 80 }}>
-        <div style={{ fontSize: 44, marginBottom: 12 }}>⏳</div>
-        <div style={{ fontSize: 17, fontWeight: 700, color: '#1d1d1f', marginBottom: 6 }}>Leaderboard not yet available</div>
-        <div style={{ fontSize: 14, color: '#86868b' }}>Check back once the event is underway.</div>
-      </div>
-    )
-  }
-  return (
-    <Link to={leaderboardUrl}
-      style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: '#1B4332', color: '#fff', borderRadius: 14, padding: '22px 24px', textDecoration: 'none' }}>
-      <div>
-        <div style={{ fontSize: 12, fontWeight: 600, color: 'rgba(255,255,255,0.6)', marginBottom: 4 }}>Official results</div>
-        <div style={{ fontSize: 20, fontWeight: 900, letterSpacing: '-0.02em' }}>Open Leaderboard ↗</div>
-      </div>
-      {event.status === 'active' && (
-        <span style={{ background: '#4ade80', color: '#14532d', fontSize: 11, fontWeight: 800, padding: '5px 12px', borderRadius: 999, textTransform: 'uppercase', letterSpacing: '0.06em' }}>
-          Live
-        </span>
-      )}
-    </Link>
-  )
-}
-
-// ─── Group List (Pairings tab) ────────────────────────────────────────────────
+// ─── Group List (Pairings) ────────────────────────────────────────────────────
 function GroupList({ eventPlayers, event }) {
   const [search, setSearch] = useState('')
 
@@ -315,14 +337,12 @@ function GroupList({ eventPlayers, event }) {
     if (!groups[g]) groups[g] = []
     groups[g].push(ep)
   }
-
-  // Sort members within each group: group_order first (nulls last), then alpha — mirrors admin Groups tab
   for (const members of Object.values(groups)) {
     members.sort((a, b) => {
       const ao = a.group_order, bo = b.group_order
-      if (ao !== null && ao !== undefined && bo !== null && bo !== undefined) return ao - bo
-      if (ao !== null && ao !== undefined) return -1
-      if (bo !== null && bo !== undefined) return 1
+      if (ao != null && bo != null) return ao - bo
+      if (ao != null) return -1
+      if (bo != null) return 1
       const fa = (a.player?.first_name ?? '').toLowerCase()
       const fb = (b.player?.first_name ?? '').toLowerCase()
       if (fa !== fb) return fa < fb ? -1 : 1
@@ -332,116 +352,76 @@ function GroupList({ eventPlayers, event }) {
 
   const sorted    = Object.entries(groups).filter(([k]) => k !== '0').sort(([a], [b]) => parseInt(a) - parseInt(b))
   const ungrouped = groups[0] ?? []
-
-  const q = search.toLowerCase().trim()
-  const filteredSorted = q
-    ? sorted.filter(([, members]) => members.some(ep => `${ep.player?.first_name ?? ''} ${ep.player?.last_name ?? ''}`.toLowerCase().includes(q)))
-    : sorted
+  const q         = search.toLowerCase().trim()
+  const filtered  = q ? sorted.filter(([, ms]) => ms.some(ep => `${ep.player?.first_name ?? ''} ${ep.player?.last_name ?? ''}`.toLowerCase().includes(q))) : sorted
 
   if (sorted.length === 0 && ungrouped.length === 0) {
     return (
       <div style={{ textAlign: 'center', paddingTop: 80, paddingBottom: 80 }}>
         <div style={{ fontSize: 44, marginBottom: 12 }}>⛳</div>
-        <div style={{ fontSize: 17, fontWeight: 700, color: '#1d1d1f', marginBottom: 6 }}>Pairings not posted yet</div>
+        <div style={{ fontSize: 17, fontWeight: 700, color: '#111827', marginBottom: 6 }}>Pairings not posted yet</div>
         <div style={{ fontSize: 14, color: '#86868b' }}>Check back closer to the event.</div>
       </div>
     )
   }
 
-  const assignedCount = eventPlayers.filter(ep => ep.group_number).length
-
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-
-      {/* Search */}
-      <div style={{ position: 'relative' }}>
-        <span style={{ position: 'absolute', left: 14, top: '50%', transform: 'translateY(-50%)', color: '#9ca3af', fontSize: 15, pointerEvents: 'none' }}>🔍</span>
-        <input
-          type="text"
-          placeholder="Search players…"
-          value={search}
-          onChange={e => setSearch(e.target.value)}
-          style={{ width: '100%', padding: '11px 16px 11px 42px', fontSize: 14, borderRadius: 12, border: '1px solid #d1d5db', background: '#fff', boxSizing: 'border-box', outline: 'none' }}
-        />
+      <div style={{ position: 'relative', maxWidth: 400 }}>
+        <span style={{ position: 'absolute', left: 14, top: '50%', transform: 'translateY(-50%)', color: '#9ca3af', pointerEvents: 'none' }}>🔍</span>
+        <input type="text" placeholder="Search players…" value={search} onChange={e => setSearch(e.target.value)}
+          style={{ width: '100%', padding: '11px 16px 11px 40px', fontSize: 14, borderRadius: 12, border: '1px solid #d1d5db', background: '#fff', boxSizing: 'border-box', outline: 'none' }} />
       </div>
-
-      {/* Summary */}
       <div style={{ fontSize: 13, color: '#9ca3af', fontWeight: 500 }}>
-        {q
-          ? `${filteredSorted.length} group${filteredSorted.length !== 1 ? 's' : ''} matching "${search}"`
-          : `${sorted.length} groups · ${assignedCount} players`}
+        {q ? `${filtered.length} group${filtered.length !== 1 ? 's' : ''} matching "${search}"` : `${sorted.length} groups · ${eventPlayers.filter(ep => ep.group_number).length} players`}
       </div>
-
-      {/* Group cards */}
-      {filteredSorted.map(([groupNum, members]) => {
-        const teeTime   = computeTeeTime(event.start_time, event.shotgun_start ? 0 : (event.tee_time_interval_mins ?? 10), parseInt(groupNum))
-        const code      = event.group_codes?.[groupNum] ?? null
-        const startHole = event.shotgun_start ? (event.group_hole_assignments?.[groupNum] ?? null) : null
-        return (
-          <div key={groupNum} style={{ background: '#fff', borderRadius: 14, overflow: 'hidden', border: '1px solid #e5e7eb' }}>
-            {/* Header */}
-            <div style={{ background: '#1B4332', color: '#fff', padding: '13px 18px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 11 }}>
-                <div style={{ width: 32, height: 32, borderRadius: '50%', background: 'rgba(255,255,255,0.18)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800, fontSize: 14, flexShrink: 0 }}>
-                  {groupNum}
-                </div>
-                <div>
-                  <div style={{ fontWeight: 700, fontSize: 14 }}>Group {groupNum}</div>
-                  <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.55)' }}>{members.length} players</div>
-                </div>
-                {code && (
-                  <div style={{ background: 'rgba(255,255,255,0.15)', borderRadius: 8, padding: '4px 10px', marginLeft: 4 }}>
-                    <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.55)', marginBottom: 1 }}>Code</div>
-                    <div style={{ fontWeight: 800, fontSize: 13, letterSpacing: '0.1em' }}>{code}</div>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))', gap: 12 }}>
+        {filtered.map(([groupNum, members]) => {
+          const teeTime   = computeTeeTime(event.start_time, event.shotgun_start ? 0 : (event.tee_time_interval_mins ?? 10), parseInt(groupNum))
+          const code      = event.group_codes?.[groupNum] ?? null
+          const startHole = event.shotgun_start ? (event.group_hole_assignments?.[groupNum] ?? null) : null
+          return (
+            <div key={groupNum} style={{ background: '#fff', borderRadius: 14, overflow: 'hidden', border: '1px solid #e5e7eb' }}>
+              <div style={{ background: GREEN, color: '#fff', padding: '12px 16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                  <div style={{ width: 30, height: 30, borderRadius: '50%', background: 'rgba(255,255,255,0.18)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800, fontSize: 13, flexShrink: 0 }}>
+                    {groupNum}
                   </div>
-                )}
-              </div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
-                {startHole && (
-                  <div style={{ textAlign: 'right' }}>
-                    <div style={{ fontWeight: 800, fontSize: 16 }}>Hole {startHole}</div>
-                    <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.55)' }}>Start hole</div>
+                  <div>
+                    <div style={{ fontWeight: 700, fontSize: 13 }}>Group {groupNum}</div>
+                    <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.55)' }}>{members.length} players</div>
                   </div>
-                )}
-                {teeTime && (
-                  <div style={{ textAlign: 'right' }}>
-                    <div style={{ fontWeight: 800, fontSize: 16 }}>{teeTime}</div>
-                    <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.55)' }}>Tee time</div>
-                  </div>
-                )}
-              </div>
-            </div>
-            {/* Players */}
-            {members.map((ep, idx) => (
-              <div key={ep.player_id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '11px 18px', borderTop: idx > 0 ? '1px solid #f3f4f6' : 'none' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 9 }}>
-                  {ep.flight && <FlightBadge flight={ep.flight} small />}
-                  <span style={{ fontSize: 14, fontWeight: 600, color: '#1d1d1f' }}>
-                    {ep.player?.first_name} {ep.player?.last_name}
-                  </span>
-                  {ep.is_scorekeeper && (
-                    <span style={{ fontSize: 11, fontWeight: 700, padding: '2px 7px', borderRadius: 6, background: '#f0fdf4', color: '#1B4332' }}>SK</span>
+                  {code && (
+                    <div style={{ background: 'rgba(255,255,255,0.15)', borderRadius: 8, padding: '3px 9px' }}>
+                      <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.55)' }}>Code</div>
+                      <div style={{ fontWeight: 800, fontSize: 12, letterSpacing: '0.1em' }}>{code}</div>
+                    </div>
                   )}
                 </div>
-                <span style={{ fontSize: 12, color: '#9ca3af', fontWeight: 500 }}>
-                  CH {ep.course_handicap ?? ep.handicap_index ?? '—'}
-                </span>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                  {startHole && <div style={{ textAlign: 'right' }}><div style={{ fontWeight: 800, fontSize: 15 }}>Hole {startHole}</div><div style={{ fontSize: 10, color: 'rgba(255,255,255,0.55)' }}>Start</div></div>}
+                  {teeTime    && <div style={{ textAlign: 'right' }}><div style={{ fontWeight: 800, fontSize: 15 }}>{teeTime}</div><div style={{ fontSize: 10, color: 'rgba(255,255,255,0.55)' }}>Tee time</div></div>}
+                </div>
               </div>
-            ))}
-          </div>
-        )
-      })}
-
-      {/* Ungrouped */}
+              {members.map((ep, idx) => (
+                <div key={ep.player_id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 16px', borderTop: idx > 0 ? '1px solid #f3f4f6' : 'none' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    {ep.flight && <FlightBadge flight={ep.flight} />}
+                    <span style={{ fontSize: 14, fontWeight: 600, color: '#111827' }}>{ep.player?.first_name} {ep.player?.last_name}</span>
+                    {ep.is_scorekeeper && <span style={{ fontSize: 11, fontWeight: 700, padding: '2px 6px', borderRadius: 6, background: '#f0fdf4', color: GREEN }}>SK</span>}
+                  </div>
+                  <span style={{ fontSize: 12, color: '#9ca3af', fontWeight: 500 }}>CH {ep.course_handicap ?? ep.handicap_index ?? '—'}</span>
+                </div>
+              ))}
+            </div>
+          )
+        })}
+      </div>
       {ungrouped.length > 0 && !q && (
         <div style={{ background: '#fff', borderRadius: 14, padding: '16px 18px', border: '1px solid #e5e7eb' }}>
           <div style={{ fontSize: 11, fontWeight: 700, color: '#9ca3af', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 10 }}>Unassigned</div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-            {ungrouped.map(ep => (
-              <div key={ep.player_id} style={{ fontSize: 14, color: '#1d1d1f', fontWeight: 500 }}>
-                {ep.player?.first_name} {ep.player?.last_name}
-              </div>
-            ))}
+            {ungrouped.map(ep => <div key={ep.player_id} style={{ fontSize: 14, color: '#111827', fontWeight: 500 }}>{ep.player?.first_name} {ep.player?.last_name}</div>)}
           </div>
         </div>
       )}
@@ -449,57 +429,46 @@ function GroupList({ eventPlayers, event }) {
   )
 }
 
-// ─── Shared small components ──────────────────────────────────────────────────
+// ─── Small components ─────────────────────────────────────────────────────────
 
-function Section({ label, children }) {
+function MetaRow({ icon, children }) {
   return (
-    <div style={{ background: '#fff', borderRadius: 14, padding: '16px 18px', border: '1px solid #e5e7eb' }}>
-      <div style={{ fontSize: 10, fontWeight: 700, color: '#9ca3af', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 10 }}>{label}</div>
-      {children}
+    <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10 }}>
+      <div style={{ width: 32, height: 32, borderRadius: 8, background: '#f3f4f6', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, marginTop: 2 }}>
+        {icon}
+      </div>
+      <div>{children}</div>
     </div>
   )
 }
 
-function HeroPill({ children }) {
+function InfoCard({ title, children }) {
   return (
-    <span style={{ background: 'rgba(255,255,255,0.13)', color: 'rgba(255,255,255,0.88)', fontSize: 13, fontWeight: 600, padding: '5px 13px', borderRadius: 999 }}>
-      {children}
-    </span>
+    <div style={{ background: '#fff', borderRadius: 16, padding: '20px 22px', border: '1px solid #e5e7eb' }}>
+      <div style={{ fontSize: 10, fontWeight: 700, color: '#9ca3af', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 14 }}>{title}</div>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>{children}</div>
+    </div>
   )
 }
 
-function StatusBadge({ status }) {
-  const map = {
-    upcoming: { bg: 'rgba(254,249,195,0.92)', color: '#854d0e',              label: 'Upcoming'    },
-    active:   { bg: 'rgba(74,222,128,0.92)',  color: '#14532d',              label: 'In Progress' },
-    complete: { bg: 'rgba(255,255,255,0.18)', color: 'rgba(255,255,255,0.8)', label: 'Complete'   },
-  }
-  const { bg, color, label } = map[status] ?? { bg: 'rgba(255,255,255,0.18)', color: 'rgba(255,255,255,0.8)', label: status }
+function InfoRow({ icon, label, value }) {
+  if (value === null || value === undefined || value === '—') return null
   return (
-    <span style={{ background: bg, color, fontSize: 12, fontWeight: 800, padding: '5px 12px', borderRadius: 999 }}>
-      {label}
-    </span>
+    <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10 }}>
+      <span style={{ fontSize: 15, flexShrink: 0, width: 20, textAlign: 'center', marginTop: 2 }}>{icon}</span>
+      <div>
+        <div style={{ fontSize: 11, color: '#9ca3af', fontWeight: 600 }}>{label}</div>
+        <div style={{ fontSize: 14, fontWeight: 600, color: '#111827' }}>{value}</div>
+      </div>
+    </div>
   )
 }
 
-function FlightBadge({ flight, small }) {
+function FlightBadge({ flight }) {
   const isA = flight === 'A'
   return (
-    <span style={{
-      width:        small ? 22 : 'auto',
-      height:       small ? 22 : 'auto',
-      minWidth:     small ? 22 : 'auto',
-      borderRadius: small ? '50%' : 999,
-      padding:      small ? 0 : '4px 12px',
-      display:      'inline-flex',
-      alignItems:   'center',
-      justifyContent: 'center',
-      fontSize:     small ? 11 : 13,
-      fontWeight:   800,
-      background:   isA ? '#dbeafe' : '#ede9fe',
-      color:        isA ? '#1d4ed8' : '#6d28d9',
-    }}>
-      {small ? flight : `Flight ${flight}`}
+    <span style={{ width: 22, height: 22, borderRadius: '50%', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, fontWeight: 800, background: isA ? '#dbeafe' : '#ede9fe', color: isA ? '#1d4ed8' : '#6d28d9', flexShrink: 0 }}>
+      {flight}
     </span>
   )
 }
@@ -517,25 +486,20 @@ function computeTeeTime(startTime, intervalMins, groupNum) {
   return `${h12}:${mm.toString().padStart(2, '0')} ${ampm}`
 }
 
-function formatTime(t) {
-  return computeTeeTime(t, 0, 1) ?? t
-}
+function formatTime(t) { return computeTeeTime(t, 0, 1) ?? t }
 
-function shortDate(d) {
+function longDate(d) {
   return new Date(d + 'T00:00:00').toLocaleDateString('en-US', {
-    month: 'short', day: 'numeric', year: 'numeric',
+    weekday: 'long', month: 'long', day: 'numeric', year: 'numeric',
   })
 }
 
 function Skeleton() {
   return (
-    <div style={{ minHeight: '100vh', background: '#f5f4f0' }}>
-      <div style={{ height: 240, background: '#1B4332', opacity: 0.8 }} />
-      <div style={{ maxWidth: 768, margin: '0 auto', padding: '24px 20px', display: 'flex', flexDirection: 'column', gap: 14 }}>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 12 }}>
-          {[0,1,2,3].map(i => <div key={i} style={{ height: 80, borderRadius: 14, background: '#e5e7eb', animation: 'pulse 1.5s infinite' }} />)}
-        </div>
-        {[0,1].map(i => <div key={i} style={{ height: 60, borderRadius: 14, background: '#e5e7eb', animation: 'pulse 1.5s infinite' }} />)}
+    <div style={{ minHeight: '100vh', background: '#f9f8f5' }}>
+      <div style={{ height: 340, background: '#e5e7eb' }} />
+      <div style={{ maxWidth: 1100, margin: '0 auto', padding: '28px 40px', display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 14 }}>
+        {[0,1,2].map(i => <div key={i} style={{ height: 120, borderRadius: 16, background: '#e5e7eb' }} />)}
       </div>
     </div>
   )

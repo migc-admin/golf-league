@@ -224,6 +224,7 @@ export default function Courses() {
 
 function CourseModal({ open, onClose, editing, orgId, orgSlug, onSaved }) {
   const [name,     setName]     = useState('')
+  const [address,  setAddress]  = useState('')
   const [tees,     setTees]     = useState(DEFAULT_TEES)
   const [holes,    setHoles]    = useState(() => emptyHoles(3))
   const [photoUrl, setPhotoUrl] = useState('')
@@ -284,6 +285,7 @@ function CourseModal({ open, onClose, editing, orgId, orgSlug, onSaved }) {
         .then(({ data }) => {
           if (!data) return
           setName(data.name)
+          setAddress(data.address ?? '')
           setPhotoUrl(data.photo_url ?? '')
 
           // If course has tees data, use it. Otherwise migrate legacy slope/rating/yardage
@@ -320,6 +322,7 @@ function CourseModal({ open, onClose, editing, orgId, orgSlug, onSaved }) {
         })
     } else {
       setName('')
+      setAddress('')
       setPhotoUrl('')
       setTees(DEFAULT_TEES.map(t => ({ ...t })))
       setHoles(emptyHoles(3))
@@ -405,6 +408,7 @@ function CourseModal({ open, onClose, editing, orgId, orgSlug, onSaved }) {
 
     const payload = {
       name:         name.trim(),
+      address:      address.trim() || null,
       slope:        primary.slope,
       rating:       primary.rating,
       par:          totalPar,
@@ -498,6 +502,14 @@ function CourseModal({ open, onClose, editing, orgId, orgSlug, onSaved }) {
           onChange={e => setName(e.target.value)}
           placeholder="Pine Valley GC"
           required
+        />
+
+        {/* Course address */}
+        <Input
+          label="Course Address (optional)"
+          value={address}
+          onChange={e => setAddress(e.target.value)}
+          placeholder="1 Pebble Beach Dr, Pebble Beach, CA 93953"
         />
 
         {/* Tee Sets */}
