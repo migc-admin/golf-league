@@ -117,6 +117,14 @@ export default function EventPage() {
 
       {/* ── Hero ──────────────────────────────────────────────────────────────── */}
       <div style={{ background: '#fff', borderBottom: '1px solid #e5e7eb' }}>
+
+        {/* Cover photo — mobile only, full-width banner */}
+        {coverImage && (
+          <div className="event-cover-mobile" style={{ width: '100%', height: 200, overflow: 'hidden' }}>
+            <img src={coverImage} alt={eventName} style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
+          </div>
+        )}
+
         <div style={{
           maxWidth: 1100, margin: '0 auto', width: '100%',
           display: 'grid',
@@ -124,7 +132,7 @@ export default function EventPage() {
         }}>
 
           {/* Left panel */}
-          <div style={{ padding: 'clamp(24px,4vw,44px) clamp(20px,4vw,44px) 0', display: 'flex', flexDirection: 'column', minHeight: coverImage ? 360 : 'auto' }}>
+          <div style={{ padding: 'clamp(20px,4vw,44px) clamp(16px,4vw,44px) 0', display: 'flex', flexDirection: 'column', minHeight: coverImage ? 360 : 'auto' }}>
 
             {/* League identity */}
             <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 18 }}>
@@ -164,7 +172,11 @@ export default function EventPage() {
               }>
                 <div>
                   <div style={{ fontSize: 14, fontWeight: 700, color: '#111827' }}>{event.course?.name ?? 'TBD'}</div>
-                  {courseAddress && <div style={{ fontSize: 12, color: '#6b7280', marginTop: 2 }}>{courseAddress}</div>}
+                  {courseAddress && (
+                    <div style={{ fontSize: 12, color: '#6b7280', marginTop: 2 }}>
+                      <span style={{ WebkitUserSelect: 'text', pointerEvents: 'none' }}>{courseAddress}</span>
+                    </div>
+                  )}
                 </div>
               </MetaRow>
             </div>
@@ -197,7 +209,7 @@ export default function EventPage() {
             <div style={{ flex: 1 }} />
 
             {/* Tab bar */}
-            <div style={{ display: 'flex', borderTop: '1px solid #e5e7eb', marginLeft: 'clamp(-20px,-4vw,-44px)', marginRight: coverImage ? 0 : 'clamp(-20px,-4vw,-44px)', overflowX: 'auto', scrollbarWidth: 'none' }}>
+            <div className="event-tab-bar" style={{ borderTop: '1px solid #e5e7eb', marginLeft: 'clamp(-16px,-4vw,-44px)', marginRight: coverImage ? 0 : 'clamp(-16px,-4vw,-44px)' }}>
               {TABS.map(tab => (
                 <button key={tab.key} onClick={() => setActiveTab(tab.key)}
                   style={{
@@ -230,9 +242,9 @@ export default function EventPage() {
             </div>
           </div>
 
-          {/* Right: Cover photo — hidden on mobile */}
+          {/* Right: Cover photo — desktop only */}
           {coverImage && (
-            <div style={{ position: 'relative', overflow: 'hidden', display: 'none' }} className="event-cover-photo">
+            <div style={{ position: 'relative', overflow: 'hidden', display: 'none' }} className="event-cover-desktop">
               <img src={coverImage} alt={eventName}
                 style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block', minHeight: 360 }} />
             </div>
@@ -266,9 +278,20 @@ export default function EventPage() {
 
       {/* Responsive styles */}
       <style>{`
-        @media (min-width: 768px) {
-          .event-cover-photo { display: block !important; }
+        /* Disable iOS Safari auto-link detection on addresses */
+        a[x-apple-data-detectors] {
+          color: inherit !important;
+          text-decoration: none !important;
+          pointer-events: none;
         }
+        .event-cover-mobile { display: block; }
+        .event-cover-desktop { display: none; }
+        @media (min-width: 768px) {
+          .event-cover-mobile { display: none; }
+          .event-cover-desktop { display: block !important; }
+        }
+        .event-tab-bar { display: flex; overflow-x: auto; scrollbar-width: none; -webkit-overflow-scrolling: touch; }
+        .event-tab-bar::-webkit-scrollbar { display: none; }
       `}</style>
     </div>
   )

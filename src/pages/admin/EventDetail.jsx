@@ -1,4 +1,12 @@
 import { useEffect, useState, useCallback, useRef } from 'react'
+import {
+  DndContext, DragOverlay, PointerSensor, useSensor, useSensors,
+  closestCenter,
+} from '@dnd-kit/core'
+import {
+  SortableContext, useSortable, verticalListSortingStrategy,
+} from '@dnd-kit/sortable'
+import { CSS } from '@dnd-kit/utilities'
 import { useParams, Link } from 'react-router-dom'
 import { supabase } from '../../lib/supabase'
 import toast from 'react-hot-toast'
@@ -1997,10 +2005,8 @@ async function clearNoShow(playerId, eventId) {
 }
 
 function TabGroups({ event, eventPlayers, onUpdated, orgSlug, allScores, course }) {
-  const ungrouped    = eventPlayers.filter(ep => !ep.group_number).sort(epAlpha)
-  const maxGroup     = Math.max(0, ...eventPlayers.map(ep => ep.group_number ?? 0))
   const isShotgun    = event?.shotgun_start ?? false
-  const [noShowLoading, setNoShowLoading] = useState(null) // player_id being processed
+  const [noShowLoading, setNoShowLoading] = useState(null)
 
   async function handleNoShow(ep) {
     if (!window.confirm(`Mark ${ep.player?.first_name} ${ep.player?.last_name} as a no-show? This will record par+2 for all 18 holes.`)) return
@@ -2033,73 +2039,145 @@ function TabGroups({ event, eventPlayers, onUpdated, orgSlug, allScores, course 
     await supabase.from('events').update({ group_hole_assignments: next }).eq('id', event.id)
   }
 
-  // Local order state: { [epId]: orderIndex }
-  const [localOrder, setLocalOrder] = useState(() => {
-    const init = {}
-    const byGroup = {}
-    for (const ep of eventPlayers) {
-      if (!ep.group_number) continue
-      if (!byGroup[ep.group_number]) byGroup[ep.group_number] = []
-      byGroup[ep.group_number].push(ep)
-    }
-    for (const members of Object.values(byGroup)) {
-      members.sort((a, b) => (a.group_order ?? 0) - (b.group_order ?? 0))
-      members.forEach((ep, i) => { init[ep.id] = i })
-    }
-    return init
-  })
+  // Compute number of groups: ceil(players / 4)
+  const totalPlayers = eventPlayers.length
+  const numGroups    = totalPlayers > 0 ? Math.ceil(totalPlayers / 4) : 1
 
-  // On mount: normalize group_order in DB to match display order so public page stays in sync
+  // Local state: groups as arrays of ep.id strings, ungrouped pool
+  const [groups, setGroups]       = useState([])
+  const [ungrouped, setUngrouped] = useState([])
+  const [activeId, setActiveId]   = useState(null)
+  const [saving, setSaving]       = useState(false)
+
+  // Build local state from eventPlayers
   useEffect(() => {
-    const updates = Object.entries(localOrder).map(([id, order]) =>
-      supabase.from('event_players').update({ group_order: order }).eq('id', id)
-    )
-    Promise.all(updates).catch(() => {})
-  }, []) // eslint-disable-line react-hooks/exhaustive-deps
-
-  // Sorted members for a given group number — alpha by first name, then last name
-  function groupMembers(g) {
-    return eventPlayers
-      .filter(ep => ep.group_number === parseInt(g, 10))
-      .sort((a, b) => {
-        const orderDiff = (localOrder[a.id] ?? 0) - (localOrder[b.id] ?? 0)
-        if (orderDiff !== 0) return orderDiff
-        return epAlpha(a, b)
-      })
-  }
-
-  async function movePlayer(epId, groupNum, direction) {
-    const members = groupMembers(groupNum)
-    const idx = members.findIndex(m => m.id === epId)
-    const swapIdx = idx + direction
-    if (swapIdx < 0 || swapIdx >= members.length) return
-
-    const a = members[idx]
-    const b = members[swapIdx]
-    const newOrder = { ...localOrder, [a.id]: swapIdx, [b.id]: idx }
-    setLocalOrder(newOrder)
-
-    // Persist ALL positions in this group so DB stays fully in sync with display order
-    await Promise.all(
-      members.map(m =>
-        supabase.from('event_players').update({ group_order: newOrder[m.id] ?? localOrder[m.id] ?? 0 }).eq('id', m.id)
-      )
-    )
-  }
-
-  async function setGroup(epId, group) {
-    const { error } = await supabase.from('event_players').update({ group_number: group || null }).eq('id', epId)
-    if (error) { toast.error(error.message); return }
-
-    if (group) {
-      const members = eventPlayers.filter(ep => ep.group_number === parseInt(group, 10))
-      const hasScorekeeper = members.some(ep => ep.is_scorekeeper)
-      if (!hasScorekeeper) {
-        await supabase.from('event_players').update({ is_scorekeeper: true }).eq('id', epId)
+    const byGroup = {}
+    const unassigned = []
+    for (const ep of eventPlayers) {
+      if (ep.group_number) {
+        if (!byGroup[ep.group_number]) byGroup[ep.group_number] = []
+        byGroup[ep.group_number].push(ep)
+      } else {
+        unassigned.push(ep)
       }
     }
+    // Sort members within each existing group by group_order
+    Object.values(byGroup).forEach(arr => arr.sort((a, b) => (a.group_order ?? 0) - (b.group_order ?? 0)))
 
-    onUpdated()
+    // Build groups array with numGroups slots
+    const existingGroupNums = Object.keys(byGroup).map(Number).sort((a, b) => a - b)
+    const maxSlots = Math.max(numGroups, existingGroupNums.length > 0 ? Math.max(...existingGroupNums) : 0)
+    const built = Array.from({ length: maxSlots }, (_, i) => byGroup[i + 1] ?? [])
+    setGroups(built)
+    setUngrouped(unassigned.sort(epAlpha))
+  }, [eventPlayers, numGroups])
+
+  const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 5 } }))
+
+  function findContainer(id) {
+    if (id === 'ungrouped') return 'ungrouped'
+    for (let i = 0; i < groups.length; i++) {
+      if (groups[i].some(ep => ep.id === id)) return `group-${i}`
+    }
+    return null
+  }
+
+  function handleDragStart({ active }) { setActiveId(active.id) }
+
+  function handleDragOver({ active, over }) {
+    if (!over) return
+    const activeContainer = findContainer(active.id)
+    let overContainer = findContainer(over.id)
+    if (!overContainer) overContainer = over.id // dropped on container itself
+
+    if (!activeContainer || !overContainer || activeContainer === overContainer) return
+
+    setGroups(prev => {
+      const next = prev.map(g => [...g])
+      let movedEp
+
+      if (activeContainer === 'ungrouped') {
+        movedEp = ungrouped.find(ep => ep.id === active.id)
+        setUngrouped(u => u.filter(ep => ep.id !== active.id))
+      } else {
+        const fromIdx = parseInt(activeContainer.replace('group-', ''), 10)
+        movedEp = next[fromIdx].find(ep => ep.id === active.id)
+        next[fromIdx] = next[fromIdx].filter(ep => ep.id !== active.id)
+      }
+
+      if (!movedEp) return prev
+
+      if (overContainer === 'ungrouped') {
+        setUngrouped(u => [...u, movedEp].sort(epAlpha))
+      } else {
+        const toIdx = parseInt(overContainer.replace('group-', ''), 10)
+        const overItemIdx = next[toIdx].findIndex(ep => ep.id === over.id)
+        if (overItemIdx >= 0) {
+          next[toIdx].splice(overItemIdx, 0, movedEp)
+        } else {
+          next[toIdx].push(movedEp)
+        }
+      }
+      return next
+    })
+  }
+
+  async function handleDragEnd({ active, over }) {
+    setActiveId(null)
+    if (!over) return
+
+    const activeContainer = findContainer(active.id)
+    let overContainer = findContainer(over.id)
+    if (!overContainer) overContainer = over.id
+
+    // Reorder within same group
+    if (activeContainer === overContainer && activeContainer !== 'ungrouped') {
+      const idx = parseInt(activeContainer.replace('group-', ''), 10)
+      setGroups(prev => {
+        const next = prev.map(g => [...g])
+        const members = next[idx]
+        const from = members.findIndex(ep => ep.id === active.id)
+        const to   = members.findIndex(ep => ep.id === over.id)
+        if (from === -1 || to === -1 || from === to) return prev
+        const [moved] = members.splice(from, 1)
+        members.splice(to, 0, moved)
+        next[idx] = members
+        return next
+      })
+    }
+
+    // Persist after any drag
+    await persistGroups()
+  }
+
+  async function persistGroups() {
+    setSaving(true)
+    try {
+      const updates = []
+      groups.forEach((members, i) => {
+        const groupNum = i + 1
+        members.forEach((ep, order) => {
+          updates.push(
+            supabase.from('event_players')
+              .update({ group_number: groupNum, group_order: order })
+              .eq('id', ep.id)
+          )
+        })
+      })
+      ungrouped.forEach(ep => {
+        updates.push(
+          supabase.from('event_players')
+            .update({ group_number: null, group_order: null })
+            .eq('id', ep.id)
+        )
+      })
+      await Promise.all(updates)
+      onUpdated()
+    } catch (err) {
+      toast.error('Save failed: ' + err.message)
+    } finally {
+      setSaving(false)
+    }
   }
 
   async function toggleScorekeeper(ep) {
@@ -2110,20 +2188,14 @@ function TabGroups({ event, eventPlayers, onUpdated, orgSlug, allScores, course 
     else onUpdated()
   }
 
-  const groupNums = [...new Set(eventPlayers.map(ep => ep.group_number).filter(Boolean))].sort((a,b) => a - b)
-
   const [showAutoAssign, setShowAutoAssign] = useState(false)
   const [autoMethod,     setAutoMethod]     = useState('random')
-  const [groupSize,      setGroupSize]      = useState(4)
   const [autoLoading,    setAutoLoading]    = useState(false)
 
   async function runAutoAssign() {
     setAutoLoading(true)
     try {
-      // Work on all enrolled players
       let players = [...eventPlayers]
-
-      // Sort players based on method
       if (autoMethod === 'alpha') {
         players.sort(epAlpha)
       } else if (autoMethod === 'handicap_balanced') {
@@ -2137,59 +2209,43 @@ function TabGroups({ event, eventPlayers, onUpdated, orgSlug, allScores, course 
           return epAlpha(a, b)
         })
       } else {
-        // random
         for (let i = players.length - 1; i > 0; i--) {
           const j = Math.floor(Math.random() * (i + 1));
           [players[i], players[j]] = [players[j], players[i]]
         }
       }
 
-      // For balanced handicap: snake draft into groups
-      let assignments = {} // epId -> groupNumber
-      const size = parseInt(groupSize, 10)
-      const numGroups = Math.ceil(players.length / size)
+      const ng = Math.ceil(players.length / 4)
+      const buckets = Array.from({ length: ng }, () => [])
 
       if (autoMethod === 'handicap_balanced') {
-        // Create empty group buckets
-        const buckets = Array.from({ length: numGroups }, () => [])
         players.forEach((ep, idx) => {
-          // Snake: go forward then backward across groups
-          const round = Math.floor(idx / numGroups)
-          const pos   = idx % numGroups
-          const groupIdx = round % 2 === 0 ? pos : numGroups - 1 - pos
-          buckets[groupIdx].push(ep)
-        })
-        buckets.forEach((bucket, gi) => {
-          bucket.forEach(ep => { assignments[ep.id] = gi + 1 })
+          const round = Math.floor(idx / ng)
+          const pos   = idx % ng
+          const gi    = round % 2 === 0 ? pos : ng - 1 - pos
+          buckets[gi].push(ep)
         })
       } else {
-        // Sequential fill
-        players.forEach((ep, idx) => {
-          assignments[ep.id] = Math.floor(idx / size) + 1
-        })
+        players.forEach((ep, idx) => { buckets[Math.floor(idx / 4)].push(ep) })
       }
 
-      // Persist all assignments in parallel
       await Promise.all(
-        Object.entries(assignments).map(([id, group]) =>
-          supabase.from('event_players').update({ group_number: group }).eq('id', id)
+        buckets.flatMap((bucket, gi) =>
+          bucket.map((ep, order) =>
+            supabase.from('event_players').update({ group_number: gi + 1, group_order: order }).eq('id', ep.id)
+          )
         )
       )
-
-      // Auto-assign first player in each group as scorekeeper
-      const groupMap = {}
-      for (const [id, group] of Object.entries(assignments)) {
-        if (!groupMap[group]) groupMap[group] = id
-      }
+      // Auto-assign first in each group as scorekeeper
       await Promise.all(
-        Object.values(groupMap).map(id =>
-          supabase.from('event_players').update({ is_scorekeeper: true }).eq('id', id)
+        buckets.map(bucket => bucket[0]
+          ? supabase.from('event_players').update({ is_scorekeeper: true }).eq('id', bucket[0].id)
+          : Promise.resolve()
         )
       )
-
       setShowAutoAssign(false)
       onUpdated()
-      toast.success(`${players.length} players assigned to ${numGroups} groups`)
+      toast.success(`${players.length} players assigned to ${ng} groups`)
     } catch (err) {
       toast.error('Auto-assign failed: ' + err.message)
     } finally {
@@ -2200,7 +2256,7 @@ function TabGroups({ event, eventPlayers, onUpdated, orgSlug, allScores, course 
   async function clearAllGroups() {
     await Promise.all(
       eventPlayers.map(ep =>
-        supabase.from('event_players').update({ group_number: null, is_scorekeeper: false }).eq('id', ep.id)
+        supabase.from('event_players').update({ group_number: null, group_order: null, is_scorekeeper: false }).eq('id', ep.id)
       )
     )
     onUpdated()
@@ -2208,14 +2264,13 @@ function TabGroups({ event, eventPlayers, onUpdated, orgSlug, allScores, course 
   }
 
   const AUTO_METHODS = [
-    { key: 'random',             label: 'Random',                    desc: 'Shuffle all players randomly into groups' },
-    { key: 'handicap_balanced',  label: 'Balanced by Handicap',      desc: 'Snake draft — each group gets a mix of low and high handicaps' },
-    { key: 'handicap_grouped',   label: 'Grouped by Handicap',       desc: 'Low handicaps together, high handicaps together' },
-    { key: 'by_flight',          label: 'By Flight',                 desc: 'Keep Flight A and Flight B players in separate groups' },
-    { key: 'alpha',              label: 'Alphabetical',              desc: 'Assign A–Z by first name, filling groups sequentially' },
+    { key: 'random',            label: 'Random',               desc: 'Shuffle all players randomly into groups' },
+    { key: 'handicap_balanced', label: 'Balanced by Handicap', desc: 'Snake draft — each group gets a mix of low and high handicaps' },
+    { key: 'handicap_grouped',  label: 'Grouped by Handicap',  desc: 'Low handicaps together, high handicaps together' },
+    { key: 'by_flight',         label: 'By Flight',            desc: 'Keep Flight A and Flight B players in separate groups' },
+    { key: 'alpha',             label: 'Alphabetical',         desc: 'Assign A–Z by first name, filling groups sequentially' },
   ]
 
-  // Build scorer map: groupNumber → Set of entered_by values from scores
   const scorerByGroup = (() => {
     const groupMap = Object.fromEntries(eventPlayers.map(ep => [ep.player_id, ep.group_number]))
     const map = {}
@@ -2229,9 +2284,10 @@ function TabGroups({ event, eventPlayers, onUpdated, orgSlug, allScores, course 
     return map
   })()
 
+  const activeEp = activeId ? eventPlayers.find(ep => ep.id === activeId) : null
+
   return (
     <div className="space-y-4">
-      {/* Scoring Access — shown when event is active */}
       {event.status === 'active' && (
         <Card>
           <CardHeader title="Scoring Access" subtitle="Share with players to enter scores" />
@@ -2240,19 +2296,16 @@ function TabGroups({ event, eventPlayers, onUpdated, orgSlug, allScores, course 
       )}
 
       {/* Toolbar */}
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between flex-wrap gap-2">
         <p className="text-sm text-gray-600">
-          Assign players to groups (2–4 per group). Any player in the group can keep score.
+          Drag players into groups. {numGroups} group{numGroups !== 1 ? 's' : ''} for {totalPlayers} player{totalPlayers !== 1 ? 's' : ''}.
         </p>
         <div className="flex items-center gap-2 shrink-0">
+          {saving && <span className="text-xs text-gray-400">Saving…</span>}
           {eventPlayers.some(ep => ep.group_number) && (
-            <Button size="sm" variant="ghost" onClick={clearAllGroups}>
-              Clear All
-            </Button>
+            <Button size="sm" variant="ghost" onClick={clearAllGroups}>Clear All</Button>
           )}
-          <Button size="sm" onClick={() => setShowAutoAssign(true)}>
-            ⚡ Auto-Assign
-          </Button>
+          <Button size="sm" onClick={() => setShowAutoAssign(true)}>⚡ Auto-Assign</Button>
         </div>
       </div>
 
@@ -2262,21 +2315,12 @@ function TabGroups({ event, eventPlayers, onUpdated, orgSlug, allScores, course 
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-6 space-y-5">
             <div>
               <h2 className="text-lg font-bold text-gray-900">Auto-Assign Groups</h2>
-              <p className="text-sm text-gray-500 mt-1">Choose a method and group size. This will overwrite all current assignments.</p>
+              <p className="text-sm text-gray-500 mt-1">Groups of 4 ({numGroups} groups). This overwrites current assignments.</p>
             </div>
-
-            {/* Method selector */}
             <div className="space-y-2">
               {AUTO_METHODS.map(m => (
                 <label key={m.key} className={`flex items-start gap-3 rounded-xl border-2 px-4 py-3 cursor-pointer transition-colors ${autoMethod === m.key ? 'border-fairway-600 bg-fairway-50' : 'border-gray-200 hover:border-gray-300'}`}>
-                  <input
-                    type="radio"
-                    name="autoMethod"
-                    value={m.key}
-                    checked={autoMethod === m.key}
-                    onChange={() => setAutoMethod(m.key)}
-                    className="mt-0.5 accent-fairway-600"
-                  />
+                  <input type="radio" name="autoMethod" value={m.key} checked={autoMethod === m.key} onChange={() => setAutoMethod(m.key)} className="mt-0.5 accent-fairway-600" />
                   <div>
                     <div className="text-sm font-semibold text-gray-900">{m.label}</div>
                     <div className="text-xs text-gray-500 mt-0.5">{m.desc}</div>
@@ -2284,176 +2328,169 @@ function TabGroups({ event, eventPlayers, onUpdated, orgSlug, allScores, course 
                 </label>
               ))}
             </div>
-
-            {/* Group size */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1.5">Players per group</label>
-              <div className="flex gap-2">
-                {[2, 3, 4].map(n => (
-                  <button
-                    key={n}
-                    onClick={() => setGroupSize(n)}
-                    className={`flex-1 py-2 rounded-lg text-sm font-semibold border-2 transition-colors ${groupSize === n ? 'border-fairway-600 bg-fairway-50 text-fairway-700' : 'border-gray-200 text-gray-600 hover:border-gray-300'}`}
-                  >
-                    {n}
-                  </button>
-                ))}
-              </div>
-              <p className="text-xs text-gray-400 mt-1.5">
-                {eventPlayers.length} players → {Math.ceil(eventPlayers.length / groupSize)} groups
-                {eventPlayers.length % groupSize !== 0 ? ` (last group has ${eventPlayers.length % groupSize})` : ''}
-              </p>
-            </div>
-
-            {/* Actions */}
             <div className="flex gap-3 pt-1">
-              <Button variant="secondary" className="flex-1" onClick={() => setShowAutoAssign(false)}>
-                Cancel
-              </Button>
-              <Button className="flex-1" loading={autoLoading} onClick={runAutoAssign}>
-                Assign Groups
-              </Button>
+              <Button variant="secondary" className="flex-1" onClick={() => setShowAutoAssign(false)}>Cancel</Button>
+              <Button className="flex-1" loading={autoLoading} onClick={runAutoAssign}>Assign Groups</Button>
             </div>
           </div>
         </div>
       )}
 
-      {ungrouped.length > 0 && (
-        <Card>
-          <CardHeader title="Ungrouped Players" subtitle="Assign these players to a group" />
-          <div className="space-y-2">
-            {ungrouped.map(ep => (
-              <GroupRow key={ep.id} ep={ep} maxGroup={maxGroup} onSetGroup={setGroup} onToggleSK={toggleScorekeeper}
-                isNoShow={isPlayerNoShow(ep.player_id, allScores)}
-                noShowLoading={noShowLoading === ep.player_id}
-                onNoShow={() => handleNoShow(ep)}
-                onClearNoShow={() => handleClearNoShow(ep)}
-              />
-            ))}
-          </div>
-        </Card>
-      )}
+      <DndContext
+        sensors={sensors}
+        collisionDetection={closestCenter}
+        onDragStart={handleDragStart}
+        onDragOver={handleDragOver}
+        onDragEnd={handleDragEnd}
+      >
+        {/* Ungrouped pool */}
+        {ungrouped.length > 0 && (
+          <DroppableGroup
+            id="ungrouped"
+            title="Unassigned Players"
+            subtitle="Drag into a group below"
+            members={ungrouped}
+            holeAssignments={holeAssignments}
+            isShotgun={false}
+            scorerByGroup={{}}
+            onToggleSK={toggleScorekeeper}
+            allScores={allScores}
+            noShowLoading={noShowLoading}
+            onNoShow={handleNoShow}
+            onClearNoShow={handleClearNoShow}
+          />
+        )}
 
-      {groupNums.map(g => {
-        const members = groupMembers(g)
-        const assignedHole = holeAssignments[g] ?? ''
-        return (
-          <Card key={g}>
-            <div className="flex items-center justify-between px-5 pt-4 pb-2">
-              <div>
-                <div className="font-semibold text-gray-900">Group {g}</div>
-                <div className="text-xs text-gray-400 mt-0.5">{members.length} player{members.length !== 1 ? 's' : ''}</div>
-                {scorerByGroup[g] && (
-                  <div className="text-xs text-green-700 mt-0.5">
-                    Scored by: {[...scorerByGroup[g]].join(', ')}
-                  </div>
-                )}
-              </div>
-              {isShotgun && (
-                <div className="flex items-center gap-2">
-                  <label className="text-xs font-medium text-gray-500">Start Hole</label>
-                  <select
-                    value={assignedHole}
-                    onChange={e => setGroupHole(g, e.target.value)}
-                    className="input py-1 text-sm w-24 bg-white"
-                  >
-                    <option value="">—</option>
-                    {Array.from({ length: 18 }, (_, i) => i + 1).flatMap(h => [
-                      <option key={`${h}A`} value={`${h}A`}>Hole {h}A</option>,
-                      <option key={`${h}B`} value={`${h}B`}>Hole {h}B</option>,
-                    ])}
-                  </select>
-                </div>
-              )}
-            </div>
-            <div className="divide-y divide-gray-100">
-              {members.map((ep, i) => (
-                <GroupRow
-                  key={ep.id}
-                  ep={ep}
-                  maxGroup={maxGroup}
-                  isFirst={i === 0}
-                  isLast={i === members.length - 1}
-                  onSetGroup={setGroup}
-                  onToggleSK={toggleScorekeeper}
-                  onMove={dir => movePlayer(ep.id, g, dir)}
-                  isNoShow={isPlayerNoShow(ep.player_id, allScores)}
-                  noShowLoading={noShowLoading === ep.player_id}
-                  onNoShow={() => handleNoShow(ep)}
-                  onClearNoShow={() => handleClearNoShow(ep)}
-                />
-              ))}
-            </div>
-          </Card>
-        )
-      })}
+        {/* Group columns */}
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          {groups.map((members, i) => {
+            const g = i + 1
+            return (
+              <DroppableGroup
+                key={g}
+                id={`group-${i}`}
+                title={`Group ${g}`}
+                subtitle={`${members.length} player${members.length !== 1 ? 's' : ''}`}
+                members={members}
+                holeAssignments={holeAssignments}
+                isShotgun={isShotgun}
+                scorerByGroup={scorerByGroup}
+                groupNum={g}
+                onSetGroupHole={setGroupHole}
+                onToggleSK={toggleScorekeeper}
+                allScores={allScores}
+                noShowLoading={noShowLoading}
+                onNoShow={handleNoShow}
+                onClearNoShow={handleClearNoShow}
+              />
+            )
+          })}
+        </div>
+
+        <DragOverlay>
+          {activeEp ? <DragCard ep={activeEp} /> : null}
+        </DragOverlay>
+      </DndContext>
     </div>
   )
 }
 
-function GroupRow({ ep, maxGroup, isFirst, isLast, onSetGroup, onToggleSK, onMove, isNoShow, noShowLoading, onNoShow, onClearNoShow }) {
-  const groupOptions = Array.from({ length: Math.max(maxGroup + 1, 5) }, (_, i) => i + 1)
+function DroppableGroup({ id, title, subtitle, members, isShotgun, holeAssignments, scorerByGroup, groupNum, onSetGroupHole, onToggleSK, allScores, noShowLoading, onNoShow, onClearNoShow }) {
+  const { setNodeRef, isOver } = useSortable({ id, data: { type: 'container' } })
+
+  const scored = groupNum && scorerByGroup[groupNum] ? [...scorerByGroup[groupNum]].join(', ') : null
 
   return (
-    <div className={`flex items-center justify-between py-2 px-1 ${isNoShow ? 'opacity-60' : ''}`}>
-      <div className="flex items-center gap-2">
-        {/* Up/down only shown when inside a group */}
-        {onMove && (
-          <div className="flex flex-col gap-0.5">
-            <button
-              onClick={() => onMove(-1)}
-              disabled={isFirst || isNoShow}
-              className="text-gray-400 hover:text-gray-700 disabled:opacity-20 leading-none px-1"
-              title="Move up"
-            >▲</button>
-            <button
-              onClick={() => onMove(1)}
-              disabled={isLast || isNoShow}
-              className="text-gray-400 hover:text-gray-700 disabled:opacity-20 leading-none px-1"
-              title="Move down"
-            >▼</button>
+    <div
+      ref={setNodeRef}
+      className="rounded-xl border-2 transition-colors"
+      style={{ borderColor: isOver ? '#1B4332' : '#e5e7eb', background: isOver ? '#f0fdf4' : '#fff', minHeight: 80 }}
+    >
+      {/* Header */}
+      <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100">
+        <div>
+          <div className="font-semibold text-gray-900 text-sm">{title}</div>
+          <div className="text-xs text-gray-400">{subtitle}</div>
+          {scored && <div className="text-xs text-green-700 mt-0.5">Scored by: {scored}</div>}
+        </div>
+        {isShotgun && groupNum && (
+          <div className="flex items-center gap-1.5">
+            <label className="text-xs text-gray-400">Hole</label>
+            <select value={holeAssignments[groupNum] ?? ''} onChange={e => onSetGroupHole(groupNum, e.target.value)} className="input py-0.5 text-xs w-20 bg-white">
+              <option value="">—</option>
+              {Array.from({ length: 18 }, (_, i) => i + 1).flatMap(h => [
+                <option key={`${h}A`} value={`${h}A`}>Hole {h}A</option>,
+                <option key={`${h}B`} value={`${h}B`}>Hole {h}B</option>,
+              ])}
+            </select>
           </div>
         )}
-        <div>
-          <span className="text-sm font-medium text-gray-900">
-            {ep.player?.first_name} {ep.player?.last_name}
-          </span>
-          {isNoShow && (
-            <span className="ml-2 text-xs font-semibold px-2 py-0.5 rounded-full" style={{ background: '#fef3c7', color: '#92400e' }}>
-              No Show
-            </span>
+      </div>
+
+      {/* Sortable members */}
+      <SortableContext items={members.map(ep => ep.id)} strategy={verticalListSortingStrategy}>
+        <div className="p-2 space-y-1">
+          {members.map(ep => (
+            <SortablePlayerCard
+              key={ep.id}
+              ep={ep}
+              onToggleSK={onToggleSK}
+              isNoShow={isPlayerNoShow(ep.player_id, allScores)}
+              noShowLoading={noShowLoading === ep.player_id}
+              onNoShow={() => onNoShow(ep)}
+              onClearNoShow={() => onClearNoShow(ep)}
+            />
+          ))}
+          {members.length === 0 && (
+            <div className="text-xs text-gray-300 text-center py-4">Drop players here</div>
           )}
+        </div>
+      </SortableContext>
+    </div>
+  )
+}
+
+function SortablePlayerCard({ ep, onToggleSK, isNoShow, noShowLoading, onNoShow, onClearNoShow }) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: ep.id })
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.4 : 1,
+  }
+
+  return (
+    <div ref={setNodeRef} style={style} className={`flex items-center justify-between rounded-lg px-3 py-2 border ${isNoShow ? 'opacity-60 bg-gray-50 border-gray-200' : 'bg-white border-gray-100 hover:border-gray-200'}`}>
+      <div className="flex items-center gap-2">
+        <span {...attributes} {...listeners} className="cursor-grab text-gray-300 hover:text-gray-500 select-none" title="Drag to move">
+          ⠿
+        </span>
+        <div>
+          <span className="text-sm font-medium text-gray-900">{ep.player?.first_name} {ep.player?.last_name}</span>
+          {isNoShow && <span className="ml-2 text-xs font-semibold px-1.5 py-0.5 rounded-full" style={{ background: '#fef3c7', color: '#92400e' }}>No Show</span>}
           {ep.flight && !isNoShow && <span className="ml-1"><FlightBadge flight={ep.flight} /></span>}
+          {ep.is_scorekeeper && <span className="ml-1 text-xs font-bold text-fairway-700">SK</span>}
         </div>
       </div>
-      <div className="flex items-center gap-2">
+      <div className="flex items-center gap-1.5">
         {isNoShow ? (
-          <button
-            onClick={onClearNoShow}
-            disabled={noShowLoading}
-            className="text-xs font-medium px-2 py-1 rounded-lg border border-gray-300 text-gray-600 hover:bg-gray-50 disabled:opacity-50"
-          >
+          <button onClick={onClearNoShow} disabled={noShowLoading} className="text-xs px-2 py-1 rounded border border-gray-200 text-gray-500 hover:bg-gray-50 disabled:opacity-40">
             {noShowLoading ? '…' : 'Undo'}
           </button>
         ) : (
-          <button
-            onClick={onNoShow}
-            disabled={noShowLoading}
-            className="text-xs font-medium px-2 py-1 rounded-lg border border-amber-300 text-amber-700 hover:bg-amber-50 disabled:opacity-50"
-          >
+          <button onClick={onNoShow} disabled={noShowLoading} className="text-xs px-2 py-1 rounded border border-amber-200 text-amber-600 hover:bg-amber-50 disabled:opacity-40">
             {noShowLoading ? '…' : 'No Show'}
           </button>
         )}
-        <select
-          value={ep.group_number ?? ''}
-          onChange={e => onSetGroup(ep.id, e.target.value)}
-          className="input py-1 text-xs w-24"
-          disabled={isNoShow}
-        >
-          <option value="">None</option>
-          {groupOptions.map(g => <option key={g} value={g}>Group {g}</option>)}
-        </select>
       </div>
+    </div>
+  )
+}
+
+function DragCard({ ep }) {
+  return (
+    <div className="flex items-center gap-2 bg-white border-2 border-fairway-500 rounded-lg px-3 py-2 shadow-xl text-sm font-semibold text-gray-900">
+      <span className="text-gray-400">⠿</span>
+      {ep.player?.first_name} {ep.player?.last_name}
     </div>
   )
 }
