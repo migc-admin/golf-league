@@ -127,7 +127,7 @@ export default function EventPage() {
           </div>
         )}
 
-        <div style={{
+        <div className="event-hero-grid" style={{
           maxWidth: 1100, margin: '0 auto', width: '100%',
           display: 'grid',
           gridTemplateColumns: coverImage ? 'minmax(0,1fr) min(420px,45%)' : '1fr',
@@ -211,7 +211,7 @@ export default function EventPage() {
             <div style={{ flex: 1 }} />
 
             {/* Tab bar */}
-            <div className="event-tab-bar" style={{ borderTop: '1px solid #e5e7eb', marginLeft: 'clamp(-16px,-4vw,-44px)', marginRight: coverImage ? 0 : 'clamp(-16px,-4vw,-44px)' }}>
+            <div className="event-tab-bar" style={{ borderTop: '1px solid #e5e7eb', marginLeft: 'clamp(-16px,-4vw,-44px)', marginRight: 'clamp(-16px,-4vw,-44px)' }}>
               {BASE_TABS.map(tab => (
                 <button key={tab.key} onClick={() => setActiveTab(tab.key)}
                   style={{
@@ -295,6 +295,9 @@ export default function EventPage() {
         @media (min-width: 768px) {
           .event-cover-mobile { display: none; }
           .event-cover-desktop { display: block !important; }
+        }
+        @media (max-width: 767px) {
+          .event-hero-grid { grid-template-columns: 1fr !important; }
         }
         .event-tab-bar { display: flex; overflow-x: auto; scrollbar-width: none; -webkit-overflow-scrolling: touch; width: 100%; }
         .event-tab-bar::-webkit-scrollbar { display: none; }
