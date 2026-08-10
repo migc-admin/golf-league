@@ -186,21 +186,14 @@ export default function EventPage() {
             {/* Registration CTA — only if upcoming and reg is available */}
             {event.status === 'upcoming' && regUrl && (
               <div className="reg-cta" style={{ marginBottom: 20, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16 }}>
-                {(event.tournament_fee > 0 || spotsLeft !== null) && (
-                  <div>
-                    {event.tournament_fee > 0 && (
-                      <div style={{ fontSize: 22, fontWeight: 900, color: '#111827', letterSpacing: '-0.02em' }}>
-                        ${Number(event.tournament_fee).toFixed(0)}<span style={{ fontSize: 13, fontWeight: 500, color: '#6b7280' }}>/player</span>
-                      </div>
-                    )}
-                    {spotsLeft !== null && (
-                      <div style={{ fontSize: 12, color: spotsLeft <= 5 ? '#dc2626' : '#6b7280', fontWeight: 600, marginTop: 2 }}>
-                        {spotsLeft > 0 ? `${spotsLeft} spot${spotsLeft !== 1 ? 's' : ''} remaining` : 'Event full'}
-                      </div>
-                    )}
+                {event.tournament_fee > 0 && (
+                  <div style={{ fontSize: 22, fontWeight: 900, color: '#111827', letterSpacing: '-0.02em' }}>
+                    ${Number(event.tournament_fee).toFixed(0)}<span style={{ fontSize: 13, fontWeight: 500, color: '#6b7280' }}>/player</span>
                   </div>
                 )}
-                {(!spotsLeft || spotsLeft > 0) && (
+                {spotsLeft !== null && spotsLeft <= 0 ? (
+                  <span style={{ fontSize: 13, fontWeight: 700, color: '#dc2626' }}>Registration Closed</span>
+                ) : (
                   <Link to={regUrl}
                     style={{ flexShrink: 0, display: 'inline-block', background: GREEN, color: '#fff', fontWeight: 800, fontSize: 14, padding: '13px 28px', borderRadius: 10, textDecoration: 'none' }}>
                     Register →
