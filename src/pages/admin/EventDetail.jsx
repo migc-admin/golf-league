@@ -1,10 +1,11 @@
 import { useEffect, useState, useCallback, useRef } from 'react'
 import {
   DndContext, DragOverlay, PointerSensor, useSensor, useSensors,
-  closestCenter,
+  closestCenter, useDroppable,
 } from '@dnd-kit/core'
 import {
   SortableContext, useSortable, verticalListSortingStrategy,
+  arrayMove,
 } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
 import { useParams, Link } from 'react-router-dom'
@@ -2039,17 +2040,14 @@ function TabGroups({ event, eventPlayers, onUpdated, orgSlug, allScores, course 
     await supabase.from('events').update({ group_hole_assignments: next }).eq('id', event.id)
   }
 
-  // Compute number of groups: ceil(players / 4)
   const totalPlayers = eventPlayers.length
   const numGroups    = totalPlayers > 0 ? Math.ceil(totalPlayers / 4) : 1
 
-  // Local state: groups as arrays of ep.id strings, ungrouped pool
-  const [groups, setGroups]       = useState([])
-  const [ungrouped, setUngrouped] = useState([])
-  const [activeId, setActiveId]   = useState(null)
-  const [saving, setSaving]       = useState(false)
+  // containers: { 'ungrouped': [ep, ...], 'group-0': [ep, ...], 'group-1': [...], ... }
+  const [containers, setContainers] = useState({})
+  const [activeId, setActiveId]     = useState(null)
+  const [saving, setSaving]         = useState(false)
 
-  // Build local state from eventPlayers
   useEffect(() => {
     const byGroup = {}
     const unassigned = []
@@ -2061,23 +2059,21 @@ function TabGroups({ event, eventPlayers, onUpdated, orgSlug, allScores, course 
         unassigned.push(ep)
       }
     }
-    // Sort members within each existing group by group_order
     Object.values(byGroup).forEach(arr => arr.sort((a, b) => (a.group_order ?? 0) - (b.group_order ?? 0)))
 
-    // Build groups array with numGroups slots
-    const existingGroupNums = Object.keys(byGroup).map(Number).sort((a, b) => a - b)
-    const maxSlots = Math.max(numGroups, existingGroupNums.length > 0 ? Math.max(...existingGroupNums) : 0)
-    const built = Array.from({ length: maxSlots }, (_, i) => byGroup[i + 1] ?? [])
-    setGroups(built)
-    setUngrouped(unassigned.sort(epAlpha))
+    const existingMax = Object.keys(byGroup).length > 0 ? Math.max(...Object.keys(byGroup).map(Number)) : 0
+    const slots = Math.max(numGroups, existingMax)
+    const next = { ungrouped: unassigned.sort(epAlpha) }
+    for (let i = 0; i < slots; i++) next[`group-${i}`] = byGroup[i + 1] ?? []
+    setContainers(next)
   }, [eventPlayers, numGroups])
 
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 5 } }))
 
   function findContainer(id) {
-    if (id === 'ungrouped') return 'ungrouped'
-    for (let i = 0; i < groups.length; i++) {
-      if (groups[i].some(ep => ep.id === id)) return `group-${i}`
+    if (id in containers) return id
+    for (const [key, members] of Object.entries(containers)) {
+      if (members.some(ep => ep.id === id)) return key
     }
     return null
   }
@@ -2086,37 +2082,24 @@ function TabGroups({ event, eventPlayers, onUpdated, orgSlug, allScores, course 
 
   function handleDragOver({ active, over }) {
     if (!over) return
-    const activeContainer = findContainer(active.id)
-    let overContainer = findContainer(over.id)
-    if (!overContainer) overContainer = over.id // dropped on container itself
+    const fromKey = findContainer(active.id)
+    let toKey = findContainer(over.id)
+    if (!toKey) toKey = over.id
+    if (!fromKey || !toKey || fromKey === toKey) return
 
-    if (!activeContainer || !overContainer || activeContainer === overContainer) return
+    setContainers(prev => {
+      const next = {}
+      for (const k of Object.keys(prev)) next[k] = [...prev[k]]
 
-    setGroups(prev => {
-      const next = prev.map(g => [...g])
-      let movedEp
-
-      if (activeContainer === 'ungrouped') {
-        movedEp = ungrouped.find(ep => ep.id === active.id)
-        setUngrouped(u => u.filter(ep => ep.id !== active.id))
-      } else {
-        const fromIdx = parseInt(activeContainer.replace('group-', ''), 10)
-        movedEp = next[fromIdx].find(ep => ep.id === active.id)
-        next[fromIdx] = next[fromIdx].filter(ep => ep.id !== active.id)
-      }
-
+      const movedEp = next[fromKey].find(ep => ep.id === active.id)
       if (!movedEp) return prev
+      next[fromKey] = next[fromKey].filter(ep => ep.id !== active.id)
 
-      if (overContainer === 'ungrouped') {
-        setUngrouped(u => [...u, movedEp].sort(epAlpha))
+      const overIdx = next[toKey]?.findIndex(ep => ep.id === over.id) ?? -1
+      if (overIdx >= 0) {
+        next[toKey].splice(overIdx, 0, movedEp)
       } else {
-        const toIdx = parseInt(overContainer.replace('group-', ''), 10)
-        const overItemIdx = next[toIdx].findIndex(ep => ep.id === over.id)
-        if (overItemIdx >= 0) {
-          next[toIdx].splice(overItemIdx, 0, movedEp)
-        } else {
-          next[toIdx].push(movedEp)
-        }
+        next[toKey] = [...(next[toKey] ?? []), movedEp]
       }
       return next
     })
@@ -2126,51 +2109,40 @@ function TabGroups({ event, eventPlayers, onUpdated, orgSlug, allScores, course 
     setActiveId(null)
     if (!over) return
 
-    const activeContainer = findContainer(active.id)
-    let overContainer = findContainer(over.id)
-    if (!overContainer) overContainer = over.id
+    const fromKey = findContainer(active.id)
+    let toKey = findContainer(over.id)
+    if (!toKey) toKey = over.id
 
-    // Reorder within same group
-    if (activeContainer === overContainer && activeContainer !== 'ungrouped') {
-      const idx = parseInt(activeContainer.replace('group-', ''), 10)
-      setGroups(prev => {
-        const next = prev.map(g => [...g])
-        const members = next[idx]
+    // Reorder within same container
+    if (fromKey === toKey) {
+      setContainers(prev => {
+        const members = [...(prev[fromKey] ?? [])]
         const from = members.findIndex(ep => ep.id === active.id)
         const to   = members.findIndex(ep => ep.id === over.id)
         if (from === -1 || to === -1 || from === to) return prev
-        const [moved] = members.splice(from, 1)
-        members.splice(to, 0, moved)
-        next[idx] = members
-        return next
+        return { ...prev, [fromKey]: arrayMove(members, from, to) }
       })
     }
 
-    // Persist after any drag
-    await persistGroups()
+    // Persist after state has settled
+    setTimeout(() => persistContainers(), 0)
   }
 
-  async function persistGroups() {
+  async function persistContainers(snap) {
+    const source = snap ?? containers
     setSaving(true)
     try {
       const updates = []
-      groups.forEach((members, i) => {
-        const groupNum = i + 1
+      for (const [key, members] of Object.entries(source)) {
+        const groupNum = key === 'ungrouped' ? null : parseInt(key.replace('group-', ''), 10) + 1
         members.forEach((ep, order) => {
           updates.push(
             supabase.from('event_players')
-              .update({ group_number: groupNum, group_order: order })
+              .update({ group_number: groupNum, group_order: groupNum ? order : null })
               .eq('id', ep.id)
           )
         })
-      })
-      ungrouped.forEach(ep => {
-        updates.push(
-          supabase.from('event_players')
-            .update({ group_number: null, group_order: null })
-            .eq('id', ep.id)
-        )
-      })
+      }
       await Promise.all(updates)
       onUpdated()
     } catch (err) {
@@ -2179,6 +2151,12 @@ function TabGroups({ event, eventPlayers, onUpdated, orgSlug, allScores, course 
       setSaving(false)
     }
   }
+
+  // Derived convenience
+  const ungrouped = containers['ungrouped'] ?? []
+  const groupKeys = Object.keys(containers).filter(k => k !== 'ungrouped').sort((a, b) => {
+    return parseInt(a.replace('group-', ''), 10) - parseInt(b.replace('group-', ''), 10)
+  })
 
   async function toggleScorekeeper(ep) {
     const { error } = await supabase.from('event_players')
@@ -2262,6 +2240,8 @@ function TabGroups({ event, eventPlayers, onUpdated, orgSlug, allScores, course 
     onUpdated()
     toast.success('All group assignments cleared')
   }
+
+  function persistGroups() { persistContainers() }
 
   const AUTO_METHODS = [
     { key: 'random',            label: 'Random',               desc: 'Shuffle all players randomly into groups' },
@@ -2355,6 +2335,7 @@ function TabGroups({ event, eventPlayers, onUpdated, orgSlug, allScores, course 
             scorerByGroup={{}}
             onToggleSK={toggleScorekeeper}
             allScores={allScores}
+            showNoShow={event.status === 'active'}
             noShowLoading={noShowLoading}
             onNoShow={handleNoShow}
             onClearNoShow={handleClearNoShow}
@@ -2363,12 +2344,14 @@ function TabGroups({ event, eventPlayers, onUpdated, orgSlug, allScores, course 
 
         {/* Group columns */}
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {groups.map((members, i) => {
+          {groupKeys.map(key => {
+            const i = parseInt(key.replace('group-', ''), 10)
             const g = i + 1
+            const members = containers[key] ?? []
             return (
               <DroppableGroup
-                key={g}
-                id={`group-${i}`}
+                key={key}
+                id={key}
                 title={`Group ${g}`}
                 subtitle={`${members.length} player${members.length !== 1 ? 's' : ''}`}
                 members={members}
@@ -2379,6 +2362,7 @@ function TabGroups({ event, eventPlayers, onUpdated, orgSlug, allScores, course 
                 onSetGroupHole={setGroupHole}
                 onToggleSK={toggleScorekeeper}
                 allScores={allScores}
+                showNoShow={event.status === 'active'}
                 noShowLoading={noShowLoading}
                 onNoShow={handleNoShow}
                 onClearNoShow={handleClearNoShow}
@@ -2395,8 +2379,8 @@ function TabGroups({ event, eventPlayers, onUpdated, orgSlug, allScores, course 
   )
 }
 
-function DroppableGroup({ id, title, subtitle, members, isShotgun, holeAssignments, scorerByGroup, groupNum, onSetGroupHole, onToggleSK, allScores, noShowLoading, onNoShow, onClearNoShow }) {
-  const { setNodeRef, isOver } = useSortable({ id, data: { type: 'container' } })
+function DroppableGroup({ id, title, subtitle, members, isShotgun, holeAssignments, scorerByGroup, groupNum, onSetGroupHole, onToggleSK, allScores, showNoShow, noShowLoading, onNoShow, onClearNoShow }) {
+  const { setNodeRef, isOver } = useDroppable({ id })
 
   const scored = groupNum && scorerByGroup[groupNum] ? [...scorerByGroup[groupNum]].join(', ') : null
 
@@ -2436,6 +2420,7 @@ function DroppableGroup({ id, title, subtitle, members, isShotgun, holeAssignmen
               ep={ep}
               onToggleSK={onToggleSK}
               isNoShow={isPlayerNoShow(ep.player_id, allScores)}
+              showNoShow={showNoShow}
               noShowLoading={noShowLoading === ep.player_id}
               onNoShow={() => onNoShow(ep)}
               onClearNoShow={() => onClearNoShow(ep)}
@@ -2450,7 +2435,7 @@ function DroppableGroup({ id, title, subtitle, members, isShotgun, holeAssignmen
   )
 }
 
-function SortablePlayerCard({ ep, onToggleSK, isNoShow, noShowLoading, onNoShow, onClearNoShow }) {
+function SortablePlayerCard({ ep, onToggleSK, isNoShow, showNoShow, noShowLoading, onNoShow, onClearNoShow }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: ep.id })
   const style = {
     transform: CSS.Transform.toString(transform),
@@ -2471,26 +2456,29 @@ function SortablePlayerCard({ ep, onToggleSK, isNoShow, noShowLoading, onNoShow,
           {ep.is_scorekeeper && <span className="ml-1 text-xs font-bold text-fairway-700">SK</span>}
         </div>
       </div>
-      <div className="flex items-center gap-1.5">
-        {isNoShow ? (
-          <button onClick={onClearNoShow} disabled={noShowLoading} className="text-xs px-2 py-1 rounded border border-gray-200 text-gray-500 hover:bg-gray-50 disabled:opacity-40">
-            {noShowLoading ? '…' : 'Undo'}
-          </button>
-        ) : (
-          <button onClick={onNoShow} disabled={noShowLoading} className="text-xs px-2 py-1 rounded border border-amber-200 text-amber-600 hover:bg-amber-50 disabled:opacity-40">
-            {noShowLoading ? '…' : 'No Show'}
-          </button>
-        )}
-      </div>
+      {showNoShow && (
+        <div className="flex items-center gap-1.5">
+          {isNoShow ? (
+            <button onClick={onClearNoShow} disabled={noShowLoading} className="text-xs px-2 py-1 rounded border border-gray-200 text-gray-500 hover:bg-gray-50 disabled:opacity-40">
+              {noShowLoading ? '…' : 'Undo'}
+            </button>
+          ) : (
+            <button onClick={onNoShow} disabled={noShowLoading} className="text-xs px-2 py-1 rounded border border-amber-200 text-amber-600 hover:bg-amber-50 disabled:opacity-40">
+              {noShowLoading ? '…' : 'No Show'}
+            </button>
+          )}
+        </div>
+      )}
     </div>
   )
 }
 
 function DragCard({ ep }) {
   return (
-    <div className="flex items-center gap-2 bg-white border-2 border-fairway-500 rounded-lg px-3 py-2 shadow-xl text-sm font-semibold text-gray-900">
-      <span className="text-gray-400">⠿</span>
+    <div style={{ display: 'inline-flex', alignItems: 'center', gap: 8, background: '#fff', border: '2px solid #1B4332', borderRadius: 8, padding: '6px 12px', boxShadow: '0 8px 24px rgba(0,0,0,0.18)', fontSize: 13, fontWeight: 600, color: '#111827', whiteSpace: 'nowrap', width: 'fit-content' }}>
+      <span style={{ color: '#9ca3af' }}>⠿</span>
       {ep.player?.first_name} {ep.player?.last_name}
+      {ep.flight && <span style={{ fontSize: 11, fontWeight: 800, padding: '1px 6px', borderRadius: 999, background: ep.flight === 'A' ? '#dbeafe' : '#ede9fe', color: ep.flight === 'A' ? '#1d4ed8' : '#6d28d9' }}>{ep.flight}</span>}
     </div>
   )
 }
