@@ -175,8 +175,8 @@ export default function EventPage() {
                 <div>
                   <div style={{ fontSize: 14, fontWeight: 700, color: '#111827' }}>{event.course?.name ?? 'TBD'}</div>
                   {courseAddress && (
-                    <div style={{ fontSize: 12, color: '#6b7280', marginTop: 2 }}>
-                      <span style={{ WebkitUserSelect: 'text', pointerEvents: 'none' }}>{courseAddress}</span>
+                    <div style={{ fontSize: 12, marginTop: 2 }}>
+                      <a href={mapsUrl} target="_blank" rel="noopener noreferrer" style={{ color: '#6b7280', textDecoration: 'underline' }}>{courseAddress}</a>
                     </div>
                   )}
                 </div>
