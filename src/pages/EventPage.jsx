@@ -261,7 +261,7 @@ export default function EventPage() {
         )}
 
         {activeTab === 'photos' && (
-          <PhotosTab photos={photos} eventId={event.id} onUploaded={newUrl => setEvent(prev => ({ ...prev, photos: [...(prev.photos ?? []), newUrl] }))} />
+          <PhotosTab photos={photos} eventId={event.id} onUploaded={photo => setEvent(prev => ({ ...prev, photos: [...(prev.photos ?? []), photo] }))} />
         )}
 
 
@@ -360,29 +360,49 @@ function OverviewTab({ event, leaderboardUrl, description }) {
 
 // ─── Photos Tab ───────────────────────────────────────────────────────────────
 function PhotosTab({ photos, eventId, onUploaded }) {
-  const [lightbox,  setLightbox]  = useState(null)
-  const [uploading, setUploading] = useState(false)
+  const [lightbox,     setLightbox]     = useState(null)
+  const [uploading,    setUploading]    = useState(false)
+  const [pendingFiles, setPendingFiles] = useState([])
+  const [uploaderName, setUploaderName] = useState('')
+  const [caption,      setCaption]      = useState('')
+  const fileInputRef = { current: null }
 
-  async function handleUpload(e) {
+  // Normalize: support legacy plain-URL strings and new objects
+  const normalizedPhotos = photos.map(p => typeof p === 'string' ? { url: p } : p)
+
+  function handleFileSelect(e) {
     const files = Array.from(e.target.files)
     if (!files.length) return
+    setPendingFiles(files)
+    e.target.value = ''
+  }
+
+  async function handleConfirmUpload() {
+    if (!pendingFiles.length) return
     setUploading(true)
     try {
-      for (const file of files) {
+      for (const file of pendingFiles) {
         const ext  = file.name.split('.').pop()
         const path = `events/${eventId}/photos/${Date.now()}_${Math.random().toString(36).slice(2)}.${ext}`
         const { error } = await supabase.storage.from('media').upload(path, file, { upsert: false })
         if (error) continue
         const { data: { publicUrl } } = supabase.storage.from('media').getPublicUrl(path)
-        // Persist to DB
+        const photo = {
+          url: publicUrl,
+          ...(caption.trim()      && { caption:      caption.trim() }),
+          ...(uploaderName.trim() && { uploaded_by:  uploaderName.trim() }),
+          uploaded_at: new Date().toISOString(),
+        }
         const { data: ev } = await supabase.from('events').select('photos').eq('id', eventId).single()
-        const next = [...(ev?.photos ?? []), publicUrl]
+        const next = [...(ev?.photos ?? []), photo]
         await supabase.from('events').update({ photos: next }).eq('id', eventId)
-        onUploaded(publicUrl)
+        onUploaded(photo)
       }
     } finally {
       setUploading(false)
-      e.target.value = ''
+      setPendingFiles([])
+      setCaption('')
+      setUploaderName('')
     }
   }
 
@@ -394,18 +414,55 @@ function PhotosTab({ photos, eventId, onUploaded }) {
           display: 'inline-flex', alignItems: 'center', gap: 8,
           padding: '10px 20px', borderRadius: 10, border: '2px dashed #1B4332',
           color: '#1B4332', fontWeight: 700, fontSize: 14, cursor: uploading ? 'not-allowed' : 'pointer',
-          opacity: uploading ? 0.5 : 1, transition: 'background 0.15s',
+          opacity: uploading ? 0.5 : 1,
         }}>
           <svg width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" d="M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2M12 12V4m0 0L8 8m4-4l4 4"/>
           </svg>
-          {uploading ? 'Uploading…' : 'Add Photos'}
-          <input type="file" accept="image/*" multiple style={{ display: 'none' }} onChange={handleUpload} disabled={uploading} />
+          Add Photos
+          <input type="file" accept="image/*" multiple style={{ display: 'none' }} onChange={handleFileSelect} disabled={uploading} />
         </label>
         <span style={{ fontSize: 12, color: '#9ca3af' }}>Share your shots from the event</span>
       </div>
 
-      {photos.length === 0 ? (
+      {/* Metadata form — shown after files are selected */}
+      {pendingFiles.length > 0 && (
+        <div style={{ background: '#f9fafb', border: '1px solid #e5e7eb', borderRadius: 14, padding: '18px 20px', display: 'flex', flexDirection: 'column', gap: 12 }}>
+          <div style={{ fontSize: 13, fontWeight: 700, color: '#374151' }}>
+            {pendingFiles.length} photo{pendingFiles.length !== 1 ? 's' : ''} selected
+          </div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+            <label style={{ fontSize: 12, fontWeight: 600, color: '#6b7280' }}>Your name</label>
+            <input
+              value={uploaderName}
+              onChange={e => setUploaderName(e.target.value)}
+              placeholder="e.g. John Smith"
+              style={{ border: '1px solid #d1d5db', borderRadius: 8, padding: '9px 12px', fontSize: 14, outline: 'none', background: '#fff' }}
+            />
+          </div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+            <label style={{ fontSize: 12, fontWeight: 600, color: '#6b7280' }}>Caption (optional)</label>
+            <input
+              value={caption}
+              onChange={e => setCaption(e.target.value)}
+              placeholder="e.g. Hole 7 eagle putt!"
+              style={{ border: '1px solid #d1d5db', borderRadius: 8, padding: '9px 12px', fontSize: 14, outline: 'none', background: '#fff' }}
+            />
+          </div>
+          <div style={{ display: 'flex', gap: 10, marginTop: 4 }}>
+            <button onClick={handleConfirmUpload} disabled={uploading}
+              style={{ flex: 1, background: '#1B4332', color: '#fff', fontWeight: 700, fontSize: 14, padding: '11px 0', borderRadius: 9, border: 'none', cursor: uploading ? 'not-allowed' : 'pointer', opacity: uploading ? 0.6 : 1 }}>
+              {uploading ? 'Uploading…' : 'Upload'}
+            </button>
+            <button onClick={() => setPendingFiles([])} disabled={uploading}
+              style={{ padding: '11px 18px', borderRadius: 9, border: '1px solid #e5e7eb', background: '#fff', fontWeight: 600, fontSize: 14, cursor: 'pointer', color: '#374151' }}>
+              Cancel
+            </button>
+          </div>
+        </div>
+      )}
+
+      {normalizedPhotos.length === 0 ? (
         <div style={{ textAlign: 'center', paddingTop: 60, paddingBottom: 60 }}>
           <div style={{ fontSize: 44, marginBottom: 12 }}>📷</div>
           <div style={{ fontSize: 17, fontWeight: 700, color: '#111827', marginBottom: 6 }}>No photos yet</div>
@@ -413,14 +470,21 @@ function PhotosTab({ photos, eventId, onUploaded }) {
         </div>
       ) : (
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))', gap: 10 }}>
-          {photos.map((url, i) => (
-            <div key={i} onClick={() => setLightbox({ url, idx: i })}
-              style={{ borderRadius: 12, overflow: 'hidden', aspectRatio: '1', cursor: 'pointer', background: '#f3f4f6' }}>
-              <img src={url} alt={`Photo ${i + 1}`}
-                style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block', transition: 'transform 0.2s' }}
-                onMouseEnter={e => e.currentTarget.style.transform = 'scale(1.04)'}
-                onMouseLeave={e => e.currentTarget.style.transform = 'scale(1)'}
-              />
+          {normalizedPhotos.map((photo, i) => (
+            <div key={i} onClick={() => setLightbox({ photo, idx: i })} style={{ cursor: 'pointer' }}>
+              <div style={{ borderRadius: 12, overflow: 'hidden', aspectRatio: '1', background: '#f3f4f6' }}>
+                <img src={photo.url} alt={photo.caption ?? `Photo ${i + 1}`}
+                  style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block', transition: 'transform 0.2s' }}
+                  onMouseEnter={e => e.currentTarget.style.transform = 'scale(1.04)'}
+                  onMouseLeave={e => e.currentTarget.style.transform = 'scale(1)'}
+                />
+              </div>
+              {(photo.caption || photo.uploaded_by) && (
+                <div style={{ padding: '6px 2px' }}>
+                  {photo.caption && <div style={{ fontSize: 12, fontWeight: 600, color: '#111827', lineHeight: 1.3 }}>{photo.caption}</div>}
+                  {photo.uploaded_by && <div style={{ fontSize: 11, color: '#9ca3af', marginTop: 2 }}>{photo.uploaded_by}</div>}
+                </div>
+              )}
             </div>
           ))}
         </div>
@@ -429,21 +493,27 @@ function PhotosTab({ photos, eventId, onUploaded }) {
       {/* Lightbox */}
       {lightbox && (
         <div onClick={() => setLightbox(null)}
-          style={{ position: 'fixed', inset: 0, zIndex: 9999, background: 'rgba(0,0,0,0.9)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
-          <img src={lightbox.url} alt="Event photo"
-            style={{ maxWidth: '100%', maxHeight: '90vh', borderRadius: 12, objectFit: 'contain', boxShadow: '0 8px 40px rgba(0,0,0,0.5)' }}
+          style={{ position: 'fixed', inset: 0, zIndex: 9999, background: 'rgba(0,0,0,0.9)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
+          <img src={lightbox.photo.url} alt={lightbox.photo.caption ?? 'Event photo'}
+            style={{ maxWidth: '100%', maxHeight: '80vh', borderRadius: 12, objectFit: 'contain', boxShadow: '0 8px 40px rgba(0,0,0,0.5)' }}
             onClick={e => e.stopPropagation()}
           />
+          {(lightbox.photo.caption || lightbox.photo.uploaded_by) && (
+            <div onClick={e => e.stopPropagation()} style={{ marginTop: 14, textAlign: 'center' }}>
+              {lightbox.photo.caption && <div style={{ fontSize: 15, fontWeight: 600, color: '#fff', marginBottom: 4 }}>{lightbox.photo.caption}</div>}
+              {lightbox.photo.uploaded_by && <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.55)' }}>📷 {lightbox.photo.uploaded_by}</div>}
+            </div>
+          )}
           {/* Prev */}
           {lightbox.idx > 0 && (
-            <button onClick={e => { e.stopPropagation(); setLightbox({ url: photos[lightbox.idx - 1], idx: lightbox.idx - 1 }) }}
+            <button onClick={e => { e.stopPropagation(); setLightbox({ photo: normalizedPhotos[lightbox.idx - 1], idx: lightbox.idx - 1 }) }}
               style={{ position: 'absolute', left: 16, top: '50%', transform: 'translateY(-50%)', width: 40, height: 40, borderRadius: '50%', background: 'rgba(255,255,255,0.15)', border: 'none', color: '#fff', fontSize: 20, cursor: 'pointer' }}>
               ‹
             </button>
           )}
           {/* Next */}
-          {lightbox.idx < photos.length - 1 && (
-            <button onClick={e => { e.stopPropagation(); setLightbox({ url: photos[lightbox.idx + 1], idx: lightbox.idx + 1 }) }}
+          {lightbox.idx < normalizedPhotos.length - 1 && (
+            <button onClick={e => { e.stopPropagation(); setLightbox({ photo: normalizedPhotos[lightbox.idx + 1], idx: lightbox.idx + 1 }) }}
               style={{ position: 'absolute', right: 16, top: '50%', transform: 'translateY(-50%)', width: 40, height: 40, borderRadius: '50%', background: 'rgba(255,255,255,0.15)', border: 'none', color: '#fff', fontSize: 20, cursor: 'pointer' }}>
               ›
             </button>
@@ -453,7 +523,7 @@ function PhotosTab({ photos, eventId, onUploaded }) {
             ✕
           </button>
           <div style={{ position: 'absolute', bottom: 16, left: '50%', transform: 'translateX(-50%)', fontSize: 12, color: 'rgba(255,255,255,0.5)' }}>
-            {lightbox.idx + 1} / {photos.length}
+            {lightbox.idx + 1} / {normalizedPhotos.length}
           </div>
         </div>
       )}

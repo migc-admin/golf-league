@@ -1196,7 +1196,8 @@ function TabPostRound({ event, eventPlayers, allScores, course, sideGames, orgNa
 
 // ─── Event Photos Manager ───────────────────────────────────────────
 function EventPhotosManager({ event, onUpdated }) {
-  const [photos,   setPhotos]   = useState(event.photos ?? [])
+  const normalize = arr => (arr ?? []).map(p => typeof p === 'string' ? { url: p } : p)
+  const [photos,    setPhotos]   = useState(() => normalize(event.photos))
   const [uploading, setUploading] = useState(false)
 
   async function handleUpload(e) {
@@ -1211,7 +1212,7 @@ function EventPhotosManager({ event, onUpdated }) {
         const { error } = await supabase.storage.from('media').upload(path, file, { upsert: false })
         if (error) { toast.error(`Upload failed: ${error.message}`); continue }
         const { data: { publicUrl } } = supabase.storage.from('media').getPublicUrl(path)
-        uploaded.push(publicUrl)
+        uploaded.push({ url: publicUrl, uploaded_at: new Date().toISOString() })
       }
       if (!uploaded.length) return
       const next = [...photos, ...uploaded]
@@ -1226,7 +1227,7 @@ function EventPhotosManager({ event, onUpdated }) {
   }
 
   async function removePhoto(url) {
-    const next = photos.filter(p => p !== url)
+    const next = photos.filter(p => p.url !== url)
     setPhotos(next)
     await supabase.from('events').update({ photos: next }).eq('id', event.id)
     onUpdated()
@@ -1234,7 +1235,7 @@ function EventPhotosManager({ event, onUpdated }) {
 
   async function downloadAll() {
     for (let i = 0; i < photos.length; i++) {
-      const url = photos[i]
+      const url = photos[i].url
       const res = await fetch(url)
       const blob = await res.blob()
       const a = document.createElement('a')
@@ -1242,7 +1243,6 @@ function EventPhotosManager({ event, onUpdated }) {
       a.download = `event-photo-${i + 1}.${blob.type.split('/')[1] || 'jpg'}`
       a.click()
       URL.revokeObjectURL(a.href)
-      // Small delay to avoid browser blocking multiple downloads
       await new Promise(r => setTimeout(r, 300))
     }
   }
@@ -1268,11 +1268,19 @@ function EventPhotosManager({ event, onUpdated }) {
       {/* Photo grid */}
       {photos.length > 0 ? (
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
-          {photos.map((url, i) => (
-            <div key={i} className="relative group rounded-xl overflow-hidden aspect-square border border-gray-100">
-              <img src={url} alt={`Event photo ${i + 1}`} className="w-full h-full object-cover" />
+          {photos.map((photo, i) => (
+            <div key={i} className="relative group rounded-xl overflow-hidden border border-gray-100">
+              <div className="aspect-square">
+                <img src={photo.url} alt={photo.caption ?? `Event photo ${i + 1}`} className="w-full h-full object-cover" />
+              </div>
+              {(photo.caption || photo.uploaded_by) && (
+                <div className="px-2 py-1.5 bg-white">
+                  {photo.caption && <p className="text-xs font-semibold text-gray-800 truncate">{photo.caption}</p>}
+                  {photo.uploaded_by && <p className="text-xs text-gray-400 truncate">{photo.uploaded_by}</p>}
+                </div>
+              )}
               <button
-                onClick={() => removePhoto(url)}
+                onClick={() => removePhoto(photo.url)}
                 className="absolute top-1.5 right-1.5 w-6 h-6 rounded-full bg-black/60 text-white text-xs flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity hover:bg-red-600"
                 title="Remove photo"
               >✕</button>
