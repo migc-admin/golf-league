@@ -185,9 +185,9 @@ export default function EventPage() {
 
             {/* Registration CTA — only if upcoming and reg is available */}
             {event.status === 'upcoming' && regUrl && (
-              <div className="reg-cta" style={{ marginBottom: 20 }}>
+              <div className="reg-cta" style={{ marginBottom: 20, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16 }}>
                 {(event.tournament_fee > 0 || spotsLeft !== null) && (
-                  <div style={{ marginBottom: (!spotsLeft || spotsLeft > 0) ? 10 : 0 }}>
+                  <div>
                     {event.tournament_fee > 0 && (
                       <div style={{ fontSize: 22, fontWeight: 900, color: '#111827', letterSpacing: '-0.02em' }}>
                         ${Number(event.tournament_fee).toFixed(0)}<span style={{ fontSize: 13, fontWeight: 500, color: '#6b7280' }}>/player</span>
@@ -201,12 +201,10 @@ export default function EventPage() {
                   </div>
                 )}
                 {(!spotsLeft || spotsLeft > 0) && (
-                  <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
-                    <Link to={regUrl}
-                      style={{ display: 'inline-block', background: GREEN, color: '#fff', fontWeight: 800, fontSize: 14, padding: '13px 28px', borderRadius: 10, textDecoration: 'none' }}>
-                      Register →
-                    </Link>
-                  </div>
+                  <Link to={regUrl}
+                    style={{ flexShrink: 0, display: 'inline-block', background: GREEN, color: '#fff', fontWeight: 800, fontSize: 14, padding: '13px 28px', borderRadius: 10, textDecoration: 'none' }}>
+                    Register →
+                  </Link>
                 )}
               </div>
             )}
