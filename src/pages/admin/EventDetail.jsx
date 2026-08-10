@@ -534,31 +534,40 @@ function TabOverview({ event, eventPlayers, allScores, sideGames, course, confli
 
   return (
     <div className="grid sm:grid-cols-2 gap-4">
-      <Card>
-        <CardHeader
-          title="Event Details"
-          action={
-            <div className="flex gap-2 flex-wrap">
-              <Button size="sm" variant="secondary" onClick={() => setEditModal(true)}>Edit</Button>
-              {event.status !== 'complete' && (
-                <Button size="sm" variant="danger" onClick={() => setDeleteModal(true)}>Delete</Button>
-              )}
-            </div>
-          }
-        />
-        <dl className="space-y-2 text-sm">
-          <Row label="Date"         value={formatDate(event.event_date)} />
-          <Row label="Course"       value={event.course?.name} />
-          <Row label="League"       value={event.league?.name} />
-          <Row label="Format"       value={FORMAT_LABELS[event.format] ?? event.format ?? 'Net Stroke Play'} />
-          <Row label="Start Time"   value={event.start_time ? formatTime(event.start_time) : '—'} />
-          {!event.shotgun_start && <Row label="Tee Interval" value={`${event.tee_time_interval_mins ?? 10} min`} />}
-          <Row label="Entry Fee"    value={`$${event.entry_fee}`} />
-          {event.tournament_fee > 0 && <Row label="Tournament Entry Fee" value={`$${Number(event.tournament_fee).toFixed(2)}`} />}
-          <Row label="Status"       value={<StatusBadge status={event.status} />} />
-        </dl>
-      </Card>
+      {/* Left column */}
+      <div className="space-y-4">
+        <Card>
+          <CardHeader
+            title="Event Details"
+            action={
+              <div className="flex gap-2 flex-wrap">
+                <Button size="sm" variant="secondary" onClick={() => setEditModal(true)}>Edit</Button>
+                {event.status !== 'complete' && (
+                  <Button size="sm" variant="danger" onClick={() => setDeleteModal(true)}>Delete</Button>
+                )}
+              </div>
+            }
+          />
+          <dl className="space-y-2 text-sm">
+            <Row label="Date"         value={formatDate(event.event_date)} />
+            <Row label="Course"       value={event.course?.name} />
+            <Row label="League"       value={event.league?.name} />
+            <Row label="Format"       value={FORMAT_LABELS[event.format] ?? event.format ?? 'Net Stroke Play'} />
+            <Row label="Start Time"   value={event.start_time ? formatTime(event.start_time) : '—'} />
+            {!event.shotgun_start && <Row label="Tee Interval" value={`${event.tee_time_interval_mins ?? 10} min`} />}
+            <Row label="Entry Fee"    value={`$${event.entry_fee}`} />
+            {event.tournament_fee > 0 && <Row label="Tournament Entry Fee" value={`$${Number(event.tournament_fee).toFixed(2)}`} />}
+            <Row label="Status"       value={<StatusBadge status={event.status} />} />
+          </dl>
+        </Card>
 
+        <Card>
+          <CardHeader title="Public Event Page" subtitle="Additional details shown to players" />
+          <EventPublicFields event={event} onUpdated={onUpdated} />
+        </Card>
+      </div>
+
+      {/* Right column */}
       <div className="space-y-4">
         <Card>
           <CardHeader title="Players" />
@@ -590,16 +599,10 @@ function TabOverview({ event, eventPlayers, allScores, sideGames, course, confli
           />
         </Card>
 
-        <Card className="sm:col-span-2">
-          <CardHeader title="Public Event Page" subtitle="Additional details shown to players" />
-          <EventPublicFields event={event} onUpdated={onUpdated} />
-        </Card>
-
-        <Card className="sm:col-span-2">
+        <Card>
           <CardHeader title="Event Photos" subtitle="Upload photos from the event — shown in a gallery on the public page" />
           <EventPhotosManager event={event} onUpdated={onUpdated} />
         </Card>
-
       </div>
 
       {/* Score conflicts */}
