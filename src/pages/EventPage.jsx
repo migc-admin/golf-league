@@ -32,6 +32,7 @@ const SIDE_GAME_LABELS = {
 const BASE_TABS = [
   { key: 'overview',  label: 'Overview'  },
   { key: 'pairings',  label: 'Pairings'  },
+  { key: 'photos',    label: 'Photos'    },
 ]
 
 export default function EventPage() {
@@ -211,7 +212,7 @@ export default function EventPage() {
 
             {/* Tab bar */}
             <div className="event-tab-bar" style={{ borderTop: '1px solid #e5e7eb', marginLeft: 'clamp(-16px,-4vw,-44px)', marginRight: coverImage ? 0 : 'clamp(-16px,-4vw,-44px)' }}>
-              {[...BASE_TABS, ...(photos.length > 0 ? [{ key: 'photos', label: `Photos (${photos.length})` }] : [])].map(tab => (
+              {BASE_TABS.map(tab => (
                 <button key={tab.key} onClick={() => setActiveTab(tab.key)}
                   style={{
                     padding: '13px 24px',
@@ -265,7 +266,7 @@ export default function EventPage() {
         )}
 
         {activeTab === 'photos' && (
-          <PhotosTab photos={photos} />
+          <PhotosTab photos={photos} eventId={event.id} onUploaded={newUrl => setEvent(prev => ({ ...prev, photos: [...(prev.photos ?? []), newUrl] }))} />
         )}
 
 
@@ -356,33 +357,72 @@ function OverviewTab({ event, leaderboardUrl, description }) {
 }
 
 // ─── Photos Tab ───────────────────────────────────────────────────────────────
-function PhotosTab({ photos }) {
-  const [lightbox, setLightbox] = useState(null)
+function PhotosTab({ photos, eventId, onUploaded }) {
+  const [lightbox,  setLightbox]  = useState(null)
+  const [uploading, setUploading] = useState(false)
 
-  if (photos.length === 0) {
-    return (
-      <div style={{ textAlign: 'center', paddingTop: 80, paddingBottom: 80 }}>
-        <div style={{ fontSize: 44, marginBottom: 12 }}>📷</div>
-        <div style={{ fontSize: 17, fontWeight: 700, color: '#111827', marginBottom: 6 }}>No photos yet</div>
-        <div style={{ fontSize: 14, color: '#86868b' }}>Check back after the event.</div>
-      </div>
-    )
+  async function handleUpload(e) {
+    const files = Array.from(e.target.files)
+    if (!files.length) return
+    setUploading(true)
+    try {
+      for (const file of files) {
+        const ext  = file.name.split('.').pop()
+        const path = `events/${eventId}/photos/${Date.now()}_${Math.random().toString(36).slice(2)}.${ext}`
+        const { error } = await supabase.storage.from('media').upload(path, file, { upsert: false })
+        if (error) continue
+        const { data: { publicUrl } } = supabase.storage.from('media').getPublicUrl(path)
+        // Persist to DB
+        const { data: ev } = await supabase.from('events').select('photos').eq('id', eventId).single()
+        const next = [...(ev?.photos ?? []), publicUrl]
+        await supabase.from('events').update({ photos: next }).eq('id', eventId)
+        onUploaded(publicUrl)
+      }
+    } finally {
+      setUploading(false)
+      e.target.value = ''
+    }
   }
 
   return (
-    <div>
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))', gap: 10 }}>
-        {photos.map((url, i) => (
-          <div key={i} onClick={() => setLightbox({ url, idx: i })}
-            style={{ borderRadius: 12, overflow: 'hidden', aspectRatio: '1', cursor: 'pointer', background: '#f3f4f6' }}>
-            <img src={url} alt={`Photo ${i + 1}`}
-              style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block', transition: 'transform 0.2s' }}
-              onMouseEnter={e => e.currentTarget.style.transform = 'scale(1.04)'}
-              onMouseLeave={e => e.currentTarget.style.transform = 'scale(1)'}
-            />
-          </div>
-        ))}
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+      {/* Upload button */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+        <label style={{
+          display: 'inline-flex', alignItems: 'center', gap: 8,
+          padding: '10px 20px', borderRadius: 10, border: '2px dashed #1B4332',
+          color: '#1B4332', fontWeight: 700, fontSize: 14, cursor: uploading ? 'not-allowed' : 'pointer',
+          opacity: uploading ? 0.5 : 1, transition: 'background 0.15s',
+        }}>
+          <svg width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" d="M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2M12 12V4m0 0L8 8m4-4l4 4"/>
+          </svg>
+          {uploading ? 'Uploading…' : 'Add Photos'}
+          <input type="file" accept="image/*" multiple style={{ display: 'none' }} onChange={handleUpload} disabled={uploading} />
+        </label>
+        <span style={{ fontSize: 12, color: '#9ca3af' }}>Share your shots from the event</span>
       </div>
+
+      {photos.length === 0 ? (
+        <div style={{ textAlign: 'center', paddingTop: 60, paddingBottom: 60 }}>
+          <div style={{ fontSize: 44, marginBottom: 12 }}>📷</div>
+          <div style={{ fontSize: 17, fontWeight: 700, color: '#111827', marginBottom: 6 }}>No photos yet</div>
+          <div style={{ fontSize: 14, color: '#86868b' }}>Be the first to upload!</div>
+        </div>
+      ) : (
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))', gap: 10 }}>
+          {photos.map((url, i) => (
+            <div key={i} onClick={() => setLightbox({ url, idx: i })}
+              style={{ borderRadius: 12, overflow: 'hidden', aspectRatio: '1', cursor: 'pointer', background: '#f3f4f6' }}>
+              <img src={url} alt={`Photo ${i + 1}`}
+                style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block', transition: 'transform 0.2s' }}
+                onMouseEnter={e => e.currentTarget.style.transform = 'scale(1.04)'}
+                onMouseLeave={e => e.currentTarget.style.transform = 'scale(1)'}
+              />
+            </div>
+          ))}
+        </div>
+      )}
 
       {/* Lightbox */}
       {lightbox && (
