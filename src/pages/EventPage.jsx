@@ -146,7 +146,7 @@ export default function EventPage() {
                 </div>
               )}
               <span style={{ color: '#6b7280', fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em' }}>
-                Hosted by {event.league?.name}
+                {event.league?.name}
               </span>
             </div>
 
@@ -185,24 +185,28 @@ export default function EventPage() {
 
             {/* Registration CTA — only if upcoming and reg is available */}
             {event.status === 'upcoming' && regUrl && (
-              <div className="reg-cta" style={{ marginBottom: 20, background: '#f9fafb', border: '1px solid #e5e7eb', borderRadius: 14, padding: '14px 18px' }}>
-                <div style={{ marginBottom: (!spotsLeft || spotsLeft > 0) ? 12 : 0 }}>
-                  {event.tournament_fee > 0 && (
-                    <div style={{ fontSize: 22, fontWeight: 900, color: '#111827', letterSpacing: '-0.02em' }}>
-                      ${Number(event.tournament_fee).toFixed(0)}<span style={{ fontSize: 13, fontWeight: 500, color: '#6b7280' }}>/player</span>
-                    </div>
-                  )}
-                  {spotsLeft !== null && (
-                    <div style={{ fontSize: 12, color: spotsLeft <= 5 ? '#dc2626' : '#6b7280', fontWeight: 600, marginTop: 2 }}>
-                      {spotsLeft > 0 ? `${spotsLeft} spot${spotsLeft !== 1 ? 's' : ''} remaining` : 'Event full'}
-                    </div>
-                  )}
-                </div>
+              <div className="reg-cta" style={{ marginBottom: 20 }}>
+                {(event.tournament_fee > 0 || spotsLeft !== null) && (
+                  <div style={{ marginBottom: (!spotsLeft || spotsLeft > 0) ? 10 : 0 }}>
+                    {event.tournament_fee > 0 && (
+                      <div style={{ fontSize: 22, fontWeight: 900, color: '#111827', letterSpacing: '-0.02em' }}>
+                        ${Number(event.tournament_fee).toFixed(0)}<span style={{ fontSize: 13, fontWeight: 500, color: '#6b7280' }}>/player</span>
+                      </div>
+                    )}
+                    {spotsLeft !== null && (
+                      <div style={{ fontSize: 12, color: spotsLeft <= 5 ? '#dc2626' : '#6b7280', fontWeight: 600, marginTop: 2 }}>
+                        {spotsLeft > 0 ? `${spotsLeft} spot${spotsLeft !== 1 ? 's' : ''} remaining` : 'Event full'}
+                      </div>
+                    )}
+                  </div>
+                )}
                 {(!spotsLeft || spotsLeft > 0) && (
-                  <Link to={regUrl}
-                    style={{ display: 'block', background: GREEN, color: '#fff', fontWeight: 800, fontSize: 14, padding: '13px 22px', borderRadius: 10, textDecoration: 'none', textAlign: 'center' }}>
-                    Register →
-                  </Link>
+                  <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+                    <Link to={regUrl}
+                      style={{ display: 'inline-block', background: GREEN, color: '#fff', fontWeight: 800, fontSize: 14, padding: '13px 28px', borderRadius: 10, textDecoration: 'none' }}>
+                      Register →
+                    </Link>
+                  </div>
                 )}
               </div>
             )}
