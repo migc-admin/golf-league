@@ -2366,6 +2366,16 @@ function TabGroups({ event, eventPlayers, onUpdated, orgSlug, allScores, course 
                 noShowLoading={noShowLoading}
                 onNoShow={handleNoShow}
                 onClearNoShow={handleClearNoShow}
+                onReturnToPool={ep => {
+                  setContainers(prev => {
+                    const next = {}
+                    for (const k of Object.keys(prev)) next[k] = [...prev[k]]
+                    next[key] = next[key].filter(m => m.id !== ep.id)
+                    next['ungrouped'] = [...next['ungrouped'], ep].sort(epAlpha)
+                    return next
+                  })
+                  setTimeout(() => persistContainers(), 0)
+                }}
               />
             )
           })}
@@ -2379,7 +2389,7 @@ function TabGroups({ event, eventPlayers, onUpdated, orgSlug, allScores, course 
   )
 }
 
-function DroppableGroup({ id, title, subtitle, members, isShotgun, holeAssignments, scorerByGroup, groupNum, onSetGroupHole, onToggleSK, allScores, showNoShow, noShowLoading, onNoShow, onClearNoShow }) {
+function DroppableGroup({ id, title, subtitle, members, isShotgun, holeAssignments, scorerByGroup, groupNum, onSetGroupHole, onToggleSK, allScores, showNoShow, noShowLoading, onNoShow, onClearNoShow, onReturnToPool }) {
   const { setNodeRef, isOver } = useDroppable({ id })
 
   const scored = groupNum && scorerByGroup[groupNum] ? [...scorerByGroup[groupNum]].join(', ') : null
@@ -2424,6 +2434,7 @@ function DroppableGroup({ id, title, subtitle, members, isShotgun, holeAssignmen
               noShowLoading={noShowLoading === ep.player_id}
               onNoShow={() => onNoShow(ep)}
               onClearNoShow={() => onClearNoShow(ep)}
+              onReturnToPool={onReturnToPool ? () => onReturnToPool(ep) : null}
             />
           ))}
           {members.length === 0 && (
@@ -2435,7 +2446,7 @@ function DroppableGroup({ id, title, subtitle, members, isShotgun, holeAssignmen
   )
 }
 
-function SortablePlayerCard({ ep, onToggleSK, isNoShow, showNoShow, noShowLoading, onNoShow, onClearNoShow }) {
+function SortablePlayerCard({ ep, onToggleSK, isNoShow, showNoShow, noShowLoading, onNoShow, onClearNoShow, onReturnToPool }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: ep.id })
   const style = {
     transform: CSS.Transform.toString(transform),
@@ -2456,9 +2467,9 @@ function SortablePlayerCard({ ep, onToggleSK, isNoShow, showNoShow, noShowLoadin
           {ep.is_scorekeeper && <span className="ml-1 text-xs font-bold text-fairway-700">SK</span>}
         </div>
       </div>
-      {showNoShow && (
-        <div className="flex items-center gap-1.5">
-          {isNoShow ? (
+      <div className="flex items-center gap-1.5">
+        {showNoShow && (
+          isNoShow ? (
             <button onClick={onClearNoShow} disabled={noShowLoading} className="text-xs px-2 py-1 rounded border border-gray-200 text-gray-500 hover:bg-gray-50 disabled:opacity-40">
               {noShowLoading ? '…' : 'Undo'}
             </button>
@@ -2466,9 +2477,14 @@ function SortablePlayerCard({ ep, onToggleSK, isNoShow, showNoShow, noShowLoadin
             <button onClick={onNoShow} disabled={noShowLoading} className="text-xs px-2 py-1 rounded border border-amber-200 text-amber-600 hover:bg-amber-50 disabled:opacity-40">
               {noShowLoading ? '…' : 'No Show'}
             </button>
-          )}
-        </div>
-      )}
+          )
+        )}
+        {onReturnToPool && (
+          <button onClick={onReturnToPool} title="Return to pool" className="text-gray-300 hover:text-red-400 transition-colors leading-none text-base font-bold px-1">
+            ✕
+          </button>
+        )}
+      </div>
     </div>
   )
 }
