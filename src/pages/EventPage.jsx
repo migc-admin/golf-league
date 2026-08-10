@@ -29,9 +29,9 @@ const SIDE_GAME_LABELS = {
   ctp:          'Closest to Pin',
 }
 
-const TABS = [
-  { key: 'overview',    label: 'Overview'    },
-  { key: 'pairings',   label: 'Pairings'    },
+const BASE_TABS = [
+  { key: 'overview',  label: 'Overview'  },
+  { key: 'pairings',  label: 'Pairings'  },
 ]
 
 export default function EventPage() {
@@ -211,7 +211,7 @@ export default function EventPage() {
 
             {/* Tab bar */}
             <div className="event-tab-bar" style={{ borderTop: '1px solid #e5e7eb', marginLeft: 'clamp(-16px,-4vw,-44px)', marginRight: coverImage ? 0 : 'clamp(-16px,-4vw,-44px)' }}>
-              {TABS.map(tab => (
+              {[...BASE_TABS, ...(photos.length > 0 ? [{ key: 'photos', label: `Photos (${photos.length})` }] : [])].map(tab => (
                 <button key={tab.key} onClick={() => setActiveTab(tab.key)}
                   style={{
                     padding: '13px 24px',
@@ -257,11 +257,15 @@ export default function EventPage() {
       <div style={{ maxWidth: 1100, margin: '0 auto', width: '100%', padding: 'clamp(20px,4vw,32px) clamp(16px,4vw,40px)', flex: 1, boxSizing: 'border-box' }}>
 
         {activeTab === 'overview' && (
-          <OverviewTab event={event} leaderboardUrl={leaderboardUrl} description={description} photos={photos} />
+          <OverviewTab event={event} leaderboardUrl={leaderboardUrl} description={description} />
         )}
 
         {activeTab === 'pairings' && (
           <GroupList eventPlayers={eventPlayers} event={event} orgSlug={orgSlug} />
+        )}
+
+        {activeTab === 'photos' && (
+          <PhotosTab photos={photos} />
         )}
 
 
@@ -323,9 +327,7 @@ function SponsorBar({ sponsors }) {
 }
 
 // ─── Overview Tab ─────────────────────────────────────────────────────────────
-function OverviewTab({ event, leaderboardUrl, description, photos }) {
-  const [lightbox, setLightbox] = useState(null)
-
+function OverviewTab({ event, leaderboardUrl, description }) {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
 
@@ -333,35 +335,6 @@ function OverviewTab({ event, leaderboardUrl, description, photos }) {
         <div style={{ background: '#fff', borderRadius: 16, padding: '20px 24px', border: '1px solid #e5e7eb' }}>
           <div style={{ fontSize: 10, fontWeight: 700, color: '#9ca3af', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 10 }}>About this Event</div>
           <p style={{ fontSize: 14, lineHeight: 1.7, color: '#374151', whiteSpace: 'pre-line', margin: 0 }}>{description}</p>
-        </div>
-      )}
-
-      {photos.length > 0 && (
-        <div style={{ background: '#fff', borderRadius: 16, padding: '20px 24px', border: '1px solid #e5e7eb' }}>
-          <div style={{ fontSize: 10, fontWeight: 700, color: '#9ca3af', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 14 }}>Event Photos</div>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))', gap: 8 }}>
-            {photos.map((url, i) => (
-              <div key={i} onClick={() => setLightbox(url)}
-                style={{ borderRadius: 10, overflow: 'hidden', aspectRatio: '1', cursor: 'pointer', background: '#f3f4f6' }}>
-                <img src={url} alt={`Photo ${i + 1}`} style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block', transition: 'transform 0.2s' }}
-                  onMouseEnter={e => e.currentTarget.style.transform = 'scale(1.04)'}
-                  onMouseLeave={e => e.currentTarget.style.transform = 'scale(1)'}
-                />
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* Lightbox */}
-      {lightbox && (
-        <div onClick={() => setLightbox(null)}
-          style={{ position: 'fixed', inset: 0, zIndex: 9999, background: 'rgba(0,0,0,0.88)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
-          <img src={lightbox} alt="Event photo" style={{ maxWidth: '100%', maxHeight: '90vh', borderRadius: 12, objectFit: 'contain', boxShadow: '0 8px 40px rgba(0,0,0,0.5)' }} />
-          <button onClick={() => setLightbox(null)}
-            style={{ position: 'absolute', top: 20, right: 20, width: 36, height: 36, borderRadius: '50%', background: 'rgba(255,255,255,0.15)', border: 'none', color: '#fff', fontSize: 18, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            ✕
-          </button>
         </div>
       )}
 
@@ -377,6 +350,70 @@ function OverviewTab({ event, leaderboardUrl, description, photos }) {
             </span>
           )}
         </Link>
+      )}
+    </div>
+  )
+}
+
+// ─── Photos Tab ───────────────────────────────────────────────────────────────
+function PhotosTab({ photos }) {
+  const [lightbox, setLightbox] = useState(null)
+
+  if (photos.length === 0) {
+    return (
+      <div style={{ textAlign: 'center', paddingTop: 80, paddingBottom: 80 }}>
+        <div style={{ fontSize: 44, marginBottom: 12 }}>📷</div>
+        <div style={{ fontSize: 17, fontWeight: 700, color: '#111827', marginBottom: 6 }}>No photos yet</div>
+        <div style={{ fontSize: 14, color: '#86868b' }}>Check back after the event.</div>
+      </div>
+    )
+  }
+
+  return (
+    <div>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))', gap: 10 }}>
+        {photos.map((url, i) => (
+          <div key={i} onClick={() => setLightbox({ url, idx: i })}
+            style={{ borderRadius: 12, overflow: 'hidden', aspectRatio: '1', cursor: 'pointer', background: '#f3f4f6' }}>
+            <img src={url} alt={`Photo ${i + 1}`}
+              style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block', transition: 'transform 0.2s' }}
+              onMouseEnter={e => e.currentTarget.style.transform = 'scale(1.04)'}
+              onMouseLeave={e => e.currentTarget.style.transform = 'scale(1)'}
+            />
+          </div>
+        ))}
+      </div>
+
+      {/* Lightbox */}
+      {lightbox && (
+        <div onClick={() => setLightbox(null)}
+          style={{ position: 'fixed', inset: 0, zIndex: 9999, background: 'rgba(0,0,0,0.9)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
+          <img src={lightbox.url} alt="Event photo"
+            style={{ maxWidth: '100%', maxHeight: '90vh', borderRadius: 12, objectFit: 'contain', boxShadow: '0 8px 40px rgba(0,0,0,0.5)' }}
+            onClick={e => e.stopPropagation()}
+          />
+          {/* Prev */}
+          {lightbox.idx > 0 && (
+            <button onClick={e => { e.stopPropagation(); setLightbox({ url: photos[lightbox.idx - 1], idx: lightbox.idx - 1 }) }}
+              style={{ position: 'absolute', left: 16, top: '50%', transform: 'translateY(-50%)', width: 40, height: 40, borderRadius: '50%', background: 'rgba(255,255,255,0.15)', border: 'none', color: '#fff', fontSize: 20, cursor: 'pointer' }}>
+              ‹
+            </button>
+          )}
+          {/* Next */}
+          {lightbox.idx < photos.length - 1 && (
+            <button onClick={e => { e.stopPropagation(); setLightbox({ url: photos[lightbox.idx + 1], idx: lightbox.idx + 1 }) }}
+              style={{ position: 'absolute', right: 16, top: '50%', transform: 'translateY(-50%)', width: 40, height: 40, borderRadius: '50%', background: 'rgba(255,255,255,0.15)', border: 'none', color: '#fff', fontSize: 20, cursor: 'pointer' }}>
+              ›
+            </button>
+          )}
+          <button onClick={() => setLightbox(null)}
+            style={{ position: 'absolute', top: 16, right: 16, width: 36, height: 36, borderRadius: '50%', background: 'rgba(255,255,255,0.15)', border: 'none', color: '#fff', fontSize: 18, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            ✕
+          </button>
+          <div style={{ position: 'absolute', bottom: 16, left: '50%', transform: 'translateX(-50%)', fontSize: 12, color: 'rgba(255,255,255,0.5)' }}>
+            {lightbox.idx + 1} / {photos.length}
+          </div>
+        </div>
       )}
     </div>
   )

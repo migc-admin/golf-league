@@ -1232,14 +1232,37 @@ function EventPhotosManager({ event, onUpdated }) {
     onUpdated()
   }
 
+  async function downloadAll() {
+    for (let i = 0; i < photos.length; i++) {
+      const url = photos[i]
+      const res = await fetch(url)
+      const blob = await res.blob()
+      const a = document.createElement('a')
+      a.href = URL.createObjectURL(blob)
+      a.download = `event-photo-${i + 1}.${blob.type.split('/')[1] || 'jpg'}`
+      a.click()
+      URL.revokeObjectURL(a.href)
+      // Small delay to avoid browser blocking multiple downloads
+      await new Promise(r => setTimeout(r, 300))
+    }
+  }
+
   return (
     <div className="p-4 space-y-4">
-      {/* Upload button */}
-      <label className={`inline-flex items-center gap-2 px-4 py-2 rounded-lg border-2 border-dashed cursor-pointer text-sm font-semibold transition-colors ${uploading ? 'opacity-50 pointer-events-none border-gray-200 text-gray-400' : 'border-fairway-400 text-fairway-700 hover:bg-fairway-50'}`}>
-        <svg width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2M12 12V4m0 0L8 8m4-4l4 4"/></svg>
-        {uploading ? 'Uploading…' : 'Upload Photos'}
-        <input type="file" accept="image/*" multiple className="hidden" onChange={handleUpload} disabled={uploading} />
-      </label>
+      {/* Toolbar */}
+      <div className="flex items-center gap-3 flex-wrap">
+        <label className={`inline-flex items-center gap-2 px-4 py-2 rounded-lg border-2 border-dashed cursor-pointer text-sm font-semibold transition-colors ${uploading ? 'opacity-50 pointer-events-none border-gray-200 text-gray-400' : 'border-fairway-400 text-fairway-700 hover:bg-fairway-50'}`}>
+          <svg width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2M12 12V4m0 0L8 8m4-4l4 4"/></svg>
+          {uploading ? 'Uploading…' : 'Upload Photos'}
+          <input type="file" accept="image/*" multiple className="hidden" onChange={handleUpload} disabled={uploading} />
+        </label>
+        {photos.length > 0 && (
+          <button onClick={downloadAll} className="inline-flex items-center gap-2 px-4 py-2 rounded-lg border border-gray-200 text-sm font-semibold text-gray-600 hover:bg-gray-50 transition-colors">
+            <svg width="15" height="15" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2M12 4v12m0 0l-4-4m4 4l4-4"/></svg>
+            Download All ({photos.length})
+          </button>
+        )}
+      </div>
       <p className="text-xs text-gray-400">JPG, PNG, HEIC · Multiple files supported</p>
 
       {/* Photo grid */}
