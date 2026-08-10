@@ -595,6 +595,11 @@ function TabOverview({ event, eventPlayers, allScores, sideGames, course, confli
           <EventPublicFields event={event} onUpdated={onUpdated} />
         </Card>
 
+        <Card className="sm:col-span-2">
+          <CardHeader title="Event Photos" subtitle="Upload photos from the event — shown in a gallery on the public page" />
+          <EventPhotosManager event={event} onUpdated={onUpdated} />
+        </Card>
+
       </div>
 
       {/* Score conflicts */}
@@ -1184,6 +1189,75 @@ function TabPostRound({ event, eventPlayers, allScores, course, sideGames, orgNa
           onClose={() => setScoreEditor(false)}
           onSaved={onUpdated}
         />
+      )}
+    </div>
+  )
+}
+
+// ─── Event Photos Manager ───────────────────────────────────────────
+function EventPhotosManager({ event, onUpdated }) {
+  const [photos,   setPhotos]   = useState(event.photos ?? [])
+  const [uploading, setUploading] = useState(false)
+
+  async function handleUpload(e) {
+    const files = Array.from(e.target.files)
+    if (!files.length) return
+    setUploading(true)
+    try {
+      const uploaded = []
+      for (const file of files) {
+        const ext  = file.name.split('.').pop()
+        const path = `events/${event.id}/photos/${Date.now()}_${Math.random().toString(36).slice(2)}.${ext}`
+        const { error } = await supabase.storage.from('media').upload(path, file, { upsert: false })
+        if (error) { toast.error(`Upload failed: ${error.message}`); continue }
+        const { data: { publicUrl } } = supabase.storage.from('media').getPublicUrl(path)
+        uploaded.push(publicUrl)
+      }
+      if (!uploaded.length) return
+      const next = [...photos, ...uploaded]
+      setPhotos(next)
+      await supabase.from('events').update({ photos: next }).eq('id', event.id)
+      onUpdated()
+      toast.success(`${uploaded.length} photo${uploaded.length !== 1 ? 's' : ''} uploaded`)
+    } finally {
+      setUploading(false)
+      e.target.value = ''
+    }
+  }
+
+  async function removePhoto(url) {
+    const next = photos.filter(p => p !== url)
+    setPhotos(next)
+    await supabase.from('events').update({ photos: next }).eq('id', event.id)
+    onUpdated()
+  }
+
+  return (
+    <div className="p-4 space-y-4">
+      {/* Upload button */}
+      <label className={`inline-flex items-center gap-2 px-4 py-2 rounded-lg border-2 border-dashed cursor-pointer text-sm font-semibold transition-colors ${uploading ? 'opacity-50 pointer-events-none border-gray-200 text-gray-400' : 'border-fairway-400 text-fairway-700 hover:bg-fairway-50'}`}>
+        <svg width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2M12 12V4m0 0L8 8m4-4l4 4"/></svg>
+        {uploading ? 'Uploading…' : 'Upload Photos'}
+        <input type="file" accept="image/*" multiple className="hidden" onChange={handleUpload} disabled={uploading} />
+      </label>
+      <p className="text-xs text-gray-400">JPG, PNG, HEIC · Multiple files supported</p>
+
+      {/* Photo grid */}
+      {photos.length > 0 ? (
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
+          {photos.map((url, i) => (
+            <div key={i} className="relative group rounded-xl overflow-hidden aspect-square border border-gray-100">
+              <img src={url} alt={`Event photo ${i + 1}`} className="w-full h-full object-cover" />
+              <button
+                onClick={() => removePhoto(url)}
+                className="absolute top-1.5 right-1.5 w-6 h-6 rounded-full bg-black/60 text-white text-xs flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity hover:bg-red-600"
+                title="Remove photo"
+              >✕</button>
+            </div>
+          ))}
+        </div>
+      ) : (
+        <p className="text-sm text-gray-400">No photos yet — upload some from the event.</p>
       )}
     </div>
   )

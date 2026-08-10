@@ -98,6 +98,7 @@ export default function EventPage() {
   const eventName      = event.name ?? `Event #${event.event_number}`
   const coverImage     = event.cover_image_url ?? null
   const sponsors       = event.sponsors ?? []
+  const photos         = event.photos ?? []
   const description    = event.description ?? null
   const courseAddress  = event.course?.address ?? null
   const mapsUrl        = courseAddress
@@ -256,7 +257,7 @@ export default function EventPage() {
       <div style={{ maxWidth: 1100, margin: '0 auto', width: '100%', padding: 'clamp(20px,4vw,32px) clamp(16px,4vw,40px)', flex: 1, boxSizing: 'border-box' }}>
 
         {activeTab === 'overview' && (
-          <OverviewTab event={event} leaderboardUrl={leaderboardUrl} description={description} />
+          <OverviewTab event={event} leaderboardUrl={leaderboardUrl} description={description} photos={photos} />
         )}
 
         {activeTab === 'pairings' && (
@@ -322,7 +323,9 @@ function SponsorBar({ sponsors }) {
 }
 
 // ─── Overview Tab ─────────────────────────────────────────────────────────────
-function OverviewTab({ event, leaderboardUrl, description }) {
+function OverviewTab({ event, leaderboardUrl, description, photos }) {
+  const [lightbox, setLightbox] = useState(null)
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
 
@@ -330,6 +333,35 @@ function OverviewTab({ event, leaderboardUrl, description }) {
         <div style={{ background: '#fff', borderRadius: 16, padding: '20px 24px', border: '1px solid #e5e7eb' }}>
           <div style={{ fontSize: 10, fontWeight: 700, color: '#9ca3af', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 10 }}>About this Event</div>
           <p style={{ fontSize: 14, lineHeight: 1.7, color: '#374151', whiteSpace: 'pre-line', margin: 0 }}>{description}</p>
+        </div>
+      )}
+
+      {photos.length > 0 && (
+        <div style={{ background: '#fff', borderRadius: 16, padding: '20px 24px', border: '1px solid #e5e7eb' }}>
+          <div style={{ fontSize: 10, fontWeight: 700, color: '#9ca3af', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 14 }}>Event Photos</div>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))', gap: 8 }}>
+            {photos.map((url, i) => (
+              <div key={i} onClick={() => setLightbox(url)}
+                style={{ borderRadius: 10, overflow: 'hidden', aspectRatio: '1', cursor: 'pointer', background: '#f3f4f6' }}>
+                <img src={url} alt={`Photo ${i + 1}`} style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block', transition: 'transform 0.2s' }}
+                  onMouseEnter={e => e.currentTarget.style.transform = 'scale(1.04)'}
+                  onMouseLeave={e => e.currentTarget.style.transform = 'scale(1)'}
+                />
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Lightbox */}
+      {lightbox && (
+        <div onClick={() => setLightbox(null)}
+          style={{ position: 'fixed', inset: 0, zIndex: 9999, background: 'rgba(0,0,0,0.88)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
+          <img src={lightbox} alt="Event photo" style={{ maxWidth: '100%', maxHeight: '90vh', borderRadius: 12, objectFit: 'contain', boxShadow: '0 8px 40px rgba(0,0,0,0.5)' }} />
+          <button onClick={() => setLightbox(null)}
+            style={{ position: 'absolute', top: 20, right: 20, width: 36, height: 36, borderRadius: '50%', background: 'rgba(255,255,255,0.15)', border: 'none', color: '#fff', fontSize: 18, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            ✕
+          </button>
         </div>
       )}
 
