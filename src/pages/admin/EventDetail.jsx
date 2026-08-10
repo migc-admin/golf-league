@@ -2120,12 +2120,14 @@ function TabGroups({ event, eventPlayers, onUpdated, orgSlug, allScores, course 
         const from = members.findIndex(ep => ep.id === active.id)
         const to   = members.findIndex(ep => ep.id === over.id)
         if (from === -1 || to === -1 || from === to) return prev
-        return { ...prev, [fromKey]: arrayMove(members, from, to) }
+        const next = { ...prev, [fromKey]: arrayMove(members, from, to) }
+        persistContainers(next)
+        return next
       })
+    } else {
+      // Cross-container move was handled in onDragOver; persist current state
+      persistContainers(containers)
     }
-
-    // Persist after state has settled
-    setTimeout(() => persistContainers(), 0)
   }
 
   async function persistContainers(snap) {
@@ -2372,9 +2374,9 @@ function TabGroups({ event, eventPlayers, onUpdated, orgSlug, allScores, course 
                     for (const k of Object.keys(prev)) next[k] = [...prev[k]]
                     next[key] = next[key].filter(m => m.id !== ep.id)
                     next['ungrouped'] = [...next['ungrouped'], ep].sort(epAlpha)
+                    persistContainers(next)
                     return next
                   })
-                  setTimeout(() => persistContainers(), 0)
                 }}
               />
             )
