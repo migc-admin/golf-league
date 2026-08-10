@@ -185,8 +185,8 @@ export default function EventPage() {
 
             {/* Registration CTA — only if upcoming and reg is available */}
             {event.status === 'upcoming' && regUrl && (
-              <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 20, background: '#f9fafb', border: '1px solid #e5e7eb', borderRadius: 14, padding: '14px 18px' }}>
-                <div style={{ flex: 1 }}>
+              <div className="reg-cta" style={{ marginBottom: 20, background: '#f9fafb', border: '1px solid #e5e7eb', borderRadius: 14, padding: '14px 18px' }}>
+                <div style={{ marginBottom: (!spotsLeft || spotsLeft > 0) ? 12 : 0 }}>
                   {event.tournament_fee > 0 && (
                     <div style={{ fontSize: 22, fontWeight: 900, color: '#111827', letterSpacing: '-0.02em' }}>
                       ${Number(event.tournament_fee).toFixed(0)}<span style={{ fontSize: 13, fontWeight: 500, color: '#6b7280' }}>/player</span>
@@ -200,7 +200,7 @@ export default function EventPage() {
                 </div>
                 {(!spotsLeft || spotsLeft > 0) && (
                   <Link to={regUrl}
-                    style={{ background: GREEN, color: '#fff', fontWeight: 800, fontSize: 14, padding: '12px 22px', borderRadius: 10, textDecoration: 'none', whiteSpace: 'nowrap', flexShrink: 0 }}>
+                    style={{ display: 'block', background: GREEN, color: '#fff', fontWeight: 800, fontSize: 14, padding: '13px 22px', borderRadius: 10, textDecoration: 'none', textAlign: 'center' }}>
                     Register →
                   </Link>
                 )}
@@ -296,8 +296,12 @@ export default function EventPage() {
           .event-cover-mobile { display: none; }
           .event-cover-desktop { display: block !important; }
         }
-        .event-tab-bar { display: flex; overflow-x: auto; scrollbar-width: none; -webkit-overflow-scrolling: touch; }
+        .event-tab-bar { display: flex; overflow-x: auto; scrollbar-width: none; -webkit-overflow-scrolling: touch; width: 100%; }
         .event-tab-bar::-webkit-scrollbar { display: none; }
+        .event-tab-bar button, .event-tab-bar a { flex: 1; text-align: center; min-width: 0; padding-left: 8px !important; padding-right: 8px !important; justify-content: center; }
+        @media (min-width: 480px) {
+          .event-tab-bar button, .event-tab-bar a { flex: none; padding-left: 24px !important; padding-right: 24px !important; }
+        }
       `}</style>
     </div>
   )
