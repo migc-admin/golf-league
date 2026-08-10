@@ -2268,7 +2268,7 @@ function TabGroups({ event, eventPlayers, onUpdated, orgSlug, allScores, course 
 
   return (
     <div className="space-y-4">
-      {event.status === 'active' && (
+      {(event.status === 'active' || (event.status === 'upcoming' && eventPlayers.length > 0 && eventPlayers.every(ep => ep.group_number))) && (
         <Card>
           <CardHeader title="Scoring Access" subtitle="Share with players to enter scores" />
           <AccessCodeSection event={event} eventPlayers={eventPlayers} onUpdated={onUpdated} orgSlug={orgSlug} />
