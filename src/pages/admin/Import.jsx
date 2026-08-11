@@ -9,16 +9,16 @@
  */
 
 import { useEffect, useState } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../hooks/useAuth'
 import Card, { CardHeader } from '../../components/ui/Card'
 import Button from '../../components/ui/Button'
 import toast from 'react-hot-toast'
 
-const TABS = ['Players', 'Course', 'Event Roster', 'Past Results']
-
 export default function Import() {
-  const [activeTab, setActiveTab] = useState('Players')
+  const [searchParams] = useSearchParams()
+  const activeTab = searchParams.get('tab') ?? 'Players'
 
   return (
     <div className="space-y-5 max-w-3xl">
@@ -27,23 +27,6 @@ export default function Import() {
         <p className="text-gray-500 text-sm mt-1">
           Upload CSV files to bulk-load players, courses, and event rosters.
         </p>
-      </div>
-
-      {/* Tabs */}
-      <div className="border-b border-gray-200">
-        <nav className="-mb-px flex gap-1">
-          {TABS.map(tab => (
-            <button
-              key={tab}
-              onClick={() => setActiveTab(tab)}
-              className={`whitespace-nowrap px-4 py-2.5 text-sm font-medium transition-colors ${
-                activeTab === tab ? 'tab-active' : 'tab-inactive'
-              }`}
-            >
-              {tab}
-            </button>
-          ))}
-        </nav>
       </div>
 
       {activeTab === 'Players'      && <ImportPlayers />}

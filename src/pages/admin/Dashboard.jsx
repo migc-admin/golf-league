@@ -10,45 +10,57 @@ import TierBadge from '../../components/ui/TierBadge'
 export default function Dashboard() {
   const { user } = useAuth()
   const org = useOrg()
-  const [stats,        setStats]        = useState(null)
-  const [events,       setEvents]       = useState([])
-  const [orgSlug,      setOrgSlug]      = useState(null)
-  const [loading,      setLoading]      = useState(true)
-  const [searchParams, setSearchParams] = useSearchParams()
+  const [leagues,       setLeagues]       = useState([])
+  const [stats,         setStats]         = useState(null)
+  const [orgSlug,       setOrgSlug]       = useState(null)
+  const [loading,       setLoading]       = useState(true)
+  const [searchParams, setSearchParams]   = useSearchParams()
   const showUpgradeBanner = searchParams.get('upgraded') === 'true'
 
   useEffect(() => {
     async function load() {
+      if (!user) return
+
+      const { data: profile } = await supabase
+        .from('profiles').select('org_id').eq('id', user.id).single()
+      if (!profile?.org_id) { setLoading(false); return }
+
+      const { data: orgData } = await supabase
+        .from('organizations').select('slug').eq('id', profile.org_id).single()
+      if (orgData?.slug) setOrgSlug(orgData.slug)
+
       const [
-        { count: leagueCount },
         { count: playerCount },
-        { count: courseCount },
         { count: eventCount },
-        { data: recentEvents },
+        { data: leagueRows },
       ] = await Promise.all([
-        supabase.from('leagues').select('*', { count: 'exact', head: true }),
-        supabase.from('players').select('*', { count: 'exact', head: true }),
-        supabase.from('courses').select('*', { count: 'exact', head: true }),
+        supabase.from('players').select('*', { count: 'exact', head: true }).eq('org_id', profile.org_id),
         supabase.from('events').select('*', { count: 'exact', head: true }),
         supabase
-          .from('events')
-          .select('id, event_date, event_number, slug, status, entry_fee, league:leagues(name, slug), course:courses(name), event_players(count)')
-          .order('event_date', { ascending: false })
-          .limit(10),
+          .from('leagues')
+          .select('id, name, slug, season_year')
+          .eq('org_id', profile.org_id)
+          .order('season_year', { ascending: false }),
       ])
 
-      setStats({ leagues: leagueCount, players: playerCount, courses: courseCount, events: eventCount })
-      setEvents(recentEvents ?? [])
+      setStats({ players: playerCount ?? 0, events: eventCount ?? 0, leagues: leagueRows?.length ?? 0 })
 
-      // Fetch orgSlug for route building
-      if (user) {
-        const { data: profile } = await supabase
-          .from('profiles').select('org_id').eq('id', user.id).single()
-        if (profile?.org_id) {
-          const { data: org } = await supabase
-            .from('organizations').select('slug').eq('id', profile.org_id).single()
-          if (org?.slug) setOrgSlug(org.slug)
+      // For each league, fetch its events
+      if (leagueRows?.length) {
+        const leagueIds = leagueRows.map(l => l.id)
+        const { data: events } = await supabase
+          .from('events')
+          .select('id, name, event_number, slug, status, entry_fee, event_date, league_id, course:courses(name), event_players(count)')
+          .in('league_id', leagueIds)
+          .order('event_date', { ascending: false })
+
+        const eventsByLeague = {}
+        for (const ev of events ?? []) {
+          if (!eventsByLeague[ev.league_id]) eventsByLeague[ev.league_id] = []
+          eventsByLeague[ev.league_id].push(ev)
         }
+
+        setLeagues(leagueRows.map(l => ({ ...l, events: eventsByLeague[l.id] ?? [] })))
       }
 
       setLoading(false)
@@ -57,16 +69,6 @@ export default function Dashboard() {
   }, [user])
 
   if (loading) return <DashboardSkeleton />
-
-  const activeEvents   = events.filter(e => e.status === 'active')
-  const upcomingEvents = events.filter(e => e.status === 'upcoming')
-  const completedEvents = events.filter(e => e.status === 'complete')
-
-  // Stats strip values
-  const activePot = activeEvents.reduce((sum, ev) => {
-    const count = ev.event_players?.[0]?.count ?? 0
-    return sum + (ev.entry_fee ?? 0) * count
-  }, 0)
 
   return (
     <div className="space-y-6">
@@ -81,16 +83,11 @@ export default function Dashboard() {
               <p className="text-sm text-green-700">Your account has been upgraded. All features for your plan are now active.</p>
             </div>
           </div>
-          <button
-            onClick={() => setSearchParams({})}
-            className="text-green-500 hover:text-green-700 text-lg leading-none"
-            aria-label="Dismiss"
-          >
-            ×
-          </button>
+          <button onClick={() => setSearchParams({})} className="text-green-500 hover:text-green-700 text-lg leading-none">×</button>
         </div>
       )}
 
+      {/* Header */}
       <div className="flex items-start justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Home</h1>
@@ -104,168 +101,118 @@ export default function Dashboard() {
         )}
       </div>
 
-      {/* #7: Stats strip */}
-      <div className="bg-white rounded-xl border border-gray-200 shadow-[0_4px_20px_rgba(15,61,46,0.05)] grid grid-cols-2 sm:flex sm:divide-x divide-gray-100 overflow-hidden">
-        <StatStrip label="Total Players" value={stats.players} to="/admin/players" />
-        <StatStrip label="Events on Record" value={stats.events ?? 0} />
-        <StatStrip label="Leagues" value={stats.leagues} to="/admin/leagues" />
-        {activePot > 0 && (
-          <StatStrip label="Active Pot" value={`$${activePot.toLocaleString()}`} highlight />
-        )}
-      </div>
-
-      {/* #6: Active events — hero card treatment */}
-      {activeEvents.length > 0 && (
-        <div>
-          <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-widest mb-3 flex items-center gap-2">
-            <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse inline-block" />
-            Active
-          </h2>
-          <div className="space-y-3">
-            {activeEvents.map(ev => <HeroEventCard key={ev.id} event={ev} orgSlug={orgSlug} />)}
-          </div>
+      {/* Stats strip */}
+      {stats && (
+        <div className="bg-white rounded-xl border border-gray-200 shadow-[0_4px_20px_rgba(15,61,46,0.05)] grid grid-cols-3 divide-x divide-gray-100 overflow-hidden">
+          <StatStrip label="Players" value={stats.players} to="/admin/players" />
+          <StatStrip label="Events" value={stats.events} />
+          <StatStrip label="Leagues" value={stats.leagues} to="/admin/leagues" />
         </div>
       )}
 
-      {/* Upcoming events */}
-      {upcomingEvents.length > 0 && (
-        <div>
-          <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-widest mb-3">Upcoming</h2>
-          <div className="grid gap-3 sm:grid-cols-2">
-            {upcomingEvents.map(ev => <EventCard key={ev.id} event={ev} orgSlug={orgSlug} />)}
-          </div>
-        </div>
-      )}
-
-      {/* Recent completed */}
-      {completedEvents.length > 0 && (
-        <div>
-          <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-widest mb-3">Recent</h2>
-          <Card className="overflow-hidden p-0">
-            <div className="divide-y divide-gray-100">
-              {completedEvents.map(ev => (
-                <Link
-                  key={ev.id}
-                  to={`/admin/${orgSlug}/${ev.league?.slug}/${ev.slug}`}
-                  className="flex items-center justify-between px-5 py-3.5 hover:bg-gray-50 transition-colors cursor-pointer"
-                >
-                  <div>
-                    <div className="font-medium text-sm text-gray-900">
-                      {ev.league?.name} — Event #{ev.event_number}
-                    </div>
-                    <div className="text-xs text-gray-500 mt-0.5">{formatDate(ev.event_date)} · {ev.course?.name}</div>
-                  </div>
-                  <div className="flex items-center gap-3">
-                    <StatusBadge status={ev.status} />
-                    <svg width="14" height="14" viewBox="0 0 16 16" fill="none" className="text-gray-400">
-                      <path d="M6 3l5 5-5 5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-                    </svg>
-                  </div>
-                </Link>
-              ))}
-            </div>
-          </Card>
-        </div>
-      )}
-
-      {events.length === 0 && (
+      {/* Leagues + events */}
+      {leagues.length === 0 ? (
         <Card>
-          <p className="text-sm text-gray-400 text-center py-4">No events yet. Create your first event from the Leagues page.</p>
+          <p className="text-sm text-gray-400 text-center py-4">No leagues yet. <Link to="/admin/leagues" className="text-fairway-700 font-semibold hover:underline">Create your first league →</Link></p>
         </Card>
+      ) : (
+        <div className="space-y-6">
+          {leagues.map(league => (
+            <LeagueSection key={league.id} league={league} orgSlug={orgSlug} />
+          ))}
+        </div>
       )}
     </div>
   )
 }
 
-// #7: Horizontal stat strip item
-function StatStrip({ label, value, to, highlight }) {
-  const inner = (
-    <div className={`flex-1 px-5 py-4 text-center transition-colors ${to ? 'hover:bg-fairway-50 cursor-pointer' : ''}`}>
-      <div className={`text-2xl font-bold tabular-nums ${highlight ? 'text-gold-500' : 'text-augusta-600'}`}>
-        {value ?? 0}
+function LeagueSection({ league, orgSlug }) {
+  const active    = league.events.filter(e => e.status === 'active')
+  const upcoming  = league.events.filter(e => e.status === 'upcoming')
+  const completed = league.events.filter(e => e.status === 'complete')
+
+  return (
+    <div>
+      {/* League header */}
+      <div className="flex items-center justify-between mb-3">
+        <div className="flex items-center gap-3">
+          <h2 className="text-base font-bold text-gray-900">{league.name}</h2>
+          {league.season_year && (
+            <span className="text-xs text-gray-400 font-medium">{league.season_year}</span>
+          )}
+        </div>
+        <Link
+          to="/admin/leagues"
+          className="text-xs text-fairway-700 font-semibold hover:underline"
+        >
+          Manage league →
+        </Link>
       </div>
-      <div className="text-xs text-gray-500 font-medium mt-0.5">{label}</div>
+
+      {league.events.length === 0 ? (
+        <div className="bg-white rounded-xl border border-gray-200 px-5 py-6 text-center">
+          <p className="text-sm text-gray-400">No events yet for this league.</p>
+        </div>
+      ) : (
+        <div className="bg-white rounded-xl border border-gray-200 shadow-[0_2px_12px_rgba(15,61,46,0.04)] overflow-hidden">
+          {/* Active events — highlighted */}
+          {active.map(ev => (
+            <EventRow key={ev.id} event={ev} orgSlug={orgSlug} leagueSlug={league.slug} highlight />
+          ))}
+          {/* Upcoming */}
+          {upcoming.map(ev => (
+            <EventRow key={ev.id} event={ev} orgSlug={orgSlug} leagueSlug={league.slug} />
+          ))}
+          {/* Completed */}
+          {completed.map(ev => (
+            <EventRow key={ev.id} event={ev} orgSlug={orgSlug} leagueSlug={league.slug} />
+          ))}
+        </div>
+      )}
     </div>
   )
-  return to ? <Link to={to} className="flex-1">{inner}</Link> : <div className="flex-1">{inner}</div>
 }
 
-// #6: Hero card for active events
-function HeroEventCard({ event: ev, orgSlug }) {
+function EventRow({ event: ev, orgSlug, leagueSlug, highlight }) {
   const playerCount = ev.event_players?.[0]?.count ?? 0
-  const pot = playerCount && ev.entry_fee ? (playerCount * ev.entry_fee).toLocaleString('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }) : null
+  const eventName   = ev.name ?? `Event #${ev.event_number}`
 
   return (
-    <div className="bg-white rounded-xl border border-gray-200 shadow-[0_4px_20px_rgba(15,61,46,0.05)] overflow-hidden border-l-4 border-l-gold-400">
-      <div className="p-5">
-        <div className="flex items-start justify-between gap-4">
-          <div className="flex-1 min-w-0">
-            <div className="flex items-center gap-2 mb-1">
-              <StatusBadge status={ev.status} />
-            </div>
-            <h3 className="text-lg font-bold text-gray-900 leading-tight">
-              {ev.league?.name} — Event #{ev.event_number}
-            </h3>
-            <p className="text-sm text-gray-500 mt-0.5">{ev.course?.name} · {formatDate(ev.event_date)}</p>
-            {(playerCount > 0 || pot) && (
-              <div className="flex items-center gap-4 mt-3">
-                {playerCount > 0 && (
-                  <span className="text-sm font-semibold text-fairway-700">
-                    {playerCount} {playerCount === 1 ? 'player' : 'players'}
-                  </span>
-                )}
-                {pot && (
-                  <span className="text-sm font-semibold text-gold-600 tabular-nums">
-                    {pot} pot
-                  </span>
-                )}
-              </div>
-            )}
+    <Link
+      to={`/admin/${orgSlug}/${leagueSlug}/${ev.slug}`}
+      className="flex items-center justify-between px-5 py-3.5 hover:bg-gray-50 transition-colors border-b border-gray-100 last:border-b-0 group"
+      style={highlight ? { borderLeft: '3px solid #D4AF37' } : {}}
+    >
+      <div className="flex items-center gap-3 min-w-0">
+        {highlight && (
+          <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse shrink-0" />
+        )}
+        <div className="min-w-0">
+          <div className="font-semibold text-sm text-gray-900 truncate">{eventName}</div>
+          <div className="text-xs text-gray-400 mt-0.5">
+            {formatDate(ev.event_date)}{ev.course?.name ? ` · ${ev.course.name}` : ''}
+            {playerCount > 0 ? ` · ${playerCount} players` : ''}
           </div>
-        </div>
-        <div className="flex items-center gap-3 mt-4 pt-4 border-t border-gray-100">
-          <Link
-            to={`/admin/${orgSlug}/${ev.league?.slug}/${ev.slug}`}
-            className="btn btn-primary btn-sm"
-          >
-            Manage Event
-          </Link>
-          <Link
-            to={`/${orgSlug}/${ev.league?.slug}/${ev.slug}/leaderboard`}
-            className="btn btn-secondary btn-sm"
-          >
-            Leaderboard
-          </Link>
-          <Link
-            to={`/${orgSlug}/${ev.league?.slug}/${ev.slug}/schedule`}
-            className="text-xs text-gray-500 font-medium hover:underline ml-1"
-          >
-            Pairings →
-          </Link>
         </div>
       </div>
-    </div>
-  )
-}
-
-function EventCard({ event: ev, orgSlug }) {
-  return (
-    <Link to={`/admin/${orgSlug}/${ev.league?.slug}/${ev.slug}`} className="block card border border-gray-200 p-4 hover:shadow-md transition-shadow cursor-pointer">
-      <div className="flex items-start justify-between">
-        <div>
-          <div className="font-semibold text-gray-900 text-sm">
-            {ev.league?.name} — Event #{ev.event_number}
-          </div>
-          <div className="text-xs text-gray-500 mt-0.5">{ev.course?.name}</div>
-          <div className="text-xs text-gray-400 mt-0.5">{formatDate(ev.event_date)}</div>
-        </div>
+      <div className="flex items-center gap-3 shrink-0">
         <StatusBadge status={ev.status} />
-      </div>
-      <div className="mt-3 flex items-center gap-3">
-        <span className="text-xs text-fairway-700 font-medium">View details →</span>
+        <svg width="14" height="14" viewBox="0 0 16 16" fill="none" className="text-gray-300 group-hover:text-gray-400 transition-colors">
+          <path d="M6 3l5 5-5 5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+        </svg>
       </div>
     </Link>
   )
+}
+
+function StatStrip({ label, value, to }) {
+  const inner = (
+    <div className={`px-5 py-4 text-center transition-colors ${to ? 'hover:bg-fairway-50 cursor-pointer' : ''}`}>
+      <div className="text-2xl font-bold tabular-nums text-augusta-600">{value ?? 0}</div>
+      <div className="text-xs text-gray-500 font-medium mt-0.5">{label}</div>
+    </div>
+  )
+  return to ? <Link to={to}>{inner}</Link> : <div>{inner}</div>
 }
 
 function DashboardSkeleton() {
@@ -273,15 +220,14 @@ function DashboardSkeleton() {
     <div className="space-y-6 animate-pulse">
       <div className="h-8 w-48 bg-gray-200 rounded" />
       <div className="h-16 bg-gray-200 rounded-xl" />
-      <div className="grid grid-cols-3 gap-4">
-        {[0,1,2].map(i => <div key={i} className="h-20 bg-gray-200 rounded-xl" />)}
-      </div>
+      <div className="h-40 bg-gray-200 rounded-xl" />
       <div className="h-40 bg-gray-200 rounded-xl" />
     </div>
   )
 }
 
 function formatDate(d) {
+  if (!d) return ''
   return new Date(d + 'T00:00:00').toLocaleDateString('en-US', {
     weekday: 'short', month: 'short', day: 'numeric', year: 'numeric',
   })

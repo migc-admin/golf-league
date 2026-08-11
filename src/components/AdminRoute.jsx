@@ -1,6 +1,6 @@
 import { Navigate, Outlet, useLocation } from 'react-router-dom'
 import { useAuth } from '../hooks/useAuth'
-import Layout from './Layout'
+import AdminLayout from './AdminLayout'
 
 export default function AdminRoute() {
   const { user, loading, profileLoading, isAdmin } = useAuth()
@@ -24,8 +24,8 @@ export default function AdminRoute() {
   if (!isAdmin) return <Navigate to="/home" replace />
 
   return (
-    <Layout>
+    <AdminLayout>
       <Outlet />
-    </Layout>
+    </AdminLayout>
   )
 }

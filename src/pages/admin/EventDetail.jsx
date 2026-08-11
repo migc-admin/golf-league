@@ -8,7 +8,7 @@ import {
   arrayMove,
 } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
-import { useParams, Link } from 'react-router-dom'
+import { useParams, Link, useSearchParams } from 'react-router-dom'
 import { supabase } from '../../lib/supabase'
 import toast from 'react-hot-toast'
 import { computePayouts, DEFAULT_PAYOUT_CONFIG, getCategoryLabel, ctpLabel, activePayoutKeys, defaultForKey } from '../../lib/engines/payouts'
@@ -109,8 +109,10 @@ export default function EventDetail() {
   const [tglSelections,  setTglSelections]  = useState([])
   const [tglLocked,      setTglLocked]      = useState(false)
   const [loading,        setLoading]        = useState(true)
-  const [activeTab,      setActiveTab]      = useState('Overview')
   const [printAsset,     setPrintAsset]     = useState(null) // 'cards' | 'tee_sheet' | 'cart_signs'
+  const [searchParams,   setSearchParams]   = useSearchParams()
+  const activeTab = searchParams.get('tab') ?? 'Overview'
+  const setActiveTab = (tab) => setSearchParams({ tab })
 
   const load = useCallback(async () => {
     const { data: league } = await supabase.from('leagues').select('id').eq('slug', leagueSlug).single()
@@ -218,8 +220,8 @@ export default function EventDetail() {
       </div>
 
 
-      {/* Tabs */}
-      <div className="border-b border-gray-200">
+      {/* Tabs — rendered in sidebar on desktop; shown here on mobile only */}
+      <div className="border-b border-gray-200 md:hidden">
         <nav className="-mb-px flex gap-1 overflow-x-auto">
           {ALL_ADMIN_TABS.filter(tab => {
             if (tab === 'Team Play') return hasFeature('tgl') && tglTeams.length > 0
@@ -246,7 +248,7 @@ export default function EventDetail() {
       {activeTab === 'Players' && (
         <div className="space-y-6">
           {hasFeature('registration') ? (
-            <div>
+            <div id="registrations">
               <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-widest mb-3">Registrations</h3>
               <TabRegistrations event={event} onUpdated={load} orgId={org?.id} />
             </div>
@@ -261,7 +263,7 @@ export default function EventDetail() {
               </span>
             </div>
           )}
-          <div className="border-t border-gray-100 pt-6">
+          <div id="roster" className="border-t border-gray-100 pt-6">
             <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-widest mb-3">Players &amp; Flights</h3>
             <TabFlights event={event} eventPlayers={eventPlayers} course={course} allPlayers={allPlayers} onUpdated={load} />
           </div>
@@ -289,17 +291,17 @@ export default function EventDetail() {
 
       {activeTab === 'Payout' && (
         <div className="space-y-6">
-          <div>
+          <div id="payout-config">
             <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-widest mb-3">Payout Config</h3>
             <TabPayoutConfig event={event} eventPlayers={eventPlayers} course={course} onUpdated={load} />
           </div>
           {(event?.side_game_options ?? []).length > 0 && (
-            <div className="border-t border-gray-100 pt-6">
+            <div id="side-games" className="border-t border-gray-100 pt-6">
               <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-widest mb-3">Side Games</h3>
               <TabSideGames event={event} eventPlayers={eventPlayers} course={course} sideGames={sideGames} onUpdated={load} />
             </div>
           )}
-          <div className="border-t border-gray-100 pt-6">
+          <div id="payout-summary" className="border-t border-gray-100 pt-6">
             <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-widest mb-3">Payout Summary</h3>
             <TabPayoutSummary event={event} eventPlayers={eventPlayers} allScores={allScores} sideGames={sideGames} course={course} />
           </div>
@@ -533,77 +535,72 @@ function TabOverview({ event, eventPlayers, allScores, sideGames, course, confli
   const scorecardUrl = `${window.location.origin}/${orgSlug}/${event.league?.slug}/${event.slug}/scorecard?eid=${event.id}`
 
   return (
-    <div className="grid sm:grid-cols-2 gap-4">
-      {/* Left column */}
-      <div className="space-y-4">
-        <Card>
-          <CardHeader
-            title="Event Details"
-            action={
-              <div className="flex gap-2 flex-wrap">
-                <Button size="sm" variant="secondary" onClick={() => setEditModal(true)}>Edit</Button>
-                {event.status !== 'complete' && (
-                  <Button size="sm" variant="danger" onClick={() => setDeleteModal(true)}>Delete</Button>
-                )}
-              </div>
-            }
-          />
-          <dl className="space-y-2 text-sm">
-            <Row label="Date"         value={formatDate(event.event_date)} />
-            <Row label="Course"       value={event.course?.name} />
-            <Row label="League"       value={event.league?.name} />
-            <Row label="Format"       value={FORMAT_LABELS[event.format] ?? event.format ?? 'Net Stroke Play'} />
-            <Row label="Start Time"   value={event.start_time ? formatTime(event.start_time) : '—'} />
-            {!event.shotgun_start && <Row label="Tee Interval" value={`${event.tee_time_interval_mins ?? 10} min`} />}
-            <Row label="Entry Fee"    value={`$${event.entry_fee}`} />
-            {event.tournament_fee > 0 && <Row label="Tournament Entry Fee" value={`$${Number(event.tournament_fee).toFixed(2)}`} />}
-            <Row label="Status"       value={<StatusBadge status={event.status} />} />
-          </dl>
-        </Card>
+    <div className="space-y-4">
 
-        <Card>
-          <CardHeader title="Public Event Page" subtitle="Additional details shown to players" />
-          <EventPublicFields event={event} onUpdated={onUpdated} />
-        </Card>
-      </div>
+      <Card id="event-details">
+        <CardHeader
+          title="Event Details"
+          action={
+            <div className="flex gap-2 flex-wrap">
+              <Button size="sm" variant="secondary" onClick={() => setEditModal(true)}>Edit</Button>
+              {event.status !== 'complete' && (
+                <Button size="sm" variant="danger" onClick={() => setDeleteModal(true)}>Delete</Button>
+              )}
+            </div>
+          }
+        />
+        <dl className="space-y-2 text-sm">
+          <Row label="Date"         value={formatDate(event.event_date)} />
+          <Row label="Course"       value={event.course?.name} />
+          <Row label="League"       value={event.league?.name} />
+          <Row label="Format"       value={FORMAT_LABELS[event.format] ?? event.format ?? 'Net Stroke Play'} />
+          <Row label="Start Time"   value={event.start_time ? formatTime(event.start_time) : '—'} />
+          {!event.shotgun_start && <Row label="Tee Interval" value={`${event.tee_time_interval_mins ?? 10} min`} />}
+          <Row label="Entry Fee"    value={`$${event.entry_fee}`} />
+          {event.tournament_fee > 0 && <Row label="Tournament Entry Fee" value={`$${Number(event.tournament_fee).toFixed(2)}`} />}
+          <Row label="Status"       value={<StatusBadge status={event.status} />} />
+        </dl>
+      </Card>
 
-      {/* Right column */}
-      <div className="space-y-4">
-        <Card>
-          <CardHeader title="Players" />
-          <dl className="space-y-2 text-sm">
-            <Row label="Total Players"  value={`${nonGuests.length}${nonGuests.length !== eventPlayers.length ? ` + ${eventPlayers.length - nonGuests.length} guest${eventPlayers.length - nonGuests.length !== 1 ? 's' : ''}` : ''}`} />
-            {(event.use_flights ?? false) && <Row label="Flight A" value={flightA} />}
-            {(event.use_flights ?? false) && <Row label="Flight B" value={flightB} />}
-            <Row label="Scores Entered" value={`${holesEntered} hole entries`} />
-            <Row label="Total Pot"      value={`$${(event.entry_fee * nonGuests.length).toFixed(2)}`} />
-          </dl>
-        </Card>
+      <Card id="players-summary">
+        <CardHeader title="Players" />
+        <dl className="space-y-2 text-sm">
+          <Row label="Total Players"  value={`${nonGuests.length}${nonGuests.length !== eventPlayers.length ? ` + ${eventPlayers.length - nonGuests.length} guest${eventPlayers.length - nonGuests.length !== 1 ? 's' : ''}` : ''}`} />
+          {(event.use_flights ?? false) && <Row label="Flight A" value={flightA} />}
+          {(event.use_flights ?? false) && <Row label="Flight B" value={flightB} />}
+          <Row label="Scores Entered" value={`${holesEntered} hole entries`} />
+          <Row label="Total Pot"      value={`$${(event.entry_fee * nonGuests.length).toFixed(2)}`} />
+        </dl>
+      </Card>
 
-        <Card>
-          <CardHeader title="Event Cover Photo" subtitle="Shown on the public event page" />
-          <ImageUpload
-            bucket="media"
-            path={`events/${event.id}/cover`}
-            currentUrl={event.cover_image_url ?? null}
-            shape="rect"
-            label="Recommended: 1200 × 800px JPG"
-            onUploaded={async (url) => {
-              await supabase.from('events').update({ cover_image_url: url }).eq('id', event.id)
-              onUpdated()
-            }}
-            onRemoved={async () => {
-              await supabase.from('events').update({ cover_image_url: null }).eq('id', event.id)
-              onUpdated()
-            }}
-          />
-        </Card>
+      <Card id="public-event">
+        <CardHeader title="Public Event Page" subtitle="Additional details shown to players" />
+        <EventPublicFields event={event} onUpdated={onUpdated} />
+      </Card>
 
-        <Card>
-          <CardHeader title="Event Photos" subtitle="Upload photos from the event — shown in a gallery on the public page" />
-          <EventPhotosManager event={event} onUpdated={onUpdated} />
-        </Card>
-      </div>
+      <Card id="cover-photo">
+        <CardHeader title="Event Cover Photo" subtitle="Shown on the public event page" />
+        <ImageUpload
+          bucket="media"
+          path={`events/${event.id}/cover`}
+          currentUrl={event.cover_image_url ?? null}
+          shape="rect"
+          label="Recommended: 1200 × 800px JPG"
+          onUploaded={async (url) => {
+            await supabase.from('events').update({ cover_image_url: url }).eq('id', event.id)
+            onUpdated()
+          }}
+          onRemoved={async () => {
+            await supabase.from('events').update({ cover_image_url: null }).eq('id', event.id)
+            onUpdated()
+          }}
+        />
+      </Card>
+
+      <Card id="event-photos">
+        <CardHeader title="Event Photos" subtitle="Upload photos from the event — shown in a gallery on the public page" />
+        <EventPhotosManager event={event} onUpdated={onUpdated} />
+      </Card>
 
       {/* Score conflicts */}
       {conflicts.length > 0 && (
@@ -1071,7 +1068,7 @@ function TabPostRound({ event, eventPlayers, allScores, course, sideGames, orgNa
     <div className="space-y-6 max-w-xl">
 
       {/* ── Pre-Round ─────────────────────────────────────────── */}
-      <div className="bg-gray-50 rounded-xl px-4 py-4 space-y-3">
+      <div id="print-assets" className="bg-gray-50 rounded-xl px-4 py-4 space-y-3">
         <div className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2">Pre-Round</div>
         <div>
           <div className="text-sm font-medium text-gray-800 mb-2">Print Assets</div>
@@ -1082,7 +1079,7 @@ function TabPostRound({ event, eventPlayers, allScores, course, sideGames, orgNa
           </div>
           <div className="text-xs text-gray-400 mt-1.5">Tee sheet, cart signs, and side game cards for the round</div>
         </div>
-        <div className="flex items-center justify-between border-t border-gray-200 pt-3">
+        <div id="export-scorecards" className="flex items-center justify-between border-t border-gray-200 pt-3">
           <div>
             <div className="text-sm font-medium text-gray-800">Export Scorecards (PNG)</div>
             <div className="text-xs text-gray-400 mt-0.5">Printable scorecards with QR codes, one per group</div>
@@ -1099,7 +1096,7 @@ function TabPostRound({ event, eventPlayers, allScores, course, sideGames, orgNa
       </div>
 
       {/* ── Scoring ───────────────────────────────────────────── */}
-      <div className="bg-gray-50 rounded-xl px-4 py-4 space-y-3">
+      <div id="edit-scores" className="bg-gray-50 rounded-xl px-4 py-4 space-y-3">
         <div className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2">Scoring</div>
         <div className="flex items-center justify-between">
           <div>
@@ -1129,7 +1126,7 @@ function TabPostRound({ event, eventPlayers, allScores, course, sideGames, orgNa
       </div>
 
       {/* ── Results ───────────────────────────────────────────── */}
-      <div className="bg-gray-50 rounded-xl px-4 py-4 space-y-3">
+      <div id="scores-export" className="bg-gray-50 rounded-xl px-4 py-4 space-y-3">
         <div className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2">Results</div>
         <div className="flex items-center justify-between">
           <div>
