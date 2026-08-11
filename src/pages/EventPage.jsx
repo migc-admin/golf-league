@@ -6,6 +6,7 @@
 import { useEffect, useState } from 'react'
 import { useParams, useSearchParams, Link } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
+import { useSubdomainOrg } from '../lib/SubdomainContext'
 
 const GREEN = '#1B4332'
 const GOLD  = '#D4AF37'
@@ -36,7 +37,9 @@ const BASE_TABS = [
 ]
 
 export default function EventPage() {
-  const { orgSlug, leagueSlug, eventSlug } = useParams()
+  const subdomainOrg = useSubdomainOrg()
+  const { orgSlug: paramOrgSlug, leagueSlug, eventSlug } = useParams()
+  const orgSlug = subdomainOrg ?? paramOrgSlug
   const [searchParams] = useSearchParams()
   const directEventId = searchParams.get('eid')
 
