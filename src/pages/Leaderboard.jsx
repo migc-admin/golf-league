@@ -73,6 +73,8 @@ export default function Leaderboard() {
   const [tglMembers,    setTglMembers]    = useState([])
   const [tglSelections, setTglSelections] = useState([])
   const [tglLocked,     setTglLocked]     = useState(false)
+  const [orgLogo,       setOrgLogo]       = useState(org?.logo_url ?? null)
+  const [orgName,       setOrgName]       = useState(org?.name ?? null)
 
   const subRef = useRef(null)
   const tabs   = event ? visibleTabs(event, hasFeature('tgl') && tglTeams.length > 0 && tglSelections.length > 0) : ALL_TABS
@@ -123,8 +125,18 @@ export default function Leaderboard() {
       await loadScores(eventId)
       setLoading(false)
 
-      // Load TGL data non-blocking
+      // Fetch org logo via league
       const leagueId = ev.league_id
+      supabase.from('leagues').select('org_id').eq('id', leagueId).single().then(({ data: lg }) => {
+        if (lg?.org_id) {
+          supabase.from('organizations').select('name, logo_url').eq('id', lg.org_id).single().then(({ data: o }) => {
+            if (o?.logo_url) setOrgLogo(o.logo_url)
+            if (o?.name)     setOrgName(o.name)
+          })
+        }
+      })
+
+      // Load TGL data non-blocking
       const { data: tglT } = await supabase.from('tgl_teams').select('*').eq('league_id', leagueId).order('name')
       if (tglT?.length) {
         const [{ data: tglM }, { data: tglS }, { data: tglLock }] = await Promise.all([
@@ -220,8 +232,8 @@ export default function Leaderboard() {
       <div className="sticky top-0 z-20" style={{ background: '#ffffff', borderBottom: '1px solid #ebe9e4' }}>
         <div className="max-w-2xl mx-auto px-4 py-3 flex items-center justify-between gap-3">
           {/* Logo */}
-          {(org?.logo_url) && (
-            <img src={org.logo_url} alt={org?.name ?? ''} className="w-9 h-9 object-contain rounded-lg shrink-0" />
+          {orgLogo && (
+            <img src={orgLogo} alt={orgName ?? ''} className="w-9 h-9 object-contain rounded-lg shrink-0" />
           )}
           <div className="flex-1 min-w-0">
             <div className="font-bold text-base text-ink truncate">{event.course?.name}</div>
