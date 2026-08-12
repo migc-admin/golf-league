@@ -220,8 +220,8 @@ export default function Leaderboard() {
       <div className="sticky top-0 z-20" style={{ background: '#ffffff', borderBottom: '1px solid #ebe9e4' }}>
         <div className="max-w-2xl mx-auto px-4 py-3 flex items-center justify-between gap-3">
           {/* Logo */}
-          {org?.logo_url && (
-            <img src={org.logo_url} alt={org.name} className="w-9 h-9 object-contain rounded-lg shrink-0" />
+          {(org?.logo_url) && (
+            <img src={org.logo_url} alt={org?.name ?? ''} className="w-9 h-9 object-contain rounded-lg shrink-0" />
           )}
           <div className="flex-1 min-w-0">
             <div className="font-bold text-base text-ink truncate">{event.course?.name}</div>
