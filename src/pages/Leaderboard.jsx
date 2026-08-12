@@ -15,7 +15,8 @@ import { computeMatchPoints, computeTeamMatchPoints } from '../lib/engines/match
 import { computePayouts, CATEGORY_LABELS, ctpLabel } from '../lib/engines/payouts'
 import { computeTGLEventResults } from '../lib/engines/tgl'
 import { FlightBadge, StatusBadge } from '../components/ui/Badge'
-import { useFeatures } from '../lib/OrgContext'
+import { useFeatures, useOrg } from '../lib/OrgContext'
+import { useSubdomainOrg } from '../lib/SubdomainContext'
 
 const ALL_TABS = ['18-Hole', 'Front 9', 'Back 9', 'Stableford', 'Match Points', 'Team Match', 'Low Putts', 'Skins', 'Payouts', 'Team Play']
 
@@ -48,6 +49,8 @@ const FORMAT_LABELS = {
 
 export default function Leaderboard() {
   const { orgSlug, leagueSlug, eventSlug } = useParams()
+  const subdomainOrg = useSubdomainOrg()
+  const org          = useOrg()
   const navigate = useNavigate()
   const location = useLocation()
   const [searchParams] = useSearchParams()
@@ -215,19 +218,28 @@ export default function Leaderboard() {
 
       {/* Header */}
       <div className="sticky top-0 z-20" style={{ background: '#ffffff', borderBottom: '1px solid #ebe9e4' }}>
-        <div className="max-w-2xl mx-auto px-4 py-3 flex items-center justify-between">
-          <div>
-            <div className="font-bold text-base text-ink">{event.course?.name}</div>
-            <div className="text-xs text-ink-muted mt-0.5">
+        <div className="max-w-2xl mx-auto px-4 py-3 flex items-center justify-between gap-3">
+          {/* Logo */}
+          {org?.logo_url && (
+            <img src={org.logo_url} alt={org.name} className="w-9 h-9 object-contain rounded-lg shrink-0" />
+          )}
+          <div className="flex-1 min-w-0">
+            <div className="font-bold text-base text-ink truncate">{event.course?.name}</div>
+            <div className="text-xs text-ink-muted mt-0.5 truncate">
               {event.league?.name} · Event #{event.event_number} · {formatDate(event.event_date)}
             </div>
             {event.format && event.format !== 'net_stroke' && (
               <div className="text-xs text-ink-muted mt-0.5">{FORMAT_LABELS[event.format] ?? event.format}</div>
             )}
           </div>
-          <div className="flex flex-col items-end gap-1.5">
+          <div className="flex flex-col items-end gap-1.5 shrink-0">
             <StatusBadge status={event.status} />
-            <Link to={`/${orgSlug}/${event.league?.slug}/${event.slug}/schedule`} className="text-xs text-ink-muted hover:text-ink">
+            <Link
+              to={subdomainOrg
+                ? `/${event.league?.slug}/${event.slug}/schedule`
+                : `/${orgSlug}/${event.league?.slug}/${event.slug}/schedule`}
+              className="text-xs text-ink-muted hover:text-ink"
+            >
               Pairings ↗
             </Link>
           </div>
