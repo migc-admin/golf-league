@@ -125,9 +125,10 @@ export default function Leaderboard() {
       await loadScores(eventId)
       setLoading(false)
 
-      // Fetch org logo via league
+      // Fetch org logo (falls back to league logo)
       const leagueId = ev.league_id
-      supabase.from('leagues').select('org_id').eq('id', leagueId).single().then(({ data: lg }) => {
+      supabase.from('leagues').select('org_id, logo_url, name').eq('id', leagueId).single().then(({ data: lg }) => {
+        if (lg?.logo_url) { setOrgLogo(lg.logo_url); setOrgName(lg.name) }
         if (lg?.org_id) {
           supabase.from('organizations').select('name, logo_url').eq('id', lg.org_id).single().then(({ data: o }) => {
             if (o?.logo_url) setOrgLogo(o.logo_url)
