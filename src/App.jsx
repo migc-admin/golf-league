@@ -49,13 +49,18 @@ export default function App() {
 
   if (subdomainSlug) {
     return (
-      <SubdomainContext.Provider value={subdomainSlug}>
-        <Routes>
-          <Route path="/" element={<OrgHome orgSlug={subdomainSlug} />} />
-          <Route path="/:leagueSlug" element={<LeagueHomeRoute orgSlug={subdomainSlug} />} />
-          <Route path="/:leagueSlug/:eventSlug" element={<EventPage />} />
-        </Routes>
-      </SubdomainContext.Provider>
+      <AuthProvider>
+        <SubdomainContext.Provider value={subdomainSlug}>
+          <Routes>
+            <Route path="/" element={<OrgHome orgSlug={subdomainSlug} />} />
+            <Route path="/:leagueSlug" element={<LeagueHomeRoute orgSlug={subdomainSlug} />} />
+            <Route path="/:leagueSlug/:eventSlug" element={<EventPage />} />
+            <Route path="/:leagueSlug/:eventSlug/leaderboard" element={<OrgProvider orgSlug={subdomainSlug}><Leaderboard /></OrgProvider>} />
+            <Route path="/:leagueSlug/:eventSlug/scorecard"   element={<OrgProvider orgSlug={subdomainSlug}><Scorecard /></OrgProvider>} />
+            <Route path="/:leagueSlug/:eventSlug/schedule"    element={<OrgProvider orgSlug={subdomainSlug}><Schedule /></OrgProvider>} />
+          </Routes>
+        </SubdomainContext.Provider>
+      </AuthProvider>
     )
   }
 

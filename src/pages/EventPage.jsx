@@ -95,7 +95,10 @@ export default function EventPage() {
   )
 
   const eid            = event.id
-  const leaderboardUrl = `/${orgSlug}/${event.league?.slug ?? leagueSlug}/${event.slug}/leaderboard?eid=${eid}`
+  const _leagueSlug    = event.league?.slug ?? leagueSlug
+  const leaderboardUrl = subdomainOrg
+    ? `/${_leagueSlug}/${event.slug}/leaderboard?eid=${eid}`
+    : `/${orgSlug}/${_leagueSlug}/${event.slug}/leaderboard?eid=${eid}`
   const regUrl         = event.league?.slug && event.slug ? `/register/${event.league.slug}/${event.slug}` : null
   const formats        = event.formats ?? (event.format ? [event.format] : [])
   const sideGames      = event.side_game_options ?? []
