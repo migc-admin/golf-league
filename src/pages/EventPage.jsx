@@ -362,7 +362,15 @@ function OverviewTab({ event, leaderboardUrl, description }) {
       {description && (
         <div style={{ background: '#fff', borderRadius: 16, padding: '20px 24px', border: '1px solid #e5e7eb' }}>
           <div style={{ fontSize: 10, fontWeight: 700, color: '#9ca3af', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 10 }}>About this Event</div>
-          <p style={{ fontSize: 14, lineHeight: 1.7, color: '#374151', whiteSpace: 'pre-line', margin: 0 }}>{description}</p>
+          <p style={{ fontSize: 14, lineHeight: 1.7, color: '#374151', margin: 0 }}
+            dangerouslySetInnerHTML={{ __html:
+              description
+                .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+                .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+                .replace(/\*(.+?)\*/g, '<em>$1</em>')
+                .replace(/\n/g, '<br/>')
+            }}
+          />
         </div>
       )}
 

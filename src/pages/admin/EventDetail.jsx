@@ -636,6 +636,50 @@ function TabOverview({ event, eventPlayers, allScores, sideGames, course, confli
   )
 }
 
+// ─── Description Editor (markdown bold/italic toolbar) ────────────────────────
+function DescriptionEditor({ value, onChange }) {
+  const ref = useRef(null)
+
+  function wrap(marker) {
+    const el = ref.current
+    if (!el) return
+    const start = el.selectionStart
+    const end   = el.selectionEnd
+    const sel   = value.slice(start, end)
+    const replacement = `${marker}${sel || 'text'}${marker}`
+    const next = value.slice(0, start) + replacement + value.slice(end)
+    onChange(next)
+    requestAnimationFrame(() => {
+      el.focus()
+      const newStart = start + marker.length
+      el.setSelectionRange(newStart, newStart + (sel || 'text').length)
+    })
+  }
+
+  return (
+    <div className="border border-gray-300 rounded-lg overflow-hidden focus-within:ring-2 focus-within:ring-green-600">
+      <div className="flex gap-1 px-2 py-1.5 bg-gray-50 border-b border-gray-200">
+        <button type="button" onMouseDown={e => { e.preventDefault(); wrap('**') }}
+          className="px-2 py-0.5 text-sm font-bold text-gray-700 hover:bg-gray-200 rounded"
+          title="Bold (**text**)">B</button>
+        <button type="button" onMouseDown={e => { e.preventDefault(); wrap('*') }}
+          className="px-2 py-0.5 text-sm italic text-gray-700 hover:bg-gray-200 rounded"
+          title="Italic (*text*)">I</button>
+        <span className="text-xs text-gray-400 ml-2 self-center">Select text then click B or I</span>
+      </div>
+      <textarea
+        ref={ref}
+        className="w-full px-3 py-2 text-sm focus:outline-none bg-white"
+        rows={5}
+        placeholder="Describe the event — format, rules, prizes, anything players should know…"
+        value={value}
+        onChange={e => onChange(e.target.value)}
+        style={{ resize: 'vertical' }}
+      />
+    </div>
+  )
+}
+
 // ─── Admin Score Editor ────────────────────────────────────────────
 // ─── Public Event Fields (description, spots, sponsors) ───────────────────────
 function EventPublicFields({ event, onUpdated }) {
@@ -690,14 +734,7 @@ function EventPublicFields({ event, onUpdated }) {
       {/* Description */}
       <div>
         <label className="label">Tournament Description</label>
-        <textarea
-          className="input w-full"
-          rows={4}
-          placeholder="Describe the event — format, rules, prizes, anything players should know…"
-          value={description}
-          onChange={e => setDescription(e.target.value)}
-          style={{ resize: 'vertical' }}
-        />
+        <DescriptionEditor value={description} onChange={setDescription} />
       </div>
 
       {/* Registration spots */}
