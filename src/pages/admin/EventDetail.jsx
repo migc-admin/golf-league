@@ -673,8 +673,12 @@ function EventPublicFields({ event, onUpdated }) {
 
   function addSponsor() {
     if (!sponsorName.trim()) return
-    setSponsors(prev => [...prev, { name: sponsorName.trim(), logo_url: null }])
+    setSponsors(prev => [...prev, { name: sponsorName.trim(), logo_url: null, url: '' }])
     setSponsorName('')
+  }
+
+  function updateSponsorUrl(idx, url) {
+    setSponsors(prev => prev.map((s, i) => i === idx ? { ...s, url } : s))
   }
 
   function removeSponsor(idx) {
@@ -713,19 +717,28 @@ function EventPublicFields({ event, onUpdated }) {
         <label className="label">Sponsors</label>
         <div className="space-y-2 mb-3">
           {sponsors.map((s, idx) => (
-            <div key={idx} className="flex items-center gap-3 bg-gray-50 rounded-xl px-3 py-2 border border-gray-200">
-              {s.logo_url ? (
-                <img src={s.logo_url} alt={s.name} style={{ height: 32, maxWidth: 80, objectFit: 'contain' }} />
-              ) : (
-                <div className="text-xs text-gray-400 w-20 text-center">No logo</div>
-              )}
-              <span className="text-sm font-semibold flex-1">{s.name}</span>
-              <label className="text-xs text-fairway-600 cursor-pointer underline">
-                {uploading ? 'Uploading…' : 'Upload logo'}
-                <input type="file" accept="image/*" className="hidden"
-                  onChange={e => uploadSponsorLogo(e.target.files[0], idx)} />
-              </label>
-              <button type="button" onClick={() => removeSponsor(idx)} className="text-red-400 hover:text-red-600 text-xs">✕</button>
+            <div key={idx} className="bg-gray-50 rounded-xl px-3 py-2 border border-gray-200 space-y-2">
+              <div className="flex items-center gap-3">
+                {s.logo_url ? (
+                  <img src={s.logo_url} alt={s.name} style={{ height: 32, maxWidth: 80, objectFit: 'contain' }} />
+                ) : (
+                  <div className="text-xs text-gray-400 w-20 text-center">No logo</div>
+                )}
+                <span className="text-sm font-semibold flex-1">{s.name}</span>
+                <label className="text-xs text-fairway-600 cursor-pointer underline">
+                  {uploading ? 'Uploading…' : 'Upload logo'}
+                  <input type="file" accept="image/*" className="hidden"
+                    onChange={e => uploadSponsorLogo(e.target.files[0], idx)} />
+                </label>
+                <button type="button" onClick={() => removeSponsor(idx)} className="text-red-400 hover:text-red-600 text-xs">✕</button>
+              </div>
+              <input
+                type="url"
+                value={s.url ?? ''}
+                onChange={e => updateSponsorUrl(idx, e.target.value)}
+                placeholder="https://sponsor-website.com (optional)"
+                className="input text-xs w-full"
+              />
             </div>
           ))}
         </div>
@@ -1565,6 +1578,7 @@ function TabFlights({ event, eventPlayers, course, allPlayers, onUpdated }) {
         available={available}
         course={course}
         useFlights={useFlights}
+        useHandicaps={event.use_handicaps ?? true}
         onSaved={onUpdated}
       />
 
@@ -1578,7 +1592,7 @@ function TabFlights({ event, eventPlayers, course, allPlayers, onUpdated }) {
   )
 }
 
-function AddPlayerModal({ open, onClose, eventId, available, course, useFlights, onSaved }) {
+function AddPlayerModal({ open, onClose, eventId, available, course, useFlights, useHandicaps = true, onSaved }) {
   // bulk: { [playerId]: { hi, flight, checked } }
   const [bulk,    setBulk]    = useState({})
   const [saving,  setSaving]  = useState(false)
@@ -1641,6 +1655,7 @@ function AddPlayerModal({ open, onClose, eventId, available, course, useFlights,
 
   const selected = Object.entries(bulk)
   const allValid = selected.length > 0 && selected.every(([, v]) =>
+    !useHandicaps ||
     v.flight === 'guest' ||
     (v.hi !== '' && !isNaN(parseFloat(v.hi)) &&
     (v.autoHC || (v.ch !== '' && !isNaN(parseInt(v.ch, 10)))))
@@ -1662,6 +1677,15 @@ function AddPlayerModal({ open, onClose, eventId, available, course, useFlights,
           flight:                  null,
           handicap_index:          0,
           adjusted_handicap_index: 0,
+        })
+      } else if (!useHandicaps) {
+        result = await supabase.from('event_players').insert({
+          event_id:                eventId,
+          player_id:               playerId,
+          handicap_index:          0,
+          adjusted_handicap_index: 0,
+          course_handicap:         0,
+          flight:                  flight || null,
         })
       } else {
         const hiVal = parseFloat(hi)
@@ -1767,8 +1791,8 @@ function AddPlayerModal({ open, onClose, eventId, available, course, useFlights,
                         </button>
                       )}
 
-                      {/* HI / CH fields — hidden for guest */}
-                      {vals.flight !== 'guest' && (
+                      {/* HI / CH fields — hidden for guest or when handicaps off */}
+                      {vals.flight !== 'guest' && useHandicaps && (
                         <>
                           <input
                             type="number" step="0.1" min="-10" max="54"
@@ -3224,6 +3248,7 @@ function EditEventModal({ open, onClose, event, onSaved }) {
   const [courseId,     setCourseId]     = useState('')
   const [courses,      setCourses]      = useState([])
   const [holesPlayed,  setHolesPlayed]  = useState(18)
+  const [useHandicaps, setUseHandicaps] = useState(true)
   const [saving,       setSaving]       = useState(false)
 
   useEffect(() => {
@@ -3254,6 +3279,7 @@ function EditEventModal({ open, onClose, event, onSaved }) {
       setPayoutFixed(event.payout_fixed_total ?? '')
       setCourseId(event.course_id ?? '')
       setHolesPlayed(event.holes_played ?? 18)
+      setUseHandicaps(event.use_handicaps ?? true)
     }
   }, [event, open])
 
@@ -3300,6 +3326,7 @@ function EditEventModal({ open, onClose, event, onSaved }) {
         schedule_items:         scheduleItems.filter(s => s.label.trim()),
         course_id:              courseId || null,
         holes_played:           holesPlayed,
+        use_handicaps:          useHandicaps,
       })
       .eq('id', event.id)
     setSaving(false)
@@ -3493,6 +3520,21 @@ function EditEventModal({ open, onClose, event, onSaved }) {
               </button>
             ))}
           </div>
+        </div>
+
+        {/* Use Handicaps toggle */}
+        <div className="bg-gray-50 rounded-xl px-4 py-3 flex items-center justify-between">
+          <div>
+            <div className="text-sm font-medium text-gray-800">Use Handicaps</div>
+            <div className="text-xs text-gray-400 mt-0.5">When off, handicap index is not required when adding players.</div>
+          </div>
+          <button
+            type="button"
+            onClick={() => setUseHandicaps(v => !v)}
+            className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${useHandicaps ? 'bg-fairway-600' : 'bg-gray-300'}`}
+          >
+            <span className={`inline-block h-5 w-5 rounded-full bg-white shadow transition-transform ${useHandicaps ? 'translate-x-5' : 'translate-x-0'}`} />
+          </button>
         </div>
 
         {/* Scoring Formats */}

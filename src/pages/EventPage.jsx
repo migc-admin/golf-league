@@ -319,16 +319,24 @@ function SponsorBar({ sponsors }) {
         <div style={{ fontSize: 10, fontWeight: 700, color: '#9ca3af', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: 16 }}>
           Sponsored by
         </div>
-        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 12 }}>
-          {sponsors.map((s, i) => (
-            <div key={i} style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#f9f8f5', border: '1px solid #e5e7eb', borderRadius: 12, padding: '12px 20px', minWidth: 120 }}>
-              {s.logo_url ? (
-                <img src={s.logo_url} alt={s.name ?? 'Sponsor'} style={{ height: 36, maxWidth: 120, objectFit: 'contain' }} />
-              ) : (
-                <span style={{ fontSize: 13, fontWeight: 700, color: '#374151' }}>{s.name}</span>
-              )}
-            </div>
-          ))}
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 16 }}>
+          {sponsors.map((s, i) => {
+            const tile = (
+              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', background: '#f9f8f5', border: '1px solid #e5e7eb', borderRadius: 14, padding: '18px 28px', minWidth: 160, gap: 8 }}>
+                {s.logo_url && (
+                  <img src={s.logo_url} alt={s.name ?? 'Sponsor'} style={{ height: 56, maxWidth: 160, objectFit: 'contain' }} />
+                )}
+                {s.name && (
+                  <span style={{ fontSize: 15, fontWeight: 700, color: '#374151', textAlign: 'center' }}>{s.name}</span>
+                )}
+              </div>
+            )
+            return s.url ? (
+              <a key={i} href={s.url} target="_blank" rel="noopener noreferrer" style={{ textDecoration: 'none' }}>{tile}</a>
+            ) : (
+              <div key={i}>{tile}</div>
+            )
+          })}
         </div>
       </div>
     </div>

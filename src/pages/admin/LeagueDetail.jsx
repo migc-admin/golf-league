@@ -407,6 +407,7 @@ function EventModal({ open, onClose, league, orgTier, onSaved }) {
   const [scheduleItems,   setScheduleItems]   = useState([])
   const [shotgunStart,  setShotgunStart]  = useState(false)
   const [holesPlayed,   setHolesPlayed]   = useState(18)
+  const [useHandicaps,  setUseHandicaps]  = useState(true)
   const [saving,        setSaving]        = useState(false)
 
   useEffect(() => {
@@ -425,6 +426,7 @@ function EventModal({ open, onClose, league, orgTier, onSaved }) {
     setCustomQuestions([{ label: '', required: false }])
     setScheduleItems([])
     setHolesPlayed(18)
+    setUseHandicaps(true)
   }, [open, league])
 
   function toggleFormat(key) {
@@ -465,6 +467,7 @@ function EventModal({ open, onClose, league, orgTier, onSaved }) {
       schedule_items:         scheduleItems.filter(s => s.label.trim()),
       shotgun_start:          shotgunStart,
       holes_played:           holesPlayed,
+      use_handicaps:          useHandicaps,
       status:                 'upcoming',
     })
     setSaving(false)
@@ -542,6 +545,20 @@ function EventModal({ open, onClose, league, orgTier, onSaved }) {
               </button>
             ))}
           </div>
+        </div>
+
+        <div className="bg-gray-50 rounded-xl px-4 py-3 flex items-center justify-between">
+          <div>
+            <div className="text-sm font-medium text-gray-800">Use Handicaps</div>
+            <div className="text-xs text-gray-400 mt-0.5">When off, handicap index is not required when adding players.</div>
+          </div>
+          <button
+            type="button"
+            onClick={() => setUseHandicaps(v => !v)}
+            className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${useHandicaps ? 'bg-fairway-600' : 'bg-gray-300'}`}
+          >
+            <span className={`inline-block h-5 w-5 rounded-full bg-white shadow transition-transform ${useHandicaps ? 'translate-x-5' : 'translate-x-0'}`} />
+          </button>
         </div>
 
         <div>
