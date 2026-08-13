@@ -295,7 +295,7 @@ export default function EventDetail() {
             <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-widest mb-3">Payout Config</h3>
             <TabPayoutConfig event={event} eventPlayers={eventPlayers} course={course} onUpdated={load} />
           </div>
-          {(event?.side_game_options ?? []).length > 0 && (
+          {((event?.side_game_options ?? []).length > 0 || (event?.custom_competitions ?? []).some(c => c?.trim())) && (
             <div id="side-games" className="border-t border-gray-100 pt-6">
               <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-widest mb-3">Side Games</h3>
               <TabSideGames event={event} eventPlayers={eventPlayers} course={course} sideGames={sideGames} onUpdated={load} />
@@ -2917,12 +2917,7 @@ function TabSideGames({ event, eventPlayers, course, sideGames, onUpdated }) {
     .map(k => parseInt(k.replace('ctp_', ''), 10))
     .sort((a, b) => a - b)
 
-  // Fallback to all par-3s if no CTP holes configured yet
-  const par3Holes = ctpConfigHoles.length > 0
-    ? ctpConfigHoles.map(h => ({ hole: h }))
-    : course
-      ? course.par_per_hole.map((p, i) => ({ hole: i+1 })).filter((_, i) => course.par_per_hole[i] === 3)
-      : []
+  const par3Holes = ctpConfigHoles.map(h => ({ hole: h }))
 
   const flightA = eventPlayers.filter(ep => ep.flight === 'A')
   const flightB = eventPlayers.filter(ep => ep.flight === 'B')
@@ -3025,6 +3020,18 @@ function TabSideGames({ event, eventPlayers, course, sideGames, onUpdated }) {
           </div>
         </Card>
       )}
+
+      {/* Custom competitions */}
+      {(event.custom_competitions ?? []).filter(c => c?.trim()).map((name, i) => (
+        <Card key={i}>
+          <CardHeader title={name} />
+          <SideGameSelect
+            players={eventPlayers}
+            value={getWinner(`custom_${i}`, null, 'overall')}
+            onChange={v => setWinner(`custom_${i}`, null, v, 'overall')}
+          />
+        </Card>
+      ))}
     </div>
   )
 }
