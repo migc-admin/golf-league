@@ -69,7 +69,7 @@ function parseSideGameOptions(options) {
   }
   return { games, scope }
 }
-const PLACES_OPTIONS = [1,2,3,4,5,6,7,8,9,10]
+const PLACES_OPTIONS = [0,1,2,3,4,5,6,7,8,9,10]
 
 // Shared alpha sort for event_player rows (ep.player.first_name, ep.player.last_name)
 function epAlpha(a, b) {

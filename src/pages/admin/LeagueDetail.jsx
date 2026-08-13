@@ -378,7 +378,7 @@ const FORMAT_OPTIONS = [
   ]},
 ]
 
-const PLACES_OPTIONS = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
+const PLACES_OPTIONS = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
 
 function EventModal({ open, onClose, league, orgTier, onSaved }) {
   const canUsePro = checkFeature(orgTier ?? 'free', 'side_games')
