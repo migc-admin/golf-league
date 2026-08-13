@@ -348,9 +348,24 @@ function SponsorBar({ sponsors }) {
 }
 
 // ─── Overview Tab ─────────────────────────────────────────────────────────────
+const SIDE_GAME_LABELS = {
+  skins:        'Skins',
+  skins_a:      'Skins — Flight A',
+  skins_b:      'Skins — Flight B',
+  long_drive:   'Long Drive',
+  long_drive_a: 'Long Drive — Flight A',
+  long_drive_b: 'Long Drive — Flight B',
+  low_putts:    'Low Putts',
+  ctp:          'Closest to Pin',
+}
+
 function OverviewTab({ event, leaderboardUrl, description }) {
   const scheduleItems = (event.schedule_items ?? []).filter(s => s.label?.trim())
   const customCompetitions = (event.custom_competitions ?? []).filter(c => c?.trim())
+  const presetGames = (event.side_game_options ?? [])
+    .map(k => SIDE_GAME_LABELS[k])
+    .filter(Boolean)
+  const allCompetitions = [...presetGames, ...customCompetitions]
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
@@ -383,15 +398,15 @@ function OverviewTab({ event, leaderboardUrl, description }) {
         </div>
       )}
 
-      {customCompetitions.length > 0 && (
-        <div style={{ background: '#fff', borderRadius: 16, padding: '16px 20px', boxShadow: '0 1px 4px rgba(0,0,0,0.06)' }}>
-          <div style={{ fontSize: 11, fontWeight: 700, color: '#9ca3af', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 10 }}>
-            Competitions
+      {allCompetitions.length > 0 && (
+        <div style={{ background: '#fff', borderRadius: 16, padding: '20px 24px', border: '1px solid #e5e7eb' }}>
+          <div style={{ fontSize: 10, fontWeight: 700, color: '#9ca3af', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 12 }}>
+            Side Games &amp; Competitions
           </div>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-            {customCompetitions.map((name, i) => (
-              <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 14, color: '#111827' }}>
-                <span style={{ color: '#16a34a', fontSize: 16 }}>⛳</span>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+            {allCompetitions.map((name, i) => (
+              <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 10, fontSize: 14, color: '#111827' }}>
+                <span style={{ color: '#16a34a', fontSize: 16, lineHeight: 1 }}>⛳</span>
                 {name}
               </div>
             ))}
