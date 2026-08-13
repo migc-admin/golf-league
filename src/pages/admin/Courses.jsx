@@ -232,6 +232,7 @@ function CourseModal({ open, onClose, editing, orgId, orgSlug, onSaved }) {
   const [tees,      setTees]      = useState(DEFAULT_TEES)
   const [holes,     setHoles]     = useState(() => emptyHoles(3, 18))
   const [numHoles,  setNumHoles]  = useState(18)
+  const [isRated,   setIsRated]   = useState(true)
   const [photoUrl,  setPhotoUrl]  = useState('')
   const [saving,    setSaving]    = useState(false)
   const [activeTeeIdx, setActiveTeeIdx] = useState(0)
@@ -300,6 +301,7 @@ function CourseModal({ open, onClose, editing, orgId, orgSlug, onSaved }) {
 
           const n = data.par_per_hole?.length ?? 18
           setNumHoles(n)
+          setIsRated(data.is_rated ?? true)
 
           if (teesData.length > 0) {
             holesData = Array.from({ length: n }, (_, i) => ({
@@ -333,6 +335,7 @@ function CourseModal({ open, onClose, editing, orgId, orgSlug, onSaved }) {
       setAddress('')
       setPhotoUrl('')
       setNumHoles(18)
+      setIsRated(true)
       setTees(DEFAULT_TEES.map(t => ({ ...t })))
       setHoles(emptyHoles(3, 18))
       setActiveTeeIdx(0)
@@ -415,17 +418,25 @@ function CourseModal({ open, onClose, editing, orgId, orgSlug, onSaved }) {
     // Primary tee = first tee (for backward compat)
     const primary = teesWithYardage[0]
 
+    // For unrated courses, use neutral defaults for slope/rating/SI
+    const si = numHoles === 9 ? DEFAULT_SI_9 : DEFAULT_SI
+    const teesForSave = isRated ? teesWithYardage : teesWithYardage.map(t => ({ ...t, slope: 113, rating: 72.0 }))
+    const strokeIndexForSave = isRated
+      ? holes.map(h => parseInt(h.stroke_index, 10))
+      : si.slice(0, numHoles)
+
     const payload = {
       name:         name.trim(),
       address:      address.trim() || null,
-      slope:        primary.slope,
-      rating:       primary.rating,
+      slope:        isRated ? primary.slope : 113,
+      rating:       isRated ? primary.rating : 72.0,
       par:          totalPar,
       par_per_hole: holes.map(h => parseInt(h.par, 10)),
       hole_type:    holes.map(h => h.par == 3 ? 'par3' : h.par == 5 ? 'par5' : 'par4'),
       yardage:      primary.yardage,
-      stroke_index: holes.map(h => parseInt(h.stroke_index, 10)),
-      tees:         teesWithYardage,
+      stroke_index: strokeIndexForSave,
+      tees:         teesForSave,
+      is_rated:     isRated,
       photo_url:    photoUrl || null,
     }
 
@@ -554,6 +565,26 @@ function CourseModal({ open, onClose, editing, orgId, orgSlug, onSaved }) {
           </div>
         </div>
 
+        {/* Rated course toggle */}
+        <div className="bg-gray-50 rounded-xl px-4 py-3 flex items-center justify-between">
+          <div>
+            <div className="text-sm font-medium text-gray-800">Officially Rated Course?</div>
+            <div className="text-xs text-gray-400 mt-0.5">When No, Slope, Rating, and Stroke Index are not required.</div>
+          </div>
+          <div className="flex rounded-lg border border-gray-300 overflow-hidden text-sm font-semibold">
+            {[true, false].map(v => (
+              <button
+                key={String(v)}
+                type="button"
+                onClick={() => setIsRated(v)}
+                className={`px-4 py-1.5 transition-colors ${isRated === v ? 'bg-fairway-700 text-white' : 'bg-white text-gray-600 hover:bg-gray-100'}`}
+              >
+                {v ? 'Yes' : 'No'}
+              </button>
+            ))}
+          </div>
+        </div>
+
         {/* Tee Sets */}
         <div>
           <div className="flex items-center justify-between mb-3">
@@ -587,16 +618,20 @@ function CourseModal({ open, onClose, editing, orgId, orgSlug, onSaved }) {
                       {TEE_COLORS.map(c => <option key={c}>{c}</option>)}
                     </select>
                   </div>
-                  <div>
-                    <label className="text-xs text-gray-400">Slope</label>
-                    <input type="number" value={t.slope} onChange={e => updateTee(i, 'slope', e.target.value)}
-                      className="input py-1 text-xs w-full" min="55" max="155" onClick={e => e.stopPropagation()} />
-                  </div>
-                  <div>
-                    <label className="text-xs text-gray-400">Rating</label>
-                    <input type="number" step="0.1" value={t.rating} onChange={e => updateTee(i, 'rating', e.target.value)}
-                      className="input py-1 text-xs w-full" min="60" max="80" onClick={e => e.stopPropagation()} />
-                  </div>
+                  {isRated && (
+                    <>
+                      <div>
+                        <label className="text-xs text-gray-400">Slope</label>
+                        <input type="number" value={t.slope} onChange={e => updateTee(i, 'slope', e.target.value)}
+                          className="input py-1 text-xs w-full" min="55" max="155" onClick={e => e.stopPropagation()} />
+                      </div>
+                      <div>
+                        <label className="text-xs text-gray-400">Rating</label>
+                        <input type="number" step="0.1" value={t.rating} onChange={e => updateTee(i, 'rating', e.target.value)}
+                          className="input py-1 text-xs w-full" min="60" max="80" onClick={e => e.stopPropagation()} />
+                      </div>
+                    </>
+                  )}
                 </div>
                 {activeTeeIdx === i && (
                   <div className="text-xs text-fairway-600 font-medium text-center">Editing yardages ↓</div>
@@ -621,7 +656,7 @@ function CourseModal({ open, onClose, editing, orgId, orgSlug, onSaved }) {
               <tr className="text-left text-xs font-semibold text-gray-500 border-b">
                 <th className="py-2 pr-2 w-8">#</th>
                 <th className="py-2 px-2 w-16">Par</th>
-                <th className="py-2 px-2 w-16">S.I.</th>
+                {isRated && <th className="py-2 px-2 w-16">S.I.</th>}
                 {tees.map((t, i) => (
                   <th key={i} className={`py-2 px-2 text-center ${activeTeeIdx === i ? 'text-fairway-700 font-bold' : ''}`}>
                     {t.name} Yds
@@ -641,10 +676,12 @@ function CourseModal({ open, onClose, editing, orgId, orgSlug, onSaved }) {
                       <option value={5}>5</option>
                     </select>
                   </td>
-                  <td className="py-1.5 px-2">
-                    <input type="number" value={h.stroke_index} onChange={e => updateHole(i, 'stroke_index', e.target.value)}
-                      className="input py-1 text-xs w-14" min="1" max="18" />
-                  </td>
+                  {isRated && (
+                    <td className="py-1.5 px-2">
+                      <input type="number" value={h.stroke_index} onChange={e => updateHole(i, 'stroke_index', e.target.value)}
+                        className="input py-1 text-xs w-14" min="1" max="18" />
+                    </td>
+                  )}
                   {h.yardages.map((yds, tIdx) => (
                     <td key={tIdx} className={`py-1.5 px-2 ${activeTeeIdx === tIdx ? 'bg-fairway-50' : ''}`}>
                       <input type="number" value={yds} onChange={e => updateYardage(i, tIdx, e.target.value)}
