@@ -338,6 +338,7 @@ function SponsorBar({ sponsors }) {
 // ─── Overview Tab ─────────────────────────────────────────────────────────────
 function OverviewTab({ event, leaderboardUrl, description }) {
   const scheduleItems = (event.schedule_items ?? []).filter(s => s.label?.trim())
+  const customCompetitions = (event.custom_competitions ?? []).filter(c => c?.trim())
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
@@ -364,6 +365,22 @@ function OverviewTab({ event, leaderboardUrl, description }) {
                     <div style={{ fontSize: 13, color: '#6b7280', marginTop: 3, lineHeight: 1.5 }}>{item.description}</div>
                   )}
                 </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {customCompetitions.length > 0 && (
+        <div style={{ background: '#fff', borderRadius: 16, padding: '16px 20px', boxShadow: '0 1px 4px rgba(0,0,0,0.06)' }}>
+          <div style={{ fontSize: 11, fontWeight: 700, color: '#9ca3af', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 10 }}>
+            Competitions
+          </div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+            {customCompetitions.map((name, i) => (
+              <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 14, color: '#111827' }}>
+                <span style={{ color: '#16a34a', fontSize: 16 }}>⛳</span>
+                {name}
               </div>
             ))}
           </div>

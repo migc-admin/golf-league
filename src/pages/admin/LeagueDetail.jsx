@@ -394,6 +394,7 @@ function EventModal({ open, onClose, league, orgTier, onSaved }) {
   const [formats,      setFormats]      = useState(new Set(['net_stroke']))
   const [payoutPlaces, setPayoutPlaces] = useState({})   // { format_key: number }
   const [sideGames,    setSideGames]    = useState(new Set())
+  const [customCompetitions, setCustomCompetitions] = useState([])
   const [gameScope,    setGameScope]    = useState({})   // { game_key: 'flight'|'group' }
   const [numFlights,   setNumFlights]   = useState(0)   // 0 = no flights, 2–25 = number of flights
   const [startTime,    setStartTime]    = useState('')
@@ -420,6 +421,7 @@ function EventModal({ open, onClose, league, orgTier, onSaved }) {
     setFormats(new Set(['net_stroke'])); setPayoutPlaces({}); setSideGames(new Set()); setGameScope({})
     setNumFlights(0); setStartTime(''); setInterval(10)
     setTournamentFee(''); setVenmoHandle(''); setPaypalLink(''); setZelleHandle(''); setShotgunStart(false)
+    setCustomCompetitions([])
     setCustomQuestions([{ label: '', required: false }])
     setScheduleItems([])
     setHolesPlayed(18)
@@ -443,7 +445,7 @@ function EventModal({ open, onClose, league, orgTier, onSaved }) {
       event_date:             eventDate,
       event_number:           parseInt(eventNum, 10),
       name:                   eventName.trim() || null,
-      entry_fee:              parseFloat(entryFee),
+      entry_fee:              Math.round(parseFloat(entryFee) * 100) / 100,
       payout_basis:           payoutBasis,
       payout_fixed_total:     payoutBasis === 'fixed' ? parseFloat(payoutFixed) || 0 : null,
       format:                 formatsArr[0],
@@ -454,11 +456,12 @@ function EventModal({ open, onClose, league, orgTier, onSaved }) {
       payout_places:          Object.keys(payoutPlaces).length > 0 ? payoutPlaces : null,
       start_time:             startTime || null,
       tee_time_interval_mins: parseInt(interval, 10),
-      tournament_fee:         tournamentFee ? parseFloat(tournamentFee) : null,
+      tournament_fee:         tournamentFee ? Math.round(parseFloat(tournamentFee) * 100) / 100 : null,
       venmo_handle:           venmoHandle.trim().replace(/^@/, '') || null,
       paypal_link:            paypalLink.trim() || null,
       zelle_handle:           zelleHandle.trim() || null,
       custom_questions:       customQuestions.filter(q => q.label.trim()),
+      custom_competitions:    customCompetitions.filter(c => c.trim()),
       schedule_items:         scheduleItems.filter(s => s.label.trim()),
       shotgun_start:          shotgunStart,
       holes_played:           holesPlayed,
@@ -629,6 +632,30 @@ function EventModal({ open, onClose, league, orgTier, onSaved }) {
                 </label>
               )
             })}
+          </div>
+
+          {/* Custom Competitions */}
+          <div className="mt-3">
+            <div className="space-y-2">
+              {customCompetitions.map((name, i) => (
+                <div key={i} className="flex gap-2 items-center">
+                  <input
+                    type="text"
+                    value={name}
+                    onChange={e => setCustomCompetitions(prev => prev.map((c, j) => j === i ? e.target.value : c))}
+                    placeholder="e.g. Bingo Bango Bongo"
+                    className="flex-1 border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-600"
+                  />
+                  <button type="button" onClick={() => setCustomCompetitions(prev => prev.filter((_, j) => j !== i))}
+                    className="text-gray-400 hover:text-red-500 text-lg leading-none">✕</button>
+                </div>
+              ))}
+            </div>
+            <button type="button"
+              onClick={() => setCustomCompetitions(prev => [...prev, ''])}
+              className="mt-2 text-xs font-semibold text-green-700 hover:text-green-900">
+              + Add Custom Competition
+            </button>
           </div>
         </div>
 

@@ -3211,6 +3211,7 @@ function EditEventModal({ open, onClose, event, onSaved }) {
   const [payoutBasis,  setPayoutBasis]  = useState('per_player')
   const [payoutFixed,  setPayoutFixed]  = useState('')
   const [zelleHandle,     setZelleHandle]     = useState('')
+  const [customCompetitions, setCustomCompetitions] = useState([])
   const [customQuestions, setCustomQuestions] = useState([{ label: '', required: false }])
   const [scheduleItems,   setScheduleItems]   = useState([])
   const [courseId,     setCourseId]     = useState('')
@@ -3228,6 +3229,7 @@ function EditEventModal({ open, onClose, event, onSaved }) {
       setVenmoHandle(event.venmo_handle ?? '')
       setPaypalLink(event.paypal_link ?? '')
       setZelleHandle(event.zelle_handle ?? '')
+      setCustomCompetitions(event.custom_competitions ?? [])
       setCustomQuestions(event.custom_questions?.length
         ? event.custom_questions
         : [{ label: '', required: false }])
@@ -3270,8 +3272,8 @@ function EditEventModal({ open, onClose, event, onSaved }) {
         event_date:             eventDate,
         name:                   eventName.trim() || null,
         event_number:           parseInt(eventNumber, 10),
-        entry_fee:              parseFloat(entryFee),
-        tournament_fee:         tournamentFee !== '' ? parseFloat(tournamentFee) : null,
+        entry_fee:              Math.round(parseFloat(entryFee) * 100) / 100,
+        tournament_fee:         tournamentFee !== '' ? Math.round(parseFloat(tournamentFee) * 100) / 100 : null,
         start_time:             startTime || null,
         tee_time_interval_mins: parseInt(interval, 10),
         format:                 formatsArr[0],
@@ -3287,6 +3289,7 @@ function EditEventModal({ open, onClose, event, onSaved }) {
         paypal_link:            paypalLink.trim() || null,
         zelle_handle:           zelleHandle.trim() || null,
         custom_questions:       customQuestions.filter(q => q.label.trim()),
+        custom_competitions:    customCompetitions.filter(c => c.trim()),
         schedule_items:         scheduleItems.filter(s => s.label.trim()),
         course_id:              courseId || null,
         holes_played:           holesPlayed,
@@ -3565,6 +3568,30 @@ function EditEventModal({ open, onClose, event, onSaved }) {
                 <span className="text-sm text-gray-800">{opt.label}</span>
               </label>
             ))}
+          </div>
+
+          {/* Custom Competitions */}
+          <div className="mt-3">
+            <div className="space-y-2">
+              {customCompetitions.map((name, i) => (
+                <div key={i} className="flex gap-2 items-center">
+                  <input
+                    type="text"
+                    value={name}
+                    onChange={e => setCustomCompetitions(prev => prev.map((c, j) => j === i ? e.target.value : c))}
+                    placeholder="e.g. Bingo Bango Bongo"
+                    className="flex-1 border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-600"
+                  />
+                  <button type="button" onClick={() => setCustomCompetitions(prev => prev.filter((_, j) => j !== i))}
+                    className="text-gray-400 hover:text-red-500 text-lg leading-none">✕</button>
+                </div>
+              ))}
+            </div>
+            <button type="button"
+              onClick={() => setCustomCompetitions(prev => [...prev, ''])}
+              className="mt-2 text-xs font-semibold text-green-700 hover:text-green-900">
+              + Add Custom Competition
+            </button>
           </div>
         </div>
 
