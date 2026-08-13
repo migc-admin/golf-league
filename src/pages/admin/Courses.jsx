@@ -82,16 +82,19 @@ function mapApiCourse(api) {
     }))
   }
 
-  // Pad to 18 holes if needed
-  while (holes.length < 18) {
+  // Determine target hole count: treat ≤11 source holes as a 9-hole course
+  const targetHoles = holes.length <= 11 ? 9 : 18
+  const si = targetHoles === 9 ? DEFAULT_SI_9 : DEFAULT_SI
+  while (holes.length < targetHoles) {
     const i = holes.length
-    holes.push({ hole: i + 1, par: 4, stroke_index: DEFAULT_SI[i], yardages: tees.map(() => 350) })
+    holes.push({ hole: i + 1, par: 4, stroke_index: si[i] ?? i + 1, yardages: tees.map(() => 350) })
   }
 
-  return { name: api.name, tees, holes }
+  return { name: api.name, tees, holes, numHoles: targetHoles }
 }
 
-const DEFAULT_SI = [1,3,5,7,9,11,13,15,17,2,4,6,8,10,12,14,16,18]
+const DEFAULT_SI    = [1,3,5,7,9,11,13,15,17,2,4,6,8,10,12,14,16,18]
+const DEFAULT_SI_9  = [1,2,3,4,5,6,7,8,9]
 
 const DEFAULT_TEES = [
   { name: 'Back',    color: 'Black', slope: 130, rating: 72.0 },
@@ -101,12 +104,13 @@ const DEFAULT_TEES = [
 
 const TEE_COLORS = ['Black', 'Blue', 'White', 'Gold', 'Red', 'Green']
 
-function emptyHoles(numTees = 3) {
-  return Array.from({ length: 18 }, (_, i) => ({
+function emptyHoles(numTees = 3, numHoles = 18) {
+  const si = numHoles === 9 ? DEFAULT_SI_9 : DEFAULT_SI
+  return Array.from({ length: numHoles }, (_, i) => ({
     hole:         i + 1,
     par:          4,
-    stroke_index: DEFAULT_SI[i],
-    yardages:     Array(numTees).fill(380),  // one yardage per tee
+    stroke_index: si[i],
+    yardages:     Array(numTees).fill(380),
   }))
 }
 
@@ -223,12 +227,13 @@ export default function Courses() {
 }
 
 function CourseModal({ open, onClose, editing, orgId, orgSlug, onSaved }) {
-  const [name,     setName]     = useState('')
-  const [address,  setAddress]  = useState('')
-  const [tees,     setTees]     = useState(DEFAULT_TEES)
-  const [holes,    setHoles]    = useState(() => emptyHoles(3))
-  const [photoUrl, setPhotoUrl] = useState('')
-  const [saving,   setSaving]   = useState(false)
+  const [name,      setName]      = useState('')
+  const [address,   setAddress]   = useState('')
+  const [tees,      setTees]      = useState(DEFAULT_TEES)
+  const [holes,     setHoles]     = useState(() => emptyHoles(3, 18))
+  const [numHoles,  setNumHoles]  = useState(18)
+  const [photoUrl,  setPhotoUrl]  = useState('')
+  const [saving,    setSaving]    = useState(false)
   const [activeTeeIdx, setActiveTeeIdx] = useState(0)
 
   // API search state
@@ -272,10 +277,11 @@ function CourseModal({ open, onClose, editing, orgId, orgSlug, onSaved }) {
     setName(mapped.name)
     setTees(mapped.tees)
     setHoles(mapped.holes)
+    setNumHoles(mapped.numHoles ?? 18)
     setActiveTeeIdx(0)
     setSearchQuery('')
     setShowResults(false)
-    toast.success(`Imported "${mapped.name}" — review and save`)
+    toast.success(`Imported "${mapped.name}" (${mapped.numHoles ?? 18} holes) — review and save`)
   }
 
   useEffect(() => {
@@ -292,9 +298,11 @@ function CourseModal({ open, onClose, editing, orgId, orgSlug, onSaved }) {
           let teesData = data.tees ?? []
           let holesData
 
+          const n = data.par_per_hole?.length ?? 18
+          setNumHoles(n)
+
           if (teesData.length > 0) {
-            // Build holes from tees yardages
-            holesData = Array.from({ length: 18 }, (_, i) => ({
+            holesData = Array.from({ length: n }, (_, i) => ({
               hole:         i + 1,
               par:          data.par_per_hole[i],
               stroke_index: data.stroke_index[i],
@@ -308,11 +316,11 @@ function CourseModal({ open, onClose, editing, orgId, orgSlug, onSaved }) {
               slope:  data.slope,
               rating: data.rating,
             }]
-            holesData = Array.from({ length: 18 }, (_, i) => ({
+            holesData = Array.from({ length: n }, (_, i) => ({
               hole:         i + 1,
               par:          data.par_per_hole[i],
               stroke_index: data.stroke_index[i],
-              yardages:     [data.yardage[i]],
+              yardages:     [data.yardage?.[i] ?? 380],
             }))
           }
 
@@ -324,8 +332,9 @@ function CourseModal({ open, onClose, editing, orgId, orgSlug, onSaved }) {
       setName('')
       setAddress('')
       setPhotoUrl('')
+      setNumHoles(18)
       setTees(DEFAULT_TEES.map(t => ({ ...t })))
-      setHoles(emptyHoles(3))
+      setHoles(emptyHoles(3, 18))
       setActiveTeeIdx(0)
     }
   }, [editing, open])
@@ -512,6 +521,39 @@ function CourseModal({ open, onClose, editing, orgId, orgSlug, onSaved }) {
           placeholder="1 Pebble Beach Dr, Pebble Beach, CA 93953"
         />
 
+        {/* Holes toggle */}
+        <div className="bg-gray-50 rounded-xl px-4 py-3 flex items-center justify-between">
+          <div>
+            <div className="text-sm font-medium text-gray-800">Number of Holes</div>
+            <div className="text-xs text-gray-400 mt-0.5">Select 9 for an executive or nine-hole course.</div>
+          </div>
+          <div className="flex rounded-lg border border-gray-300 overflow-hidden text-sm font-semibold">
+            {[18, 9].map(n => (
+              <button
+                key={n}
+                type="button"
+                onClick={() => {
+                  if (n === numHoles) return
+                  setNumHoles(n)
+                  setHoles(prev => {
+                    if (n === 9) return prev.slice(0, 9)
+                    // extend from 9 → 18
+                    const extended = [...prev]
+                    while (extended.length < 18) {
+                      const i = extended.length
+                      extended.push({ hole: i + 1, par: 4, stroke_index: DEFAULT_SI[i], yardages: prev[0].yardages.map(() => 380) })
+                    }
+                    return extended
+                  })
+                }}
+                className={`px-4 py-1.5 transition-colors ${numHoles === n ? 'bg-fairway-700 text-white' : 'bg-white text-gray-600 hover:bg-gray-100'}`}
+              >
+                {n}
+              </button>
+            ))}
+          </div>
+        </div>
+
         {/* Tee Sets */}
         <div>
           <div className="flex items-center justify-between mb-3">
@@ -590,7 +632,7 @@ function CourseModal({ open, onClose, editing, orgId, orgSlug, onSaved }) {
             </thead>
             <tbody className="divide-y divide-gray-100">
               {holes.map((h, i) => (
-                <tr key={i} className={i === 8 ? 'border-t-2 border-gray-300' : ''}>
+                <tr key={i} className={numHoles === 18 && i === 9 ? 'border-t-2 border-gray-300' : ''}>
                   <td className="py-1.5 pr-2 font-medium text-gray-500 text-xs">{h.hole}</td>
                   <td className="py-1.5 px-2">
                     <select value={h.par} onChange={e => updateHole(i, 'par', e.target.value)} className="input py-1 text-xs w-14">
