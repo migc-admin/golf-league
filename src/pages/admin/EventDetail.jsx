@@ -554,6 +554,7 @@ function TabOverview({ event, eventPlayers, allScores, sideGames, course, confli
           <Row label="Course"       value={event.course?.name} />
           <Row label="League"       value={event.league?.name} />
           <Row label="Format"       value={FORMAT_LABELS[event.format] ?? event.format ?? 'Net Stroke Play'} />
+          <Row label="Holes"        value={`${event.holes_played ?? 18} holes`} />
           <Row label="Start Time"   value={event.start_time ? formatTime(event.start_time) : '—'} />
           {!event.shotgun_start && <Row label="Tee Interval" value={`${event.tee_time_interval_mins ?? 10} min`} />}
           <Row label="Entry Fee"    value={`$${event.entry_fee}`} />
@@ -3183,6 +3184,7 @@ const EDIT_FORMAT_OPTIONS = [
   ]},
   { group: 'Other Formats', options: [
     { value: 'stableford',      label: 'Stableford',                 tip: 'Points awarded per hole based on net score vs par. Double bogey = 0 pts, bogey = 1, par = 2, birdie = 3, eagle = 4. Highest points wins.' },
+    { value: 'scramble',        label: 'Scramble',                   tip: 'All players tee off, choose the best shot, and play from that spot. One team score per hole. No handicaps applied. Lowest team gross wins.' },
     { value: 'match_points',    label: 'Match Play (Head-to-Head)',   tip: 'Each player is paired against one opponent. Net score is compared hole-by-hole. Win a hole = 1 point. Most points after 18 wins.' },
     { value: 'team_match_play', label: 'Match Play (Team Best Ball)', tip: 'Teams compete using the best net score among teammates on each hole. Scored hole-by-hole like match play.' },
     { value: 'ryder_cup',       label: 'Ryder Cup',                  tip: 'Team format across multiple rounds. Players earn points for their team via match play results. Highest team total wins.' },
@@ -3208,8 +3210,12 @@ function EditEventModal({ open, onClose, event, onSaved }) {
   const [shotgunStart, setShotgunStart] = useState(false)
   const [payoutBasis,  setPayoutBasis]  = useState('per_player')
   const [payoutFixed,  setPayoutFixed]  = useState('')
+  const [zelleHandle,     setZelleHandle]     = useState('')
+  const [customQuestions, setCustomQuestions] = useState([{ label: '', required: false }])
+  const [scheduleItems,   setScheduleItems]   = useState([])
   const [courseId,     setCourseId]     = useState('')
   const [courses,      setCourses]      = useState([])
+  const [holesPlayed,  setHolesPlayed]  = useState(18)
   const [saving,       setSaving]       = useState(false)
 
   useEffect(() => {
@@ -3221,6 +3227,11 @@ function EditEventModal({ open, onClose, event, onSaved }) {
       setTournamentFee(event.tournament_fee ?? '')
       setVenmoHandle(event.venmo_handle ?? '')
       setPaypalLink(event.paypal_link ?? '')
+      setZelleHandle(event.zelle_handle ?? '')
+      setCustomQuestions(event.custom_questions?.length
+        ? event.custom_questions
+        : [{ label: '', required: false }])
+      setScheduleItems(event.schedule_items ?? [])
       setStartTime(event.start_time ? event.start_time.slice(0, 5) : '')
       setInterval(event.tee_time_interval_mins ?? 10)
       setFormats(new Set(event.formats?.length ? event.formats : [event.format ?? 'net_stroke']))
@@ -3233,6 +3244,7 @@ function EditEventModal({ open, onClose, event, onSaved }) {
       setPayoutBasis(event.payout_basis ?? 'per_player')
       setPayoutFixed(event.payout_fixed_total ?? '')
       setCourseId(event.course_id ?? '')
+      setHolesPlayed(event.holes_played ?? 18)
     }
   }, [event, open])
 
@@ -3273,7 +3285,11 @@ function EditEventModal({ open, onClose, event, onSaved }) {
         payout_fixed_total:     payoutBasis === 'fixed' ? parseFloat(payoutFixed) || 0 : null,
         venmo_handle:           venmoHandle.trim().replace(/^@/, '') || null,
         paypal_link:            paypalLink.trim() || null,
+        zelle_handle:           zelleHandle.trim() || null,
+        custom_questions:       customQuestions.filter(q => q.label.trim()),
+        schedule_items:         scheduleItems.filter(s => s.label.trim()),
         course_id:              courseId || null,
+        holes_played:           holesPlayed,
       })
       .eq('id', event.id)
     setSaving(false)
@@ -3331,6 +3347,87 @@ function EditEventModal({ open, onClose, event, onSaved }) {
               className="input"
             />
           </div>
+          <div>
+            <label className="label">Zelle (phone or email)</label>
+            <input
+              type="text"
+              value={zelleHandle}
+              onChange={e => setZelleHandle(e.target.value)}
+              placeholder="555-555-5555 or name@email.com"
+              className="input"
+            />
+          </div>
+        </div>
+
+        {/* Schedule of Events */}
+        <div className="space-y-3 bg-gray-50 rounded-xl px-4 py-3">
+          <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Schedule of Events <span className="normal-case text-gray-400 font-normal">(shown on event page and registration)</span></p>
+          {scheduleItems.map((item, i) => (
+            <div key={i} className="bg-white rounded-lg border border-gray-200 p-3 space-y-2">
+              <div className="flex items-center gap-2">
+                <input
+                  type="time"
+                  value={item.time ?? ''}
+                  onChange={e => setScheduleItems(prev => prev.map((s, j) => j === i ? { ...s, time: e.target.value } : s))}
+                  className="input w-28 shrink-0"
+                />
+                <input
+                  type="text"
+                  value={item.label}
+                  onChange={e => setScheduleItems(prev => prev.map((s, j) => j === i ? { ...s, label: e.target.value } : s))}
+                  placeholder="e.g. Check-in, Tee Time, Awards…"
+                  className="input flex-1"
+                />
+                <button type="button" onClick={() => setScheduleItems(prev => prev.filter((_, j) => j !== i))}
+                  className="text-gray-400 hover:text-red-500 text-sm shrink-0">✕</button>
+              </div>
+              <input
+                type="text"
+                value={item.description ?? ''}
+                onChange={e => setScheduleItems(prev => prev.map((s, j) => j === i ? { ...s, description: e.target.value } : s))}
+                placeholder="Description (optional) — e.g. Pick up your scorecard and cart assignment"
+                className="input text-sm"
+              />
+            </div>
+          ))}
+          <button
+            type="button"
+            onClick={() => setScheduleItems(prev => [...prev, { time: '', label: '' }])}
+            className="text-xs text-fairway-700 font-semibold hover:underline mt-1"
+          >
+            + Add item
+          </button>
+        </div>
+
+        {/* Custom Registration Questions */}
+        <div className="space-y-2 bg-gray-50 rounded-xl px-4 py-3">
+          <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Registration Questions <span className="normal-case text-gray-400 font-normal">(shown on registration form)</span></p>
+          {customQuestions.map((q, i) => (
+            <div key={i} className="flex items-center gap-2">
+              <input
+                type="text"
+                value={q.label}
+                onChange={e => setCustomQuestions(prev => prev.map((x, j) => j === i ? { ...x, label: e.target.value } : x))}
+                placeholder="e.g. Interested in bringing a guest?"
+                className="input flex-1"
+              />
+              <label className="flex items-center gap-1 text-xs text-gray-500 shrink-0 cursor-pointer">
+                <input type="checkbox" checked={q.required}
+                  onChange={e => setCustomQuestions(prev => prev.map((x, j) => j === i ? { ...x, required: e.target.checked } : x))}
+                  className="accent-fairway-600" />
+                Required
+              </label>
+              <button type="button" onClick={() => setCustomQuestions(prev => prev.filter((_, j) => j !== i))}
+                className="text-gray-400 hover:text-red-500 text-sm shrink-0">✕</button>
+            </div>
+          ))}
+          <button
+            type="button"
+            onClick={() => setCustomQuestions(prev => [...prev, { label: '', required: false }])}
+            className="text-xs text-fairway-700 font-semibold hover:underline mt-1"
+          >
+            + Add item
+          </button>
         </div>
 
         {/* Number of Flights */}
@@ -3366,6 +3463,26 @@ function EditEventModal({ open, onClose, event, onSaved }) {
           >
             <span className={`inline-block h-5 w-5 rounded-full bg-white shadow transition-transform ${shotgunStart ? 'translate-x-5' : 'translate-x-0'}`} />
           </button>
+        </div>
+
+        {/* Holes Played toggle */}
+        <div className="bg-gray-50 rounded-xl px-4 py-3 flex items-center justify-between">
+          <div>
+            <div className="text-sm font-medium text-gray-800">Holes Played</div>
+            <div className="text-xs text-gray-400 mt-0.5">Defaults to 18. Select 9 for a nine-hole event.</div>
+          </div>
+          <div className="flex rounded-lg border border-gray-300 overflow-hidden text-sm font-semibold">
+            {[18, 9].map(h => (
+              <button
+                key={h}
+                type="button"
+                onClick={() => setHolesPlayed(h)}
+                className={`px-4 py-1.5 transition-colors ${holesPlayed === h ? 'bg-fairway-700 text-white' : 'bg-white text-gray-600 hover:bg-gray-100'}`}
+              >
+                {h}
+              </button>
+            ))}
+          </div>
         </div>
 
         {/* Scoring Formats */}
@@ -3766,9 +3883,9 @@ function TabRegistrations({ event, onUpdated, orgId }) {
             Copy
           </Button>
         </div>
-        {!event.venmo_handle && !event.paypal_link && (
+        {!event.venmo_handle && !event.paypal_link && !event.zelle_handle && (
           <p className="text-xs text-amber-600 px-4 pb-3">
-            ⚠ No payment links set — players won't see a payment button after registering. Add a Venmo handle or PayPal link in Event Settings.
+            ⚠ No payment links set — players won't see a payment button after registering. Add a Venmo handle, Zelle, or PayPal link in Event Settings.
           </p>
         )}
       </Card>

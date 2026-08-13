@@ -337,6 +337,8 @@ function SponsorBar({ sponsors }) {
 
 // ─── Overview Tab ─────────────────────────────────────────────────────────────
 function OverviewTab({ event, leaderboardUrl, description }) {
+  const scheduleItems = (event.schedule_items ?? []).filter(s => s.label?.trim())
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
 
@@ -344,6 +346,27 @@ function OverviewTab({ event, leaderboardUrl, description }) {
         <div style={{ background: '#fff', borderRadius: 16, padding: '20px 24px', border: '1px solid #e5e7eb' }}>
           <div style={{ fontSize: 10, fontWeight: 700, color: '#9ca3af', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 10 }}>About this Event</div>
           <p style={{ fontSize: 14, lineHeight: 1.7, color: '#374151', whiteSpace: 'pre-line', margin: 0 }}>{description}</p>
+        </div>
+      )}
+
+      {scheduleItems.length > 0 && (
+        <div style={{ background: '#fff', borderRadius: 16, padding: '20px 24px', border: '1px solid #e5e7eb' }}>
+          <div style={{ fontSize: 10, fontWeight: 700, color: '#9ca3af', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 16 }}>Schedule</div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+            {scheduleItems.map((item, i) => (
+              <div key={i} style={{ display: 'grid', gridTemplateColumns: '90px 1fr', gap: 16, alignItems: 'start', padding: '14px 16px', background: '#f9f8f5', borderRadius: 12, border: '1px solid #f3f4f6' }}>
+                <div style={{ fontSize: 13, fontWeight: 700, color: '#374151', paddingTop: 1 }}>
+                  {item.time ? formatTime12(item.time) : '—'}
+                </div>
+                <div>
+                  <div style={{ fontSize: 14, fontWeight: 700, color: '#111827' }}>{item.label}</div>
+                  {item.description?.trim() && (
+                    <div style={{ fontSize: 13, color: '#6b7280', marginTop: 3, lineHeight: 1.5 }}>{item.description}</div>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
         </div>
       )}
 
@@ -697,6 +720,14 @@ function computeTeeTime(startTime, intervalMins, groupNum) {
 }
 
 function formatTime(t) { return computeTeeTime(t, 0, 1) ?? t }
+
+function formatTime12(t) {
+  if (!t) return ''
+  const [h, m] = t.split(':').map(Number)
+  const ampm = h >= 12 ? 'pm' : 'am'
+  const h12 = h % 12 || 12
+  return `${h12}:${String(m).padStart(2, '0')} ${ampm}`
+}
 
 function longDate(d) {
   return new Date(d + 'T00:00:00').toLocaleDateString('en-US', {

@@ -18,7 +18,7 @@ import { FlightBadge, StatusBadge } from '../components/ui/Badge'
 import { useFeatures, useOrg } from '../lib/OrgContext'
 import { useSubdomainOrg } from '../lib/SubdomainContext'
 
-const ALL_TABS = ['18-Hole', 'Front 9', 'Back 9', 'Stableford', 'Match Points', 'Team Match', 'Low Putts', 'Skins', 'Payouts', 'Team Play']
+const ALL_TABS = ['18-Hole', 'Front 9', 'Back 9', 'Stableford', 'Scramble', 'Match Points', 'Team Match', 'Low Putts', 'Skins', 'Payouts', 'Team Play']
 
 function visibleTabs(event, hasTGL = false) {
   if (!event) return ALL_TABS
@@ -30,6 +30,7 @@ function visibleTabs(event, hasTGL = false) {
     if (tab === 'Front 9')       return formats.includes('net_stroke_front9')
     if (tab === 'Back 9')        return formats.includes('net_stroke_back9')
     if (tab === 'Stableford')    return formats.includes('stableford')
+    if (tab === 'Scramble')      return formats.includes('scramble')
     if (tab === 'Match Points')  return formats.includes('match_points') || formats.includes('ryder_cup')
     if (tab === 'Team Match')    return formats.includes('team_match_play')
     if (tab === 'Low Putts')     return sideOpts.includes('low_putts')
@@ -287,7 +288,7 @@ export default function Leaderboard() {
       )}
 
       {/* Flight toggle — only shown when flights are in use */}
-      {hasFlights && !['Low Putts', 'Skins', 'Match Points', 'Team Match', 'Payouts'].includes(activeTab) && (
+      {hasFlights && !['Low Putts', 'Skins', 'Match Points', 'Team Match', 'Payouts', 'Scramble'].includes(activeTab) && (
         <div className="max-w-2xl mx-auto px-4 pt-4 flex gap-2">
           {['A', 'B'].map(f => (
             <button
@@ -375,6 +376,9 @@ export default function Leaderboard() {
         {activeTab === 'Skins' && skinsResults && (
           <SkinsBoard skinsResults={skinsResults} playerMap={playerMap} />
         )}
+        {activeTab === 'Scramble' && (
+          <ScrambleLeaderboard eventPlayers={eventPlayers} allScores={allScores} course={course} />
+        )}
         {activeTab === 'Payouts' && (
           <PayoutsBoard
             event={event}
@@ -391,6 +395,94 @@ export default function Leaderboard() {
       </div>
     </div>
     </>
+  )
+}
+
+// ─── Scramble Leaderboard ─────────────────────────────────────────
+function ScrambleLeaderboard({ eventPlayers, allScores, course }) {
+  const parPerHole = course?.par_per_hole ?? Array(18).fill(4)
+
+  // Build groups
+  const groupMap = {}
+  for (const ep of eventPlayers) {
+    const g = ep.group_number
+    if (!g) continue
+    if (!groupMap[g]) groupMap[g] = []
+    groupMap[g].push(ep)
+  }
+
+  const groups = Object.entries(groupMap).map(([gNum, players]) => {
+    // All players share the same score in scramble — use first player's scores
+    const pid = players[0]?.player_id
+    const playerScores = allScores.filter(s => s.player_id === pid)
+    const holesPlayed = playerScores.length
+    const totalGross = playerScores.reduce((s, sc) => s + (sc.gross_score ?? 0), 0)
+    const holesParSum = parPerHole.slice(0, holesPlayed).reduce((s, p) => s + p, 0)
+    const grossVsPar = holesPlayed > 0 ? totalGross - holesParSum : null
+    const teamName = players.map(ep => ep.player?.last_name ?? '?').join(' / ')
+    return { groupNum: Number(gNum), players, totalGross: holesPlayed > 0 ? totalGross : null, holesPlayed, grossVsPar, teamName }
+  })
+
+  const withScores = groups.filter(g => g.totalGross != null)
+  const noScores   = groups.filter(g => g.totalGross == null)
+
+  withScores.sort((a, b) => (a.totalGross ?? 999) - (b.totalGross ?? 999))
+
+  // Assign ranks with tie handling
+  const ranked = withScores.map((g, _, arr) => {
+    const rank = arr.filter(x => (x.totalGross ?? 999) < (g.totalGross ?? 999)).length + 1
+    const tied = arr.filter(x => x.totalGross === g.totalGross).length > 1
+    return { ...g, rank, rankLabel: tied ? `T${rank}` : `${rank}` }
+  })
+
+  const all = [...ranked, ...noScores.map(g => ({ ...g, rankLabel: '—' }))]
+
+  if (!all.length) {
+    return (
+      <div className="text-center py-12 text-gray-400">
+        <p className="font-medium">No groups assigned yet</p>
+      </div>
+    )
+  }
+
+  return (
+    <div className="card overflow-hidden p-0">
+      <div className="grid grid-cols-[2.5rem_1fr_3.5rem_3rem] text-[10px] font-bold uppercase tracking-widest px-4 py-2.5" style={{ background: '#f4f3f0', color: '#86868b' }}>
+        <span>Pos</span>
+        <span>Team</span>
+        <span className="text-right">Gross</span>
+        <span className="text-right">Thru</span>
+      </div>
+      {all.map((g, i) => {
+        const vs = g.grossVsPar
+        const vsDisplay = vs == null ? '—' : vs === 0 ? 'E' : `${vs > 0 ? '+' : ''}${vs}`
+        const vsColor = vs == null ? 'text-ink-muted' : vs < 0 ? 'text-status-active-text font-bold' : 'text-ink'
+        const isFirst = g.rank === 1
+        return (
+          <div
+            key={g.groupNum}
+            className="grid grid-cols-[2.5rem_1fr_3.5rem_3rem] items-center px-4 py-3"
+            style={{
+              background: i % 2 === 1 ? 'rgba(27,67,50,0.025)' : '#ffffff',
+              borderBottom: '1px solid #ebe9e4',
+              borderLeft: isFirst ? '3px solid #1B4332' : undefined,
+            }}
+          >
+            <span className="text-sm font-semibold text-ink-muted tabular-nums">{g.rankLabel}</span>
+            <div>
+              <div className="font-semibold text-sm text-ink leading-tight">{g.teamName}</div>
+              <div className="text-[10px] text-ink-muted mt-0.5">
+                {g.players.map(ep => `${ep.player?.first_name ?? ''} ${ep.player?.last_name ?? ''}`.trim()).join(', ')}
+              </div>
+            </div>
+            <span className={`text-sm tabular-nums text-right ${vsColor}`}>{vsDisplay}</span>
+            <span className="text-xs text-ink-muted text-right tabular-nums">
+              {g.holesPlayed === 18 ? 'F' : g.holesPlayed || '—'}
+            </span>
+          </div>
+        )
+      })}
+    </div>
   )
 }
 

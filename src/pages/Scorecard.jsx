@@ -293,6 +293,21 @@ export default function Scorecard() {
     }))
   }
 
+  // Scramble: one shared score applied to all players in group
+  function updateScrambleScore(hole, field, value) {
+    setDirtyHoles(prev => new Set([...prev, hole]))
+    setScores(prev => {
+      const next = { ...prev }
+      for (const ep of groupPlayers) {
+        next[ep.player_id] = {
+          ...(prev[ep.player_id] ?? {}),
+          [hole]: { ...(prev[ep.player_id]?.[hole] ?? { gross: '', putts: '' }), [field]: value },
+        }
+      }
+      return next
+    })
+  }
+
   // Check if every player has a saved score for the given hole
   function holeSaved(hole) {
     return groupPlayers.length > 0 &&
@@ -388,6 +403,7 @@ export default function Scorecard() {
 
   const parPerHole    = course.par_per_hole    ?? Array(18).fill(4)
   const strokeIndex   = course.stroke_index    ?? Array(18).fill(0)
+  const isScramble    = (event.formats ?? (event.format ? [event.format] : [])).includes('scramble')
 
   const hole       = currentHole
   const par        = parPerHole[hole - 1]
@@ -568,31 +584,43 @@ export default function Scorecard() {
             <p className="text-sm mt-1">Contact your admin.</p>
           </div>
         )}
-        {groupPlayers.map((ep, idx) => (
-          <PlayerScoreCard
-            key={ep.player_id}
-            ep={ep}
-            hole={hole}
-            par={par}
-            si={si}
-            score={getScore(ep.player_id, hole)}
-            allHoleScores={scores[ep.player_id] ?? {}}
-            courseStrokeIndexes={strokeIndex}
-            trackPutts={trackPutts}
-            onChange={(field, val) => updateScore(ep.player_id, hole, field, val)}
-            onGrossDone={() => {
-              const inputs = document.querySelectorAll('[data-player-gross]')
-              const nextCard = inputs[idx + 1]
-              if (nextCard) {
-                nextCard.focus()
-                nextCard.select()
-              } else {
-                // Last player — dismiss keyboard
-                document.activeElement?.blur()
-              }
-            }}
-          />
-        ))}
+        {isScramble ? (
+          groupPlayers.length > 0 && (
+            <ScrambleGroupCard
+              players={groupPlayers}
+              hole={hole}
+              par={par}
+              score={getScore(groupPlayers[0].player_id, hole)}
+              allHoleScores={scores[groupPlayers[0].player_id] ?? {}}
+              onChange={(field, val) => updateScrambleScore(hole, field, val)}
+            />
+          )
+        ) : (
+          groupPlayers.map((ep, idx) => (
+            <PlayerScoreCard
+              key={ep.player_id}
+              ep={ep}
+              hole={hole}
+              par={par}
+              si={si}
+              score={getScore(ep.player_id, hole)}
+              allHoleScores={scores[ep.player_id] ?? {}}
+              courseStrokeIndexes={strokeIndex}
+              trackPutts={trackPutts}
+              onChange={(field, val) => updateScore(ep.player_id, hole, field, val)}
+              onGrossDone={() => {
+                const inputs = document.querySelectorAll('[data-player-gross]')
+                const nextCard = inputs[idx + 1]
+                if (nextCard) {
+                  nextCard.focus()
+                  nextCard.select()
+                } else {
+                  document.activeElement?.blur()
+                }
+              }}
+            />
+          ))
+        )}
       </div>
 
       {/* Conflicts banner */}
@@ -651,6 +679,90 @@ export default function Scorecard() {
           >
             →
           </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// ─── Scramble Group Card ──────────────────────────────────────────
+function ScrambleGroupCard({ players, hole, par, score, allHoleScores, onChange }) {
+  const grossRef = useRef(null)
+  const advanceTimer = useRef(null)
+
+  // Running total using first player's score (same for all in scramble)
+  let totalGross = 0, holesPlayed = 0
+  for (let h = 1; h <= 18; h++) {
+    const sc = allHoleScores[h]
+    if (sc && sc.gross !== '' && sc.gross != null) {
+      totalGross += parseInt(sc.gross, 10)
+      holesPlayed++
+    }
+  }
+
+  const grossVal = score.gross !== '' && score.gross != null ? parseInt(score.gross, 10) : null
+  const grossVsPar = grossVal != null ? grossVal - par : null
+  const vsColor = grossVsPar == null ? 'text-ink-muted'
+    : grossVsPar < 0 ? 'text-status-active-text font-bold'
+    : 'text-ink'
+  const grossDisplay = score.gross !== '' && score.gross != null ? String(score.gross) : ''
+
+  const runningLabel = holesPlayed > 0
+    ? `${holesPlayed} hole${holesPlayed !== 1 ? 's' : ''} · Team Gross ${totalGross}`
+    : 'No holes entered'
+
+  return (
+    <div className="card overflow-hidden p-0">
+      {/* Team header */}
+      <div className="px-4 py-2.5" style={{ background: '#eaf1ec', borderBottom: '1px solid #d1e7d9' }}>
+        <div className="text-xs font-bold text-fairway-700 uppercase tracking-wide">Scramble Team</div>
+        <div className="text-xs text-ink-muted mt-0.5">{runningLabel}</div>
+      </div>
+
+      {/* Player list */}
+      <div className="px-4 py-2 space-y-1" style={{ borderBottom: '1px solid #ebe9e4' }}>
+        {players.map(ep => (
+          <div key={ep.player_id} className="text-sm text-ink">
+            {ep.player?.first_name} {ep.player?.last_name}
+          </div>
+        ))}
+      </div>
+
+      {/* Shared score input */}
+      <div className="flex items-center justify-between px-4 py-3">
+        <div className="text-sm text-ink-muted font-medium">Team Score — Hole {hole}</div>
+        <div className="flex items-center gap-3">
+          {grossVsPar != null && (
+            <div className="text-right">
+              <div className="text-xs text-ink-muted leading-none mb-0.5">vs Par</div>
+              <div className={`text-xl font-black leading-none ${vsColor}`}>
+                {grossVsPar === 0 ? 'E' : `${grossVsPar > 0 ? '+' : ''}${grossVsPar}`}
+              </div>
+            </div>
+          )}
+          <div className="flex flex-col items-center gap-0.5">
+            <span className="text-xs text-ink-muted font-medium" style={{ letterSpacing: '0.04em' }}>SCORE</span>
+            <input
+              ref={grossRef}
+              type="number"
+              inputMode="numeric"
+              pattern="[0-9]*"
+              data-player-gross
+              value={grossDisplay}
+              onChange={e => {
+                const raw = e.target.value
+                const val = raw === '' ? '' : parseInt(raw, 10) || ''
+                onChange('gross', val)
+                if (val !== '' && advanceTimer.current) clearTimeout(advanceTimer.current)
+                if (val !== '') {
+                  const delay = String(val) === '1' ? 1600 : 0
+                  advanceTimer.current = setTimeout(() => document.activeElement?.blur(), delay)
+                }
+              }}
+              className="w-14 h-14 text-center text-2xl font-black rounded-xl border-2 outline-none transition-colors"
+              style={{ borderColor: grossDisplay ? '#1B4332' : '#d1d5db', color: '#1d1d1f', background: '#fff' }}
+            />
+          </div>
         </div>
       </div>
     </div>

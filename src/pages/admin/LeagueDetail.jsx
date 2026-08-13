@@ -371,6 +371,7 @@ const FORMAT_OPTIONS = [
   ]},
   { group: 'Other Formats', options: [
     { value: 'stableford',      label: 'Stableford' },
+    { value: 'scramble',        label: 'Scramble' },
     { value: 'match_points',    label: 'Match Play (Head-to-Head)',  pro: true },
     { value: 'team_match_play', label: 'Match Play (Team Best Ball)', pro: true },
     { value: 'ryder_cup',       label: 'Ryder Cup',                  pro: true },
@@ -400,7 +401,11 @@ function EventModal({ open, onClose, league, orgTier, onSaved }) {
   const [tournamentFee,  setTournamentFee]  = useState('')
   const [venmoHandle,   setVenmoHandle]   = useState('')
   const [paypalLink,    setPaypalLink]    = useState('')
+  const [zelleHandle,     setZelleHandle]     = useState('')
+  const [customQuestions, setCustomQuestions] = useState([{ label: '', required: false }])
+  const [scheduleItems,   setScheduleItems]   = useState([])
   const [shotgunStart,  setShotgunStart]  = useState(false)
+  const [holesPlayed,   setHolesPlayed]   = useState(18)
   const [saving,        setSaving]        = useState(false)
 
   useEffect(() => {
@@ -414,7 +419,10 @@ function EventModal({ open, onClose, league, orgTier, onSaved }) {
     setPayoutBasis('per_player'); setPayoutFixed('')
     setFormats(new Set(['net_stroke'])); setPayoutPlaces({}); setSideGames(new Set()); setGameScope({})
     setNumFlights(0); setStartTime(''); setInterval(10)
-    setTournamentFee(''); setVenmoHandle(''); setPaypalLink(''); setShotgunStart(false)
+    setTournamentFee(''); setVenmoHandle(''); setPaypalLink(''); setZelleHandle(''); setShotgunStart(false)
+    setCustomQuestions([{ label: '', required: false }])
+    setScheduleItems([])
+    setHolesPlayed(18)
   }, [open, league])
 
   function toggleFormat(key) {
@@ -449,7 +457,11 @@ function EventModal({ open, onClose, league, orgTier, onSaved }) {
       tournament_fee:         tournamentFee ? parseFloat(tournamentFee) : null,
       venmo_handle:           venmoHandle.trim().replace(/^@/, '') || null,
       paypal_link:            paypalLink.trim() || null,
+      zelle_handle:           zelleHandle.trim() || null,
+      custom_questions:       customQuestions.filter(q => q.label.trim()),
+      schedule_items:         scheduleItems.filter(s => s.label.trim()),
       shotgun_start:          shotgunStart,
+      holes_played:           holesPlayed,
       status:                 'upcoming',
     })
     setSaving(false)
@@ -508,6 +520,25 @@ function EventModal({ open, onClose, league, orgTier, onSaved }) {
           >
             <span className={`inline-block h-5 w-5 rounded-full bg-white shadow transition-transform ${shotgunStart ? 'translate-x-5' : 'translate-x-0'}`} />
           </button>
+        </div>
+
+        <div className="bg-gray-50 rounded-xl px-4 py-3 flex items-center justify-between">
+          <div>
+            <div className="text-sm font-medium text-gray-800">Holes Played</div>
+            <div className="text-xs text-gray-400 mt-0.5">Defaults to 18. Select 9 for a nine-hole event.</div>
+          </div>
+          <div className="flex rounded-lg border border-gray-300 overflow-hidden text-sm font-semibold">
+            {[18, 9].map(h => (
+              <button
+                key={h}
+                type="button"
+                onClick={() => setHolesPlayed(h)}
+                className={`px-4 py-1.5 transition-colors ${holesPlayed === h ? 'bg-fairway-700 text-white' : 'bg-white text-gray-600 hover:bg-gray-100'}`}
+              >
+                {h}
+              </button>
+            ))}
+          </div>
         </div>
 
         <div>
@@ -640,6 +671,87 @@ function EventModal({ open, onClose, league, orgTier, onSaved }) {
             </div>
           </div>
           <Input label="PayPal.me Link" value={paypalLink} onChange={e => setPaypalLink(e.target.value)} placeholder="https://paypal.me/yourhandle" />
+          <div>
+            <label className="label">Zelle (phone or email)</label>
+            <input
+              type="text"
+              value={zelleHandle}
+              onChange={e => setZelleHandle(e.target.value)}
+              placeholder="555-555-5555 or name@email.com"
+              className="input"
+            />
+          </div>
+        </div>
+
+        {/* Schedule of Events */}
+        <div className="space-y-3 bg-gray-50 rounded-xl px-4 py-3">
+          <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Schedule of Events <span className="normal-case text-gray-400 font-normal">(shown on event page and registration)</span></p>
+          {scheduleItems.map((item, i) => (
+            <div key={i} className="bg-white rounded-lg border border-gray-200 p-3 space-y-2">
+              <div className="flex items-center gap-2">
+                <input
+                  type="time"
+                  value={item.time ?? ''}
+                  onChange={e => setScheduleItems(prev => prev.map((s, j) => j === i ? { ...s, time: e.target.value } : s))}
+                  className="input w-28 shrink-0"
+                />
+                <input
+                  type="text"
+                  value={item.label}
+                  onChange={e => setScheduleItems(prev => prev.map((s, j) => j === i ? { ...s, label: e.target.value } : s))}
+                  placeholder="e.g. Check-in, Tee Time, Awards…"
+                  className="input flex-1"
+                />
+                <button type="button" onClick={() => setScheduleItems(prev => prev.filter((_, j) => j !== i))}
+                  className="text-gray-400 hover:text-red-500 text-sm shrink-0">✕</button>
+              </div>
+              <input
+                type="text"
+                value={item.description ?? ''}
+                onChange={e => setScheduleItems(prev => prev.map((s, j) => j === i ? { ...s, description: e.target.value } : s))}
+                placeholder="Description (optional)"
+                className="input text-sm"
+              />
+            </div>
+          ))}
+          <button
+            type="button"
+            onClick={() => setScheduleItems(prev => [...prev, { time: '', label: '', description: '' }])}
+            className="text-xs text-fairway-700 font-semibold hover:underline mt-1"
+          >
+            + Add item
+          </button>
+        </div>
+
+        {/* Custom Registration Questions */}
+        <div className="space-y-2 bg-gray-50 rounded-xl px-4 py-3">
+          <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Registration Questions <span className="normal-case text-gray-400 font-normal">(shown on registration form)</span></p>
+          {customQuestions.map((q, i) => (
+            <div key={i} className="flex items-center gap-2">
+              <input
+                type="text"
+                value={q.label}
+                onChange={e => setCustomQuestions(prev => prev.map((x, j) => j === i ? { ...x, label: e.target.value } : x))}
+                placeholder="e.g. Interested in bringing a guest?"
+                className="input flex-1"
+              />
+              <label className="flex items-center gap-1 text-xs text-gray-500 shrink-0 cursor-pointer">
+                <input type="checkbox" checked={q.required}
+                  onChange={e => setCustomQuestions(prev => prev.map((x, j) => j === i ? { ...x, required: e.target.checked } : x))}
+                  className="accent-fairway-600" />
+                Required
+              </label>
+              <button type="button" onClick={() => setCustomQuestions(prev => prev.filter((_, j) => j !== i))}
+                className="text-gray-400 hover:text-red-500 text-sm shrink-0">✕</button>
+            </div>
+          ))}
+          <button
+            type="button"
+            onClick={() => setCustomQuestions(prev => [...prev, { label: '', required: false }])}
+            className="text-xs text-fairway-700 font-semibold hover:underline mt-1"
+          >
+            + Add item
+          </button>
         </div>
 
         <div className="flex justify-end gap-3 pt-2">

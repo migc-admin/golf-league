@@ -17,6 +17,14 @@ import { supabase } from '../lib/supabase'
 
 const GOLD = '#D4AF37'
 
+function formatTime(t) {
+  if (!t) return ''
+  const [h, m] = t.split(':').map(Number)
+  const ampm = h >= 12 ? 'PM' : 'AM'
+  const h12 = h % 12 || 12
+  return `${h12}:${String(m).padStart(2, '0')} ${ampm}`
+}
+
 function isMobile() {
   return /android|iphone|ipad|ipod/i.test(navigator.userAgent)
 }
@@ -64,6 +72,42 @@ function VenmoButton({ handle, amount, note }) {
   )
 }
 
+function ZelleButton({ handle, amount, note }) {
+  const isPhone = /^\+?[\d\s\-().]{7,}$/.test(handle)
+  // Zelle deeplink only works on mobile in the Zelle or bank app
+  const appUrl  = `zelle://payment?amount=${amount}&message=${encodeURIComponent(note)}&recipient=${encodeURIComponent(handle)}`
+  const webUrl  = 'https://enroll.zellepay.com/get-started'
+
+  function handleClick(e) {
+    if (!isMobile()) return
+    e.preventDefault()
+    const fallbackTimer = setTimeout(() => { window.location.href = webUrl }, 1500)
+    window.location.href = appUrl
+    window.addEventListener('blur', () => clearTimeout(fallbackTimer), { once: true })
+  }
+
+  return (
+    <>
+      <a
+        href={isMobile() ? appUrl : webUrl}
+        target={isMobile() ? '_self' : '_blank'}
+        rel="noopener noreferrer"
+        onClick={handleClick}
+        className="flex items-center justify-center gap-3 w-full py-3.5 rounded-xl font-bold text-white shadow-lg transition-opacity hover:opacity-90"
+        style={{ background: '#6D1ED4' }}
+      >
+        <svg viewBox="0 0 48 48" className="w-5 h-5 fill-white" xmlns="http://www.w3.org/2000/svg">
+          <path d="M24 4C12.95 4 4 12.95 4 24s8.95 20 20 20 20-8.95 20-20S35.05 4 24 4zm8 14H20.83l8.58-6H32v6zm-16 12h11.17l-8.58 6H16v-6zm16-6H16v-4h16v4z"/>
+        </svg>
+        Pay ${amount} via Zelle
+      </a>
+      <p className="text-xs text-gray-400 text-center -mt-1">
+        Send to <strong>{handle}</strong> — confirm amount is <strong>${amount}</strong>.
+      </p>
+    </>
+  )
+}
+
 function PayPalButton({ link, amount, note }) {
   const url = new URL(link)
   // Append amount to paypal.me links if not already present
@@ -91,19 +135,15 @@ export default function Register() {
   const [error,     setError]     = useState(null)
 
   // Form fields
-  const [firstName,     setFirstName]     = useState('')
-  const [lastName,      setLastName]      = useState('')
-  const [notes,         setNotes]         = useState('')
-  const [interestedGuest, setInterestedGuest] = useState('')
-  // Guest info (shown when interestedGuest === 'Yes')
-  const [guestName,  setGuestName]  = useState('')
-  const [guestEmail, setGuestEmail] = useState('')
-  const [guestGhin,  setGuestGhin]  = useState('')
+  const [firstName,      setFirstName]      = useState('')
+  const [lastName,       setLastName]       = useState('')
+  const [notes,          setNotes]          = useState('')
+  const [customAnswers,  setCustomAnswers]  = useState(['', ''])
 
   useEffect(() => {
     supabase
       .from('events')
-      .select('id, name, slug, event_number, event_date, entry_fee, tournament_fee, status, venmo_handle, paypal_link, course:courses(name), league:leagues(name, slug, logo_url, org:organizations(logo_url)), use_flights')
+      .select('id, name, slug, event_number, event_date, entry_fee, tournament_fee, status, venmo_handle, paypal_link, zelle_handle, custom_questions, schedule_items, course:courses(name), league:leagues(name, slug, logo_url, org:organizations(logo_url)), use_flights')
       .eq('slug', eventSlug)
       .eq('league.slug', leagueSlug)
       .single()
@@ -119,11 +159,13 @@ export default function Register() {
     setSaving(true)
     setError(null)
 
-    const guestNote = interestedGuest === 'Yes'
-      ? `Guest request: ${guestName.trim()}${guestEmail.trim() ? `, ${guestEmail.trim()}` : ''}${guestGhin.trim() ? `, GHIN: ${guestGhin.trim()}` : ''}`
-      : interestedGuest === 'No' ? 'No guest' : ''
+    const questions = event.custom_questions ?? []
+    const qNotes = questions
+      .map((q, i) => customAnswers[i]?.trim() ? `${q.label}: ${customAnswers[i].trim()}` : null)
+      .filter(Boolean)
+      .join(' | ')
 
-    const fullNotes = [notes.trim(), guestNote].filter(Boolean).join(' | ')
+    const fullNotes = [notes.trim(), qNotes].filter(Boolean).join(' | ')
 
     const { error: insErr } = await supabase.from('registrations').insert({
       event_id:   event.id,
@@ -194,6 +236,28 @@ export default function Register() {
           </div>
         )}
 
+        {/* Schedule of Events */}
+        {!loading && event && (event.schedule_items ?? []).length > 0 && (
+          <div className="bg-white/10 backdrop-blur rounded-2xl p-5 mb-4 space-y-2">
+            <p className="text-xs font-bold text-white/60 uppercase tracking-widest mb-3">Schedule of Events</p>
+            {event.schedule_items.map((item, i) => (
+              <div key={i} className="flex gap-3">
+                {item.time && (
+                  <span className="text-white font-bold text-sm tabular-nums w-16 shrink-0 pt-0.5">
+                    {formatTime(item.time)}
+                  </span>
+                )}
+                <div>
+                  <div className="text-white text-sm font-semibold">{item.label}</div>
+                  {item.description?.trim() && (
+                    <div className="text-white/60 text-xs mt-0.5">{item.description}</div>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+
         {/* Registration form */}
         {!loading && event && event.status !== 'complete' && !submitted && (
           <div className="bg-white rounded-2xl shadow-2xl p-6 space-y-4">
@@ -229,57 +293,25 @@ export default function Register() {
                 </div>
               </div>
 
-              <div>
-                <label className="block text-xs font-semibold text-gray-600 mb-1">Interested in inviting a guest? <span className="font-normal text-gray-400">(based on availability)</span></label>
-                <select
-                  value={interestedGuest}
-                  onChange={e => { setInterestedGuest(e.target.value); setGuestName(''); setGuestEmail(''); setGuestGhin('') }}
-                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-600"
-                >
-                  <option value="">— Select —</option>
-                  <option value="Yes">Yes</option>
-                  <option value="No">No</option>
-                </select>
-              </div>
-
-              {interestedGuest === 'Yes' && (
-                <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 space-y-3">
-                  <p className="text-xs font-semibold text-amber-800 uppercase tracking-wide">Guest Information</p>
-                  <div>
-                    <label className="block text-xs font-semibold text-gray-600 mb-1">Guest Name *</label>
-                    <input
-                      required
-                      value={guestName}
-                      onChange={e => setGuestName(e.target.value)}
-                      className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-600 bg-white"
-                      placeholder="Full name"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-semibold text-gray-600 mb-1">Guest Email *</label>
-                    <input
-                      required
-                      type="email"
-                      value={guestEmail}
-                      onChange={e => setGuestEmail(e.target.value)}
-                      className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-600 bg-white"
-                      placeholder="email@example.com"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-semibold text-gray-600 mb-1">Guest GHIN # <span className="font-normal text-gray-400">(if applicable)</span></label>
-                    <input
-                      value={guestGhin}
-                      onChange={e => setGuestGhin(e.target.value)}
-                      className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-600 bg-white"
-                      placeholder="Optional"
-                    />
-                  </div>
+              {/* Custom questions set by organizer */}
+              {(event.custom_questions ?? []).filter(q => q.label?.trim()).map((q, i) => (
+                <div key={i}>
+                  <label className="block text-xs font-semibold text-gray-600 mb-1">
+                    {q.label}{q.required ? ' *' : ' '}
+                    {!q.required && <span className="font-normal text-gray-400">(optional)</span>}
+                  </label>
+                  <input
+                    required={q.required}
+                    value={customAnswers[i] ?? ''}
+                    onChange={e => setCustomAnswers(prev => { const next = [...prev]; next[i] = e.target.value; return next })}
+                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-600"
+                    placeholder="Your answer…"
+                  />
                 </div>
-              )}
+              ))}
 
               <div>
-                <label className="block text-xs font-semibold text-gray-600 mb-1">Notes</label>
+                <label className="block text-xs font-semibold text-gray-600 mb-1">Notes <span className="font-normal text-gray-400">(optional)</span></label>
                 <textarea
                   value={notes}
                   onChange={e => setNotes(e.target.value)}
@@ -315,19 +347,26 @@ export default function Register() {
               </div>
               <h2 className="text-lg font-bold text-gray-900">You're registered!</h2>
               <p className="text-sm text-gray-500 mt-1">
-                {(event.venmo_handle || event.paypal_link)
+                {(event.venmo_handle || event.paypal_link || event.zelle_handle)
                   ? <>{firstName}, your spot is <span className="font-semibold text-amber-600">pending payment</span>. Complete your payment below to confirm your registration.</>
                   : <>{firstName}, your spot is <span className="font-semibold text-amber-600">pending payment</span>. Follow payment instructions provided by your administrator.</>
                 }
               </p>
             </div>
 
-            {(event.venmo_handle || event.paypal_link) && (
+            {(event.venmo_handle || event.paypal_link || event.zelle_handle) && (
               <div className="space-y-3">
                 <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Complete your payment</p>
                 {event.venmo_handle && (
                   <VenmoButton
                     handle={event.venmo_handle}
+                    amount={Number(event.tournament_fee || event.entry_fee || 0).toFixed(2)}
+                    note={`${eventLabel} – ${firstName} ${lastName}`}
+                  />
+                )}
+                {event.zelle_handle && (
+                  <ZelleButton
+                    handle={event.zelle_handle}
                     amount={Number(event.tournament_fee || event.entry_fee || 0).toFixed(2)}
                     note={`${eventLabel} – ${firstName} ${lastName}`}
                   />
