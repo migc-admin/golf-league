@@ -215,7 +215,7 @@ export default function Home() {
       if (isAdmin) {
         const { data } = await supabase
           .from('events')
-          .select('id, name, slug, event_number, event_date, status, league:leagues(slug)')
+          .select('id, name, slug, event_number, event_date, status, league:leagues(slug, org:organizations(slug))')
           .in('status', ['active', 'upcoming'])
           .order('event_date', { ascending: true })
           .limit(10)
@@ -227,7 +227,7 @@ export default function Home() {
         if (playerId) {
           const { data: entries } = await supabase
             .from('event_players')
-            .select('event_id, events(id, name, slug, event_number, event_date, status, league:leagues(slug))')
+            .select('event_id, events(id, name, slug, event_number, event_date, status, league:leagues(slug, org:organizations(slug)))')
             .eq('player_id', playerId)
           const active = (entries ?? [])
             .map(e => e.events)
@@ -397,7 +397,7 @@ export default function Home() {
                   <div className="flex flex-wrap gap-2">
                     {events.map(ev => (
                       <Link key={ev.id}
-                        to={`/${ev.league?.slug}/${ev.slug}/scorecard`}
+                        to={`/${ev.league?.org?.slug}/${ev.league?.slug}/${ev.slug}/scorecard`}
                         className="text-xs font-semibold px-3 py-1.5 rounded-full text-white transition-opacity hover:opacity-80"
                         style={{ background: GREEN }}>
                         {ev.name || `Event #${ev.event_number}`}
