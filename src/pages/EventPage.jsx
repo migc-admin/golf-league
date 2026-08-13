@@ -348,17 +348,6 @@ function SponsorBar({ sponsors }) {
 }
 
 // ─── Overview Tab ─────────────────────────────────────────────────────────────
-const SIDE_GAME_LABELS = {
-  skins:        'Skins',
-  skins_a:      'Skins — Flight A',
-  skins_b:      'Skins — Flight B',
-  long_drive:   'Long Drive',
-  long_drive_a: 'Long Drive — Flight A',
-  long_drive_b: 'Long Drive — Flight B',
-  low_putts:    'Low Putts',
-  ctp:          'Closest to Pin',
-}
-
 function OverviewTab({ event, leaderboardUrl, description }) {
   const scheduleItems = (event.schedule_items ?? []).filter(s => s.label?.trim())
   const customCompetitions = (event.custom_competitions ?? []).filter(c => c?.trim())
