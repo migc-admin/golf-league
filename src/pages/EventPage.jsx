@@ -322,12 +322,16 @@ function SponsorBar({ sponsors }) {
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 16 }}>
           {sponsors.map((s, i) => {
             const tile = (
-              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', background: '#f9f8f5', border: '1px solid #e5e7eb', borderRadius: 14, padding: '18px 28px', minWidth: 160, gap: 8 }}>
-                {s.logo_url && (
-                  <img src={s.logo_url} alt={s.name ?? 'Sponsor'} style={{ height: 56, maxWidth: 160, objectFit: 'contain' }} />
+              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', background: '#f9f8f5', border: '1px solid #e5e7eb', borderRadius: 14, padding: '20px 24px 14px', minWidth: 140, gap: 10 }}>
+                {s.logo_url ? (
+                  <img src={s.logo_url} alt={s.name ?? 'Sponsor'} style={{ height: 72, maxWidth: 160, objectFit: 'contain' }} />
+                ) : (
+                  <div style={{ height: 72, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    <span style={{ fontSize: 13, fontWeight: 700, color: '#374151', textAlign: 'center' }}>{s.name}</span>
+                  </div>
                 )}
-                {s.name && (
-                  <span style={{ fontSize: 15, fontWeight: 700, color: '#374151', textAlign: 'center' }}>{s.name}</span>
+                {s.logo_url && s.name && (
+                  <span style={{ fontSize: 11, fontWeight: 500, color: '#6b7280', textAlign: 'center' }}>{s.name}</span>
                 )}
               </div>
             )
