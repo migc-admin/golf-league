@@ -375,6 +375,17 @@ export default function PrintAssets({ type, event, eventPlayers = [], onClose })
         />
       )
     }
+
+    // Custom competitions
+    const customCompetitions = (event?.custom_competitions ?? []).filter(c => c?.trim())
+    customCompetitions.forEach((name, i) => {
+      printNodes.push(
+        <CtpLongDriveCard key={`custom_${i}`}
+          logoUrl={logoUrl} leagueName={leagueName} eventName={eventName} date={date}
+          competitionLine={name}
+        />
+      )
+    })
   }
 
   // ── Tee Sheet ─────────────────────────────────────────────────────────────
@@ -439,7 +450,7 @@ export default function PrintAssets({ type, event, eventPlayers = [], onClose })
   // ── Empty state ───────────────────────────────────────────────────────────
   if (printNodes.length === 0) {
     const hint = type === 'cards'
-      ? "Enable CTP or Long Drive in the event's Side Games to generate cards."
+      ? "Enable CTP, Long Drive, or add custom competitions in the event's Side Games to generate cards."
       : type === 'cart_signs'
       ? 'Assign players to groups in the Groups tab first.'
       : 'No data to print.'
