@@ -1357,7 +1357,7 @@ function TabFlights({ event, eventPlayers, course, allPlayers, onUpdated }) {
   const available = allPlayers.filter(p => !rostered.has(p.id))
 
   async function overrideFlight(epId, newFlight) {
-    const { error } = await supabase.from('event_players').update({ flight: newFlight }).eq('id', epId)
+    const { error } = await supabase.from('event_players').update({ flight: newFlight || null }).eq('id', epId)
     if (error) toast.error(error.message)
     else onUpdated()
   }
