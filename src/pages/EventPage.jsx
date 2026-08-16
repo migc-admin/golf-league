@@ -629,7 +629,7 @@ function GroupList({ eventPlayers, event }) {
   const q         = search.toLowerCase().trim()
   const filtered  = q ? sorted.filter(([, ms]) => ms.some(ep => `${ep.player?.first_name ?? ''} ${ep.player?.last_name ?? ''}`.toLowerCase().includes(q))) : sorted
 
-  if (sorted.length === 0 && ungrouped.length === 0) {
+  if (sorted.length === 0 || ungrouped.length > 0) {
     return (
       <div style={{ textAlign: 'center', paddingTop: 80, paddingBottom: 80 }}>
         <div style={{ fontSize: 44, marginBottom: 12 }}>⛳</div>
