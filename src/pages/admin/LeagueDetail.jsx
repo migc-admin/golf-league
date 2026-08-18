@@ -27,6 +27,7 @@ export default function LeagueDetail() {
   const [leagueModal,  setLeagueModal]  = useState(false)
   const [eventModal,   setEventModal]   = useState(false)
   const [tglModal,     setTglModal]     = useState(false)
+  const [deleteModal,  setDeleteModal]  = useState(false)
 
   const dragItem = useRef(null)
   const dragOver = useRef(null)
@@ -96,7 +97,6 @@ export default function LeagueDetail() {
   }, [user, leagueSlug])
 
   async function handleDeleteLeague() {
-    if (!confirm('Delete this league? All events and earnings will be deleted.')) return
     const { error } = await supabase.from('leagues').delete().eq('id', league.id)
     if (error) toast.error(error.message)
     else { toast.success('League deleted'); navigate('/admin/leagues') }
@@ -172,7 +172,7 @@ export default function LeagueDetail() {
             ) : (
               <span className="text-xs text-ink-muted rounded-full px-3 py-1" style={{ background: '#eceae5' }}>Team Play — Club</span>
             )}
-            <Button size="sm" variant="danger" onClick={handleDeleteLeague}>Delete</Button>
+            <Button size="sm" variant="danger" onClick={() => setDeleteModal(true)}>Delete</Button>
           </div>
         </div>
 
@@ -255,7 +255,58 @@ export default function LeagueDetail() {
           league={league}
         />
       )}
+      <DeleteLeagueModal
+        open={deleteModal}
+        onClose={() => setDeleteModal(false)}
+        league={league}
+        onConfirm={handleDeleteLeague}
+      />
     </div>
+  )
+}
+
+function DeleteLeagueModal({ open, onClose, league, onConfirm }) {
+  const [confirmText, setConfirmText] = useState('')
+  const [deleting,    setDeleting]    = useState(false)
+
+  useEffect(() => {
+    if (!open) setConfirmText('')
+  }, [open])
+
+  async function handleDelete() {
+    setDeleting(true)
+    await onConfirm()
+    setDeleting(false)
+  }
+
+  return (
+    <Modal open={open} onClose={onClose} title="Delete League">
+      <div className="space-y-4">
+        <p className="text-sm text-ink-muted">
+          This will permanently delete <span className="font-semibold text-ink">{league?.name}</span> and all of its
+          events, scores, skins, earnings, and team play data. This cannot be undone.
+        </p>
+        <Input
+          label={<>Type <span className="font-mono font-semibold">DELETE</span> to confirm</>}
+          value={confirmText}
+          onChange={e => setConfirmText(e.target.value)}
+          placeholder="DELETE"
+          autoFocus
+        />
+        <div className="flex justify-end gap-3 pt-2">
+          <Button type="button" variant="secondary" onClick={onClose}>Cancel</Button>
+          <Button
+            type="button"
+            variant="danger"
+            disabled={confirmText !== 'DELETE'}
+            loading={deleting}
+            onClick={handleDelete}
+          >
+            Delete League
+          </Button>
+        </div>
+      </div>
+    </Modal>
   )
 }
 
