@@ -35,7 +35,7 @@ function downloadPng(dataUrl, filename) {
 const PAGE_W    = 1100
 const PAGE_H    = 850
 const PAD       = 18
-const GAP       = 10
+const GAP       = 40   // gap between the two stacked cards, houses the cut line
 const CARD_W    = PAGE_W - PAD * 2   // 1064
 const CARD_H    = Math.floor((PAGE_H - PAD * 2 - GAP) / 2)
 
@@ -206,15 +206,35 @@ function buildPage({ event, course, groupNum, players, code, qrDataUrl, ctpHoles
     width: PAGE_W + 'px', height: PAGE_H + 'px',
     background: '#ffffff',
     display: 'flex', flexDirection: 'column',
-    gap: GAP + 'px',
     padding: PAD + 'px',
     boxSizing: 'border-box',
     fontFamily: 'Arial, Helvetica, sans-serif',
   })
   const opts = { event, course, groupNum, players, code, qrDataUrl, ctpHoles, longDriveHole, orgName, startingHole, holeAssignStr, orgLogoUrl, globalFlightTeeMap }
   page.appendChild(buildCard(opts))
+  page.appendChild(buildCutLine())
   page.appendChild(buildCard(opts))
   return page
+}
+
+// ─── Cut line — dashed divider centered in the gap between stacked cards ──
+function buildCutLine() {
+  const wrap = el('div', {
+    height: GAP + 'px', flexShrink: '0',
+    display: 'flex', alignItems: 'center', justifyContent: 'center',
+    position: 'relative',
+  })
+  const line = el('div', {
+    position: 'absolute', left: '0', right: '0', top: '50%',
+    borderTop: `1.5px dashed ${BORDER}`,
+  })
+  wrap.appendChild(line)
+  const label = txt('✂ cut here', {
+    position: 'relative', background: '#ffffff', padding: '0 10px',
+    fontSize: '9px', color: '#9ca3af', letterSpacing: '0.05em',
+  })
+  wrap.appendChild(label)
+  return wrap
 }
 
 // ─── Card ─────────────────────────────────────────────────────────

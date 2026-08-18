@@ -7,12 +7,31 @@
  *  'cart_signs' → Cart Signs                (8.5" × 5.5" landscape)
  */
 
-import { useEffect } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
+import { toPng } from 'html-to-image'
 
 const GOLD  = '#C9A84C'
 const GREEN = '#1B4332'
 const FONT  = "'Playfair Display', Georgia, serif"
+
+// ─── Mobile-safe PNG download ─────────────────────────────────────
+// iOS Safari ignores <a download> — open in new tab instead so user can long-press save
+function downloadPng(dataUrl, filename) {
+  const isMobileSafari = /iphone|ipad|ipod/i.test(navigator.userAgent)
+  if (isMobileSafari) {
+    const w = window.open('', '_blank')
+    if (w) {
+      w.document.write(`<html><body style="margin:0;background:#000"><img src="${dataUrl}" style="max-width:100%;display:block"/></body></html>`)
+      w.document.close()
+    }
+  } else {
+    const link = document.createElement('a')
+    link.download = filename
+    link.href = dataUrl
+    link.click()
+  }
+}
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 function calcTeeTime(startTime, intervalMins, groupNum) {
@@ -72,7 +91,6 @@ function CtpLongDriveCard({ logoUrl, leagueName, eventName, date, competitionLin
       background: '#fff', color: '#111',
       padding: '0.45in 0.55in 0.4in',
       boxSizing: 'border-box',
-      pageBreakAfter: 'always',
       fontFamily: FONT,
     }}>
       {/* Logo */}
@@ -120,10 +138,51 @@ function CtpLongDriveCard({ logoUrl, leagueName, eventName, date, competitionLin
   )
 }
 
+// Two CTP/Long Drive cards, shrunk to fit side-by-side on a standard Letter sheet
+const CTP_ORIG_W    = 4.72
+const CTP_ORIG_H    = 8.27
+const CTP_PAGE_MARGIN = 0.4  // in
+const CTP_GAP         = 0.3  // in
+
+function CtpCardsPage({ cards }) {
+  const availW = 8.5 - CTP_PAGE_MARGIN * 2
+  const cardW  = (availW - CTP_GAP) / 2
+  const scale  = cardW / CTP_ORIG_W
+  const cardH  = CTP_ORIG_H * scale
+
+  return (
+    <div style={{
+      width: '8.5in', height: '11in',
+      boxSizing: 'border-box',
+      padding: `${CTP_PAGE_MARGIN}in`,
+      display: 'flex', justifyContent: 'center', alignItems: 'flex-start',
+      gap: `${CTP_GAP}in`,
+      background: '#fff',
+      pageBreakAfter: 'always',
+    }}>
+      {cards.map((c, i) => (
+        <div key={i} style={{
+          width: `${cardW}in`, height: `${cardH}in`,
+          boxSizing: 'border-box',
+          border: '1.5px dashed #999',
+          overflow: 'hidden',
+        }}>
+          <div style={{
+            width: `${CTP_ORIG_W}in`, height: `${CTP_ORIG_H}in`,
+            transform: `scale(${scale})`, transformOrigin: 'top left',
+          }}>
+            <CtpLongDriveCard {...c} />
+          </div>
+        </div>
+      ))}
+    </div>
+  )
+}
+
 // ═══════════════════════════════════════════════════════════════════════════════
 // ASSET TYPE 2 — Tee Sheet  (8.5" × 11")
 // ═══════════════════════════════════════════════════════════════════════════════
-function TeeSheetPage({ event, eventPlayers }) {
+function TeeSheetPage({ event, eventPlayers, forPng = false }) {
   const league     = event?.league ?? {}
   const logoUrl    = league.logo_url ?? null
   const leagueName = league.name ?? ''
@@ -141,12 +200,12 @@ function TeeSheetPage({ event, eventPlayers }) {
 
   return (
     <div style={{
-      width: '8.5in', minHeight: '11in',
+      width: '8.5in', ...(forPng ? {} : { minHeight: '11in' }),
       background: '#fff', color: '#111',
       padding: '0.5in 0.55in',
       boxSizing: 'border-box',
       fontFamily: FONT,
-      pageBreakAfter: 'always',
+      ...(forPng ? {} : { pageBreakAfter: 'always' }),
     }}>
       {/* Page header */}
       <div style={{ display: 'flex', alignItems: 'center', gap: '0.22in', marginBottom: '0.22in' }}>
@@ -246,7 +305,6 @@ function CartSignCard({ logoUrl, leagueName, eventName, date, groupNum, teeTime,
       background: '#fff', color: '#111',
       padding: '0.38in 0.65in',
       boxSizing: 'border-box',
-      pageBreakAfter: 'always',
       fontFamily: FONT,
     }}>
       {/* Logo + league + event/date */}
@@ -298,24 +356,66 @@ function CartSignCard({ logoUrl, leagueName, eventName, date, groupNum, teeTime,
   )
 }
 
+// Two cart signs, shrunk slightly to stack on a single standard Letter sheet
+const SIGN_ORIG_W      = 8.5
+const SIGN_ORIG_H      = 5.5
+const SIGN_PAGE_MARGIN_X = 0.25  // in
+const SIGN_PAGE_MARGIN_Y = 0.15  // in
+const SIGN_GAP           = 0.3   // in
+
+function CartSignsPage({ signs }) {
+  const availH = 11 - SIGN_PAGE_MARGIN_Y * 2 - SIGN_GAP
+  const signH  = availH / 2
+  const scale  = signH / SIGN_ORIG_H
+  const signW  = SIGN_ORIG_W * scale
+
+  return (
+    <div style={{
+      width: '8.5in', height: '11in',
+      boxSizing: 'border-box',
+      padding: `${SIGN_PAGE_MARGIN_Y}in ${SIGN_PAGE_MARGIN_X}in`,
+      display: 'flex', flexDirection: 'column', alignItems: 'center',
+      gap: `${SIGN_GAP}in`,
+      background: '#fff',
+      pageBreakAfter: 'always',
+    }}>
+      {signs.map((s, i) => (
+        <div key={i} style={{
+          width: `${signW}in`, height: `${signH}in`,
+          boxSizing: 'border-box',
+          border: '1.5px dashed #999',
+          overflow: 'hidden',
+        }}>
+          <div style={{
+            width: `${SIGN_ORIG_W}in`, height: `${SIGN_ORIG_H}in`,
+            transform: `scale(${scale})`, transformOrigin: 'top left',
+          }}>
+            <CartSignCard {...s} />
+          </div>
+        </div>
+      ))}
+    </div>
+  )
+}
+
 // ═══════════════════════════════════════════════════════════════════════════════
 // Main export
 // ═══════════════════════════════════════════════════════════════════════════════
 const PAGE_SIZE = {
-  cards:      '4.72in 8.27in',
+  cards:      '8.5in 11in',
   tee_sheet:  '8.5in 11in',
-  cart_signs: '8.5in 5.5in landscape',
+  cart_signs: '8.5in 11in',
 }
 
-// Physical pixel dimensions at 96dpi (1in = 96px)
+// Physical pixel dimensions at 96dpi (1in = 96px) — all types now render full Letter pages
 const PREVIEW_DIMS = {
-  cart_signs: { w: 8.5 * 96, h: 5.5  * 96 },
-  cards:      { w: 4.72 * 96, h: 8.27 * 96 },
-  tee_sheet:  { w: 8.5 * 96, h: 11   * 96 },
+  cart_signs: { w: 8.5 * 96, h: 11 * 96 },
+  cards:      { w: 8.5 * 96, h: 11 * 96 },
+  tee_sheet:  { w: 8.5 * 96, h: 11 * 96 },
 }
 const PREVIEW_SCALE = {
-  cart_signs: 0.72,
-  cards:      0.62,
+  cart_signs: 0.68,
+  cards:      0.68,
   tee_sheet:  0.68,
 }
 
@@ -333,12 +433,28 @@ export default function PrintAssets({ type, event, eventPlayers = [], onClose })
   const date       = shortDate(event?.event_date)
   const interval   = event?.tee_time_interval_mins ?? 10
 
+  const pngRef = useRef(null)
+  const [downloadingPng, setDownloadingPng] = useState(false)
+
+  const handleDownloadPng = async () => {
+    if (!pngRef.current || downloadingPng) return
+    setDownloadingPng(true)
+    try {
+      const dataUrl = await toPng(pngRef.current, { pixelRatio: 2, cacheBust: true, backgroundColor: '#ffffff' })
+      downloadPng(dataUrl, `tee-sheet-${event?.event_number ?? 'event'}.png`)
+    } finally {
+      setDownloadingPng(false)
+    }
+  }
+
   let printNodes = []
+  let itemCount  = 0
 
   // ── CTP / Long Drive cards ────────────────────────────────────────────────
   if (type === 'cards') {
     const sideGames    = event?.side_game_options ?? []
     const payoutConfig = event?.payout_config ?? {}
+    const cardItems    = []
 
     const hasCtp   = sideGames.includes('ctp')
     const ctpHoles = Object.keys(payoutConfig)
@@ -348,49 +464,41 @@ export default function PrintAssets({ type, event, eventPlayers = [], onClose })
 
     if (hasCtp && ctpHoles.length > 0) {
       ctpHoles.forEach(h => {
-        printNodes.push(
-          <CtpLongDriveCard key={`ctp_${h}`}
-            logoUrl={logoUrl} leagueName={leagueName} eventName={eventName} date={date}
-            competitionLine={`Closest to Pin #${h}`}
-          />
-        )
+        cardItems.push({
+          logoUrl, leagueName, eventName, date,
+          competitionLine: `Closest to Pin #${h}`,
+        })
       })
     } else if (hasCtp) {
-      printNodes.push(
-        <CtpLongDriveCard key="ctp_generic"
-          logoUrl={logoUrl} leagueName={leagueName} eventName={eventName} date={date}
-          competitionLine="Closest to Pin"
-        />
-      )
+      cardItems.push({ logoUrl, leagueName, eventName, date, competitionLine: 'Closest to Pin' })
     }
 
     const hasLongDrive = sideGames.some(s => s.startsWith('long_drive'))
     const ldHole       = event?.long_drive_hole ?? null
 
     if (hasLongDrive) {
-      printNodes.push(
-        <CtpLongDriveCard key="long_drive"
-          logoUrl={logoUrl} leagueName={leagueName} eventName={eventName} date={date}
-          competitionLine={ldHole ? `Longest Drive #${ldHole}` : 'Longest Drive'}
-        />
-      )
+      cardItems.push({
+        logoUrl, leagueName, eventName, date,
+        competitionLine: ldHole ? `Longest Drive #${ldHole}` : 'Longest Drive',
+      })
     }
 
     // Custom competitions
     const customCompetitions = (event?.custom_competitions ?? []).filter(c => c?.trim())
-    customCompetitions.forEach((name, i) => {
-      printNodes.push(
-        <CtpLongDriveCard key={`custom_${i}`}
-          logoUrl={logoUrl} leagueName={leagueName} eventName={eventName} date={date}
-          competitionLine={name}
-        />
-      )
+    customCompetitions.forEach(name => {
+      cardItems.push({ logoUrl, leagueName, eventName, date, competitionLine: name })
     })
+
+    itemCount = cardItems.length
+    for (let i = 0; i < cardItems.length; i += 2) {
+      printNodes.push(<CtpCardsPage key={`page_${i / 2}`} cards={cardItems.slice(i, i + 2)} />)
+    }
   }
 
   // ── Tee Sheet ─────────────────────────────────────────────────────────────
   if (type === 'tee_sheet') {
     printNodes = [<TeeSheetPage key="tee_sheet" event={event} eventPlayers={eventPlayers} />]
+    itemCount  = 1
   }
 
   // ── Cart Signs ────────────────────────────────────────────────────────────
@@ -399,6 +507,7 @@ export default function PrintAssets({ type, event, eventPlayers = [], onClose })
     const groupNums = Object.keys(groups).map(Number).sort((a, b) => a - b)
     const isShotgun = event?.shotgun_start ?? false
     const holeMap   = event?.group_hole_assignments ?? {}
+    const signItems = []
 
     groupNums.forEach(g => {
       const members   = groups[g]
@@ -413,21 +522,22 @@ export default function PrintAssets({ type, event, eventPlayers = [], onClose })
       const card1 = members.slice(0, 2)
       const card2 = members.slice(2, 4)
 
-      printNodes.push(
-        <CartSignCard key={`g${g}-c1`}
-          logoUrl={logoUrl} leagueName={leagueName} eventName={eventName} date={date}
-          groupNum={g} teeTime={teeTime} holeLabel={holeLabel} players={card1}
-        />
-      )
+      signItems.push({
+        logoUrl, leagueName, eventName, date,
+        groupNum: g, teeTime, holeLabel, players: card1,
+      })
       if (card2.length > 0) {
-        printNodes.push(
-          <CartSignCard key={`g${g}-c2`}
-            logoUrl={logoUrl} leagueName={leagueName} eventName={eventName} date={date}
-            groupNum={g} teeTime={teeTime} holeLabel={holeLabel} players={card2}
-          />
-        )
+        signItems.push({
+          logoUrl, leagueName, eventName, date,
+          groupNum: g, teeTime, holeLabel, players: card2,
+        })
       }
     })
+
+    itemCount = signItems.length
+    for (let i = 0; i < signItems.length; i += 2) {
+      printNodes.push(<CartSignsPage key={`page_${i / 2}`} signs={signItems.slice(i, i + 2)} />)
+    }
   }
 
   // ── Print CSS ─────────────────────────────────────────────────────────────
@@ -466,12 +576,12 @@ export default function PrintAssets({ type, event, eventPlayers = [], onClose })
     )
   }
 
-  const cardCount = printNodes.length
+  const pageCount = printNodes.length
   const subtitle  = type === 'tee_sheet'
     ? '1 page · 8.5" × 11"'
     : type === 'cart_signs'
-    ? `${cardCount} sign${cardCount !== 1 ? 's' : ''} · 8.5" × 5.5" landscape`
-    : `${cardCount} card${cardCount !== 1 ? 's' : ''} · 4.72" × 8.27"`
+    ? `${itemCount} sign${itemCount !== 1 ? 's' : ''} · ${pageCount} page${pageCount !== 1 ? 's' : ''} · 8.5" × 11"`
+    : `${itemCount} card${itemCount !== 1 ? 's' : ''} · ${pageCount} page${pageCount !== 1 ? 's' : ''} · 8.5" × 11"`
 
   return (
     <>
@@ -487,13 +597,32 @@ export default function PrintAssets({ type, event, eventPlayers = [], onClose })
             <button onClick={onClose} className="px-4 py-1.5 rounded-lg text-sm bg-gray-100 text-gray-700 hover:bg-gray-200 font-medium">
               Close
             </button>
-            <button
-              onClick={() => window.print()}
-              className="px-4 py-1.5 rounded-lg text-sm text-white font-medium"
-              style={{ background: GREEN }}
-            >
-              🖨 Print
-            </button>
+            {type === 'tee_sheet' ? (
+              <>
+                <button
+                  onClick={handleDownloadPng}
+                  disabled={downloadingPng}
+                  className="px-4 py-1.5 rounded-lg text-sm bg-gray-100 text-gray-700 hover:bg-gray-200 font-medium disabled:opacity-50"
+                >
+                  {downloadingPng ? 'Generating…' : '⬇ Download PNG'}
+                </button>
+                <button
+                  onClick={() => window.print()}
+                  className="px-4 py-1.5 rounded-lg text-sm text-white font-medium"
+                  style={{ background: GREEN }}
+                >
+                  🖨 Download PDF
+                </button>
+              </>
+            ) : (
+              <button
+                onClick={() => window.print()}
+                className="px-4 py-1.5 rounded-lg text-sm text-white font-medium"
+                style={{ background: GREEN }}
+              >
+                🖨 Print
+              </button>
+            )}
           </div>
         </div>
 
@@ -511,7 +640,7 @@ export default function PrintAssets({ type, event, eventPlayers = [], onClose })
                   position: 'absolute', top: -24, left: 0,
                   fontSize: 11, color: '#aaa', letterSpacing: '0.05em', textTransform: 'uppercase',
                 }}>
-                  {type === 'tee_sheet' ? 'Tee Sheet' : `${type === 'cards' ? 'Card' : 'Sign'} ${i + 1} of ${printNodes.length}`}
+                  {type === 'tee_sheet' ? 'Tee Sheet' : `Page ${i + 1} of ${printNodes.length}`}
                 </div>
                 {/* Scaled card */}
                 <div style={{
@@ -535,6 +664,16 @@ export default function PrintAssets({ type, event, eventPlayers = [], onClose })
       {createPortal(
         <div id="print-assets-root" style={{ display: 'none' }}>
           {printNodes}
+        </div>,
+        document.body
+      )}
+
+      {/* Off-screen render for Tee Sheet PNG capture — sized to actual content, not a forced full page */}
+      {type === 'tee_sheet' && createPortal(
+        <div style={{ position: 'fixed', top: '-99999px', left: '-99999px', pointerEvents: 'none', zIndex: -1 }}>
+          <div ref={pngRef}>
+            <TeeSheetPage forPng event={event} eventPlayers={eventPlayers} />
+          </div>
         </div>,
         document.body
       )}
