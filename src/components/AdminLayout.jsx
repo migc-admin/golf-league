@@ -26,8 +26,8 @@ const EVENT_TABS = [
   { key: 'Overview',       label: 'Overview',       icon: GridIcon,      sub: [
     { label: 'Event Details',    anchor: 'event-details'  },
     { label: 'Participants',     anchor: 'players-summary' },
-    { label: 'Cover Photo',      anchor: 'cover-photo'    },
     { label: 'Public Event Page',anchor: 'public-event'   },
+    { label: 'Cover Photo',      anchor: 'cover-photo'    },
     { label: 'Photos',           anchor: 'event-photos'   },
   ]},
   { key: 'Players',        label: 'Players',         icon: UsersIcon,     sub: [
