@@ -25,7 +25,7 @@ function visibleTabs(event, hasTGL = false) {
   const formats  = event.formats ?? (event.format ? [event.format] : ['net_stroke'])
   const sideOpts = event.side_game_options ?? []
   return ALL_TABS.filter(tab => {
-    if (tab === 'Payouts')       return true
+    if (tab === 'Payouts')       return event.status === 'complete'
     if (tab === '18-Hole')       return formats.includes('net_stroke')
     if (tab === 'Front 9')       return formats.includes('net_stroke_front9')
     if (tab === 'Back 9')        return formats.includes('net_stroke_back9')

@@ -1357,7 +1357,10 @@ function TabFlights({ event, eventPlayers, course, allPlayers, onUpdated }) {
   const available = allPlayers.filter(p => !rostered.has(p.id))
 
   async function overrideFlight(epId, newFlight) {
-    const { error } = await supabase.from('event_players').update({ flight: newFlight || null }).eq('id', epId)
+    const patch = newFlight === 'guest'
+      ? { is_guest: true,  flight: null }
+      : { is_guest: false, flight: newFlight || null }
+    const { error } = await supabase.from('event_players').update(patch).eq('id', epId)
     if (error) toast.error(error.message)
     else onUpdated()
   }
@@ -1450,14 +1453,24 @@ function TabFlights({ event, eventPlayers, course, allPlayers, onUpdated }) {
           )}
           {useFlights && (
             <select
-              value={ep.flight ?? ''}
+              value={ep.is_guest ? 'guest' : (ep.flight ?? '')}
               onChange={e => overrideFlight(ep.id, e.target.value)}
-              className="input py-1 text-xs w-24"
+              className="input py-1 text-xs w-28"
             >
               <option value="">—</option>
               <option value="A">Flight A</option>
               <option value="B">Flight B</option>
+              <option value="guest">Guest Player</option>
             </select>
+          )}
+          {!useFlights && (
+            <button
+              type="button"
+              onClick={() => overrideFlight(ep.id, ep.is_guest ? '' : 'guest')}
+              className={`text-xs shrink-0 px-2 py-1 rounded-full font-semibold border ${ep.is_guest ? 'bg-purple-100 text-purple-700 border-purple-300' : 'bg-gray-100 text-gray-500 border-gray-200'}`}
+            >
+              Guest
+            </button>
           )}
           <button
             onClick={() => removePlayer(ep.id)}
@@ -1561,6 +1574,7 @@ function TabFlights({ event, eventPlayers, course, allPlayers, onUpdated }) {
                     <option value="">Assign flight…</option>
                     <option value="A">Flight A</option>
                     <option value="B">Flight B</option>
+                    <option value="guest">Guest Player</option>
                   </select>
                   <button onClick={() => setEditingEp(ep)} className="text-xs px-2 py-1 rounded bg-gray-100 hover:bg-fairway-100 text-gray-600 hover:text-fairway-800 font-medium">Edit HI</button>
                   <button onClick={() => removePlayer(ep.id)} className="text-red-400 hover:text-red-600 text-xs">✕</button>
@@ -1573,21 +1587,34 @@ function TabFlights({ event, eventPlayers, course, allPlayers, onUpdated }) {
 
       {/* Flight-based roster — only when flights on */}
       {useFlights ? (
-        ['A', 'B'].map(flight => {
-          const list = flight === 'A' ? flightA : flightB
-          if (list.length === 0 && eventPlayers.length > 0) return null
-          return (
-            <Card key={flight} className="overflow-hidden p-0">
-              <div className="px-5 py-3 border-b border-gray-100 flex items-center gap-2 bg-gray-50">
-                <FlightBadge flight={flight} />
-                <span className="text-sm font-semibold text-gray-700">{list.length} players</span>
+        <>
+          {['A', 'B'].map(flight => {
+            const list = flight === 'A' ? flightA : flightB
+            if (list.length === 0 && eventPlayers.length > 0) return null
+            return (
+              <Card key={flight} className="overflow-hidden p-0">
+                <div className="px-5 py-3 border-b border-gray-100 flex items-center gap-2 bg-gray-50">
+                  <FlightBadge flight={flight} />
+                  <span className="text-sm font-semibold text-gray-700">{list.length} players</span>
+                </div>
+                <div className="divide-y divide-gray-100">
+                  {list.map(ep => renderPlayerRow(ep))}
+                </div>
+              </Card>
+            )
+          })}
+          {guests.length > 0 && (
+            <Card className="overflow-hidden p-0">
+              <div className="px-5 py-3 border-b border-gray-100 flex items-center gap-2 bg-purple-50">
+                <span className="bg-purple-100 text-purple-700 font-semibold px-2 py-0.5 rounded-full text-xs">Guests</span>
+                <span className="text-sm font-semibold text-gray-700">{guests.length} player{guests.length !== 1 ? 's' : ''} — playing only, excluded from bets/payouts</span>
               </div>
               <div className="divide-y divide-gray-100">
-                {list.map(ep => renderPlayerRow(ep))}
+                {guests.map(ep => renderPlayerRow(ep))}
               </div>
             </Card>
-          )
-        })
+          )}
+        </>
       ) : (
         /* No flights — single flat roster */
         eventPlayers.length > 0 && (
