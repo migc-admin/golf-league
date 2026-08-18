@@ -94,7 +94,7 @@ export default function Standings() {
 
         try {
           const leaderboards = computeLeaderboards(nonGuest, scores, course)
-          const skinsResults = computeAllSkins(nonGuest, scores, course.stroke_index)
+          const skinsResults = computeAllSkins(nonGuest, scores, course)
           const { byPlayer } = computePayouts(ev, nonGuest.length, leaderboards, sideGames, skinsResults, flightCounts)
 
           for (const { playerId, items } of byPlayer) {

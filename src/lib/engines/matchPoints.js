@@ -20,7 +20,7 @@
  *   Match ends when lead > holes remaining (e.g. 3&2, 1 UP, All Square)
  */
 
-import { getStrokesOnHole } from './scoring'
+import { getStrokesOnHole, getStrokeIndexForTee } from './scoring'
 
 /**
  * Format a USGA match play status string.
@@ -80,11 +80,14 @@ function buildPairings(groupPlayers) {
  * @param {Object}   playerA
  * @param {Object}   playerB
  * @param {Array}    allScores
- * @param {number[]} strokeIndexes
- * @param {number[]} parPerHole
+ * @param {Object}   course
  * @param {number}   [baselineCH]  — optional external baseline (for team context); defaults to min of the two
  */
-function computePairingResult(playerA, playerB, allScores, strokeIndexes, parPerHole, baselineCH = null) {
+function computePairingResult(playerA, playerB, allScores, course, baselineCH = null) {
+  const { par_per_hole: parPerHole } = course
+  const siA = getStrokeIndexForTee(course, playerA.tee)
+  const siB = getStrokeIndexForTee(course, playerB.tee)
+
   const scoresA = Object.fromEntries(
     allScores.filter(s => s.player_id === playerA.player_id).map(s => [s.hole_number, s])
   )
@@ -118,11 +121,10 @@ function computePairingResult(playerA, playerB, allScores, strokeIndexes, parPer
       continue
     }
 
-    const si  = strokeIndexes[h - 1]
     const par = parPerHole[h - 1]
 
-    const strokesA = getStrokesOnHole(relA, si)
-    const strokesB = getStrokesOnHole(relB, si)
+    const strokesA = getStrokesOnHole(relA, siA[h - 1])
+    const strokesB = getStrokesOnHole(relB, siB[h - 1])
     const netA = sA.gross_score - strokesA
     const netB = sB.gross_score - strokesB
 
@@ -171,8 +173,6 @@ function computePairingResult(playerA, playerB, allScores, strokeIndexes, parPer
  * Compute individual match play results for an entire event.
  */
 export function computeMatchPoints(eventPlayers, allScores, course, storedPairings = []) {
-  const { stroke_index: strokeIndexes, par_per_hole: parPerHole } = course
-
   const pairings = []
   const playerPoints = {}
 
@@ -182,7 +182,7 @@ export function computeMatchPoints(eventPlayers, allScores, course, storedPairin
       const playerA = playerMap[pairing.player_a_id]
       const playerB = playerMap[pairing.player_b_id]
       if (!playerA || !playerB) continue
-      const result = computePairingResult(playerA, playerB, allScores, strokeIndexes, parPerHole)
+      const result = computePairingResult(playerA, playerB, allScores, course)
       result.groupNumber = pairing.match_number
       pairings.push(result)
       playerPoints[playerA.player_id] = (playerPoints[playerA.player_id] ?? 0) + result.pointsA
@@ -198,7 +198,7 @@ export function computeMatchPoints(eventPlayers, allScores, course, storedPairin
     for (const [groupNum, members] of Object.entries(groups)) {
       const pairs = buildPairings(members)
       for (const { playerA, playerB } of pairs) {
-        const result = computePairingResult(playerA, playerB, allScores, strokeIndexes, parPerHole)
+        const result = computePairingResult(playerA, playerB, allScores, course)
         result.groupNumber = parseInt(groupNum, 10)
         pairings.push(result)
         playerPoints[playerA.player_id] = (playerPoints[playerA.player_id] ?? 0) + result.pointsA
@@ -245,7 +245,7 @@ export function computeMatchPoints(eventPlayers, allScores, course, storedPairin
  * @returns {{ groupMatches, totalA, totalB, teamAName, teamBName }}
  */
 export function computeTeamMatchPoints(eventPlayers, allScores, course, teamMatchConfig = null) {
-  const { stroke_index: strokeIndexes, par_per_hole: parPerHole } = course
+  const { par_per_hole: parPerHole } = course
   const sides    = teamMatchConfig?.sides    ?? {}
   const teamAName = teamMatchConfig?.teamA   || 'Team A'
   const teamBName = teamMatchConfig?.teamB   || 'Team B'
@@ -299,7 +299,6 @@ export function computeTeamMatchPoints(eventPlayers, allScores, course, teamMatc
         continue
       }
 
-      const si  = strokeIndexes[h - 1]
       const par = parPerHole[h - 1]
 
       // Compute net for each player; track who had the best ball
@@ -307,6 +306,7 @@ export function computeTeamMatchPoints(eventPlayers, allScores, course, teamMatc
       for (const ep of teamA) {
         const s = scoreMap[ep.player_id]?.[h]
         if (!s) continue
+        const si = getStrokeIndexForTee(course, ep.tee)[h - 1]
         const strokes = getStrokesOnHole(relCH[ep.player_id], si)
         const net = s.gross_score - strokes
         if (net < bestNetA) { bestNetA = net; contributorA = ep }
@@ -316,6 +316,7 @@ export function computeTeamMatchPoints(eventPlayers, allScores, course, teamMatc
       for (const ep of teamB) {
         const s = scoreMap[ep.player_id]?.[h]
         if (!s) continue
+        const si = getStrokeIndexForTee(course, ep.tee)[h - 1]
         const strokes = getStrokesOnHole(relCH[ep.player_id], si)
         const net = s.gross_score - strokes
         if (net < bestNetB) { bestNetB = net; contributorB = ep }

@@ -33,7 +33,7 @@ import { useParams, Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../hooks/useAuth'
 import { useOfflineQueue } from '../hooks/useOfflineQueue'
-import { getStrokesOnHole } from '../lib/engines/scoring'
+import { getStrokesOnHole, getStrokeIndexForTee } from '../lib/engines/scoring'
 import toast from 'react-hot-toast'
 
 export default function Scorecard() {
@@ -602,10 +602,10 @@ export default function Scorecard() {
               ep={ep}
               hole={hole}
               par={par}
-              si={si}
+              si={getStrokeIndexForTee(course, ep.tee)[hole - 1]}
               score={getScore(ep.player_id, hole)}
               allHoleScores={scores[ep.player_id] ?? {}}
-              courseStrokeIndexes={strokeIndex}
+              courseStrokeIndexes={getStrokeIndexForTee(course, ep.tee)}
               trackPutts={trackPutts}
               onChange={(field, val) => updateScore(ep.player_id, hole, field, val)}
               onGrossDone={() => {
@@ -932,12 +932,12 @@ function PlayerScoreCard({ ep, hole, par, si, score, allHoleScores, courseStroke
 // ─── Traditional Scorecard View (vertical: holes=rows, players=cols) ──
 function TraditionalScorecard({ event, course, groupPlayers, scores, isComplete, canEdit, onEdit, homeLink, onSignOut, trackPutts, orgSlug }) {
   const pars  = course.par_per_hole ?? Array(18).fill(4)
-  const sis   = course.stroke_index ?? Array(18).fill(0)
 
   // Build per-player totals
   const playerData = groupPlayers.map(ep => {
     const ch = ep.course_handicap ?? 0
     const name = ep.player?.first_name ?? ''
+    const playerSis = getStrokeIndexForTee(course, ep.tee)
     let frontGross = 0, backGross = 0, frontNet = 0, backNet = 0
     let frontPutts = 0, backPutts = 0, hasPutts = false
 
@@ -947,7 +947,7 @@ function TraditionalScorecard({ event, course, groupPlayers, scores, isComplete,
       const g = sc ? parseInt(sc.gross, 10) : null
       const putts = sc && sc.putts !== '' && sc.putts != null ? parseInt(sc.putts, 10) : null
       if (putts != null) hasPutts = true
-      const strokes = getStrokesOnHole(ch, sis[i])
+      const strokes = getStrokesOnHole(ch, playerSis[i])
       const net = g != null ? g - strokes : null
       const p = pars[i]
       if (g != null) {

@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef } from 'react'
+import { useEffect, useState, useRef, Fragment } from 'react'
 import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../hooks/useAuth'
 import toast from 'react-hot-toast'
@@ -51,12 +51,16 @@ function mapApiCourse(api) {
       }
     })
 
-    holes = (api.scorecard ?? []).map(h => ({
-      hole:         h.Hole,
-      par:          h.Par,
-      stroke_index: h.Handicap ?? DEFAULT_SI[h.Hole - 1],
-      yardages:     teeKeys.map(key => h.tees[key]?.yards ?? 350),
-    }))
+    holes = (api.scorecard ?? []).map(h => {
+      const si = h.Handicap ?? DEFAULT_SI[h.Hole - 1]
+      return {
+        hole:         h.Hole,
+        par:          h.Par,
+        stroke_index: si,
+        tee_stroke_index: teeKeys.map(() => si),
+        yardages:     teeKeys.map(key => h.tees[key]?.yards ?? 350),
+      }
+    })
   } else if (teeBoxes.length > 0) {
     // No per-hole tee data — use teeBoxes only, holes get default yardage
     tees = teeBoxes.map(box => ({
@@ -65,21 +69,29 @@ function mapApiCourse(api) {
       slope:  box.slope  ?? 113,
       rating: box.handicap ?? 72.0,
     }))
-    holes = (api.scorecard ?? []).map(h => ({
-      hole:         h.Hole,
-      par:          h.Par,
-      stroke_index: h.Handicap ?? DEFAULT_SI[h.Hole - 1],
-      yardages:     tees.map(() => 350),
-    }))
+    holes = (api.scorecard ?? []).map(h => {
+      const si = h.Handicap ?? DEFAULT_SI[h.Hole - 1]
+      return {
+        hole:         h.Hole,
+        par:          h.Par,
+        stroke_index: si,
+        tee_stroke_index: tees.map(() => si),
+        yardages:     tees.map(() => 350),
+      }
+    })
   } else {
     // Fallback — default tees
     tees = DEFAULT_TEES.map(t => ({ ...t }))
-    holes = (api.scorecard ?? []).map(h => ({
-      hole:         h.Hole,
-      par:          h.Par,
-      stroke_index: h.Handicap ?? DEFAULT_SI[h.Hole - 1],
-      yardages:     [350, 330, 310],
-    }))
+    holes = (api.scorecard ?? []).map(h => {
+      const si = h.Handicap ?? DEFAULT_SI[h.Hole - 1]
+      return {
+        hole:         h.Hole,
+        par:          h.Par,
+        stroke_index: si,
+        tee_stroke_index: [si, si, si],
+        yardages:     [350, 330, 310],
+      }
+    })
   }
 
   // Determine target hole count: treat ≤11 source holes as a 9-hole course
@@ -87,7 +99,8 @@ function mapApiCourse(api) {
   const si = targetHoles === 9 ? DEFAULT_SI_9 : DEFAULT_SI
   while (holes.length < targetHoles) {
     const i = holes.length
-    holes.push({ hole: i + 1, par: 4, stroke_index: si[i] ?? i + 1, yardages: tees.map(() => 350) })
+    const filler = si[i] ?? i + 1
+    holes.push({ hole: i + 1, par: 4, stroke_index: filler, tee_stroke_index: tees.map(() => filler), yardages: tees.map(() => 350) })
   }
 
   return { name: api.name, tees, holes, numHoles: targetHoles }
@@ -110,8 +123,15 @@ function emptyHoles(numTees = 3, numHoles = 18) {
     hole:         i + 1,
     par:          4,
     stroke_index: si[i],
+    tee_stroke_index: Array(numTees).fill(si[i]),
     yardages:     Array(numTees).fill(380),
   }))
+}
+
+function isValidStrokeIndexSet(values, n) {
+  if (values.some(v => Number.isNaN(v))) return false
+  const set = new Set(values)
+  return set.size === n && Math.min(...values) === 1 && Math.max(...values) === n
 }
 
 export default function Courses() {
@@ -233,6 +253,7 @@ function CourseModal({ open, onClose, editing, orgId, orgSlug, onSaved }) {
   const [holes,     setHoles]     = useState(() => emptyHoles(3, 18))
   const [numHoles,  setNumHoles]  = useState(18)
   const [isRated,   setIsRated]   = useState(true)
+  const [perTeeSI,  setPerTeeSI]  = useState(false)
   const [photoUrl,  setPhotoUrl]  = useState('')
   const [saving,    setSaving]    = useState(false)
   const [activeTeeIdx, setActiveTeeIdx] = useState(0)
@@ -279,6 +300,7 @@ function CourseModal({ open, onClose, editing, orgId, orgSlug, onSaved }) {
     setTees(mapped.tees)
     setHoles(mapped.holes)
     setNumHoles(mapped.numHoles ?? 18)
+    setPerTeeSI(false)
     setActiveTeeIdx(0)
     setSearchQuery('')
     setShowResults(false)
@@ -302,12 +324,15 @@ function CourseModal({ open, onClose, editing, orgId, orgSlug, onSaved }) {
           const n = data.par_per_hole?.length ?? 18
           setNumHoles(n)
           setIsRated(data.is_rated ?? true)
+          const perTee = data.per_tee_stroke_index ?? false
+          setPerTeeSI(perTee)
 
           if (teesData.length > 0) {
             holesData = Array.from({ length: n }, (_, i) => ({
               hole:         i + 1,
               par:          data.par_per_hole[i],
               stroke_index: data.stroke_index[i],
+              tee_stroke_index: teesData.map(t => t.stroke_index?.[i] ?? data.stroke_index[i]),
               yardages:     teesData.map(t => t.yardage?.[i] ?? 380),
             }))
           } else {
@@ -322,6 +347,7 @@ function CourseModal({ open, onClose, editing, orgId, orgSlug, onSaved }) {
               hole:         i + 1,
               par:          data.par_per_hole[i],
               stroke_index: data.stroke_index[i],
+              tee_stroke_index: [data.stroke_index[i]],
               yardages:     [data.yardage?.[i] ?? 380],
             }))
           }
@@ -336,6 +362,7 @@ function CourseModal({ open, onClose, editing, orgId, orgSlug, onSaved }) {
       setPhotoUrl('')
       setNumHoles(18)
       setIsRated(true)
+      setPerTeeSI(false)
       setTees(DEFAULT_TEES.map(t => ({ ...t })))
       setHoles(emptyHoles(3, 18))
       setActiveTeeIdx(0)
@@ -364,6 +391,16 @@ function CourseModal({ open, onClose, editing, orgId, orgSlug, onSaved }) {
     })
   }
 
+  function updateTeeStrokeIndex(holeIdx, teeIdx, value) {
+    setHoles(prev => {
+      const next = [...prev]
+      const tsi = [...(next[holeIdx].tee_stroke_index ?? [])]
+      tsi[teeIdx] = parseInt(value, 10) || 0
+      next[holeIdx] = { ...next[holeIdx], tee_stroke_index: tsi }
+      return next
+    })
+  }
+
   function updateTee(i, field, value) {
     setTees(prev => {
       const next = [...prev]
@@ -378,6 +415,7 @@ function CourseModal({ open, onClose, editing, orgId, orgSlug, onSaved }) {
     setHoles(prev => prev.map(h => ({
       ...h,
       yardages: [...h.yardages, 350],
+      tee_stroke_index: [...(h.tee_stroke_index ?? []), h.stroke_index],
     })))
     setActiveTeeIdx(tees.length)
   }
@@ -388,6 +426,7 @@ function CourseModal({ open, onClose, editing, orgId, orgSlug, onSaved }) {
     setHoles(prev => prev.map(h => ({
       ...h,
       yardages: h.yardages.filter((_, idx) => idx !== i),
+      tee_stroke_index: (h.tee_stroke_index ?? []).filter((_, idx) => idx !== i),
     })))
     if (activeTeeIdx >= i && activeTeeIdx > 0) setActiveTeeIdx(activeTeeIdx - 1)
   }
@@ -405,14 +444,27 @@ function CourseModal({ open, onClose, editing, orgId, orgSlug, onSaved }) {
     }
 
     const totalPar = holes.reduce((a, h) => a + parseInt(h.par, 10), 0)
+    const usePerTeeSI = isRated && perTeeSI
 
-    // Build tees array with yardages
+    if (usePerTeeSI) {
+      for (const [tIdx, t] of tees.entries()) {
+        const values = holes.map(h => parseInt(h.tee_stroke_index?.[tIdx], 10))
+        if (!isValidStrokeIndexSet(values, numHoles)) {
+          toast.error(`${t.name || `Tee ${tIdx + 1}`}: Stroke Index must be unique values 1–${numHoles}`)
+          setSaving(false)
+          return
+        }
+      }
+    }
+
+    // Build tees array with yardages (+ per-tee S.I. when enabled)
     const teesWithYardage = tees.map((t, tIdx) => ({
       name:    t.name,
       color:   t.color,
       slope:   parseInt(t.slope, 10),
       rating:  parseFloat(t.rating),
       yardage: holes.map(h => h.yardages[tIdx] ?? 0),
+      ...(usePerTeeSI ? { stroke_index: holes.map(h => parseInt(h.tee_stroke_index[tIdx], 10)) } : {}),
     }))
 
     // Primary tee = first tee (for backward compat)
@@ -420,10 +472,12 @@ function CourseModal({ open, onClose, editing, orgId, orgSlug, onSaved }) {
 
     // For unrated courses, use neutral defaults for slope/rating/SI
     const si = numHoles === 9 ? DEFAULT_SI_9 : DEFAULT_SI
-    const teesForSave = isRated ? teesWithYardage : teesWithYardage.map(t => ({ ...t, slope: 113, rating: 72.0 }))
-    const strokeIndexForSave = isRated
-      ? holes.map(h => parseInt(h.stroke_index, 10))
-      : si.slice(0, numHoles)
+    const teesForSave = isRated ? teesWithYardage : teesWithYardage.map(t => ({ ...t, slope: 113, rating: 72.0, stroke_index: undefined }))
+    const strokeIndexForSave = !isRated
+      ? si.slice(0, numHoles)
+      : usePerTeeSI
+        ? primary.stroke_index
+        : holes.map(h => parseInt(h.stroke_index, 10))
 
     const payload = {
       name:         name.trim(),
@@ -437,6 +491,7 @@ function CourseModal({ open, onClose, editing, orgId, orgSlug, onSaved }) {
       stroke_index: strokeIndexForSave,
       tees:         teesForSave,
       is_rated:     isRated,
+      per_tee_stroke_index: usePerTeeSI,
       photo_url:    photoUrl || null,
     }
 
@@ -552,7 +607,11 @@ function CourseModal({ open, onClose, editing, orgId, orgSlug, onSaved }) {
                     const extended = [...prev]
                     while (extended.length < 18) {
                       const i = extended.length
-                      extended.push({ hole: i + 1, par: 4, stroke_index: DEFAULT_SI[i], yardages: prev[0].yardages.map(() => 380) })
+                      extended.push({
+                        hole: i + 1, par: 4, stroke_index: DEFAULT_SI[i],
+                        tee_stroke_index: prev[0].yardages.map(() => DEFAULT_SI[i]),
+                        yardages: prev[0].yardages.map(() => 380),
+                      })
                     }
                     return extended
                   })
@@ -584,6 +643,33 @@ function CourseModal({ open, onClose, editing, orgId, orgSlug, onSaved }) {
             ))}
           </div>
         </div>
+
+        {/* Per-tee stroke index toggle */}
+        {isRated && (
+          <div className="bg-gray-50 rounded-xl px-4 py-3 flex items-center justify-between">
+            <div>
+              <div className="text-sm font-medium text-gray-800">Different Stroke Index per Tee?</div>
+              <div className="text-xs text-gray-400 mt-0.5">Enable if this course rates hole handicap allocation differently per tee.</div>
+            </div>
+            <div className="flex rounded-lg border border-gray-300 overflow-hidden text-sm font-semibold">
+              {[false, true].map(v => (
+                <button
+                  key={String(v)}
+                  type="button"
+                  onClick={() => setPerTeeSI(v)}
+                  className={`px-4 py-1.5 transition-colors ${perTeeSI === v ? 'bg-fairway-700 text-white' : 'bg-white text-gray-600 hover:bg-gray-100'}`}
+                >
+                  {v ? 'Yes' : 'No'}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+        {isRated && perTeeSI && (
+          <p className="text-xs text-amber-700 -mt-3">
+            Each tee's Stroke Index column must independently contain unique values 1–{numHoles}.
+          </p>
+        )}
 
         {/* Tee Sets */}
         <div>
@@ -656,12 +742,20 @@ function CourseModal({ open, onClose, editing, orgId, orgSlug, onSaved }) {
               <tr className="text-left text-xs font-semibold text-gray-500 border-b">
                 <th className="py-2 pr-2 w-8">#</th>
                 <th className="py-2 px-2 w-16">Par</th>
-                {isRated && <th className="py-2 px-2 w-16">S.I.</th>}
+                {isRated && !perTeeSI && <th className="py-2 px-2 w-16">S.I.</th>}
                 {tees.map((t, i) => (
-                  <th key={i} className={`py-2 px-2 text-center ${activeTeeIdx === i ? 'text-fairway-700 font-bold' : ''}`}>
-                    {t.name} Yds
-                    <div className={`text-xs font-normal mt-0.5 ${activeTeeIdx === i ? 'text-fairway-500' : 'text-gray-400'}`}>{t.color}</div>
-                  </th>
+                  <Fragment key={i}>
+                    {isRated && perTeeSI && (
+                      <th className="py-2 px-2 w-14 text-center">
+                        S.I.
+                        <div className="text-xs font-normal mt-0.5 text-gray-400">{t.name}</div>
+                      </th>
+                    )}
+                    <th className={`py-2 px-2 text-center ${activeTeeIdx === i ? 'text-fairway-700 font-bold' : ''}`}>
+                      {t.name} Yds
+                      <div className={`text-xs font-normal mt-0.5 ${activeTeeIdx === i ? 'text-fairway-500' : 'text-gray-400'}`}>{t.color}</div>
+                    </th>
+                  </Fragment>
                 ))}
               </tr>
             </thead>
@@ -676,17 +770,25 @@ function CourseModal({ open, onClose, editing, orgId, orgSlug, onSaved }) {
                       <option value={5}>5</option>
                     </select>
                   </td>
-                  {isRated && (
+                  {isRated && !perTeeSI && (
                     <td className="py-1.5 px-2">
                       <input type="number" value={h.stroke_index} onChange={e => updateHole(i, 'stroke_index', e.target.value)}
-                        className="input py-1 text-xs w-14" min="1" max="18" />
+                        className="input py-1 text-xs w-14" min="1" max={numHoles} />
                     </td>
                   )}
                   {h.yardages.map((yds, tIdx) => (
-                    <td key={tIdx} className={`py-1.5 px-2 ${activeTeeIdx === tIdx ? 'bg-fairway-50' : ''}`}>
-                      <input type="number" value={yds} onChange={e => updateYardage(i, tIdx, e.target.value)}
-                        className="input py-1 text-xs w-20" min="50" max="700" />
-                    </td>
+                    <Fragment key={tIdx}>
+                      {isRated && perTeeSI && (
+                        <td className="py-1.5 px-2">
+                          <input type="number" value={h.tee_stroke_index?.[tIdx] ?? ''} onChange={e => updateTeeStrokeIndex(i, tIdx, e.target.value)}
+                            className="input py-1 text-xs w-14" min="1" max={numHoles} />
+                        </td>
+                      )}
+                      <td className={`py-1.5 px-2 ${activeTeeIdx === tIdx ? 'bg-fairway-50' : ''}`}>
+                        <input type="number" value={yds} onChange={e => updateYardage(i, tIdx, e.target.value)}
+                          className="input py-1 text-xs w-20" min="50" max="700" />
+                      </td>
+                    </Fragment>
                   ))}
                 </tr>
               ))}

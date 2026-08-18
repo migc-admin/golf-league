@@ -12,7 +12,7 @@
  *  7. Flight A and Flight B are independent.
  */
 
-import { getStrokesOnHole } from './scoring.js'
+import { getStrokesOnHole, getStrokeIndexForTee } from './scoring.js'
 
 /**
  * Compute skins for one flight.
@@ -20,11 +20,11 @@ import { getStrokesOnHole } from './scoring.js'
  * @param {Array}  eventPlayers   — event_players rows filtered to this flight,
  *                                  each with .course_handicap and .player_id
  * @param {Array}  allScores      — all scores rows for the event
- * @param {number[]} strokeIndexes — 18-element stroke-index array (index 0 = hole 1)
+ * @param {Object} course         — { stroke_index, per_tee_stroke_index, tees }
  * @param {string} flight         — 'A' | 'B'
  * @returns {{ holes, playerSkins, carryoverToNext, carryoverAmount }}
  */
-export function computeSkinsForFlight(eventPlayers, allScores, strokeIndexes, flight) {
+export function computeSkinsForFlight(eventPlayers, allScores, course, flight) {
   const flightPlayers = eventPlayers.filter(ep => ep.flight === flight)
   if (flightPlayers.length === 0) {
     return { holes: [], playerSkins: {}, carryoverToNext: false, carryoverAmount: 0 }
@@ -37,6 +37,7 @@ export function computeSkinsForFlight(eventPlayers, allScores, strokeIndexes, fl
     for (const ep of flightPlayers) {
       const s = allScores.find(x => x.player_id === ep.player_id && x.hole_number === h)
       if (s) {
+        const strokeIndexes = getStrokeIndexForTee(course, ep.tee)
         const strokes = getStrokesOnHole(ep.course_handicap ?? 0, strokeIndexes[h - 1])
         netByHole[h][ep.player_id] = s.gross_score - strokes
       }
@@ -139,10 +140,10 @@ export function computeSkinsForFlight(eventPlayers, allScores, strokeIndexes, fl
 /**
  * Compute skins for both flights.
  */
-export function computeAllSkins(eventPlayers, allScores, strokeIndexes) {
+export function computeAllSkins(eventPlayers, allScores, course) {
   return {
-    A: computeSkinsForFlight(eventPlayers, allScores, strokeIndexes, 'A'),
-    B: computeSkinsForFlight(eventPlayers, allScores, strokeIndexes, 'B'),
+    A: computeSkinsForFlight(eventPlayers, allScores, course, 'A'),
+    B: computeSkinsForFlight(eventPlayers, allScores, course, 'B'),
   }
 }
 

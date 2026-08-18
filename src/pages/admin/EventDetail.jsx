@@ -12,7 +12,7 @@ import { useParams, Link, useSearchParams } from 'react-router-dom'
 import { supabase } from '../../lib/supabase'
 import toast from 'react-hot-toast'
 import { computePayouts, DEFAULT_PAYOUT_CONFIG, getCategoryLabel, ctpLabel, activePayoutKeys, defaultForKey } from '../../lib/engines/payouts'
-import { computeLeaderboards } from '../../lib/engines/scoring'
+import { computeLeaderboards, getStrokeIndexForTee } from '../../lib/engines/scoring'
 import { computeAllSkins } from '../../lib/engines/skins'
 import { computeTGLEventResults, assignTGLPoints } from '../../lib/engines/tgl'
 import Card, { CardHeader } from '../../components/ui/Card'
@@ -369,10 +369,11 @@ async function exportScoresCSV(event, eventPlayers, allScores, course, sideGames
   const playerData = eventPlayers.map(ep => {
     const pScores = scoreMap[ep.player_id] ?? {}
     const ch = parseInt(ep.course_handicap) || 0
+    const playerSis = getStrokeIndexForTee(course, ep.tee)
     const holes = Array.from({ length: 18 }, (_, i) => {
       const gross  = parseInt(pScores[i + 1]?.gross_score) || null
       const putts  = parseInt(pScores[i + 1]?.putts) || 0
-      const si     = sis[i] ?? (i + 1)
+      const si     = playerSis[i] ?? (i + 1)
       const strokes = Math.floor(ch / 18) + (si <= (ch % 18) ? 1 : 0)
       const net    = gross != null ? gross - strokes : null
       return { gross, net, putts }
@@ -412,7 +413,7 @@ async function exportScoresCSV(event, eventPlayers, allScores, course, sideGames
   const flightCounts = {}
   nonGuestEPs.forEach(ep => { if (ep.flight) flightCounts[ep.flight] = (flightCounts[ep.flight] ?? 0) + 1 })
   const leaderboards  = computeLeaderboards(nonGuestEPs, allScores, course)
-  const skinsResults  = computeAllSkins(nonGuestEPs, allScores, sis)
+  const skinsResults  = computeAllSkins(nonGuestEPs, allScores, course)
   const { byCategory } = computePayouts(event, nonGuestEPs.length, leaderboards, sideGames, skinsResults, flightCounts)
 
   const playerMap = Object.fromEntries(eventPlayers.map(ep => [ep.player_id, ep.player]))
@@ -473,6 +474,7 @@ function exportHandicapCSV(event, eventPlayers, allScores, course) {
     const ch = parseInt(ep.course_handicap) || parseInt(ep.adjusted_handicap_index) || 0
     const scores = scoreMap[ep.player_id] ?? {}
     const pName = [ep.player?.first_name, ep.player?.last_name].filter(Boolean).join(' ')
+    const playerSis = getStrokeIndexForTee(course, ep.tee)
 
     const adjScores = []
     const cappedHoles = []
@@ -482,7 +484,7 @@ function exportHandicapCSV(event, eventPlayers, allScores, course) {
       if (gross === null) { adjScores.push(null); continue }
       const full = Math.floor(ch / 18)
       const rem  = ch % 18
-      const strokes = full + (sis[h] <= rem ? 1 : 0)
+      const strokes = full + (playerSis[h] <= rem ? 1 : 0)
       const cap = pars[h] + 2 + strokes
       const adj = Math.min(gross, cap)
       adjScores.push(adj)
@@ -937,7 +939,7 @@ function AdminScoreEditor({ event, eventPlayers, allScores, course, onClose, onS
                         </tr>
                         <tr style={{ background: '#f0f0ee', color: '#6c757d' }}>
                           <td className="px-2 py-1">S.I.</td>
-                          {holeGroup.map(h => <td key={h} className="px-2 py-1 text-center">{course.stroke_index[h-1]}</td>)}
+                          {holeGroup.map(h => <td key={h} className="px-2 py-1 text-center">{getStrokeIndexForTee(course, selectedEp?.tee)[h-1]}</td>)}
                           <td className="px-2 py-1" />
                         </tr>
                       </thead>
@@ -3152,7 +3154,7 @@ function TabPayoutSummary({ event, eventPlayers, allScores, sideGames, course })
   const flightCounts  = {}
   nonGuestEPs.forEach(ep => { if (ep.flight) flightCounts[ep.flight] = (flightCounts[ep.flight] ?? 0) + 1 })
   const leaderboards  = computeLeaderboards(nonGuestEPs, allScores, course)
-  const skinsResults  = computeAllSkins(nonGuestEPs, allScores, course.stroke_index)
+  const skinsResults  = computeAllSkins(nonGuestEPs, allScores, course)
   const { totalPot, byCategory, byPlayer, totalAllocated } = computePayouts(
     event, nonGuestEPs.length, leaderboards, sideGames, skinsResults, flightCounts
   )

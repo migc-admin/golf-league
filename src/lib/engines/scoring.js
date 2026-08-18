@@ -76,6 +76,25 @@ export function buildPlayerNetMap(scores, courseHandicap, strokeIndexes) {
 }
 
 /**
+ * Resolve the stroke-index array to use for a given tee name.
+ * Falls back to course.stroke_index when the course hasn't opted into
+ * per-tee stroke index, the tee can't be resolved, or the matched tee
+ * has no (or an invalid) stroke_index array.
+ *
+ * @param {Object} course   — { stroke_index, per_tee_stroke_index, tees }
+ * @param {string} [teeName]
+ * @returns {number[]}  index 0 = hole 1
+ */
+export function getStrokeIndexForTee(course, teeName) {
+  const fallback = course?.stroke_index ?? []
+  if (!course?.per_tee_stroke_index || !teeName) return fallback
+  const tee = (course.tees ?? []).find(t => t.name === teeName)
+  const si  = tee?.stroke_index
+  if (!Array.isArray(si) || si.length !== fallback.length) return fallback
+  return si
+}
+
+/**
  * Stableford points for a single net score vs par.
  * Eagle or better=4, Birdie=3, Par=2, Bogey=1, Double Bogey+=0
  * @param {number} netScore
@@ -101,11 +120,12 @@ export function stablefordPoints(netScore, par) {
  * @returns {{ A: Array, B: Array }}
  */
 export function computeStableford(eventPlayers, allScores, course) {
-  const { stroke_index: strokeIndexes, par_per_hole: parPerHole } = course
+  const { par_per_hole: parPerHole } = course
 
   const players = eventPlayers.filter(ep => !ep.is_guest).map(ep => {
     const playerScores = allScores.filter(s => s.player_id === ep.player_id)
     const ch = ep.course_handicap ?? 0
+    const strokeIndexes = getStrokeIndexForTee(course, ep.tee)
 
     let totalPoints = 0
     let holesPlayed = 0
@@ -151,7 +171,7 @@ export function computeStableford(eventPlayers, allScores, course) {
  * @returns {{ full, front9, back9, putts }}  each is an array sorted by score asc
  */
 export function computeLeaderboards(eventPlayers, allScores, course) {
-  const { stroke_index: strokeIndexes, par_per_hole: parPerHole } = course
+  const { par_per_hole: parPerHole } = course
 
   // Exclude guests from scoring
   const scoringPlayers = eventPlayers.filter(ep => !ep.is_guest)
@@ -159,6 +179,7 @@ export function computeLeaderboards(eventPlayers, allScores, course) {
   const players = scoringPlayers.map(ep => {
     const playerScores = allScores.filter(s => s.player_id === ep.player_id)
     const ch = ep.course_handicap ?? 0
+    const strokeIndexes = getStrokeIndexForTee(course, ep.tee)
     const netMap = buildPlayerNetMap(playerScores, ch, strokeIndexes)
 
     // Gross / net totals

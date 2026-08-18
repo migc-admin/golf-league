@@ -9,7 +9,7 @@ import { useParams, Link, useNavigate, useLocation, useSearchParams } from 'reac
 import { Helmet } from 'react-helmet-async'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../hooks/useAuth'
-import { computeLeaderboards, computeStableford } from '../lib/engines/scoring'
+import { computeLeaderboards, computeStableford, getStrokeIndexForTee } from '../lib/engines/scoring'
 import { computeAllSkins } from '../lib/engines/skins'
 import { computeMatchPoints, computeTeamMatchPoints } from '../lib/engines/matchPoints'
 import { computePayouts, CATEGORY_LABELS, ctpLabel } from '../lib/engines/payouts'
@@ -182,7 +182,7 @@ export default function Leaderboard() {
   )
 
   const leaderboards    = course ? computeLeaderboards(eventPlayers, allScores, course)              : null
-  const skinsResults    = course ? computeAllSkins(eventPlayers, allScores, course.stroke_index)     : null
+  const skinsResults    = course ? computeAllSkins(eventPlayers, allScores, course)                  : null
   const stablefordData  = course ? computeStableford(eventPlayers, allScores, course)                : null
   const matchData       = course ? computeMatchPoints(eventPlayers, allScores, course, matchPairings) : null
   const teamMatchData   = course ? computeTeamMatchPoints(eventPlayers, allScores, course, event?.team_match_config ?? null) : null
@@ -1218,7 +1218,8 @@ function PayoutsBoard({ event, eventPlayers, leaderboards, sideGames, skinsResul
 
 // ─── Player Scorecard Modal ───────────────────────────────────────
 function PlayerScorecardModal({ player, allScores, course, onClose }) {
-  const { par_per_hole: pars, stroke_index: sis } = course
+  const { par_per_hole: pars } = course
+  const sis = getStrokeIndexForTee(course, player.tee)
   const ch = player.course_handicap ?? 0
   const playerScores = allScores.filter(s => s.player_id === player.player_id)
   const scoreMap = Object.fromEntries(playerScores.map(s => [s.hole_number, { gross: s.gross_score, putts: s.putts ?? null }]))

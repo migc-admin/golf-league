@@ -8,7 +8,7 @@
 import { useRef, useState } from 'react'
 import { toPng } from 'html-to-image'
 import QRCode from 'qrcode'
-import { getStrokesOnHole, computeLeaderboards } from '../lib/engines/scoring'
+import { getStrokesOnHole, computeLeaderboards, getStrokeIndexForTee } from '../lib/engines/scoring'
 import { computeSkinsForFlight, computeAllSkins } from '../lib/engines/skins'
 import { computePayouts } from '../lib/engines/payouts'
 import { computeTGLEventResults, assignTGLPoints } from '../lib/engines/tgl'
@@ -322,7 +322,7 @@ function buildCard({ event, course, groupNum, players, code, qrDataUrl, ctpHoles
   card.appendChild(header)
 
   // ── Score table ──────────────────────────────────────────────────
-  card.appendChild(buildTable({ parPerHole, strokeIndex, teesToShow, players, longDriveHole, startingHole }))
+  card.appendChild(buildTable({ course, parPerHole, strokeIndex, teesToShow, players, longDriveHole, startingHole }))
 
   // ── Footer ───────────────────────────────────────────────────────
   const footer = el('div', {
@@ -445,7 +445,7 @@ function buildCard({ event, course, groupNum, players, code, qrDataUrl, ctpHoles
 }
 
 // ─── Score table ─────────────────────────────────────────────────
-function buildTable({ parPerHole, strokeIndex, teesToShow, players, longDriveHole, startingHole }) {
+function buildTable({ course, parPerHole, strokeIndex, teesToShow, players, longDriveHole, startingHole }) {
   const tbl = document.createElement('table')
   tbl.style.cssText = `
     width: 100%;
@@ -672,6 +672,7 @@ function buildTable({ parPerHole, strokeIndex, teesToShow, players, longDriveHol
     const lastName  = ep?.player?.last_name  ?? ''
     const flight    = ep?.flight ?? null
     const ch        = ep?.course_handicap ?? null
+    const playerSis = ep ? getStrokeIndexForTee(course, ep.tee) : strokeIndex
 
     let nameLabel
     if (ep) {
@@ -692,7 +693,7 @@ function buildTable({ parPerHole, strokeIndex, teesToShow, players, longDriveHol
 
     // H1-9 with stroke dots (+ long drive / starting hole highlight)
     for (let h = 1; h <= 9; h++) {
-      const strokes = (ep && ch !== null) ? getStrokesOnHole(ch, strokeIndex[h - 1]) : 0
+      const strokes = (ep && ch !== null) ? getStrokesOnHole(ch, playerSis[h - 1]) : 0
       const bg = longDriveHole === h
         ? 'rgba(255,235,59,0.18)'
         : startingHole === h
@@ -706,7 +707,7 @@ function buildTable({ parPerHole, strokeIndex, teesToShow, players, longDriveHol
     tr.appendChild(mkInitCell(initials))
     // H10-18 with stroke dots (+ long drive / starting hole highlight)
     for (let h = 10; h <= 18; h++) {
-      const strokes = (ep && ch !== null) ? getStrokesOnHole(ch, strokeIndex[h - 1]) : 0
+      const strokes = (ep && ch !== null) ? getStrokesOnHole(ch, playerSis[h - 1]) : 0
       const bg = longDriveHole === h
         ? 'rgba(255,235,59,0.18)'
         : startingHole === h
@@ -833,7 +834,7 @@ function buildSkinsGrid({ event, course, flightPlayers, allScores, flight, orgNa
   const backGroup  = Array.from({ length: 9 }, (_, i) => ({ hole: i + 10, si: sis[i + 9],  par: pars[i + 9] }))
 
   // ── Skins engine — identical to leaderboard ──────────────────────
-  const skinsResult = computeSkinsForFlight(flightPlayers, allScores, sis, flight)
+  const skinsResult = computeSkinsForFlight(flightPlayers, allScores, course, flight)
   const { holes: skinsHoles, playerSkins } = skinsResult
   const skinWinnerByHole = {}
   skinsHoles.forEach(r => { skinWinnerByHole[r.hole] = r.winner ?? null })
@@ -849,6 +850,7 @@ function buildSkinsGrid({ event, course, flightPlayers, allScores, flight, orgNa
   // ── Per-player data ──────────────────────────────────────────────
   const playerData = flightPlayers.map(ep => {
     const ch = ep.course_handicap ?? 0
+    const playerSis = getStrokeIndexForTee(course, ep.tee)
     const grossByHole = {}
     const netByHole   = {}
     let frontGross = 0, frontNet = 0, backGross = 0, backNet = 0
@@ -858,7 +860,7 @@ function buildSkinsGrid({ event, course, flightPlayers, allScores, flight, orgNa
       const s = allScores.find(x => x.player_id === ep.player_id && x.hole_number === h)
       if (s) {
         const gross   = s.gross_score
-        const strokes = getStrokesOnHole(ch, sis[h - 1])
+        const strokes = getStrokesOnHole(ch, playerSis[h - 1])
         const net     = gross - strokes
         grossByHole[h] = gross
         netByHole[h]   = net
@@ -1166,7 +1168,7 @@ function buildResultsCard({ event, eventPlayers, allScores, course, sideGames, o
   const leaderboards = computeLeaderboards(nonGuests, allScores, course)
 
   // Skins
-  const skinsResults = computeAllSkins(nonGuests, allScores, course.stroke_index)
+  const skinsResults = computeAllSkins(nonGuests, allScores, course)
 
   const eventDate = event.event_date
     ? new Date(event.event_date + 'T00:00:00').toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' })
