@@ -7,6 +7,7 @@ import { TIER_LABELS } from '../lib/features'
 
 const GREEN = '#1B4332'
 const GOLD  = '#D4AF37'
+const SLATE = '#334155' // exploratory sidebar accent — alternative to fairway green
 
 const NAV_MAIN = [
   { to: '/admin',          label: 'Home',     end: true,  icon: HomeIcon   },
@@ -24,7 +25,7 @@ const NAV_MAIN = [
 const EVENT_TABS = [
   { key: 'Overview',       label: 'Overview',       icon: GridIcon,      sub: [
     { label: 'Event Details',    anchor: 'event-details'  },
-    { label: 'Players',          anchor: 'players-summary' },
+    { label: 'Participants',     anchor: 'players-summary' },
     { label: 'Cover Photo',      anchor: 'cover-photo'    },
     { label: 'Public Event Page',anchor: 'public-event'   },
     { label: 'Photos',           anchor: 'event-photos'   },
@@ -76,19 +77,27 @@ function GlobalNavItem({ to, end, label, icon: Icon, sub, onClose, linkClass, ac
       <NavLink to={to} end={end} onClick={onClose}
         className={linkClass}
         style={({ isActive }) => isActive ? activeStyle : {}}>
-        <Icon className="w-4 h-4 shrink-0" />
-        {label}
+        <span className="flex items-center gap-2.5">
+          <Icon className="w-4 h-4 shrink-0" />
+          {label}
+        </span>
+        {sub?.length > 0 && (
+          <svg className="w-3.5 h-3.5 text-current opacity-40 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+          </svg>
+        )}
       </NavLink>
       {isActive && sub?.length > 0 && (
-        <div className="ml-7 mt-0.5 space-y-0.5">
+        <div className="ml-7 mt-0.5 space-y-0.5 relative">
+          <div className="absolute top-0 bottom-0 left-[3px] border-l border-ink/[0.06]" />
           {sub.map(({ label: sublabel, tab }) => (
             <button
               key={tab}
               onClick={() => setTab(tab)}
-              className={`w-full text-left px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
+              className={`w-full text-left pl-3 pr-3 py-1.5 rounded-md text-xs font-medium transition-colors ${
                 activeTab === tab
-                  ? 'text-white bg-white/20'
-                  : 'text-white/50 hover:text-white hover:bg-white/10'
+                  ? 'text-ink bg-ink/[0.05]'
+                  : 'text-ink-muted hover:text-ink hover:bg-ink/[0.04]'
               }`}
             >
               {sublabel}
@@ -107,24 +116,31 @@ function GlobalSidebar({ org, user, profile, tier, isOwner, onSignOut, onClose }
   const orgName  = org?.name ?? 'Scorify Golf'
 
   const linkClass = ({ isActive }) =>
-    `flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-semibold transition-colors ${
-      isActive ? 'text-white' : 'text-white/60 hover:text-white hover:bg-white/10'
+    `flex items-center justify-between gap-2 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${
+      isActive ? 'text-ink bg-ink/[0.05] font-semibold' : 'text-ink-muted hover:text-ink hover:bg-ink/[0.04]'
     }`
-  const activeStyle = { background: 'rgba(255,255,255,0.15)' }
+  const activeStyle = {}
 
   return (
-    <div className="flex flex-col h-full" style={{ background: GREEN }}>
+    <div className="flex flex-col h-full bg-white border-r" style={{ borderColor: '#ebe9e4' }}>
       {/* Brand */}
-      <div className="flex items-center gap-3 px-5 py-5" style={{ borderBottom: '1px solid rgba(255,255,255,0.1)' }}>
-        <img src={org?.logo_url ?? '/logo.png'} alt={orgName}
-          className="w-8 h-8 object-contain rounded-lg shrink-0"
-          style={{ border: '1px solid rgba(255,255,255,0.2)' }} />
-        <div className="min-w-0">
-          <div className="text-white font-bold text-sm truncate leading-tight">{orgName}</div>
-          <div className="text-white/50 text-xs truncate">{label} plan</div>
+      <div className="flex items-center gap-3 px-4 py-4 border-b" style={{ borderColor: '#ebe9e4' }}>
+        {org?.logo_url ? (
+          <img src={org.logo_url} alt={orgName}
+            className="w-9 h-9 object-cover rounded-lg shrink-0 border"
+            style={{ borderColor: '#ebe9e4' }} />
+        ) : (
+          <div className="w-9 h-9 rounded-lg shrink-0 flex items-center justify-center text-white font-semibold text-xs"
+            style={{ background: SLATE }}>
+            {orgName.slice(0, 2).toUpperCase()}
+          </div>
+        )}
+        <div className="min-w-0 flex-1">
+          <div className="text-ink font-semibold text-sm truncate leading-tight">{orgName}</div>
+          <div className="text-ink-muted text-xs truncate">{label} plan</div>
         </div>
         {onClose && (
-          <button onClick={onClose} className="ml-auto text-white/60 hover:text-white p-1">
+          <button onClick={onClose} className="text-ink-muted hover:text-ink p-1">
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
             </svg>
@@ -140,36 +156,38 @@ function GlobalSidebar({ org, user, profile, tier, isOwner, onSignOut, onClose }
       </nav>
 
       {/* Bottom */}
-      <div className="px-3 pb-4 space-y-0.5" style={{ borderTop: '1px solid rgba(255,255,255,0.1)', paddingTop: '0.75rem' }}>
+      <div className="px-3 pb-4 space-y-0.5 border-t pt-3" style={{ borderColor: '#ebe9e4' }}>
         <NavLink to="/admin/settings" end={false} onClick={onClose}
           className={linkClass}
           style={({ isActive }) => isActive ? activeStyle : {}}>
-          <GearIcon className="w-4 h-4 shrink-0" />
-          Settings
+          <span className="flex items-center gap-2.5">
+            <GearIcon className="w-4 h-4 shrink-0" />
+            Settings
+          </span>
         </NavLink>
         <Link to="/home" onClick={onClose}
-          className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-semibold text-white/60 hover:text-white hover:bg-white/10 transition-colors">
+          className="flex items-center gap-2.5 px-3 py-2.5 rounded-lg text-sm font-medium text-ink-muted hover:text-ink hover:bg-ink/[0.04] transition-colors">
           <ExternalIcon className="w-4 h-4 shrink-0" />
           View Site
         </Link>
         {!isOwner && tier !== 'club' && (
           <a href="/upgrade" onClick={onClose}
-            className="flex items-center justify-center gap-2 mt-2 px-3 py-2.5 rounded-xl text-sm font-bold transition-opacity hover:opacity-90"
-            style={{ background: GOLD, color: GREEN }}>
+            className="flex items-center justify-center gap-2 mt-2 px-3 py-2.5 rounded-lg text-sm font-semibold transition-opacity hover:opacity-90"
+            style={{ background: SLATE, color: '#fff' }}>
             Upgrade {tier === 'pro' ? '→ Club' : '→ Pro'}
           </a>
         )}
         {/* User row */}
-        <div className="flex items-center gap-3 px-3 pt-3 mt-1" style={{ borderTop: '1px solid rgba(255,255,255,0.1)' }}>
-          <span className="w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold shrink-0"
-            style={{ background: 'rgba(255,255,255,0.2)', color: '#fff' }}>
+        <div className="flex items-center gap-3 px-3 pt-3 mt-1 border-t" style={{ borderColor: '#ebe9e4' }}>
+          <span className="w-7 h-7 rounded-full flex items-center justify-center text-xs font-semibold shrink-0"
+            style={{ background: '#eceae5', color: '#1d1d1f' }}>
             {initials}
           </span>
           <div className="min-w-0 flex-1">
-            <div className="text-white text-xs font-semibold truncate">{profile?.full_name ?? user?.email}</div>
-            <div className="text-white/40 text-xs truncate">{user?.email}</div>
+            <div className="text-ink text-xs font-semibold truncate">{profile?.full_name ?? user?.email}</div>
+            <div className="text-ink-muted text-xs truncate">{user?.email}</div>
           </div>
-          <button onClick={onSignOut} title="Sign out" className="text-white/40 hover:text-white/80 transition-colors shrink-0">
+          <button onClick={onSignOut} title="Sign out" className="text-ink-muted hover:text-ink transition-colors shrink-0">
             <SignOutIcon className="w-4 h-4" />
           </button>
         </div>
@@ -186,31 +204,31 @@ function EventSidebar({ org, eventName, eventStatus, basePath, onClose, onSignOu
   const initials  = (profile?.full_name ?? user?.email ?? '?').split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase()
 
   function tabClass(key) {
-    return `flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-semibold transition-colors ${
-      activeTab === key ? 'text-white' : 'text-white/60 hover:text-white hover:bg-white/10'
+    return `flex items-center gap-2.5 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${
+      activeTab === key ? 'text-ink bg-ink/[0.05] font-semibold' : 'text-ink-muted hover:text-ink hover:bg-ink/[0.04]'
     }`
   }
 
   return (
-    <div className="flex flex-col h-full" style={{ background: GREEN }}>
+    <div className="flex flex-col h-full bg-white border-r" style={{ borderColor: '#ebe9e4' }}>
       {/* Back + org */}
-      <div className="px-4 pt-4 pb-3" style={{ borderBottom: '1px solid rgba(255,255,255,0.1)' }}>
+      <div className="relative px-4 pt-4 pb-3 border-b" style={{ borderColor: '#ebe9e4' }}>
         <Link to="/admin"
-          className="flex items-center gap-1.5 text-white/50 hover:text-white text-xs font-semibold mb-3 transition-colors"
+          className="flex items-center gap-1.5 text-ink-muted hover:text-ink text-xs font-semibold mb-3 transition-colors"
           onClick={onClose}>
           <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
           </svg>
           {org?.name ?? 'Home'}
         </Link>
-        <div className="text-white font-bold text-sm leading-snug truncate">{eventName}</div>
+        <div className="text-ink font-semibold text-sm leading-snug truncate">{eventName}</div>
         {eventStatus && (
           <div className="mt-1">
             <StatusDot status={eventStatus} />
           </div>
         )}
         {onClose && (
-          <button onClick={onClose} className="absolute top-4 right-4 text-white/60 hover:text-white p-1">
+          <button onClick={onClose} className="absolute top-4 right-4 text-ink-muted hover:text-ink p-1">
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
             </svg>
@@ -225,21 +243,21 @@ function EventSidebar({ org, eventName, eventStatus, basePath, onClose, onSignOu
             <button
               onClick={() => { setSearchParams({ tab: key }); onClose?.() }}
               className={tabClass(key)}
-              style={{ width: '100%', textAlign: 'left', ...(activeTab === key ? { background: 'rgba(255,255,255,0.15)' } : {}) }}>
+              style={{ width: '100%', textAlign: 'left' }}>
               <Icon className="w-4 h-4 shrink-0" />
               {label}
             </button>
             {/* Sub-items — shown when this tab is active */}
             {activeTab === key && sub?.length > 0 && (
-              <div className="ml-7 mt-0.5 space-y-0.5">
+              <div className="ml-7 mt-0.5 space-y-0.5 relative">
+                <div className="absolute top-0 bottom-0 left-[3px] border-l border-ink/[0.06]" />
                 {sub.map(({ label: subLabel, anchor }) => (
                   <a
                     key={anchor}
                     href={`#${anchor}`}
                     onClick={onClose}
-                    className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-medium text-white/50 hover:text-white hover:bg-white/10 transition-colors"
+                    className="flex items-center gap-2 pl-3 pr-3 py-1.5 rounded-md text-xs font-medium text-ink-muted hover:text-ink hover:bg-ink/[0.04] transition-colors"
                   >
-                    <span className="w-1 h-1 rounded-full bg-white/30 shrink-0" />
                     {subLabel}
                   </a>
                 ))}
@@ -250,21 +268,21 @@ function EventSidebar({ org, eventName, eventStatus, basePath, onClose, onSignOu
       </nav>
 
       {/* Bottom */}
-      <div className="px-3 pb-4" style={{ borderTop: '1px solid rgba(255,255,255,0.1)', paddingTop: '0.75rem' }}>
+      <div className="px-3 pb-4 border-t pt-3" style={{ borderColor: '#ebe9e4' }}>
         <Link to="/home" onClick={onClose}
-          className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-semibold text-white/60 hover:text-white hover:bg-white/10 transition-colors">
+          className="flex items-center gap-2.5 px-3 py-2.5 rounded-lg text-sm font-medium text-ink-muted hover:text-ink hover:bg-ink/[0.04] transition-colors">
           <ExternalIcon className="w-4 h-4 shrink-0" />
           View Site
         </Link>
-        <div className="flex items-center gap-3 px-3 pt-3 mt-1" style={{ borderTop: '1px solid rgba(255,255,255,0.1)' }}>
-          <span className="w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold shrink-0"
-            style={{ background: 'rgba(255,255,255,0.2)', color: '#fff' }}>
+        <div className="flex items-center gap-3 px-3 pt-3 mt-1 border-t" style={{ borderColor: '#ebe9e4' }}>
+          <span className="w-7 h-7 rounded-full flex items-center justify-center text-xs font-semibold shrink-0"
+            style={{ background: '#eceae5', color: '#1d1d1f' }}>
             {initials}
           </span>
           <div className="min-w-0 flex-1">
-            <div className="text-white text-xs font-semibold truncate">{profile?.full_name ?? user?.email}</div>
+            <div className="text-ink text-xs font-semibold truncate">{profile?.full_name ?? user?.email}</div>
           </div>
-          <button onClick={onSignOut} title="Sign out" className="text-white/40 hover:text-white/80 transition-colors shrink-0">
+          <button onClick={onSignOut} title="Sign out" className="text-ink-muted hover:text-ink transition-colors shrink-0">
             <SignOutIcon className="w-4 h-4" />
           </button>
         </div>
@@ -275,10 +293,10 @@ function EventSidebar({ org, eventName, eventStatus, basePath, onClose, onSignOu
 
 function StatusDot({ status }) {
   const map = {
-    active:   { color: '#4ade80', label: 'Active' },
-    upcoming: { color: '#fbbf24', label: 'Upcoming' },
-    complete: { color: '#9ca3af', label: 'Complete' },
-    draft:    { color: '#9ca3af', label: 'Draft' },
+    active:   { color: '#16a34a', label: 'Active' },
+    upcoming: { color: '#b45309', label: 'Upcoming' },
+    complete: { color: '#6b7280', label: 'Complete' },
+    draft:    { color: '#6b7280', label: 'Draft' },
   }
   const s = map[status] ?? map.upcoming
   return (
@@ -369,15 +387,15 @@ export default function AdminLayout({ children }) {
       <div className="flex-1 flex flex-col min-w-0 md:ml-[220px]">
 
         {/* Mobile top bar */}
-        <header className="md:hidden sticky top-0 z-30 flex items-center gap-3 px-4 h-14"
-          style={{ background: GREEN, borderBottom: '1px solid rgba(255,255,255,0.1)' }}>
-          <button onClick={() => setDrawerOpen(true)} className="text-white/70 hover:text-white p-1" aria-label="Open menu">
+        <header className="md:hidden sticky top-0 z-30 flex items-center gap-3 px-4 h-14 bg-white border-b"
+          style={{ borderColor: '#ebe9e4' }}>
+          <button onClick={() => setDrawerOpen(true)} className="text-ink-muted hover:text-ink p-1" aria-label="Open menu">
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
             </svg>
           </button>
           <img src={org?.logo_url ?? '/logo.png'} alt="" className="w-6 h-6 object-contain rounded" />
-          <span className="text-white font-bold text-sm truncate">
+          <span className="text-ink font-semibold text-sm truncate">
             {isEventRoute && eventMeta ? eventMeta.name : (org?.name ?? 'Scorify Golf')}
           </span>
         </header>

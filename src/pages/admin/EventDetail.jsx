@@ -564,7 +564,7 @@ function TabOverview({ event, eventPlayers, allScores, sideGames, course, confli
       </Card>
 
       <Card id="players-summary">
-        <CardHeader title="Players" />
+        <CardHeader title="Participants" />
         <dl className="space-y-2 text-sm">
           <Row label="Total Players"  value={`${nonGuests.length}${nonGuests.length !== eventPlayers.length ? ` + ${eventPlayers.length - nonGuests.length} guest${eventPlayers.length - nonGuests.length !== 1 ? 's' : ''}` : ''}`} />
           {(event.use_flights ?? false) && <Row label="Flight A" value={flightA} />}
