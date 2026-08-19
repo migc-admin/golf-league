@@ -21,7 +21,8 @@ const FAQS = [
       },
       {
         q: 'How do I get started?',
-        a: 'Sign up for a free Starter account, create your league, add your players, and set up your first event. Most league admins are up and running in under 15 minutes.',
+        a: 'Sign up for a free Starter account, create your league, add your players, and set up your first event. Most league admins are up and running in under 15 minutes. Download our Quick Start Guide for a step-by-step walkthrough.',
+        link: { label: 'Download Quick Start Guide →', href: '/scorify-cheatsheet.html' },
       },
       {
         q: 'Can I try Scorify Golf before paying?',
@@ -227,7 +228,7 @@ Similar to CTP, the admin designates which holes have a Long Drive contest. A pr
   },
 ]
 
-function FAQItem({ q, a }) {
+function FAQItem({ q, a, link }) {
   const [open, setOpen] = useState(false)
   return (
     <div className="border-b border-gray-100 last:border-0">
@@ -248,6 +249,12 @@ function FAQItem({ q, a }) {
           {a.split('\n\n').map((block, i) => (
             <p key={i} style={{ whiteSpace: 'pre-line' }}>{block}</p>
           ))}
+          {link && (
+            <a href={link.href} target="_blank" rel="noopener noreferrer"
+              style={{ display: 'inline-block', marginTop: 8, color: GREEN, fontWeight: 700, fontSize: 13, textDecoration: 'underline' }}>
+              {link.label}
+            </a>
+          )}
         </div>
       )}
     </div>
@@ -312,7 +319,7 @@ export default function FAQ() {
                   )}
                   <div className="bg-white rounded-2xl px-6 shadow-sm" style={{ border: '1px solid #ebe9e4' }}>
                     {section.items.map(item => (
-                      <FAQItem key={item.q} q={item.q} a={item.a} />
+                      <FAQItem key={item.q} q={item.q} a={item.a} link={item.link} />
                     ))}
                   </div>
                 </div>
