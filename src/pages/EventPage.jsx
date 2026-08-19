@@ -198,8 +198,8 @@ export default function EventPage() {
               </MetaRow>
             </div>
 
-            {/* Registration CTA — only if upcoming and reg is available */}
-            {event.status === 'upcoming' && regUrl && (
+            {/* Registration CTA — show whenever reg is available (upcoming or active) */}
+            {regUrl && event.status !== 'complete' && (
               <div className="reg-cta" style={{ marginBottom: 20, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16 }}>
                 {event.tournament_fee > 0 && (
                   <div style={{ fontSize: 22, fontWeight: 900, color: '#111827', letterSpacing: '-0.02em' }}>
@@ -423,19 +423,6 @@ function OverviewTab({ event, leaderboardUrl, description }) {
         </div>
       )}
 
-      {event.status !== 'upcoming' && (
-        <Link to={leaderboardUrl} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: GREEN, color: '#fff', borderRadius: 16, padding: '20px 24px', textDecoration: 'none', gridColumn: '1 / -1' }}>
-          <div>
-            <div style={{ fontSize: 12, fontWeight: 600, color: 'rgba(255,255,255,0.6)', marginBottom: 4 }}>View results</div>
-            <div style={{ fontSize: 18, fontWeight: 900, letterSpacing: '-0.02em' }}>Full Leaderboard →</div>
-          </div>
-          {event.status === 'active' && (
-            <span style={{ background: '#4ade80', color: '#14532d', fontSize: 11, fontWeight: 800, padding: '6px 14px', borderRadius: 999, textTransform: 'uppercase', letterSpacing: '0.06em' }}>
-              Live
-            </span>
-          )}
-        </Link>
-      )}
     </div>
   )
 }
