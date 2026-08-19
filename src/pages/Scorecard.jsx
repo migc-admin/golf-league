@@ -254,12 +254,12 @@ export default function Scorecard() {
             const shotgunStart = assignStr ? (parseInt(assignStr, 10) || 1) : 1
             setCurrentHole(shotgunStart)
           } else {
-            const nh = (ev.course?.par_per_hole?.length === 9) ? 9 : 18
+            const nh = ev.holes_played === 9 ? 9 : 18
           setCurrentHole(Math.min(nh, lastComplete + 1))
           }
         }
 
-        const nh2 = (ev.course?.par_per_hole?.length === 9) ? 9 : 18
+        const nh2 = ev.holes_played === 9 ? 9 : 18
         const allDone = playerIds.every(pid => Object.keys(map[pid] ?? {}).length >= nh2)
         if (allDone || ev.status === 'complete') setShowScorecard(true)
 
@@ -357,7 +357,7 @@ export default function Scorecard() {
       setDirtyHoles(prev => { const n = new Set(prev); n.delete(currentHole); return n })
     }
 
-    const nh = (course?.par_per_hole?.length === 9) ? 9 : 18
+    const nh = event?.holes_played === 9 ? 9 : 18
     if (allValid && currentHole < nh) {
       focusFirstOnHoleChange.current = true
       setCurrentHole(h => h + 1)
@@ -404,9 +404,9 @@ export default function Scorecard() {
 
   if (!event || !course) return null
 
-  const parPerHole    = course.par_per_hole    ?? Array(18).fill(4)
-  const strokeIndex   = course.stroke_index    ?? Array(18).fill(0)
-  const numHoles      = parPerHole.length === 9 ? 9 : 18
+  const numHoles      = event.holes_played === 9 ? 9 : 18
+  const parPerHole    = (course.par_per_hole    ?? Array(18).fill(4)).slice(0, numHoles)
+  const strokeIndex   = (course.stroke_index    ?? Array(18).fill(0)).slice(0, numHoles)
   const isScramble    = (event.formats ?? (event.format ? [event.format] : [])).includes('scramble')
 
   const hole       = currentHole
