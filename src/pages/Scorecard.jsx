@@ -254,11 +254,13 @@ export default function Scorecard() {
             const shotgunStart = assignStr ? (parseInt(assignStr, 10) || 1) : 1
             setCurrentHole(shotgunStart)
           } else {
-            setCurrentHole(Math.min(18, lastComplete + 1))
+            const nh = (ev.course?.par_per_hole?.length === 9) ? 9 : 18
+          setCurrentHole(Math.min(nh, lastComplete + 1))
           }
         }
 
-        const allDone = playerIds.every(pid => Object.keys(map[pid] ?? {}).length === 18)
+        const nh2 = (ev.course?.par_per_hole?.length === 9) ? 9 : 18
+        const allDone = playerIds.every(pid => Object.keys(map[pid] ?? {}).length >= nh2)
         if (allDone || ev.status === 'complete') setShowScorecard(true)
 
         // Load conflicts for this group
@@ -355,11 +357,12 @@ export default function Scorecard() {
       setDirtyHoles(prev => { const n = new Set(prev); n.delete(currentHole); return n })
     }
 
-    if (allValid && currentHole < 18) {
+    const nh = (course?.par_per_hole?.length === 9) ? 9 : 18
+    if (allValid && currentHole < nh) {
       focusFirstOnHoleChange.current = true
       setCurrentHole(h => h + 1)
       window.scrollTo({ top: 0, behavior: 'instant' })
-    } else if (allValid && currentHole === 18) {
+    } else if (allValid && currentHole === nh) {
       setShowReconcile(true)
     }
   }, [event, course, currentHole, groupPlayers, scores, saveScore])
@@ -403,6 +406,7 @@ export default function Scorecard() {
 
   const parPerHole    = course.par_per_hole    ?? Array(18).fill(4)
   const strokeIndex   = course.stroke_index    ?? Array(18).fill(0)
+  const numHoles      = parPerHole.length === 9 ? 9 : 18
   const isScramble    = (event.formats ?? (event.format ? [event.format] : [])).includes('scramble')
 
   const hole       = currentHole
@@ -470,6 +474,7 @@ export default function Scorecard() {
         homeLink={homeLink}
         onSignOut={user ? handleSignOut : null}
         orgSlug={orgSlug}
+        numHoles={numHoles}
       />
     )
   }
@@ -497,7 +502,7 @@ export default function Scorecard() {
                 onClick={() => setShowScorecard(true)}
                 className="text-xs font-semibold px-3 py-1.5 rounded-full transition-colors text-ink-muted hover:text-ink hover:bg-surface-high"
               >
-                {holesEntered === 18 ? 'Scorecard' : `Progress (${holesEntered})`}
+                {holesEntered >= numHoles ? 'Scorecard' : `Progress (${holesEntered})`}
               </button>
             )}
             <Link
@@ -529,7 +534,7 @@ export default function Scorecard() {
 
         {/* Hole navigator — dot chips */}
         <div className="px-4 pb-3 flex gap-1.5 overflow-x-auto scrollbar-hide">
-          {Array.from({ length: 18 }, (_, i) => i + 1).map(h => {
+          {Array.from({ length: numHoles }, (_, i) => i + 1).map(h => {
             const saved   = holeSaved(h)
             const dirty   = dirtyHoles.has(h)
             const current = h === hole
@@ -573,7 +578,7 @@ export default function Scorecard() {
           <div className="text-xl font-bold text-ink">{si}</div>
           <div className="text-xs text-ink-muted" style={{ letterSpacing: '0.04em' }}>S.I.</div>
         </div>
-        <div className="ml-auto text-xs text-ink-muted">{holesEntered}/18 done</div>
+        <div className="ml-auto text-xs text-ink-muted">{holesEntered}/{numHoles} done</div>
       </div>
 
       {/* Player score cards */}
@@ -668,12 +673,12 @@ export default function Scorecard() {
                 Saving…
               </span>
             ) : (
-              hole === 18 ? 'Save Hole 18 · Finish Round' : `Save Hole ${hole} · Next →`
+              hole === numHoles ? `Save Hole ${numHoles} · Finish Round` : `Save Hole ${hole} · Next →`
             )}
           </button>
           <button
-            disabled={hole >= 18}
-            onClick={() => handleHoleNav(Math.min(18, hole + 1))}
+            disabled={hole >= numHoles}
+            onClick={() => handleHoleNav(Math.min(numHoles, hole + 1))}
             className="btn btn-secondary flex-none disabled:opacity-30 active:scale-95"
             style={{ width: 48, height: 48, padding: 0 }}
           >
@@ -930,8 +935,8 @@ function PlayerScoreCard({ ep, hole, par, si, score, allHoleScores, courseStroke
 }
 
 // ─── Traditional Scorecard View (vertical: holes=rows, players=cols) ──
-function TraditionalScorecard({ event, course, groupPlayers, scores, isComplete, canEdit, onEdit, homeLink, onSignOut, trackPutts, orgSlug }) {
-  const pars  = course.par_per_hole ?? Array(18).fill(4)
+function TraditionalScorecard({ event, course, groupPlayers, scores, isComplete, canEdit, onEdit, homeLink, onSignOut, trackPutts, orgSlug, numHoles = 18 }) {
+  const pars  = course.par_per_hole ?? Array(numHoles).fill(4)
 
   // Build per-player totals
   const playerData = groupPlayers.map(ep => {
@@ -941,7 +946,7 @@ function TraditionalScorecard({ event, course, groupPlayers, scores, isComplete,
     let frontGross = 0, backGross = 0, frontNet = 0, backNet = 0
     let frontPutts = 0, backPutts = 0, hasPutts = false
 
-    const cells = Array.from({ length: 18 }, (_, i) => {
+    const cells = Array.from({ length: numHoles }, (_, i) => {
       const h = i + 1
       const sc = scores[ep.player_id]?.[h]
       const g = sc ? parseInt(sc.gross, 10) : null
@@ -1003,8 +1008,8 @@ function TraditionalScorecard({ event, course, groupPlayers, scores, isComplete,
     )
   }
 
-  const frontPar = pars.slice(0, 9).reduce((a, b) => a + b, 0)
-  const backPar  = pars.slice(9).reduce((a, b) => a + b, 0)
+  const frontPar = pars.slice(0, Math.min(9, numHoles)).reduce((a, b) => a + b, 0)
+  const backPar  = numHoles === 18 ? pars.slice(9).reduce((a, b) => a + b, 0) : 0
 
   return (
     <div className="min-h-screen flex flex-col" style={{ background: '#fbfaf8' }}>
@@ -1097,6 +1102,7 @@ function TraditionalScorecard({ event, course, groupPlayers, scores, isComplete,
                 ))}
               </tr>
 
+              {numHoles === 18 && (<>
               {/* Back nine divider label */}
               <tr>
                 <td colSpan={2 + playerData.length} className="text-center py-2 text-xs font-bold tracking-widest text-ink-muted" style={{ borderTop: '2px dashed #ebe9e4', background: '#f4f3f0' }}>
@@ -1141,6 +1147,7 @@ function TraditionalScorecard({ event, course, groupPlayers, scores, isComplete,
                   </td>
                 ))}
               </tr>
+              </>)}
               {/* Grand total */}
               <tr style={{ background: '#1B4332', color: '#ffffff' }}>
                 <td className="px-3 py-2.5 text-sm font-black">TOTAL</td>
