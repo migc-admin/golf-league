@@ -12,12 +12,21 @@ const GREEN = '#1B4332'
 const GOLD  = '#D4AF37'
 
 const FORMAT_LABELS = {
-  net_stroke_front9: 'Net Stroke · Front 9',
-  net_stroke_back9:  'Net Stroke · Back 9',
-  net_stroke:        'Net Stroke Play',
-  stableford:        'Stableford',
-  match_points:      'Match Points',
-  ryder_cup:         'Ryder Cup',
+  net_stroke:          'Net Stroke Play — Overall',
+  net_stroke_front9:   'Net Stroke Play — Front 9',
+  net_stroke_back9:    'Net Stroke Play — Back 9',
+  low_gross:           'Low Gross — Overall',
+  gross_stroke_front9: 'Low Gross — Front 9',
+  gross_stroke_back9:  'Low Gross — Back 9',
+  net_stroke_nassau:   'Nassau',
+  stableford:          'Stableford — Net',
+  stableford_gross:    'Stableford — Gross',
+  best_ball_2:         'Best Ball — 2 Person',
+  best_ball_4:         'Best Ball — 4 Person',
+  scramble:            'Scramble',
+  shamble:             'Shamble',
+  match_points:        'Match Points',
+  ryder_cup:           'Ryder Cup',
 }
 const SIDE_GAME_LABELS = {
   skins:        'Skins',
@@ -351,10 +360,13 @@ function SponsorBar({ sponsors }) {
 function OverviewTab({ event, leaderboardUrl, description }) {
   const scheduleItems = (event.schedule_items ?? []).filter(s => s.label?.trim())
   const customCompetitions = (event.custom_competitions ?? []).filter(c => c?.trim())
+  const formats = (event.formats ?? (event.format ? [event.format] : []))
+    .map(k => FORMAT_LABELS[k])
+    .filter(Boolean)
   const presetGames = (event.side_game_options ?? [])
     .map(k => SIDE_GAME_LABELS[k])
     .filter(Boolean)
-  const allCompetitions = [...presetGames, ...customCompetitions]
+  const allCompetitions = [...formats, ...presetGames, ...customCompetitions]
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
@@ -398,7 +410,7 @@ function OverviewTab({ event, leaderboardUrl, description }) {
       {allCompetitions.length > 0 && (
         <div style={{ background: '#fff', borderRadius: 16, padding: '20px 24px', border: '1px solid #e5e7eb' }}>
           <div style={{ fontSize: 10, fontWeight: 700, color: '#9ca3af', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 12 }}>
-            Side Games &amp; Competitions
+            Competitions &amp; Side Games
           </div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
             {allCompetitions.map((name, i) => (
