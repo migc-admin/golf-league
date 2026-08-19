@@ -2791,9 +2791,9 @@ function TabPayoutConfig({ event, eventPlayers, course, onUpdated }) {
   function getMultiplier(key) {
     // Full-field keys
     if (key === 'low_putts' || key.startsWith('ctp_') || key === 'skins' || key === 'long_drive') return totalPlayers
-    if (!hasFlights && (key.startsWith('18_net_') || key.startsWith('f9_') || key.startsWith('b9_'))) return totalPlayers
+    if (!hasFlights && (key.startsWith('18_net_') || key.startsWith('18_gross_') || key.startsWith('f9_') || key.startsWith('b9_'))) return totalPlayers
     // Per-flight: extract letter
-    const flMatch = key.match(/(?:skins|long_drive|low_putts|18_net|f9|b9)_([a-z])/)
+    const flMatch = key.match(/(?:skins|long_drive|low_putts|18_net|18_gross|f9|b9)_([a-z])/)
     if (flMatch) {
       const fl = flMatch[1].toUpperCase()
       return flightCounts[fl] ?? Math.round(totalPlayers / (numFlights || 1))
@@ -2814,7 +2814,7 @@ function TabPayoutConfig({ event, eventPlayers, course, onUpdated }) {
     const total = (val || 0) * mult
     const label = getCategoryLabel(key)
     // Determine flight letter
-    const flMatch = hasFlights && key.match(/(?:skins|long_drive|low_putts|18_net|f9|b9)_([a-z])(?:_|$)/)
+    const flMatch = hasFlights && key.match(/(?:skins|long_drive|low_putts|18_net|18_gross|f9|b9)_([a-z])(?:_|$)/)
     const flLetter = flMatch ? flMatch[1].toUpperCase() : null
     const isField = !flLetter
     return { key, val, label, isField, flLetter, mult, total }
@@ -3275,16 +3275,42 @@ function EventStatusControl({ event, onUpdated }) {
 // ─── Edit Event Modal ──────────────────────────────────────────────
 const EDIT_FORMAT_OPTIONS = [
   { group: 'Net Stroke Play', options: [
-    { value: 'net_stroke',        label: '18-Hole Overall Net',  tip: 'Players complete all 18 holes. Net score = gross score minus course handicap. Lowest net score wins.' },
-    { value: 'net_stroke_front9', label: 'Front Nine Net',       tip: 'Only holes 1–9 count. Net score calculated using half the course handicap. Good for shorter events.' },
-    { value: 'net_stroke_back9',  label: 'Back Nine Net',        tip: 'Only holes 10–18 count. Net score calculated using half the course handicap. Good for shorter events.' },
+    { value: 'net_stroke',        label: 'Full 18 — Net',    tip: 'All 18 holes. Net score = gross minus course handicap. Lowest net wins.' },
+    { value: 'net_stroke_front9', label: 'Front 9 — Net',    tip: 'Holes 1–9 only. Net calculated using half the course handicap.' },
+    { value: 'net_stroke_back9',  label: 'Back 9 — Net',     tip: 'Holes 10–18 only. Net calculated using half the course handicap.' },
+    { value: 'net_stroke_nassau', label: 'Nassau — Net',     tip: 'Three separate bets: Front 9, Back 9, and Full 18 — each scored and paid independently.' },
   ]},
-  { group: 'Other Formats', options: [
-    { value: 'stableford',      label: 'Stableford',                 tip: 'Points awarded per hole based on net score vs par. Double bogey = 0 pts, bogey = 1, par = 2, birdie = 3, eagle = 4. Highest points wins.' },
-    { value: 'scramble',        label: 'Scramble',                   tip: 'All players tee off, choose the best shot, and play from that spot. One team score per hole. No handicaps applied. Lowest team gross wins.' },
-    { value: 'match_points',    label: 'Match Play (Head-to-Head)',   tip: 'Each player is paired against one opponent. Net score is compared hole-by-hole. Win a hole = 1 point. Most points after 18 wins.' },
-    { value: 'team_match_play', label: 'Match Play (Team Best Ball)', tip: 'Teams compete using the best net score among teammates on each hole. Scored hole-by-hole like match play.' },
-    { value: 'ryder_cup',       label: 'Ryder Cup',                  tip: 'Team format across multiple rounds. Players earn points for their team via match play results. Highest team total wins.' },
+  { group: 'Gross Stroke Play', options: [
+    { value: 'low_gross',           label: 'Full 18 — Gross',       tip: 'No handicap applied. Lowest raw gross score wins.' },
+    { value: 'gross_stroke_front9', label: 'Front 9 — Gross',       tip: 'Holes 1–9 only, no handicap applied.' },
+    { value: 'gross_stroke_back9',  label: 'Back 9 — Gross',        tip: 'Holes 10–18 only, no handicap applied.' },
+    { value: 'gross_stroke_nassau', label: 'Nassau — Gross',        tip: 'Front 9, Back 9, and Full 18 scored separately. No handicap applied.' },
+    { value: 'callaway',            label: 'Callaway / Peoria',     tip: 'Handicap approximation calculated from the scorecard — ideal for outings where players lack an official handicap index.' },
+  ]},
+  { group: 'Points & Alternative', options: [
+    { value: 'stableford',          label: 'Stableford (Net)',         tip: 'Points per hole based on net score vs par. Double bogey = 0, bogey = 1, par = 2, birdie = 3, eagle = 4. Highest points wins.' },
+    { value: 'stableford_gross',    label: 'Stableford (Gross)',       tip: 'Same as Stableford but uses raw gross score — no handicap applied.' },
+    { value: 'modified_stableford', label: 'Modified Stableford',      tip: 'Eagle = 5 pts, Birdie = 2 pts, Par = 0 pts, Bogey = −1 pt, Double+ = −3 pts. Keeps bad holes from ruining a round.' },
+    { value: 'quota_chicago',       label: 'Quota / Chicago',          tip: 'Players start with a point target (36 minus handicap) and earn Stableford points per hole. Highest score over quota wins.' },
+  ]},
+  { group: 'Team — Best Ball', options: [
+    { value: 'best_ball_2',       label: '2-Person Best Ball (Net)',    tip: 'Each player plays their own ball; team records the lowest net score on each hole. 2-person teams.' },
+    { value: 'best_ball_4',       label: '4-Person Best Ball (Net)',    tip: 'Each player plays their own ball; team records the lowest net score on each hole. 4-person teams.' },
+    { value: 'best_ball_2_gross', label: '2-Person Best Ball (Gross)',  tip: 'Best raw score per hole between 2 players. No handicap applied.' },
+    { value: 'best_ball_4_gross', label: '4-Person Best Ball (Gross)',  tip: 'Best raw score per hole among 4 players. No handicap applied.' },
+    { value: 'cha_cha_cha',       label: '1-2-3 / ChaChaCha',          tip: 'On 4-person teams: count 1 best score on Par 5s, 2 best scores on Par 4s, 3 best scores on Par 3s.' },
+    { value: 'team_match_play',   label: 'Best Ball Match Play',        tip: 'Teams compete using best net score per hole, scored hole-by-hole like match play.' },
+  ]},
+  { group: 'Team — Scramble & Alternate', options: [
+    { value: 'scramble',       label: 'Scramble',                        tip: 'Everyone tees off, choose the best shot, all play from that spot until holed. One team score per hole.' },
+    { value: 'shamble',        label: 'Shamble (Texas Scramble)',         tip: 'Best drive selected, then each player plays their own ball into the hole from that spot.' },
+    { value: 'alternate_shot', label: 'Alternate Shot (Foursomes)',       tip: '2-person teams alternate shots into the hole — one player tees odd holes, the other even holes.' },
+    { value: 'chapman',        label: 'Chapman / Pinehurst',              tip: 'Both players tee off, swap balls for the second shot, then alternate into the hole from the chosen ball.' },
+  ]},
+  { group: 'Match Play & Cups', options: [
+    { value: 'match_points',    label: 'Individual Match Play', tip: 'Head-to-head. Net score compared hole-by-hole. Win a hole = 1 point. Most points wins.' },
+    { value: 'four_ball_match', label: 'Four-Ball Match Play',  tip: '2 vs 2. Each team plays best ball; holes won/lost/halved determine the match result.' },
+    { value: 'ryder_cup',       label: 'Ryder Cup / Team Cup',  tip: 'Multi-format team competition (e.g. Scramble, Alternate Shot, Best Ball, Singles). Points awarded per session.' },
   ]},
 ]
 
@@ -4153,11 +4179,38 @@ function formatTime(t) {
 }
 
 const FORMAT_LABELS = {
-  net_stroke:   'Net Stroke Play',
-  stableford:   'Stableford',
-  match_points:    'Match Play (Head-to-Head)',
-  team_match_play: 'Match Play (Team Best Ball)',
-  ryder_cup:       'Ryder Cup',
+  // Net stroke play
+  net_stroke:           'Net Stroke Play — Full 18',
+  net_stroke_front9:    'Net Stroke Play — Front 9',
+  net_stroke_back9:     'Net Stroke Play — Back 9',
+  net_stroke_nassau:    'Nassau (Net)',
+  // Gross stroke play
+  low_gross:            'Low Gross — Full 18',
+  gross_stroke_front9:  'Low Gross — Front 9',
+  gross_stroke_back9:   'Low Gross — Back 9',
+  gross_stroke_nassau:  'Nassau (Gross)',
+  callaway:             'Callaway / Peoria',
+  // Points & alternative
+  stableford:           'Stableford (Net)',
+  stableford_gross:     'Stableford (Gross)',
+  modified_stableford:  'Modified Stableford',
+  quota_chicago:        'Quota / Chicago',
+  // Team best ball
+  best_ball_2:          '2-Person Best Ball (Net)',
+  best_ball_4:          '4-Person Best Ball (Net)',
+  best_ball_2_gross:    '2-Person Best Ball (Gross)',
+  best_ball_4_gross:    '4-Person Best Ball (Gross)',
+  cha_cha_cha:          '1-2-3 / ChaChaCha',
+  team_match_play:      'Best Ball Match Play',
+  // Scramble & alternate
+  scramble:             'Scramble',
+  shamble:              'Shamble',
+  alternate_shot:       'Alternate Shot (Foursomes)',
+  chapman:              'Chapman / Pinehurst',
+  // Match play & cups
+  match_points:         'Individual Match Play',
+  four_ball_match:      'Four-Ball Match Play',
+  ryder_cup:            'Ryder Cup / Team Cup',
 }
 
 // ─── TGL Manager ─────────────────────────────────────────────────────────────
