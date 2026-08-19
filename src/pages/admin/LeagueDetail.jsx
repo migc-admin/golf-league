@@ -416,42 +416,27 @@ function parseSideGameOptions(options) {
 
 const FORMAT_OPTIONS = [
   { group: 'Net Stroke Play', options: [
-    { value: 'net_stroke',        label: 'Full 18 — Net' },
-    { value: 'net_stroke_front9', label: 'Front 9 — Net' },
-    { value: 'net_stroke_back9',  label: 'Back 9 — Net' },
-    { value: 'net_stroke_nassau', label: 'Nassau — Net' },
+    { value: 'net_stroke',        label: 'Net — Overall (18)' },
+    { value: 'net_stroke_front9', label: 'Net — Front 9' },
+    { value: 'net_stroke_back9',  label: 'Net — Back 9' },
   ]},
   { group: 'Gross Stroke Play', options: [
-    { value: 'low_gross',           label: 'Full 18 — Gross' },
-    { value: 'gross_stroke_front9', label: 'Front 9 — Gross' },
-    { value: 'gross_stroke_back9',  label: 'Back 9 — Gross' },
-    { value: 'gross_stroke_nassau', label: 'Nassau — Gross' },
-    { value: 'callaway',            label: 'Callaway / Peoria' },
+    { value: 'low_gross',           label: 'Gross — Overall (18)' },
+    { value: 'gross_stroke_front9', label: 'Gross — Front 9' },
+    { value: 'gross_stroke_back9',  label: 'Gross — Back 9' },
   ]},
-  { group: 'Points & Alternative', options: [
-    { value: 'stableford',          label: 'Stableford (Net)' },
-    { value: 'stableford_gross',    label: 'Stableford (Gross)' },
-    { value: 'modified_stableford', label: 'Modified Stableford' },
-    { value: 'quota_chicago',       label: 'Quota / Chicago' },
+  { group: 'Nassau', options: [
+    { value: 'net_stroke_nassau', label: 'Nassau' },
   ]},
-  { group: 'Team — Best Ball', options: [
-    { value: 'best_ball_2',       label: '2-Person Best Ball (Net)',    pro: true },
-    { value: 'best_ball_4',       label: '4-Person Best Ball (Net)',    pro: true },
-    { value: 'best_ball_2_gross', label: '2-Person Best Ball (Gross)',  pro: true },
-    { value: 'best_ball_4_gross', label: '4-Person Best Ball (Gross)',  pro: true },
-    { value: 'cha_cha_cha',       label: '1-2-3 / ChaChaCha',          pro: true },
-    { value: 'team_match_play',   label: 'Best Ball Match Play',        pro: true },
+  { group: 'Stableford', options: [
+    { value: 'stableford',       label: 'Stableford — Net' },
+    { value: 'stableford_gross', label: 'Stableford — Gross' },
   ]},
-  { group: 'Team — Scramble & Alternate', options: [
-    { value: 'scramble',       label: 'Scramble' },
-    { value: 'shamble',        label: 'Shamble (Texas Scramble)' },
-    { value: 'alternate_shot', label: 'Alternate Shot (Foursomes)', pro: true },
-    { value: 'chapman',        label: 'Chapman / Pinehurst',        pro: true },
-  ]},
-  { group: 'Match Play & Cups', options: [
-    { value: 'match_points',    label: 'Individual Match Play', pro: true },
-    { value: 'four_ball_match', label: 'Four-Ball Match Play',  pro: true },
-    { value: 'ryder_cup',       label: 'Ryder Cup / Team Cup',  pro: true },
+  { group: 'Team Formats', options: [
+    { value: 'best_ball_2', label: 'Best Ball — 2 Person', pro: true },
+    { value: 'best_ball_4', label: 'Best Ball — 4 Person', pro: true },
+    { value: 'scramble',    label: 'Scramble' },
+    { value: 'shamble',     label: 'Shamble' },
   ]},
 ]
 

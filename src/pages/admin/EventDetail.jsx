@@ -3275,42 +3275,27 @@ function EventStatusControl({ event, onUpdated }) {
 // ─── Edit Event Modal ──────────────────────────────────────────────
 const EDIT_FORMAT_OPTIONS = [
   { group: 'Net Stroke Play', options: [
-    { value: 'net_stroke',        label: 'Full 18 — Net',    tip: 'All 18 holes. Net score = gross minus course handicap. Lowest net wins.' },
-    { value: 'net_stroke_front9', label: 'Front 9 — Net',    tip: 'Holes 1–9 only. Net calculated using half the course handicap.' },
-    { value: 'net_stroke_back9',  label: 'Back 9 — Net',     tip: 'Holes 10–18 only. Net calculated using half the course handicap.' },
-    { value: 'net_stroke_nassau', label: 'Nassau — Net',     tip: 'Three separate bets: Front 9, Back 9, and Full 18 — each scored and paid independently.' },
+    { value: 'net_stroke',        label: 'Net — Overall (18)', tip: 'All 18 holes. Net score = gross minus course handicap. Lowest net wins.' },
+    { value: 'net_stroke_front9', label: 'Net — Front 9',      tip: 'Holes 1–9 only. Net calculated using half the course handicap.' },
+    { value: 'net_stroke_back9',  label: 'Net — Back 9',       tip: 'Holes 10–18 only. Net calculated using half the course handicap.' },
   ]},
   { group: 'Gross Stroke Play', options: [
-    { value: 'low_gross',           label: 'Full 18 — Gross',       tip: 'No handicap applied. Lowest raw gross score wins.' },
-    { value: 'gross_stroke_front9', label: 'Front 9 — Gross',       tip: 'Holes 1–9 only, no handicap applied.' },
-    { value: 'gross_stroke_back9',  label: 'Back 9 — Gross',        tip: 'Holes 10–18 only, no handicap applied.' },
-    { value: 'gross_stroke_nassau', label: 'Nassau — Gross',        tip: 'Front 9, Back 9, and Full 18 scored separately. No handicap applied.' },
-    { value: 'callaway',            label: 'Callaway / Peoria',     tip: 'Handicap approximation calculated from the scorecard — ideal for outings where players lack an official handicap index.' },
+    { value: 'low_gross',           label: 'Gross — Overall (18)', tip: 'No handicap applied. Lowest raw gross score wins.' },
+    { value: 'gross_stroke_front9', label: 'Gross — Front 9',      tip: 'Holes 1–9 only, no handicap applied.' },
+    { value: 'gross_stroke_back9',  label: 'Gross — Back 9',       tip: 'Holes 10–18 only, no handicap applied.' },
   ]},
-  { group: 'Points & Alternative', options: [
-    { value: 'stableford',          label: 'Stableford (Net)',         tip: 'Points per hole based on net score vs par. Double bogey = 0, bogey = 1, par = 2, birdie = 3, eagle = 4. Highest points wins.' },
-    { value: 'stableford_gross',    label: 'Stableford (Gross)',       tip: 'Same as Stableford but uses raw gross score — no handicap applied.' },
-    { value: 'modified_stableford', label: 'Modified Stableford',      tip: 'Eagle = 5 pts, Birdie = 2 pts, Par = 0 pts, Bogey = −1 pt, Double+ = −3 pts. Keeps bad holes from ruining a round.' },
-    { value: 'quota_chicago',       label: 'Quota / Chicago',          tip: 'Players start with a point target (36 minus handicap) and earn Stableford points per hole. Highest score over quota wins.' },
+  { group: 'Nassau', options: [
+    { value: 'net_stroke_nassau', label: 'Nassau', tip: 'Three separate bets: Front 9, Back 9, and Full 18 net — each scored and paid independently.' },
   ]},
-  { group: 'Team — Best Ball', options: [
-    { value: 'best_ball_2',       label: '2-Person Best Ball (Net)',    tip: 'Each player plays their own ball; team records the lowest net score on each hole. 2-person teams.' },
-    { value: 'best_ball_4',       label: '4-Person Best Ball (Net)',    tip: 'Each player plays their own ball; team records the lowest net score on each hole. 4-person teams.' },
-    { value: 'best_ball_2_gross', label: '2-Person Best Ball (Gross)',  tip: 'Best raw score per hole between 2 players. No handicap applied.' },
-    { value: 'best_ball_4_gross', label: '4-Person Best Ball (Gross)',  tip: 'Best raw score per hole among 4 players. No handicap applied.' },
-    { value: 'cha_cha_cha',       label: '1-2-3 / ChaChaCha',          tip: 'On 4-person teams: count 1 best score on Par 5s, 2 best scores on Par 4s, 3 best scores on Par 3s.' },
-    { value: 'team_match_play',   label: 'Best Ball Match Play',        tip: 'Teams compete using best net score per hole, scored hole-by-hole like match play.' },
+  { group: 'Stableford', options: [
+    { value: 'stableford',       label: 'Stableford — Net',   tip: 'Points per hole vs par using net score. Double bogey = 0, Bogey = 1, Par = 2, Birdie = 3, Eagle = 4. Highest points wins.' },
+    { value: 'stableford_gross', label: 'Stableford — Gross', tip: 'Same Stableford points but based on raw gross score — no handicap applied.' },
   ]},
-  { group: 'Team — Scramble & Alternate', options: [
-    { value: 'scramble',       label: 'Scramble',                        tip: 'Everyone tees off, choose the best shot, all play from that spot until holed. One team score per hole.' },
-    { value: 'shamble',        label: 'Shamble (Texas Scramble)',         tip: 'Best drive selected, then each player plays their own ball into the hole from that spot.' },
-    { value: 'alternate_shot', label: 'Alternate Shot (Foursomes)',       tip: '2-person teams alternate shots into the hole — one player tees odd holes, the other even holes.' },
-    { value: 'chapman',        label: 'Chapman / Pinehurst',              tip: 'Both players tee off, swap balls for the second shot, then alternate into the hole from the chosen ball.' },
-  ]},
-  { group: 'Match Play & Cups', options: [
-    { value: 'match_points',    label: 'Individual Match Play', tip: 'Head-to-head. Net score compared hole-by-hole. Win a hole = 1 point. Most points wins.' },
-    { value: 'four_ball_match', label: 'Four-Ball Match Play',  tip: '2 vs 2. Each team plays best ball; holes won/lost/halved determine the match result.' },
-    { value: 'ryder_cup',       label: 'Ryder Cup / Team Cup',  tip: 'Multi-format team competition (e.g. Scramble, Alternate Shot, Best Ball, Singles). Points awarded per session.' },
+  { group: 'Team Formats', options: [
+    { value: 'best_ball_2', label: 'Best Ball — 2 Person', tip: 'Each player plays their own ball; team records the lowest net score on each hole.' },
+    { value: 'best_ball_4', label: 'Best Ball — 4 Person', tip: 'Each player plays their own ball; team records the lowest net score on each hole. 4-person teams.' },
+    { value: 'scramble',    label: 'Scramble',             tip: 'Everyone tees off, choose the best shot, all play from that spot until holed. One team score per hole.' },
+    { value: 'shamble',     label: 'Shamble',              tip: 'Best drive selected, then each player plays their own ball into the hole from that spot.' },
   ]},
 ]
 
