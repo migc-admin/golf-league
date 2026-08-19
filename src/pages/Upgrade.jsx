@@ -158,7 +158,7 @@ export default function Upgrade() {
         </div>
 
         <p className="text-center text-xs text-gray-400 mt-8">
-          3-day free trial included. Cancel anytime.{' '}
+          21-day free trial included. Cancel anytime.{' '}
           <a href="/refund-policy" target="_blank" rel="noopener noreferrer" className="underline hover:text-gray-600">Refund policy</a>
           {' · '}
           <button onClick={() => navigate(-1)} className="underline hover:text-gray-600">Go back</button>

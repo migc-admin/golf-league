@@ -340,7 +340,7 @@ export default function Onboarding() {
                     <a href="/refund-policy" target="_blank" rel="noopener noreferrer" className="underline font-medium" style={{ color: GREEN }}>Refund Policy</a>
                     {' '}and{' '}
                     <a href="/privacy" target="_blank" rel="noopener noreferrer" className="underline font-medium" style={{ color: GREEN }}>Privacy Policy</a>.
-                    I understand that my subscription will begin after a 3-day free trial and I will be charged <strong>{selectedPrice}</strong> after the trial ends.
+                    I understand that my subscription will begin after a 21-day free trial and I will be charged <strong>{selectedPrice}</strong> after the trial ends.
                   </span>
                 </label>
               )}

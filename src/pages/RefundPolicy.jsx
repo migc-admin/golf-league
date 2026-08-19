@@ -68,7 +68,7 @@ export default function RefundPolicy() {
         {/* ── 1. Free Trial ── */}
         <Section title="1. Free Trial">
           <Callout>
-            All paid plans include a <strong>3-day free trial</strong>. You will not be charged during the trial period.
+            All paid plans include a <strong>21-day free trial</strong>. You will not be charged during the trial period.
             You may cancel at any time during the trial at no cost.
           </Callout>
           <p>

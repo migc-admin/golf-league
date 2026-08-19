@@ -118,7 +118,7 @@ Our published Refund Policy is available at:
 https://scorifygolf.com/refund-policy
 
 Key terms applicable to this charge:
-• All plans include a 3-day free trial before billing begins.
+• All plans include a 21-day free trial before billing begins.
 • Monthly subscriptions are non-refundable once a billing period begins,
   except in cases of verified software malfunction.
 • Annual subscriptions qualify for a 50% prorated refund if cancelled
