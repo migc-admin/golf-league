@@ -18,7 +18,7 @@ import { FlightBadge, StatusBadge } from '../components/ui/Badge'
 import { useFeatures, useOrg } from '../lib/OrgContext'
 import { useSubdomainOrg } from '../lib/SubdomainContext'
 
-const ALL_TABS = ['18-Hole', 'Front 9', 'Back 9', 'Stableford', 'Scramble', 'Match Points', 'Team Match', 'Low Putts', 'Skins', 'Payouts', 'Team Play']
+const ALL_TABS = ['18-Hole', 'Front 9', 'Back 9', 'Low Gross', 'Stableford', 'Scramble', 'Match Points', 'Team Match', 'Low Putts', 'Skins', 'Payouts', 'Team Play']
 
 function visibleTabs(event, hasTGL = false) {
   if (!event) return ALL_TABS
@@ -29,6 +29,7 @@ function visibleTabs(event, hasTGL = false) {
     if (tab === '18-Hole')       return formats.includes('net_stroke')
     if (tab === 'Front 9')       return formats.includes('net_stroke_front9')
     if (tab === 'Back 9')        return formats.includes('net_stroke_back9')
+    if (tab === 'Low Gross')     return formats.includes('low_gross')
     if (tab === 'Stableford')    return formats.includes('stableford')
     if (tab === 'Scramble')      return formats.includes('scramble')
     if (tab === 'Match Points')  return formats.includes('match_points') || formats.includes('ryder_cup')
@@ -42,6 +43,7 @@ function visibleTabs(event, hasTGL = false) {
 
 const FORMAT_LABELS = {
   net_stroke:      'Net Stroke Play',
+  low_gross:       'Low Gross',
   stableford:      'Stableford',
   match_points:    'Match Play (Head-to-Head)',
   team_match_play: 'Match Play (Team Best Ball)',
@@ -327,6 +329,7 @@ export default function Leaderboard() {
                 maxHoles={18}
                 allScores={allScores}
                 course={course}
+                eventPlayers={eventPlayers}
               />
             )}
             {activeTab === 'Front 9' && (
@@ -342,6 +345,7 @@ export default function Leaderboard() {
                 maxHoles={9}
                 allScores={allScores}
                 course={course}
+                eventPlayers={eventPlayers}
               />
             )}
             {activeTab === 'Back 9' && (
@@ -357,6 +361,23 @@ export default function Leaderboard() {
                 maxHoles={9}
                 allScores={allScores}
                 course={course}
+                eventPlayers={eventPlayers}
+              />
+            )}
+            {activeTab === 'Low Gross' && (
+              <NetLeaderboard
+                complete={leaderboards.grossFull[activeFlight]}
+                inProgress={leaderboards.grossFull[`${activeFlight}InProgress`]}
+                flight={activeFlight}
+                vsParKey="grossVsPar"
+                grossKey="gross18"
+                netKey="gross18"
+                handicapKey="course_handicap"
+                progressHolesKey="holesCompleted"
+                maxHoles={18}
+                allScores={allScores}
+                course={course}
+                eventPlayers={eventPlayers}
               />
             )}
             {activeTab === 'Low Putts' && (
@@ -487,16 +508,8 @@ function ScrambleLeaderboard({ eventPlayers, allScores, course }) {
 }
 
 // ─── Net Leaderboard ──────────────────────────────────────────────
-function NetLeaderboard({ complete, inProgress, flight, vsParKey = 'netVsPar', grossKey = 'gross18', netKey = 'net18', handicapKey = 'course_handicap', progressHolesKey = 'holesCompleted', maxHoles = 18, allScores = [], course = null }) {
+function NetLeaderboard({ complete, inProgress, flight, vsParKey = 'netVsPar', grossKey = 'gross18', netKey = 'net18', handicapKey = 'course_handicap', progressHolesKey = 'holesCompleted', maxHoles = 18, allScores = [], course = null, eventPlayers = [] }) {
   const [scorecardPlayer, setScorecardPlayer] = useState(null)
-  if (!complete?.length && !inProgress?.length) {
-    return (
-      <div className="text-center py-12 text-gray-400">
-        <svg className="mx-auto mb-3 w-10 h-10 text-gray-300" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.5"><path strokeLinecap="round" strokeLinejoin="round" d="M3 13.125C3 12.504 3.504 12 4.125 12h2.25c.621 0 1.125.504 1.125 1.125v6.75C7.5 20.496 6.996 21 6.375 21h-2.25A1.125 1.125 0 013 19.875v-6.75zM9.75 8.625c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125v11.25c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 01-1.125-1.125V8.625zM16.5 4.125c0-.621.504-1.125 1.125-1.125h2.25C20.496 3 21 3.504 21 4.125v15.75c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 01-1.125-1.125V4.125z"/></svg>
-        <p className="font-medium">No scores yet for Flight {flight}</p>
-      </div>
-    )
-  }
 
   const allComplete = complete ?? []
 
@@ -529,8 +542,20 @@ function NetLeaderboard({ complete, inProgress, flight, vsParKey = 'netVsPar', g
     ...(allComplete ?? []).map(p => ({ ...p, finished: true })),
     ...(inProgress  ?? []).map(p => ({ ...p, finished: false })),
   ]
+  const scoredPlayerIds = new Set(merged.map(p => p.player_id))
   const competitive = merged.filter(p => !noShowPlayerIds.has(p.player_id))
   const noShows     = merged.filter(p => noShowPlayerIds.has(p.player_id))
+  const hasFlightData = eventPlayers.some(ep => !ep.is_guest && (ep.flight === 'A' || ep.flight === 'B'))
+  const notStarted  = eventPlayers
+    .filter(ep => {
+      if (ep.is_guest) return false
+      if (scoredPlayerIds.has(ep.player_id)) return false
+      if (noShowPlayerIds.has(ep.player_id)) return false
+      if (hasFlightData) return ep.flight === flight
+      return true
+    })
+    .map(ep => ({ ...ep, player: ep.player }))
+    .sort((a, b) => (a.course_handicap ?? 999) - (b.course_handicap ?? 999))
 
   competitive.sort((a, b) => {
     const aVs = a[vsParKey] ?? 999
@@ -610,6 +635,30 @@ function NetLeaderboard({ complete, inProgress, flight, vsParKey = 'netVsPar', g
                   {p.player?.last_name}, {p.player?.first_name}
                 </div>
                 <div className="text-[10px] text-amber-600 mt-0.5">No Show</div>
+              </div>
+              <span className="text-xs text-ink-muted text-right">—</span>
+              <span className="text-xs text-ink-muted text-right">—</span>
+            </div>
+          ))}
+        </>
+      )}
+      {notStarted.length > 0 && (
+        <>
+          <div className="px-4 py-1.5 text-[10px] font-bold uppercase tracking-widest" style={{ background: '#f4f3f0', color: '#86868b' }}>
+            Not Started
+          </div>
+          {notStarted.map(ep => (
+            <div
+              key={ep.player_id}
+              className="grid grid-cols-[2.5rem_1fr_3.5rem_3rem] items-center px-4 py-3"
+              style={{ background: '#f9f8f6', borderBottom: '1px solid #ebe9e4', opacity: 0.6 }}
+            >
+              <span className="text-xs text-ink-muted font-semibold">—</span>
+              <div>
+                <div className="font-semibold text-sm text-ink leading-tight">
+                  {ep.player?.last_name}, {ep.player?.first_name}
+                </div>
+                <div className="text-[10px] text-ink-muted mt-0.5">CH {ep.course_handicap ?? '—'}</div>
               </div>
               <span className="text-xs text-ink-muted text-right">—</span>
               <span className="text-xs text-ink-muted text-right">—</span>
