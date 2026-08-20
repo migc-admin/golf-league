@@ -142,11 +142,16 @@ export default function LeagueHome({ orgSlug, leagueSlug, initialTab = 'events' 
     if (!evs?.length) { setStandingsLoading(false); return }
 
     const eventIds = evs.map(e => e.id)
-    const [{ data: allEPs }, { data: allScores }, { data: allSideGames }] = await Promise.all([
+    const [{ data: allEPs }, { data: allSideGames }] = await Promise.all([
       supabase.from('event_players').select('*, player:players(*)').in('event_id', eventIds),
-      supabase.from('scores').select('*').in('event_id', eventIds),
       supabase.from('side_games').select('*, winner:players(first_name,last_name)').in('event_id', eventIds),
     ])
+    // Fetch scores per-event to avoid Supabase's 1000-row server limit
+    const scoresByEvent = {}
+    await Promise.all(evs.map(async ev => {
+      const { data } = await supabase.from('scores').select('*').eq('event_id', ev.id)
+      scoresByEvent[ev.id] = data ?? []
+    }))
 
     const playerEarnings  = {}   // playerId → { player, totalEarnings, eventsPlayed, byEvent, itemsByEvent }
     const sideGameTotals  = {}   // playerId → { player, skinsWon, skinsTotal, ctpWins, ctpTotal, ldWins, ldTotal, lpWins, lpTotal }
@@ -155,7 +160,7 @@ export default function LeagueHome({ orgSlug, leagueSlug, initialTab = 'events' 
       const course    = ev.course
       if (!course) continue
       const eps       = (allEPs       ?? []).filter(ep => ep.event_id === ev.id)
-      const scores    = (allScores    ?? []).filter(s  => s.event_id  === ev.id)
+      const scores    = scoresByEvent[ev.id] ?? []
       const sideGames = (allSideGames ?? []).filter(sg => sg.event_id === ev.id)
       if (!eps.length) continue
 
@@ -221,7 +226,7 @@ export default function LeagueHome({ orgSlug, leagueSlug, initialTab = 'events' 
             sideGameTotals[playerId].lpTotal   += lpItems.reduce((s, i) => s + i.amount, 0)
           }
         }
-      } catch { /* skip */ }
+      } catch (err) { console.error('[Standings] error for event', ev.name, err) }
     }
 
     const sorted = Object.values(playerEarnings).sort((a, b) => b.totalEarnings - a.totalEarnings)
