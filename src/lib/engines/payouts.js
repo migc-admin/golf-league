@@ -24,8 +24,8 @@ function flightLetterOf(key) {
   // skins_a, long_drive_b, low_putts_c
   const sideMatch = key.match(/^(?:skins|long_drive|low_putts)_([a-z])$/)
   if (sideMatch) return sideMatch[1].toUpperCase()
-  // 18_net_a_1st, f9_b_2nd, b9_c_3rd
-  const scoringMatch = key.match(/^(?:18_net|f9|b9)_([a-z])_(?:1st|2nd|3rd)$/)
+  // 18_net_a_1st, 18_gross_a_1st, f9_b_2nd, b9_c_3rd
+  const scoringMatch = key.match(/^(?:18_net|18_gross|f9|b9)_([a-z])_(?:1st|2nd|3rd)$/)
   if (scoringMatch) return scoringMatch[1].toUpperCase()
   return null
 }
@@ -48,6 +48,9 @@ export function getCategoryLabel(key) {
   if (key === 'f9_2nd')     return 'Front 9 Net — 2nd'
   if (key === 'b9_1st')     return 'Back 9 Net — 1st'
   if (key === 'b9_2nd')     return 'Back 9 Net — 2nd'
+  if (key === '18_gross_1st') return 'Low Gross — 1st'
+  if (key === '18_gross_2nd') return 'Low Gross — 2nd'
+  if (key === '18_gross_3rd') return 'Low Gross — 3rd'
 
   // Per-flight patterns — any letter
   const fl = flightLetterOf(key)
@@ -58,6 +61,10 @@ export function getCategoryLabel(key) {
     if (key.startsWith('18_net_')) {
       const rank = key.split('_').pop()
       return `18-Hole Net — Flight ${fl}, ${rank}`
+    }
+    if (key.startsWith('18_gross_')) {
+      const rank = key.split('_').pop()
+      return `Low Gross — Flight ${fl}, ${rank}`
     }
     if (key.startsWith('f9_')) {
       const rank = key.split('_').pop()
@@ -85,6 +92,8 @@ export const DEFAULT_PAYOUT_CONFIG = {
   // Per-flight (A/B defaults — applied to any letter)
   '18_net_a_1st': 3, '18_net_a_2nd': 2, '18_net_a_3rd': 1,
   '18_net_b_1st': 3, '18_net_b_2nd': 2, '18_net_b_3rd': 1,
+  '18_gross_a_1st': 3, '18_gross_a_2nd': 2, '18_gross_a_3rd': 1,
+  '18_gross_b_1st': 3, '18_gross_b_2nd': 2, '18_gross_b_3rd': 1,
   'f9_a_1st': 2, 'f9_a_2nd': 1,
   'f9_b_1st': 2, 'f9_b_2nd': 1,
   'b9_a_1st': 2, 'b9_a_2nd': 1,
@@ -93,6 +102,7 @@ export const DEFAULT_PAYOUT_CONFIG = {
   'long_drive_a': 0, 'long_drive_b': 0,
   // No-flight
   '18_net_1st': 3, '18_net_2nd': 2, '18_net_3rd': 1,
+  '18_gross_1st': 3, '18_gross_2nd': 2, '18_gross_3rd': 1,
   'f9_1st': 2, 'f9_2nd': 1,
   'b9_1st': 2, 'b9_2nd': 1,
   'skins': 2,
@@ -135,6 +145,15 @@ export function activePayoutKeys(event) {
       flightLetters.forEach(l => placeKeys.forEach(p => keys.push(`18_net_${l}_${p}`)))
     } else {
       placeKeys.forEach(p => keys.push(`18_net_${p}`))
+    }
+  }
+  if (formats.includes('low_gross')) {
+    const places = Math.min(payoutPlaces.low_gross ?? 3, 3)
+    const placeKeys = Array.from({ length: places }, (_, i) => ['1st','2nd','3rd'][i])
+    if (hasFlights) {
+      flightLetters.forEach(l => placeKeys.forEach(p => keys.push(`18_gross_${l}_${p}`)))
+    } else {
+      placeKeys.forEach(p => keys.push(`18_gross_${p}`))
     }
   }
   if (formats.includes('net_stroke_front9')) {
@@ -188,6 +207,16 @@ function resolveWinners(key, leaderboards, sideGames) {
     const list = fl
       ? (leaderboards.full?.[fl] ?? [])
       : Object.values(leaderboards.full ?? {}).flat()
+    return list.filter(p => p.rank === rank).map(p => p.player_id)
+  }
+  // Low Gross (18-hole, per-flight or full field)
+  if (key.startsWith('18_gross_')) {
+    const fl = flightLetterOf(key)
+    const suffix = key.split('_').pop()
+    const rank = rankMap[suffix]
+    const list = fl
+      ? (leaderboards.grossFull?.[fl] ?? [])
+      : Object.values(leaderboards.grossFull ?? {}).flat()
     return list.filter(p => p.rank === rank).map(p => p.player_id)
   }
   // Front 9

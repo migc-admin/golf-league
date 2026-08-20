@@ -168,7 +168,7 @@ export function computeStableford(eventPlayers, allScores, course) {
  * @param {Array} eventPlayers   — from event_players with player attached
  * @param {Array} allScores      — from scores table
  * @param {Object} course        — { par_per_hole, stroke_index }
- * @returns {{ full, front9, back9, putts }}  each is an array sorted by score asc
+ * @returns {{ full, front9, back9, grossFull, putts }}  each is an array sorted by score asc
  */
 export function computeLeaderboards(eventPlayers, allScores, course) {
   const { par_per_hole: parPerHole } = course
@@ -230,14 +230,16 @@ export function computeLeaderboards(eventPlayers, allScores, course) {
       netVsPar:  net18   - parPlayed,
       f9VsPar:   netF9   - parF9,
       b9VsPar:   netB9   - parB9,
+      grossVsPar: gross18 - parPlayed,
       totalPutts: playerScores.length > 0 ? totalPutts : null,
     }
   })
 
   // Sort helpers
-  const byNet18  = (a, b) => a.net18  - b.net18  || a.holesCompleted - b.holesCompleted
-  const byNetF9  = (a, b) => a.netF9  - b.netF9  || a.f9Holes - b.f9Holes
-  const byNetB9  = (a, b) => a.netB9  - b.netB9  || a.b9Holes - b.b9Holes
+  const byNet18   = (a, b) => a.net18   - b.net18   || a.holesCompleted - b.holesCompleted
+  const byNetF9   = (a, b) => a.netF9   - b.netF9   || a.f9Holes - b.f9Holes
+  const byNetB9   = (a, b) => a.netB9   - b.netB9   || a.b9Holes - b.b9Holes
+  const byGross18 = (a, b) => a.gross18 - b.gross18 || a.holesCompleted - b.holesCompleted
   const byPutts  = (a, b) => {
     if (a.totalPutts == null) return 1
     if (b.totalPutts == null) return -1
@@ -283,6 +285,12 @@ export function computeLeaderboards(eventPlayers, allScores, course) {
       B: withRank(flightB.filter(p => p.b9Holes === 9), byNetB9, p => p.netB9),
       AInProgress: withRank(flightA.filter(p => p.b9Holes > 0 && p.b9Holes < 9), byNetB9, p => p.netB9),
       BInProgress: withRank(flightB.filter(p => p.b9Holes > 0 && p.b9Holes < 9), byNetB9, p => p.netB9),
+    },
+    grossFull: {
+      A: withRank(flightA.filter(p => p.holesCompleted === 18), byGross18, p => p.gross18),
+      B: withRank(flightB.filter(p => p.holesCompleted === 18), byGross18, p => p.gross18),
+      AInProgress: withRank(flightA.filter(p => p.holesCompleted > 0 && p.holesCompleted < 18), byGross18, p => p.gross18),
+      BInProgress: withRank(flightB.filter(p => p.holesCompleted > 0 && p.holesCompleted < 18), byGross18, p => p.gross18),
     },
     putts: withRank(players.filter(p => p.holesCompleted === 18 && p.totalPutts != null), byPutts, p => p.totalPutts),
   }

@@ -12,6 +12,7 @@ import { supabase } from '../lib/supabase'
 
 const FORMAT_LABELS = {
   net_stroke:   'Net Stroke Play',
+  low_gross:    'Low Gross',
   stableford:   'Stableford',
   match_points: 'Match Play Points',
   ryder_cup:    'Ryder Cup',
@@ -19,6 +20,7 @@ const FORMAT_LABELS = {
 
 const FORMAT_DESCRIPTIONS = {
   net_stroke:   'Lowest net score wins. Handicap strokes applied per USGA allocation.',
+  low_gross:    'Lowest raw gross score wins. No handicap applied.',
   stableford:   'Points per hole. Eagle=4, Birdie=3, Par=2, Bogey=1, Double+=0. Most points wins.',
   match_points: 'Head-to-head within groups. Win a hole = 1 pt, halve = 0.5 pts each.',
   ryder_cup:    'Flight A vs Flight B team match play. Win/halve/lose each match for team points.',
@@ -396,7 +398,7 @@ function formatDate(d) {
 }
 
 function formatIcon(format) {
-  const icons = { net_stroke: '🏌️', stableford: '🎯', match_points: '⚔️', ryder_cup: '🏆' }
+  const icons = { net_stroke: '🏌️', low_gross: '⛳', stableford: '🎯', match_points: '⚔️', ryder_cup: '🏆' }
   return icons[format] ?? '⛳'
 }
 

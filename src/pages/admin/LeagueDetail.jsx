@@ -85,7 +85,7 @@ export default function LeagueDetail() {
 
       const { data: lg } = await supabase
         .from('leagues')
-        .select('id, name, slug, season_year, logo_url, team_play_label')
+        .select('id, name, slug, season_year, logo_url, team_play_label, standings_config')
         .eq('slug', leagueSlug)
         .single()
       if (!lg) { navigate('/admin/leagues'); return }
@@ -104,7 +104,7 @@ export default function LeagueDetail() {
 
   async function refreshLeague() {
     const { data: lg } = await supabase
-      .from('leagues').select('id, name, slug, season_year, logo_url, team_play_label').eq('id', league.id).single()
+      .from('leagues').select('id, name, slug, season_year, logo_url, team_play_label, standings_config').eq('id', league.id).single()
     if (lg) setLeague(lg)
     await load(orgSlug, league.id)
   }
@@ -132,7 +132,7 @@ export default function LeagueDetail() {
           <div className="shrink-0">
             {checkFeature(orgTier ?? 'free', 'custom_branding') ? (
               <ImageUpload
-                shape="rect"
+                shape="circle"
                 path={`orgs/${orgSlug}/leagues/${league.id}/logo`}
                 currentUrl={league.logo_url ?? null}
                 onUploaded={async (url) => {
@@ -232,6 +232,9 @@ export default function LeagueDetail() {
           </div>
         )}
       </div>
+
+      {/* Standings Settings */}
+      <StandingsSettings league={league} onSaved={refreshLeague} />
 
       <LeagueModal
         open={leagueModal}
@@ -995,4 +998,85 @@ function formatDate(d) {
   return new Date(d + 'T00:00:00').toLocaleDateString('en-US', {
     weekday: 'short', month: 'short', day: 'numeric',
   })
+}
+
+// ─── Standings Settings ───────────────────────────────────────────────────────
+const STANDINGS_TOGGLES = [
+  { key: 'include_scoring',    label: 'Scoring (Net / Gross / Stableford)', description: 'Place finishes from scoring formats count toward season earnings' },
+  { key: 'include_skins',      label: 'Skins',                              description: 'Skins hole winnings count toward season earnings' },
+  { key: 'include_ctp',        label: 'Closest to Pin (CTP)',               description: 'CTP winnings count toward season earnings' },
+  { key: 'include_long_drive', label: 'Long Drive',                         description: 'Long Drive winnings count toward season earnings' },
+  { key: 'include_low_putts',  label: 'Low Putts',                          description: 'Low Putts winnings count toward season earnings' },
+]
+
+const DEFAULT_STANDINGS_CONFIG = {
+  include_scoring:    true,
+  include_skins:      true,
+  include_ctp:        true,
+  include_long_drive: true,
+  include_low_putts:  false,
+}
+
+function StandingsSettings({ league, onSaved }) {
+  const config = { ...DEFAULT_STANDINGS_CONFIG, ...(league?.standings_config ?? {}) }
+  const [saving, setSaving] = useState(false)
+  const [local,  setLocal]  = useState(config)
+
+  useEffect(() => {
+    setLocal({ ...DEFAULT_STANDINGS_CONFIG, ...(league?.standings_config ?? {}) })
+  }, [league])
+
+  function toggle(key) {
+    setLocal(prev => ({ ...prev, [key]: !prev[key] }))
+  }
+
+  async function handleSave() {
+    setSaving(true)
+    const { error } = await supabase.from('leagues').update({ standings_config: local }).eq('id', league.id)
+    setSaving(false)
+    if (error) toast.error(error.message)
+    else { toast.success('Standings settings saved'); onSaved() }
+  }
+
+  const dirty = JSON.stringify(local) !== JSON.stringify(config)
+
+  return (
+    <div className="card p-5 space-y-4">
+      <div className="flex items-center justify-between">
+        <div>
+          <h2 className="text-base font-bold text-ink">Standings Settings</h2>
+          <p className="text-xs text-ink-muted mt-0.5">Choose which categories count toward season earnings on the public standings page.</p>
+        </div>
+        {dirty && (
+          <Button size="sm" loading={saving} onClick={handleSave}>Save</Button>
+        )}
+      </div>
+      <div className="space-y-3">
+        {STANDINGS_TOGGLES.map(({ key, label, description }) => (
+          <label key={key} className="flex items-start gap-3 cursor-pointer group">
+            <div className="relative mt-0.5 flex-shrink-0">
+              <input
+                type="checkbox"
+                className="sr-only"
+                checked={local[key]}
+                onChange={() => toggle(key)}
+              />
+              <div
+                className="w-9 h-5 rounded-full transition-colors"
+                style={{ background: local[key] ? '#1B4332' : '#d1d5db' }}
+              />
+              <div
+                className="absolute top-0.5 left-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform"
+                style={{ transform: local[key] ? 'translateX(16px)' : 'translateX(0)' }}
+              />
+            </div>
+            <div>
+              <div className="text-sm font-semibold text-ink leading-tight">{label}</div>
+              <div className="text-xs text-ink-muted mt-0.5">{description}</div>
+            </div>
+          </label>
+        ))}
+      </div>
+    </div>
+  )
 }

@@ -18,7 +18,6 @@ import EventDetail    from './pages/admin/EventDetail'
 import Scorecard      from './pages/Scorecard'
 import ScorecardJoin  from './pages/ScorecardJoin'
 import Leaderboard    from './pages/Leaderboard'
-import Standings      from './pages/Standings'
 import Schedule       from './pages/Schedule'
 import EventPage      from './pages/EventPage'
 import Import         from './pages/admin/Import'
@@ -39,9 +38,14 @@ function OrgRouteWrapper({ children }) {
   return <OrgProvider orgSlug={orgSlug}>{children}</OrgProvider>
 }
 
-function LeagueHomeRoute({ orgSlug }) {
+function LeagueHomeRoute({ orgSlug, initialTab }) {
   const { leagueSlug } = useParams()
-  return <LeagueHome orgSlug={orgSlug} leagueSlug={leagueSlug} />
+  return <LeagueHome orgSlug={orgSlug} leagueSlug={leagueSlug} initialTab={initialTab} />
+}
+
+function LeagueStandingsRoute() {
+  const { orgSlug, leagueSlug } = useParams()
+  return <OrgProvider orgSlug={orgSlug}><LeagueHome orgSlug={orgSlug} leagueSlug={leagueSlug} initialTab="standings" /></OrgProvider>
 }
 
 export default function App() {
@@ -104,7 +108,7 @@ export default function App() {
         <Route path="/" element={<Navigate to="/home" replace />} />
 
         {/* Generic slug-based routes — must be LAST to avoid conflicts */}
-        <Route path="/:orgSlug/:leagueSlug/standings"              element={<OrgRouteWrapper><Standings /></OrgRouteWrapper>} />
+        <Route path="/:orgSlug/:leagueSlug/standings"              element={<LeagueStandingsRoute />} />
         <Route path="/:orgSlug/:leagueSlug/:eventSlug/event"       element={<EventPage />} />
         <Route path="/:orgSlug/:leagueSlug/:eventSlug/leaderboard" element={<OrgRouteWrapper><Leaderboard /></OrgRouteWrapper>} />
         <Route path="/:orgSlug/:leagueSlug/:eventSlug/schedule"    element={<OrgRouteWrapper><Schedule /></OrgRouteWrapper>} />
