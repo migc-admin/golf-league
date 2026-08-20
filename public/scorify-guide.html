@@ -1,0 +1,945 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Scorify Golf — Admin Guide</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700;900&family=Inter:wght@400;500;600;700;800&display=swap');
+
+    :root {
+      --green: #1B4332;
+      --green-light: #eaf1ec;
+      --gold: #D4AF37;
+      --ink: #1d1d1f;
+      --muted: #6b7280;
+      --border: #e5e7eb;
+      --bg: #f9f8f5;
+    }
+
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      font-family: 'Inter', sans-serif;
+      background: var(--bg);
+      color: var(--ink);
+      font-size: 15px;
+      line-height: 1.6;
+    }
+
+    /* ── Layout ── */
+    .layout { display: flex; min-height: 100vh; }
+
+    /* ── Sidebar ── */
+    .sidebar {
+      width: 260px;
+      flex-shrink: 0;
+      background: var(--green);
+      position: sticky;
+      top: 0;
+      height: 100vh;
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+    }
+    .sidebar-logo {
+      padding: 28px 24px 20px;
+      border-bottom: 1px solid rgba(255,255,255,0.1);
+    }
+    .logo-row { display: flex; align-items: center; gap: 10px; }
+    .logo-mark {
+      width: 36px; height: 36px;
+      background: var(--gold);
+      border-radius: 8px;
+      display: flex; align-items: center; justify-content: center;
+      flex-shrink: 0;
+    }
+    .logo-name {
+      font-family: 'Playfair Display', serif;
+      font-size: 17px; font-weight: 900;
+      color: #fff; line-height: 1;
+    }
+    .logo-sub { font-size: 10px; color: rgba(255,255,255,0.5); font-weight: 600; margin-top: 2px; letter-spacing: 0.06em; text-transform: uppercase; }
+    .guide-label { font-size: 10px; color: rgba(255,255,255,0.4); font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; margin-top: 14px; }
+
+    .nav { padding: 16px 0; flex: 1; }
+    .nav-section { padding: 6px 24px 4px; font-size: 10px; font-weight: 700; color: rgba(255,255,255,0.35); letter-spacing: 0.1em; text-transform: uppercase; margin-top: 10px; }
+    .nav a {
+      display: flex; align-items: center; gap: 10px;
+      padding: 9px 24px;
+      font-size: 13px; font-weight: 500;
+      color: rgba(255,255,255,0.7);
+      text-decoration: none;
+      border-left: 3px solid transparent;
+      transition: all 0.15s;
+    }
+    .nav a:hover { color: #fff; background: rgba(255,255,255,0.06); }
+    .nav a.active { color: #fff; border-left-color: var(--gold); background: rgba(255,255,255,0.08); font-weight: 700; }
+    .nav-num {
+      width: 20px; height: 20px; border-radius: 50%;
+      background: rgba(255,255,255,0.12);
+      font-size: 10px; font-weight: 800;
+      display: flex; align-items: center; justify-content: center;
+      flex-shrink: 0; color: rgba(255,255,255,0.6);
+    }
+    .nav a.active .nav-num { background: var(--gold); color: var(--green); }
+
+    /* ── Main content ── */
+    .main { flex: 1; overflow-y: auto; }
+
+    /* ── Sections ── */
+    .section {
+      max-width: 820px;
+      margin: 0 auto;
+      padding: 52px 48px 80px;
+      border-bottom: 1px solid var(--border);
+    }
+    .section:last-child { border-bottom: none; }
+
+    .section-eyebrow {
+      font-size: 11px; font-weight: 700; color: var(--gold);
+      text-transform: uppercase; letter-spacing: 0.1em;
+      margin-bottom: 8px;
+    }
+    .section-title {
+      font-family: 'Playfair Display', serif;
+      font-size: 32px; font-weight: 900;
+      color: var(--ink); letter-spacing: -0.02em;
+      line-height: 1.15; margin-bottom: 6px;
+    }
+    .section-subtitle {
+      font-size: 15px; color: var(--muted);
+      margin-bottom: 36px; max-width: 600px;
+    }
+    .gold-bar { width: 40px; height: 4px; background: var(--gold); border-radius: 2px; margin-bottom: 24px; }
+
+    /* ── Steps ── */
+    .steps { display: flex; flex-direction: column; gap: 0; }
+    .step {
+      display: flex; gap: 20px;
+      padding: 24px 0;
+      border-bottom: 1px solid var(--border);
+    }
+    .step:last-child { border-bottom: none; }
+    .step-left { display: flex; flex-direction: column; align-items: center; gap: 0; flex-shrink: 0; }
+    .step-num {
+      width: 36px; height: 36px; border-radius: 50%;
+      background: var(--green); color: #fff;
+      font-size: 14px; font-weight: 800;
+      display: flex; align-items: center; justify-content: center;
+      flex-shrink: 0;
+    }
+    .step-line { width: 2px; flex: 1; background: var(--border); margin: 6px 0; min-height: 20px; }
+    .step-body { flex: 1; padding-top: 6px; }
+    .step-title { font-size: 16px; font-weight: 800; color: var(--ink); margin-bottom: 6px; }
+    .step-desc { font-size: 14px; color: #374151; line-height: 1.65; }
+    .step-desc p { margin-bottom: 8px; }
+    .step-desc p:last-child { margin-bottom: 0; }
+
+    /* ── Where box ── */
+    .where {
+      display: inline-flex; align-items: center; gap: 6px;
+      background: var(--green-light);
+      border: 1px solid #c6dece;
+      border-radius: 6px;
+      padding: 4px 10px;
+      font-size: 12px; font-weight: 700; color: var(--green);
+      margin-bottom: 10px;
+    }
+
+    /* ── Tip / Note boxes ── */
+    .tip {
+      background: #fffbeb; border: 1px solid #fde68a;
+      border-radius: 10px; padding: 12px 16px;
+      font-size: 13px; color: #78350f;
+      margin-top: 12px;
+    }
+    .tip strong { color: #92400e; }
+    .note {
+      background: #eff6ff; border: 1px solid #bfdbfe;
+      border-radius: 10px; padding: 12px 16px;
+      font-size: 13px; color: #1e40af;
+      margin-top: 12px;
+    }
+    .note strong { color: #1d4ed8; }
+
+    /* ── Field list ── */
+    .fields { display: flex; flex-direction: column; gap: 8px; margin-top: 12px; }
+    .field {
+      display: flex; gap: 12px; align-items: flex-start;
+      background: #fff; border: 1px solid var(--border);
+      border-radius: 8px; padding: 10px 14px;
+    }
+    .field-name { font-size: 13px; font-weight: 700; color: var(--ink); min-width: 160px; flex-shrink: 0; }
+    .field-desc { font-size: 13px; color: var(--muted); line-height: 1.5; }
+    .required { color: #dc2626; font-size: 11px; font-weight: 700; margin-left: 4px; }
+    .optional { color: #9ca3af; font-size: 11px; font-weight: 600; margin-left: 4px; }
+
+    /* ── Checklist ── */
+    .checklist { display: flex; flex-direction: column; gap: 6px; margin-top: 12px; }
+    .check-item {
+      display: flex; gap: 10px; align-items: flex-start;
+      font-size: 14px; color: #374151;
+    }
+    .check-box {
+      width: 18px; height: 18px; border-radius: 4px;
+      border: 2px solid var(--border);
+      flex-shrink: 0; margin-top: 2px;
+    }
+
+    /* ── Info cards grid ── */
+    .cards-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-top: 16px; }
+    .info-card {
+      background: #fff; border: 1px solid var(--border);
+      border-radius: 12px; padding: 18px 20px;
+    }
+    .info-card-icon { font-size: 24px; margin-bottom: 8px; }
+    .info-card-title { font-size: 14px; font-weight: 800; color: var(--ink); margin-bottom: 4px; }
+    .info-card-desc { font-size: 13px; color: var(--muted); line-height: 1.5; }
+
+    /* ── Cover / hero section ── */
+    .hero {
+      background: var(--green);
+      padding: 72px 48px;
+      max-width: 100%;
+    }
+    .hero-inner { max-width: 820px; margin: 0 auto; }
+    .hero-eyebrow { font-size: 11px; font-weight: 700; color: var(--gold); text-transform: uppercase; letter-spacing: 0.12em; margin-bottom: 12px; }
+    .hero-title { font-family: 'Playfair Display', serif; font-size: 44px; font-weight: 900; color: #fff; line-height: 1.1; letter-spacing: -0.02em; margin-bottom: 16px; }
+    .hero-sub { font-size: 17px; color: rgba(255,255,255,0.65); max-width: 520px; line-height: 1.6; margin-bottom: 32px; }
+    .hero-divider { width: 48px; height: 4px; background: var(--gold); border-radius: 2px; margin-bottom: 32px; }
+
+    .toc { display: flex; flex-direction: column; gap: 10px; }
+    .toc-item {
+      display: flex; align-items: center; gap: 14px;
+      background: rgba(255,255,255,0.07);
+      border: 1px solid rgba(255,255,255,0.1);
+      border-radius: 10px; padding: 12px 16px;
+      text-decoration: none; color: #fff;
+      transition: background 0.15s;
+    }
+    .toc-item:hover { background: rgba(255,255,255,0.12); }
+    .toc-num {
+      width: 28px; height: 28px; border-radius: 50%;
+      background: var(--gold); color: var(--green);
+      font-size: 12px; font-weight: 900;
+      display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+    }
+    .toc-label { font-size: 14px; font-weight: 600; }
+    .toc-arrow { margin-left: auto; color: rgba(255,255,255,0.3); font-size: 16px; }
+
+    /* ── Tag pills ── */
+    .tag {
+      display: inline-flex; align-items: center;
+      padding: 3px 8px; border-radius: 99px;
+      font-size: 11px; font-weight: 700;
+    }
+    .tag-green { background: var(--green-light); color: var(--green); }
+    .tag-gold { background: #fef3c7; color: #92400e; }
+    .tag-blue { background: #eff6ff; color: #1d4ed8; }
+
+    /* ── Print ── */
+    @media print {
+      body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+      .sidebar { display: none; }
+      .section { break-inside: avoid; page-break-after: always; }
+      .hero { page-break-after: always; }
+    }
+
+    /* ── Mobile ── */
+    @media (max-width: 768px) {
+      .sidebar { display: none; }
+      .section { padding: 36px 20px 60px; }
+      .hero { padding: 48px 20px; }
+      .cards-grid { grid-template-columns: 1fr; }
+      .field { flex-direction: column; gap: 4px; }
+      .field-name { min-width: unset; }
+    }
+
+    a { color: inherit; }
+  </style>
+</head>
+<body>
+<div class="layout">
+
+  <!-- Sidebar nav -->
+  <nav class="sidebar">
+    <div class="sidebar-logo">
+      <div class="logo-row">
+        <div class="logo-mark">
+          <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
+            <path d="M10 1L19 10L10 19L1 10L10 1Z" fill="#1B4332"/>
+            <path d="M10 5L15 10L10 15L5 10L10 5Z" fill="white" opacity="0.5"/>
+          </svg>
+        </div>
+        <div>
+          <div class="logo-name">Scorify Golf</div>
+          <div class="logo-sub">Admin Guide</div>
+        </div>
+      </div>
+      <div class="guide-label">Complete Setup Guide</div>
+    </div>
+    <div class="nav">
+      <a href="#welcome" class="active"><span class="nav-num">★</span> Welcome</a>
+
+      <div class="nav-section">Setup</div>
+      <a href="#courses"><span class="nav-num">1</span> Courses</a>
+      <a href="#leagues"><span class="nav-num">2</span> Leagues</a>
+      <a href="#events"><span class="nav-num">3</span> Events</a>
+      <a href="#players"><span class="nav-num">4</span> Players</a>
+      <a href="#groups"><span class="nav-num">5</span> Groups</a>
+
+      <div class="nav-section">Event Day</div>
+      <a href="#scoring"><span class="nav-num">6</span> Scoring</a>
+      <a href="#payout"><span class="nav-num">7</span> Payouts</a>
+      <a href="#print"><span class="nav-num">8</span> Print Assets</a>
+
+      <div class="nav-section">More</div>
+      <a href="#registration"><span class="nav-num">9</span> Registration</a>
+      <a href="#tips"><span class="nav-num">✓</span> Pro Tips</a>
+    </div>
+  </nav>
+
+  <!-- Main -->
+  <div class="main">
+
+    <!-- Hero / Welcome -->
+    <div class="hero" id="welcome">
+      <div class="hero-inner">
+        <div class="hero-eyebrow">Scorify Golf — Admin Guide</div>
+        <div class="hero-title">Welcome to<br/>Scorify Golf.</div>
+        <div class="hero-divider"></div>
+        <div class="hero-sub">This guide walks you through everything you need to run your first event — from setting up a course to posting final results.</div>
+
+        <div class="toc">
+          <a href="#courses" class="toc-item"><span class="toc-num">1</span><span class="toc-label">Add your golf course</span><span class="toc-arrow">→</span></a>
+          <a href="#leagues" class="toc-item"><span class="toc-num">2</span><span class="toc-label">Create a league</span><span class="toc-arrow">→</span></a>
+          <a href="#events" class="toc-item"><span class="toc-num">3</span><span class="toc-label">Set up an event</span><span class="toc-arrow">→</span></a>
+          <a href="#players" class="toc-item"><span class="toc-num">4</span><span class="toc-label">Add players</span><span class="toc-arrow">→</span></a>
+          <a href="#groups" class="toc-item"><span class="toc-num">5</span><span class="toc-label">Assign groups & tee times</span><span class="toc-arrow">→</span></a>
+          <a href="#scoring" class="toc-item"><span class="toc-num">6</span><span class="toc-label">Run digital scoring</span><span class="toc-arrow">→</span></a>
+          <a href="#payout" class="toc-item"><span class="toc-num">7</span><span class="toc-label">Record results & payouts</span><span class="toc-arrow">→</span></a>
+          <a href="#print" class="toc-item"><span class="toc-num">8</span><span class="toc-label">Print assets</span><span class="toc-arrow">→</span></a>
+        </div>
+      </div>
+    </div>
+
+    <!-- 1. Courses -->
+    <div class="section" id="courses">
+      <div class="section-eyebrow">Step 1</div>
+      <div class="section-title">Add Your Golf Course</div>
+      <div class="gold-bar"></div>
+      <div class="section-subtitle">Before creating any events, add the course you play at. Scorify uses course data to calculate handicaps, display hole info during scoring, and generate tee sheets.</div>
+
+      <div class="steps">
+        <div class="step">
+          <div class="step-left"><div class="step-num">1</div><div class="step-line"></div></div>
+          <div class="step-body">
+            <div class="where">⛳ Admin → Courses → New Course</div>
+            <div class="step-title">Search for your course</div>
+            <div class="step-desc">
+              <p>Type your course name in the search bar. Scorify pulls data from a golf course database — if your course is listed, select it and the holes, par, yardage, slope, and rating will auto-populate.</p>
+              <p>If your course isn't in the database, click <strong>Create Manually</strong> to enter it yourself.</p>
+            </div>
+            <div class="tip"><strong>Tip:</strong> Search by city or partial name if the full name doesn't return results.</div>
+          </div>
+        </div>
+
+        <div class="step">
+          <div class="step-left"><div class="step-num">2</div><div class="step-line"></div></div>
+          <div class="step-body">
+            <div class="step-title">Choose number of holes</div>
+            <div class="step-desc">
+              <p>Select <strong>18 holes</strong> (default) or <strong>9 holes</strong> for a nine-hole course. This controls which holes appear during scoring and on print assets.</p>
+            </div>
+          </div>
+        </div>
+
+        <div class="step">
+          <div class="step-left"><div class="step-num">3</div><div class="step-line"></div></div>
+          <div class="step-body">
+            <div class="step-title">Is the course officially rated?</div>
+            <div class="step-desc">
+              <p>Toggle <strong>Yes</strong> if the course has an official USGA course rating and slope. This is needed for accurate handicap calculations.</p>
+              <p>Toggle <strong>No</strong> for unrated courses (executive courses, private layouts, etc.) — Slope, Rating, and Stroke Index are not required.</p>
+            </div>
+          </div>
+        </div>
+
+        <div class="step">
+          <div class="step-left"><div class="step-num">4</div><div class="step-line"></div></div>
+          <div class="step-body">
+            <div class="step-title">Review tee information</div>
+            <div class="step-desc">
+              <p>For each tee set (e.g. Blue, White, Red), confirm or enter:</p>
+            </div>
+            <div class="fields">
+              <div class="field"><span class="field-name">Slope <span class="required">*</span></span><span class="field-desc">Used to calculate course handicap. Typically between 55–155.</span></div>
+              <div class="field"><span class="field-name">Rating <span class="required">*</span></span><span class="field-desc">Expected score for a scratch golfer. Usually close to par.</span></div>
+              <div class="field"><span class="field-name">Par per hole <span class="required">*</span></span><span class="field-desc">Par for each individual hole (3, 4, or 5).</span></div>
+              <div class="field"><span class="field-name">Yardage <span class="optional">optional</span></span><span class="field-desc">Displayed on the scorecard during scoring.</span></div>
+              <div class="field"><span class="field-name">Stroke Index <span class="required">*</span></span><span class="field-desc">Handicap stroke allocation per hole (1 = hardest).</span></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="step">
+          <div class="step-left"><div class="step-num">5</div></div>
+          <div class="step-body">
+            <div class="step-title">Save the course</div>
+            <div class="step-desc">Click <strong>Save Course</strong>. It will now appear in your course list and be available when creating events.</div>
+            <div class="note"><strong>Note:</strong> You can edit a course at any time. Changes apply to future events only — scores already recorded are not affected.</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 2. Leagues -->
+    <div class="section" id="leagues">
+      <div class="section-eyebrow">Step 2</div>
+      <div class="section-title">Create a League</div>
+      <div class="gold-bar"></div>
+      <div class="section-subtitle">A league groups your events together for a season. Think of it as a container — all events, players, standings, and payouts belong to a league.</div>
+
+      <div class="steps">
+        <div class="step">
+          <div class="step-left"><div class="step-num">1</div><div class="step-line"></div></div>
+          <div class="step-body">
+            <div class="where">🏆 Admin → Leagues → New League</div>
+            <div class="step-title">Name your league</div>
+            <div class="step-desc">Give it a clear name — players will see this on the public event page and scorecards. Examples: <em>Friday Morning Golf</em>, <em>SGV9 Golf Club — Fall 2026</em>.</div>
+          </div>
+        </div>
+
+        <div class="step">
+          <div class="step-left"><div class="step-num">2</div><div class="step-line"></div></div>
+          <div class="step-body">
+            <div class="step-title">Set the season year</div>
+            <div class="step-desc">Used to organize leagues by year and display on standings pages.</div>
+          </div>
+        </div>
+
+        <div class="step">
+          <div class="step-left"><div class="step-num">3</div><div class="step-line"></div></div>
+          <div class="step-body">
+            <div class="step-title">Choose a primary scoring format</div>
+            <div class="step-desc">
+              <p>This sets the default format for all events in the league. You can override it per event.</p>
+            </div>
+            <div class="fields">
+              <div class="field"><span class="field-name">Net Stroke Play</span><span class="field-desc">Gross score minus course handicap. Most common format.</span></div>
+              <div class="field"><span class="field-name">Gross Stroke Play</span><span class="field-desc">Raw strokes, no handicap adjustment.</span></div>
+              <div class="field"><span class="field-name">Stableford</span><span class="field-desc">Points per hole relative to net par. Higher = better.</span></div>
+              <div class="field"><span class="field-name">Nassau</span><span class="field-desc">Three separate competitions: front 9, back 9, total.</span></div>
+              <div class="field"><span class="field-name">Best Ball / Scramble / Shamble</span><span class="field-desc">Team formats. Best Ball uses each player's best score per hole.</span></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="step">
+          <div class="step-left"><div class="step-num">4</div><div class="step-line"></div></div>
+          <div class="step-body">
+            <div class="step-title">Configure side games</div>
+            <div class="step-desc">Side games run alongside the main format and have their own payouts.</div>
+            <div class="fields">
+              <div class="field"><span class="field-name">Skins</span><span class="field-desc">Hole-by-hole competition. Low net score wins the skin. Ties carry over.</span></div>
+              <div class="field"><span class="field-name">Closest to Pin (CTP)</span><span class="field-desc">Tee shot closest to the hole on designated par-3s.</span></div>
+              <div class="field"><span class="field-name">Long Drive</span><span class="field-desc">Longest drive in the fairway on designated holes.</span></div>
+              <div class="field"><span class="field-name">Low Putts</span><span class="field-desc">Fewest total putts across the round.</span></div>
+            </div>
+            <div class="tip"><strong>Tip:</strong> You can also add custom competitions (e.g. "Closest to the Tree", "Longest Par 3") using the free-form field.</div>
+          </div>
+        </div>
+
+        <div class="step">
+          <div class="step-left"><div class="step-num">5</div><div class="step-line"></div></div>
+          <div class="step-body">
+            <div class="step-title">Set entry fee & payout places</div>
+            <div class="step-desc">
+              <p>Enter the <strong>entry fee per player</strong>. This is used to calculate total prize pools automatically based on the number of players.</p>
+              <p>Set <strong>Places to Pay</strong> (1st, 2nd, 3rd, etc.) for overall and flight standings. Set to 0 if no payouts for that format.</p>
+            </div>
+          </div>
+        </div>
+
+        <div class="step">
+          <div class="step-left"><div class="step-num">6</div></div>
+          <div class="step-body">
+            <div class="step-title">Upload a league logo (optional)</div>
+            <div class="step-desc">Your logo appears on the public event page, scorecards, and print assets. Recommended: square image, at least 200×200px.</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 3. Events -->
+    <div class="section" id="events">
+      <div class="section-eyebrow">Step 3</div>
+      <div class="section-title">Create an Event</div>
+      <div class="gold-bar"></div>
+      <div class="section-subtitle">Events are individual rounds within a league. Each event has its own players, groups, scores, and payouts.</div>
+
+      <div class="steps">
+        <div class="step">
+          <div class="step-left"><div class="step-num">1</div><div class="step-line"></div></div>
+          <div class="step-body">
+            <div class="where">🏆 Admin → Leagues → [Your League] → New Event</div>
+            <div class="step-title">Set the basics</div>
+            <div class="fields">
+              <div class="field"><span class="field-name">Event Name <span class="optional">optional</span></span><span class="field-desc">Defaults to "Event #1", "Event #2" etc. Add a name for special events.</span></div>
+              <div class="field"><span class="field-name">Date <span class="required">*</span></span><span class="field-desc">The date of the round.</span></div>
+              <div class="field"><span class="field-name">Course <span class="required">*</span></span><span class="field-desc">Select from your saved courses.</span></div>
+              <div class="field"><span class="field-name">Tee Time <span class="optional">optional</span></span><span class="field-desc">First tee time. Used to calculate group tee times automatically.</span></div>
+              <div class="field"><span class="field-name">Holes Played <span class="required">*</span></span><span class="field-desc">18 (default) or 9. Controls the electronic scorecard and print assets.</span></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="step">
+          <div class="step-left"><div class="step-num">2</div><div class="step-line"></div></div>
+          <div class="step-body">
+            <div class="step-title">Configure scoring & side games</div>
+            <div class="step-desc">
+              <p>The event inherits settings from the league, but you can override anything here:</p>
+              <ul style="padding-left:18px;margin-top:6px;font-size:14px;color:#374151;line-height:1.8;">
+                <li>Scoring format (Net, Gross, Stableford, etc.)</li>
+                <li>Number of flights (A/B or single field)</li>
+                <li>Side games (Skins, CTP, Long Drive, Low Putts)</li>
+                <li>CTP hole numbers (which par-3s have a contest)</li>
+                <li>Custom competitions</li>
+                <li>Use Handicaps toggle</li>
+              </ul>
+            </div>
+          </div>
+        </div>
+
+        <div class="step">
+          <div class="step-left"><div class="step-num">3</div><div class="step-line"></div></div>
+          <div class="step-body">
+            <div class="step-title">Shotgun start? (optional)</div>
+            <div class="step-desc">
+              <p>Toggle <strong>Shotgun Start</strong> if all groups tee off simultaneously from different holes. You'll assign a starting hole to each group in the Groups tab.</p>
+              <p>Leave off for sequential tee times (groups go off Hole 1 at intervals).</p>
+            </div>
+          </div>
+        </div>
+
+        <div class="step">
+          <div class="step-left"><div class="step-num">4</div><div class="step-line"></div></div>
+          <div class="step-body">
+            <div class="step-title">Add event details (optional)</div>
+            <div class="step-desc">
+              <p>Fill out any optional fields to enhance the public event page:</p>
+            </div>
+            <div class="fields">
+              <div class="field"><span class="field-name">About this Event</span><span class="field-desc">Rich text description shown on the public page. Supports <strong>bold</strong> and <em>italic</em>.</span></div>
+              <div class="field"><span class="field-name">Schedule</span><span class="field-desc">Add check-in time, first tee, lunch, awards, etc.</span></div>
+              <div class="field"><span class="field-name">Sponsors</span><span class="field-desc">Add sponsor names, logos, and website links.</span></div>
+              <div class="field"><span class="field-name">Cover Photo</span><span class="field-desc">Hero image shown at the top of the public event page.</span></div>
+              <div class="field"><span class="field-name">Registration Spots</span><span class="field-desc">Max player count for online registration.</span></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="step">
+          <div class="step-left"><div class="step-num">5</div></div>
+          <div class="step-body">
+            <div class="step-title">Save the event</div>
+            <div class="step-desc">Your event is created with <span class="tag tag-blue">Upcoming</span> status. You'll activate it on the day of the round.</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 4. Players -->
+    <div class="section" id="players">
+      <div class="section-eyebrow">Step 4</div>
+      <div class="section-title">Add Players to the Event</div>
+      <div class="gold-bar"></div>
+      <div class="section-subtitle">Players need to be added to each event individually. You can pull from your existing roster or add someone new on the spot.</div>
+
+      <div class="steps">
+        <div class="step">
+          <div class="step-left"><div class="step-num">1</div><div class="step-line"></div></div>
+          <div class="step-body">
+            <div class="where">📋 Event → Players tab → Add Player to Event</div>
+            <div class="step-title">Select a player from your roster</div>
+            <div class="step-desc">Type a name to search your existing player list. If they're new, click <strong>+ Create New Player</strong> and enter their details.</div>
+          </div>
+        </div>
+
+        <div class="step">
+          <div class="step-left"><div class="step-num">2</div><div class="step-line"></div></div>
+          <div class="step-body">
+            <div class="step-title">Enter handicap information</div>
+            <div class="step-desc">
+              <p>For each player added to the event:</p>
+            </div>
+            <div class="fields">
+              <div class="field"><span class="field-name">Handicap Index <span class="required">*</span></span><span class="field-desc">The player's official USGA handicap index (e.g. 14.2). Scorify calculates the course handicap automatically.</span></div>
+              <div class="field"><span class="field-name">Tee</span><span class="field-desc">Which tee set they're playing from. Affects stroke index allocation.</span></div>
+              <div class="field"><span class="field-name">Flight <span class="optional">optional</span></span><span class="field-desc">A or B. Only appears if flights are enabled for the event.</span></div>
+            </div>
+            <div class="tip"><strong>Tip:</strong> If "Use Handicaps" is turned off for the event, handicap index is not required and course handicap won't be calculated.</div>
+          </div>
+        </div>
+
+        <div class="step">
+          <div class="step-left"><div class="step-num">3</div><div class="step-line"></div></div>
+          <div class="step-body">
+            <div class="step-title">Mark a scorekeeper per group (optional)</div>
+            <div class="step-desc">
+              <p>You can designate one player per group as the <strong>Scorekeeper (SK)</strong>. They'll be responsible for entering scores for their group on the day of the event.</p>
+              <p>Non-scorekeeper players can still view the scorecard but cannot enter scores.</p>
+            </div>
+          </div>
+        </div>
+
+        <div class="step">
+          <div class="step-left"><div class="step-num">4</div></div>
+          <div class="step-body">
+            <div class="step-title">Add guest players</div>
+            <div class="step-desc">
+              <p>Select <strong>Guest</strong> as the player type for one-time players. Guests are excluded from season standings but are included in event scoring and payouts.</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 5. Groups -->
+    <div class="section" id="groups">
+      <div class="section-eyebrow">Step 5</div>
+      <div class="section-title">Assign Groups & Tee Times</div>
+      <div class="gold-bar"></div>
+      <div class="section-subtitle">Group players into foursomes (or any size). Each group gets a unique code players use to access their digital scorecard on the course.</div>
+
+      <div class="steps">
+        <div class="step">
+          <div class="step-left"><div class="step-num">1</div><div class="step-line"></div></div>
+          <div class="step-body">
+            <div class="where">👥 Event → Groups tab</div>
+            <div class="step-title">Drag players into groups</div>
+            <div class="step-desc">Players start in the Unassigned pool. Drag them into numbered groups or click <strong>Auto-Assign</strong> to let Scorify create balanced groups automatically.</div>
+          </div>
+        </div>
+
+        <div class="step">
+          <div class="step-left"><div class="step-num">2</div><div class="step-line"></div></div>
+          <div class="step-body">
+            <div class="step-title">Tee times (sequential start)</div>
+            <div class="step-desc">
+              <p>If you set a first tee time on the event, Scorify calculates each group's tee time automatically based on the <strong>interval</strong> you set (default: 10 minutes).</p>
+              <p>Group 1 = first tee time, Group 2 = first + 10 min, etc.</p>
+            </div>
+          </div>
+        </div>
+
+        <div class="step">
+          <div class="step-left"><div class="step-num">3</div><div class="step-line"></div></div>
+          <div class="step-body">
+            <div class="step-title">Starting holes (shotgun start)</div>
+            <div class="step-desc">If Shotgun Start is enabled, assign each group a starting hole. Groups tee off simultaneously — Scorify tracks which hole each group is on during scoring.</div>
+          </div>
+        </div>
+
+        <div class="step">
+          <div class="step-left"><div class="step-num">4</div><div class="step-line"></div></div>
+          <div class="step-body">
+            <div class="step-title">Generate group codes</div>
+            <div class="step-desc">
+              <p>Click <strong>Generate Codes</strong>. Each group gets a unique 5-character code (e.g. <strong>ALPHA</strong>, <strong>BRAVO</strong>). Players enter this code on their phone to access their scorecard.</p>
+              <p>Codes are printed on Cart Signs automatically.</p>
+            </div>
+            <div class="tip"><strong>Tip:</strong> Print Cart Signs after generating codes — one per group, placed in the golf cart on the day of the event.</div>
+          </div>
+        </div>
+
+        <div class="step">
+          <div class="step-left"><div class="step-num">5</div></div>
+          <div class="step-body">
+            <div class="step-title">Share the public event link</div>
+            <div class="step-desc">
+              <p>Send your players the public event URL before the round. They can view the event details, pairings, and access scoring on the day.</p>
+              <p>URL format: <strong>scorifygolf.com/[org]/[league]/[event]</strong></p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 6. Scoring -->
+    <div class="section" id="scoring">
+      <div class="section-eyebrow">Step 6 — Event Day</div>
+      <div class="section-title">Running Digital Scoring</div>
+      <div class="gold-bar"></div>
+      <div class="section-subtitle">On the day of the event, activate the round and let players score hole-by-hole on their phones. The leaderboard updates in real time.</div>
+
+      <div class="steps">
+        <div class="step">
+          <div class="step-left"><div class="step-num">1</div><div class="step-line"></div></div>
+          <div class="step-body">
+            <div class="where">📍 Event → Overview → Start Event</div>
+            <div class="step-title">Activate the event</div>
+            <div class="step-desc">Change the event status from <span class="tag tag-blue">Upcoming</span> to <span class="tag tag-green">Active</span>. This enables live scoring and makes the leaderboard visible.</div>
+          </div>
+        </div>
+
+        <div class="step">
+          <div class="step-left"><div class="step-num">2</div><div class="step-line"></div></div>
+          <div class="step-body">
+            <div class="step-title">Players access their scorecard</div>
+            <div class="step-desc">
+              <p>Players open the event URL on their phone, tap <strong>Pairings</strong>, find their group code, then go to the scorecard URL or scan the QR code on the Cart Sign.</p>
+              <p>They'll be asked to enter their group code and select their name from the group list.</p>
+            </div>
+            <div class="note"><strong>No account needed.</strong> Players don't need to sign up or log in — just the group code.</div>
+          </div>
+        </div>
+
+        <div class="step">
+          <div class="step-left"><div class="step-num">3</div><div class="step-line"></div></div>
+          <div class="step-body">
+            <div class="step-title">Scoring hole-by-hole</div>
+            <div class="step-desc">
+              <p>The scorecard shows one hole at a time. The scorekeeper enters each player's gross score, then taps <strong>Save & Next</strong> to advance to the next hole.</p>
+              <p>Net score and vs-par display updates automatically as scores are entered.</p>
+            </div>
+            <div class="tip"><strong>Tip:</strong> The scorecard works offline — scores are saved locally and synced when connection is restored. Great for courses with spotty signal.</div>
+          </div>
+        </div>
+
+        <div class="step">
+          <div class="step-left"><div class="step-num">4</div><div class="step-line"></div></div>
+          <div class="step-body">
+            <div class="step-title">Admin scoring (backup)</div>
+            <div class="step-desc">As an admin, you can enter or edit scores directly from <strong>Event → Groups → Edit Scores</strong>. This is useful if a group has trouble with their phone or prefers paper.</div>
+          </div>
+        </div>
+
+        <div class="step">
+          <div class="step-left"><div class="step-num">5</div></div>
+          <div class="step-body">
+            <div class="step-title">Monitor the live leaderboard</div>
+            <div class="step-desc">
+              <p>Share the leaderboard URL with anyone — it updates live as scores come in. No login required to view.</p>
+              <p>Display it on a TV or tablet at the clubhouse for everyone to follow along.</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 7. Payouts -->
+    <div class="section" id="payout">
+      <div class="section-eyebrow">Step 7 — After the Round</div>
+      <div class="section-title">Results & Payouts</div>
+      <div class="gold-bar"></div>
+      <div class="section-subtitle">After all scores are in, record side game winners and let Scorify calculate the final payout breakdown.</div>
+
+      <div class="steps">
+        <div class="step">
+          <div class="step-left"><div class="step-num">1</div><div class="step-line"></div></div>
+          <div class="step-body">
+            <div class="where">💰 Event → Payout tab</div>
+            <div class="step-title">Review standings</div>
+            <div class="step-desc">The leaderboard is automatically ranked by your scoring format. Check that all scores are entered and correct before proceeding.</div>
+          </div>
+        </div>
+
+        <div class="step">
+          <div class="step-left"><div class="step-num">2</div><div class="step-line"></div></div>
+          <div class="step-body">
+            <div class="step-title">Enter prize amounts</div>
+            <div class="step-desc">
+              <p>For each scoring format and side game, enter the prize dollar amount. Scorify calculates the breakdown automatically based on the entry fee and player count — or you can override with custom amounts.</p>
+            </div>
+          </div>
+        </div>
+
+        <div class="step">
+          <div class="step-left"><div class="step-num">3</div><div class="step-line"></div></div>
+          <div class="step-body">
+            <div class="step-title">Record side game winners</div>
+            <div class="step-desc">
+              <p>For Skins — winners are calculated automatically from scores.</p>
+              <p>For CTP, Long Drive, and custom competitions — select the winner from the dropdown for each hole/contest. Enter the payout amount.</p>
+            </div>
+          </div>
+        </div>
+
+        <div class="step">
+          <div class="step-left"><div class="step-num">4</div><div class="step-line"></div></div>
+          <div class="step-body">
+            <div class="step-title">Review the payout summary</div>
+            <div class="step-desc">A complete breakdown shows total prize pool, winnings per player, and earnings by category. This doubles as a record for future reference.</div>
+          </div>
+        </div>
+
+        <div class="step">
+          <div class="step-left"><div class="step-num">5</div></div>
+          <div class="step-body">
+            <div class="step-title">Complete the event</div>
+            <div class="step-desc">
+              <p>Click <strong>Complete Event</strong> to lock scores and post final results. The status changes to <span class="tag tag-gold">Complete</span>.</p>
+              <p>Final standings are preserved and visible on the public leaderboard permanently.</p>
+            </div>
+            <div class="note"><strong>Note:</strong> You can still edit scores after completing an event if a correction is needed. Results update automatically.</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 8. Print Assets -->
+    <div class="section" id="print">
+      <div class="section-eyebrow">Step 8</div>
+      <div class="section-title">Print Assets</div>
+      <div class="gold-bar"></div>
+      <div class="section-subtitle">Scorify generates print-ready assets for your event. Print them before the round and place them in carts or at check-in.</div>
+
+      <div class="cards-grid">
+        <div class="info-card">
+          <div class="info-card-icon">📋</div>
+          <div class="info-card-title">Tee Sheet</div>
+          <div class="info-card-desc">Full list of all groups with player names, tee times, and starting holes. Great for check-in or posting at the pro shop.</div>
+        </div>
+        <div class="info-card">
+          <div class="info-card-icon">🪧</div>
+          <div class="info-card-title">Cart Signs</div>
+          <div class="info-card-desc">One per group. Shows group number, players, tee time, starting hole, and the group code for digital scoring. Place in the golf cart.</div>
+        </div>
+        <div class="info-card">
+          <div class="info-card-icon">📍</div>
+          <div class="info-card-title">CTP Cards</div>
+          <div class="info-card-desc">One per designated CTP hole. Place at the tee box. Players record their distance to the pin on the card.</div>
+        </div>
+        <div class="info-card">
+          <div class="info-card-icon">🏌️</div>
+          <div class="info-card-title">Side Game Cards</div>
+          <div class="info-card-desc">Cards for Long Drive, custom competitions, and other side games. One per contest, placed at the relevant hole or check-in table.</div>
+        </div>
+      </div>
+
+      <div style="margin-top:24px;">
+        <div class="where">🖨️ Event → Pre/Post Round tab → Print</div>
+        <div style="font-size:14px;color:#374151;margin-top:12px;line-height:1.7;">
+          Select which assets to print, then use your browser's print dialog (<strong>⌘P</strong> on Mac / <strong>Ctrl+P</strong> on Windows). Assets are formatted for standard letter paper. Make sure <strong>Background Graphics</strong> is enabled in print settings for full color output.
+        </div>
+      </div>
+    </div>
+
+    <!-- 9. Registration -->
+    <div class="section" id="registration">
+      <div class="section-eyebrow">Club Plan Feature</div>
+      <div class="section-title">Online Registration</div>
+      <div class="gold-bar"></div>
+      <div class="section-subtitle">Let players register for events online — collecting their info, questions, and payment confirmation — all without back-and-forth messages.</div>
+
+      <div class="steps">
+        <div class="step">
+          <div class="step-left"><div class="step-num">1</div><div class="step-line"></div></div>
+          <div class="step-body">
+            <div class="step-title">Enable registration on an event</div>
+            <div class="step-desc">In the event settings, toggle on <strong>Online Registration</strong>. Set the registration fee, max spots, and Venmo/PayPal handle for payment.</div>
+          </div>
+        </div>
+
+        <div class="step">
+          <div class="step-left"><div class="step-num">2</div><div class="step-line"></div></div>
+          <div class="step-body">
+            <div class="step-title">Add custom registration questions (optional)</div>
+            <div class="step-desc">Ask players anything during registration — shirt size, handicap index, meal preference, etc. Mark questions as required or optional.</div>
+          </div>
+        </div>
+
+        <div class="step">
+          <div class="step-left"><div class="step-num">3</div><div class="step-line"></div></div>
+          <div class="step-body">
+            <div class="step-title">Share the registration link</div>
+            <div class="step-desc">A Register button appears on the public event page. Players fill out the form and are directed to pay via Venmo or PayPal. You receive an email notification for each new registration.</div>
+          </div>
+        </div>
+
+        <div class="step">
+          <div class="step-left"><div class="step-num">4</div></div>
+          <div class="step-body">
+            <div class="step-title">Manage registrations</div>
+            <div class="step-desc">
+              <p>View all registrations in <strong>Event → Players → Registrations</strong>. Confirm payment manually, mark players as confirmed, and add them to the event player list with one click.</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Pro Tips -->
+    <div class="section" id="tips">
+      <div class="section-eyebrow">Pro Tips</div>
+      <div class="section-title">Getting the Most Out of Scorify</div>
+      <div class="gold-bar"></div>
+
+      <div class="cards-grid">
+        <div class="info-card">
+          <div class="info-card-icon">📱</div>
+          <div class="info-card-title">Test scoring before the round</div>
+          <div class="info-card-desc">Do a quick test run the day before — enter a group code, select a name, and try entering a score. Confirm it appears on the leaderboard.</div>
+        </div>
+        <div class="info-card">
+          <div class="info-card-icon">📶</div>
+          <div class="info-card-title">Offline mode works</div>
+          <div class="info-card-desc">Scores are saved locally when there's no signal and sync automatically when connection returns. No data is lost on spotty courses.</div>
+        </div>
+        <div class="info-card">
+          <div class="info-card-icon">🖨️</div>
+          <div class="info-card-title">Print Cart Signs the night before</div>
+          <div class="info-card-desc">Don't wait until the morning. Print and prep all assets the evening before so check-in runs smoothly.</div>
+        </div>
+        <div class="info-card">
+          <div class="info-card-icon">✏️</div>
+          <div class="info-card-title">Scores are always editable</div>
+          <div class="info-card-desc">Even after an event is completed, admins can correct any score. The leaderboard and payouts update instantly.</div>
+        </div>
+        <div class="info-card">
+          <div class="info-card-icon">👤</div>
+          <div class="info-card-title">Reuse your player roster</div>
+          <div class="info-card-desc">Players added once stay in your roster forever. For recurring events, just pull them from the roster — no re-entering info each time.</div>
+        </div>
+        <div class="info-card">
+          <div class="info-card-icon">📺</div>
+          <div class="info-card-title">Display leaderboard on a TV</div>
+          <div class="info-card-desc">Open the leaderboard URL on any device and display it at the clubhouse. It auto-refreshes — no one needs to do anything.</div>
+        </div>
+      </div>
+
+      <div style="margin-top:40px;padding:28px 32px;background:var(--green);border-radius:16px;text-align:center;">
+        <div style="font-size:13px;font-weight:700;color:rgba(255,255,255,0.5);letter-spacing:0.08em;text-transform:uppercase;margin-bottom:8px;">Need help?</div>
+        <div style="font-size:22px;font-weight:900;color:#fff;font-family:'Playfair Display',serif;margin-bottom:8px;">We're here for you.</div>
+        <div style="font-size:14px;color:rgba(255,255,255,0.65);margin-bottom:20px;">Reach out anytime and we'll get you sorted.</div>
+        <a href="mailto:admin@scorifygolf.com" style="display:inline-block;background:var(--gold);color:var(--green);font-weight:800;font-size:14px;padding:12px 28px;border-radius:10px;text-decoration:none;">
+          admin@scorifygolf.com
+        </a>
+      </div>
+    </div>
+
+  </div><!-- /main -->
+</div><!-- /layout -->
+
+<script>
+  // Highlight active nav item on scroll
+  const sections = document.querySelectorAll('.section[id], .hero[id]')
+  const navLinks = document.querySelectorAll('.nav a')
+
+  const observer = new IntersectionObserver(entries => {
+    entries.forEach(entry => {
+      if (entry.isIntersecting) {
+        navLinks.forEach(a => a.classList.remove('active'))
+        const active = document.querySelector(`.nav a[href="#${entry.target.id}"]`)
+        if (active) active.classList.add('active')
+      }
+    })
+  }, { threshold: 0.3 })
+
+  sections.forEach(s => observer.observe(s))
+</script>
+</body>
+</html>
