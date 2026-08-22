@@ -6,6 +6,7 @@ import { HelmetProvider } from 'react-helmet-async'
 import * as Sentry from '@sentry/react'
 import App from './App'
 import ErrorBoundary from './components/ErrorBoundary'
+import CookieBanner from './components/CookieBanner'
 import './index.css'
 
 if (import.meta.env.VITE_SENTRY_DSN) {
@@ -28,6 +29,7 @@ ReactDOM.createRoot(document.getElementById('root')).render(
     <HelmetProvider>
     <BrowserRouter>
       <App />
+      <CookieBanner />
       <Toaster
         position="top-center"
         toastOptions={{
