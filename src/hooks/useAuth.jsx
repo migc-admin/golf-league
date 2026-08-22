@@ -1,5 +1,6 @@
 import { createContext, useContext, useEffect, useRef, useState } from 'react'
 import { supabase } from '../lib/supabase'
+import * as Sentry from '@sentry/react'
 
 const AuthContext = createContext(null)
 
@@ -26,6 +27,10 @@ export function AuthProvider({ children }) {
       const timeout = new Promise(resolve => setTimeout(() => resolve({ data: null }), PROFILE_TIMEOUT_MS))
       const { data } = await Promise.race([dbQuery, timeout])
       setProfile(data ?? null)
+      // Tell Sentry who is logged in so errors are linked to a user
+      if (data) {
+        Sentry.setUser({ id: userId, email: data.email, role: data.role })
+      }
     } catch {
       setProfile(null)
     } finally {
@@ -64,6 +69,7 @@ export function AuthProvider({ children }) {
           setUser(null)
           setProfile(null)
           setLoading(false)
+          Sentry.setUser(null)
         }
         // INITIAL_SESSION handled by getSession() above; USER_UPDATED etc: no-op
       }

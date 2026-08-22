@@ -1,4 +1,5 @@
 import { Component } from 'react'
+import * as Sentry from '@sentry/react'
 
 /**
  * ErrorBoundary — catches unhandled React render errors so the whole
@@ -16,6 +17,7 @@ export default class ErrorBoundary extends Component {
 
   componentDidCatch(error, info) {
     console.error('[ErrorBoundary] Unhandled render error:', error.message, info.componentStack)
+    Sentry.captureException(error, { extra: { componentStack: info.componentStack } })
   }
 
   render() {
