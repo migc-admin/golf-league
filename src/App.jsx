@@ -5,6 +5,7 @@ import AdminRoute     from './components/AdminRoute'
 import { OrgProvider } from './lib/OrgContext'
 import { useSubdomain } from './lib/useSubdomain'
 import { SubdomainContext } from './lib/SubdomainContext'
+import { TenantProvider, TenantRouteWrapper } from './lib/TenantProvider'
 import OrgHome        from './pages/league/OrgHome'
 import LeagueHome     from './pages/league/LeagueHome'
 import Login          from './pages/Login'
@@ -35,7 +36,11 @@ import Roadmap        from './pages/Roadmap'
 
 function OrgRouteWrapper({ children }) {
   const { orgSlug } = useParams()
-  return <OrgProvider orgSlug={orgSlug}>{children}</OrgProvider>
+  return (
+    <TenantProvider orgSlug={orgSlug}>
+      <OrgProvider orgSlug={orgSlug}>{children}</OrgProvider>
+    </TenantProvider>
+  )
 }
 
 function LeagueHomeRoute({ orgSlug, initialTab }) {
@@ -54,6 +59,7 @@ export default function App() {
   if (subdomainSlug) {
     return (
       <AuthProvider>
+        <TenantProvider orgSlug={subdomainSlug}>
         <SubdomainContext.Provider value={subdomainSlug}>
           <Routes>
             <Route path="/" element={<OrgHome orgSlug={subdomainSlug} />} />
@@ -64,6 +70,7 @@ export default function App() {
             <Route path="/:leagueSlug/:eventSlug/schedule"    element={<OrgProvider orgSlug={subdomainSlug}><Schedule /></OrgProvider>} />
           </Routes>
         </SubdomainContext.Provider>
+        </TenantProvider>
       </AuthProvider>
     )
   }
