@@ -3452,6 +3452,10 @@ function TabSideGames({ event, eventPlayers, course, sideGames, sideGameEntries 
         const hasSuperCtpB = sides.includes('super_ctp_b')
         const perFlight = hasSuperCtpA || hasSuperCtpB
         const holeLabel = superCtpDesignatedHole ? `Hole ${superCtpDesignatedHole}` : 'No hole designated'
+        const optedInIds = sideGameEntries.super_ctp ?? []
+        const ctpPool = optedInIds.length > 0
+          ? eventPlayers.filter(ep => optedInIds.includes(ep.player_id))
+          : eventPlayers
         return (
           <Card>
             <CardHeader title="Super CTP" subtitle={holeLabel} />
@@ -3462,7 +3466,7 @@ function TabSideGames({ event, eventPlayers, course, sideGames, sideGameEntries 
                     <div className="flex items-center gap-4">
                       <span className="text-xs font-semibold text-blue-600 w-16">Flight A</span>
                       <SideGameSelect
-                        players={flightA.length ? flightA : eventPlayers}
+                        players={ctpPool.filter(ep => !ep.flight || ep.flight === 'A')}
                         value={getWinner('super_ctp', superCtpDesignatedHole, 'A')}
                         onChange={v => setWinner('super_ctp', superCtpDesignatedHole, v, 'A')}
                       />
@@ -3472,7 +3476,7 @@ function TabSideGames({ event, eventPlayers, course, sideGames, sideGameEntries 
                     <div className="flex items-center gap-4">
                       <span className="text-xs font-semibold text-purple-600 w-16">Flight B</span>
                       <SideGameSelect
-                        players={flightB.length ? flightB : eventPlayers}
+                        players={ctpPool.filter(ep => !ep.flight || ep.flight === 'B')}
                         value={getWinner('super_ctp', superCtpDesignatedHole, 'B')}
                         onChange={v => setWinner('super_ctp', superCtpDesignatedHole, v, 'B')}
                       />
@@ -3481,7 +3485,7 @@ function TabSideGames({ event, eventPlayers, course, sideGames, sideGameEntries 
                 </div>
               ) : (
                 <SideGameSelect
-                  players={eventPlayers}
+                  players={ctpPool}
                   value={getWinner('super_ctp', superCtpDesignatedHole, 'overall')}
                   onChange={v => setWinner('super_ctp', superCtpDesignatedHole, v, 'overall')}
                 />
