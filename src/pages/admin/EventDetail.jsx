@@ -1973,10 +1973,10 @@ function MatchPairingsManager({ event, eventId, eventPlayers }) {
     }
     setSaving(true)
     const { error } = await supabase.from('match_pairings').insert({
-      event_id:    eventId,
-      player_a_id: playerAId,
-      player_b_id: playerBId,
-      match_number: matchNumber,
+      event_id:     eventId,
+      player_a_id:  playerAId,
+      player_b_id:  playerBId,
+      match_number: pairings.length + 1,
     })
     setSaving(false)
     if (error) { toast.error(error.message); return }
@@ -1988,7 +1988,20 @@ function MatchPairingsManager({ event, eventId, eventPlayers }) {
   async function deletePairing(id) {
     const { error } = await supabase.from('match_pairings').delete().eq('id', id)
     if (error) { toast.error(error.message); return }
+    // Renumber remaining pairings sequentially after delete
+    const remaining = pairings.filter(p => p.id !== id)
+    await Promise.all(remaining.map((p, i) =>
+      supabase.from('match_pairings').update({ match_number: i + 1 }).eq('id', p.id)
+    ))
     await loadPairings()
+  }
+
+  async function renumberAll() {
+    await Promise.all(pairings.map((p, i) =>
+      supabase.from('match_pairings').update({ match_number: i + 1 }).eq('id', p.id)
+    ))
+    await loadPairings()
+    toast.success('Pairings renumbered')
   }
 
   function playerName(ep) {
@@ -2024,8 +2037,13 @@ function MatchPairingsManager({ event, eventId, eventPlayers }) {
 
       {/* Current pairings */}
       <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
-        <div className="px-4 py-3 bg-gray-50 border-b border-gray-100">
+        <div className="px-4 py-3 bg-gray-50 border-b border-gray-100 flex items-center justify-between">
           <h3 className="text-sm font-semibold text-gray-800">Current Match Pairings</h3>
+          {pairings.length > 0 && (
+            <button type="button" onClick={renumberAll} className="text-xs text-fairway-700 font-semibold hover:underline">
+              Renumber
+            </button>
+          )}
         </div>
         {pairings.length === 0 ? (
           <p className="px-4 py-4 text-sm text-gray-400">No pairings assigned yet.</p>
@@ -2091,17 +2109,7 @@ function MatchPairingsManager({ event, eventId, eventPlayers }) {
                 </select>
               </div>
             </div>
-            <div className="flex items-end gap-3">
-              <div>
-                <label className="block text-xs font-medium text-gray-600 mb-1">Match #</label>
-                <input
-                  type="number"
-                  min="1"
-                  className="input w-24"
-                  value={matchNumber}
-                  onChange={e => setMatchNumber(parseInt(e.target.value, 10) || 1)}
-                />
-              </div>
+            <div className="flex items-center gap-3">
               <Button onClick={addPairing} loading={saving} disabled={!playerAId || !playerBId}>
                 Add Pairing
               </Button>
