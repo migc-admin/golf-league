@@ -10,7 +10,7 @@ import { Helmet } from 'react-helmet-async'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../hooks/useAuth'
 import { computeLeaderboards, computeStableford, getStrokeIndexForTee } from '../lib/engines/scoring'
-import { computeAllSkins } from '../lib/engines/skins'
+import { computeAllSkins, computeSkinsForFlight } from '../lib/engines/skins'
 import { computeMatchPoints, computeTeamMatchPoints } from '../lib/engines/matchPoints'
 import { computePayouts, CATEGORY_LABELS, ctpLabel } from '../lib/engines/payouts'
 import { computeTGLEventResults } from '../lib/engines/tgl'
@@ -18,7 +18,7 @@ import { FlightBadge, StatusBadge } from '../components/ui/Badge'
 import { useFeatures, useOrg } from '../lib/OrgContext'
 import { useSubdomainOrg } from '../lib/SubdomainContext'
 
-const ALL_TABS = ['18-Hole', 'Front 9', 'Back 9', 'Low Gross', 'Stableford', 'Scramble', 'Match Points', 'Team Match', 'Low Putts', 'Skins', 'Blind Partners', 'Payouts', 'Team Play']
+const ALL_TABS = ['18-Hole', 'Front 9', 'Back 9', 'Low Gross', 'Stableford', 'Scramble', 'Match Points', 'Team Match', 'Low Putts', 'Skins', 'Super Skins', 'Blind Partners', 'Payouts', 'Team Play']
 
 function visibleTabs(event, hasTGL = false) {
   if (!event) return ALL_TABS
@@ -36,6 +36,7 @@ function visibleTabs(event, hasTGL = false) {
     if (tab === 'Team Match')    return formats.includes('team_match_play')
     if (tab === 'Low Putts')     return sideOpts.includes('low_putts')
     if (tab === 'Skins')          return sideOpts.some(s => s.startsWith('skins_'))
+    if (tab === 'Super Skins')    return sideOpts.some(s => s === 'super_skins' || s.startsWith('super_skins_'))
     if (tab === 'Blind Partners') return sideOpts.includes('blind_partners') && (event.side_game_entries?.blind_partner_pairs ?? []).length > 0
     if (tab === 'Team Play')      return hasTGL
     return false
@@ -398,6 +399,9 @@ export default function Leaderboard() {
         {activeTab === 'Skins' && skinsResults && (
           <SkinsBoard skinsResults={skinsResults} playerMap={playerMap} />
         )}
+        {activeTab === 'Super Skins' && (
+          <SuperSkinsBoard event={event} eventPlayers={eventPlayers} allScores={allScores} course={course} playerMap={playerMap} />
+        )}
         {activeTab === 'Blind Partners' && (
           <BlindPartnersLeaderboard event={event} eventPlayers={eventPlayers} allScores={allScores} course={course} />
         )}
@@ -739,6 +743,59 @@ function PuttLeaderboard({ data, playerMap, allScores = [], course = null }) {
 }
 
 // ─── Skins Board ──────────────────────────────────────────────────
+// ─── Super Skins Leaderboard ──────────────────────────────────────────────────
+function SuperSkinsBoard({ event, eventPlayers, allScores, course, playerMap }) {
+  const optedInIds = event?.side_game_entries?.super_skins ?? []
+  const sides      = event?.side_game_options ?? []
+  const hasA       = sides.includes('super_skins_a')
+  const hasB       = sides.includes('super_skins_b')
+
+  // Filter to only opted-in players (or all if none opted in yet)
+  const filteredPlayers = optedInIds.length > 0
+    ? eventPlayers.filter(ep => optedInIds.includes(ep.player_id))
+    : eventPlayers
+
+  if (filteredPlayers.length === 0) {
+    return <p className="text-sm text-gray-400 text-center py-8">No players have opted in to Super Skins yet.</p>
+  }
+
+  const skinsA = computeSkinsForFlight(filteredPlayers, allScores, course, 'A')
+  const skinsB = hasB ? computeSkinsForFlight(filteredPlayers, allScores, course, 'B') : null
+
+  function renderFlight(result, flightLabel, labelColor) {
+    const totalSkins = Object.values(result.playerSkins).reduce((a, b) => a + b, 0)
+    const sorted = Object.entries(result.playerSkins)
+      .filter(([, count]) => count > 0)
+      .sort(([, a], [, b]) => b - a)
+
+    return (
+      <div>
+        {flightLabel && <div className={`text-xs font-bold ${labelColor} mb-2`}>{flightLabel}</div>}
+        {sorted.length === 0 ? (
+          <p className="text-sm text-gray-400 italic py-2">No skins won yet.</p>
+        ) : sorted.map(([pid, count]) => {
+          const name = playerMap[pid] ?? pid
+          return (
+            <div key={pid} className="flex items-center justify-between bg-white rounded-xl px-4 py-2.5 shadow-sm border border-gray-100 mb-2">
+              <span className="text-sm font-semibold text-gray-800">{name}</span>
+              <span className="text-sm font-bold text-fairway-700">{count} skin{count !== 1 ? 's' : ''}</span>
+            </div>
+          )
+        })}
+        <div className="text-xs text-gray-400 mt-1">{totalSkins} total skin{totalSkins !== 1 ? 's' : ''} awarded</div>
+      </div>
+    )
+  }
+
+  return (
+    <div className="space-y-4">
+      <p className="text-xs text-gray-400">Super Skins — opt-in only. Runs on same hole scoring as regular skins.</p>
+      {(hasA || !hasB) && renderFlight(skinsA, hasB ? 'Flight A' : null, 'text-blue-600')}
+      {hasB && skinsB && renderFlight(skinsB, 'Flight B', 'text-purple-600')}
+    </div>
+  )
+}
+
 // ─── Blind Partners Leaderboard ───────────────────────────────────────────────
 function BlindPartnersLeaderboard({ event, eventPlayers, allScores, course }) {
   const pairs   = event?.side_game_entries?.blind_partner_pairs ?? []
@@ -801,7 +858,7 @@ function BlindPartnersLeaderboard({ event, eventPlayers, allScores, course }) {
               <div>
                 <div className="text-sm font-semibold text-gray-800">{playerName(pair.p1)}</div>
                 {pair.p2
-                  ? <div className="text-sm text-gray-500">{playerName(pair.p2)}</div>
+                  ? <div className="text-sm font-semibold text-gray-800">{playerName(pair.p2)}</div>
                   : <div className="text-xs text-gray-400 italic">no partner</div>
                 }
               </div>
@@ -1021,8 +1078,8 @@ function MatchPointsBoard({ matchData, event }) {
           ? (pair.winner === 'A' ? stylesA.status.win : pair.winner === 'B' ? stylesB.status.win : 'bg-gray-200 text-gray-700')
           : (leaderSide === 'A' ? stylesA.status.lead : leaderSide === 'B' ? stylesB.status.lead : 'bg-gray-100 text-gray-600')
 
-        const labelA = pair.playerA.flight ? `Flight ${pair.playerA.flight}` : null
-        const labelB = pair.playerB.flight ? `Flight ${pair.playerB.flight}` : null
+        const labelA = pair.playerA.flight ? (pair.playerA.flight === 'A' ? teamALabel : teamBLabel) : null
+        const labelB = pair.playerB.flight ? (pair.playerB.flight === 'A' ? teamALabel : teamBLabel) : null
 
         return (
           <div key={idx} className="bg-white rounded-xl border border-gray-200 overflow-hidden">
