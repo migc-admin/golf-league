@@ -800,42 +800,48 @@ const TeeSheetReelCard = forwardRef(function TeeSheetReelCard({ event, eventPlay
 
       <div style={{ height: 1, background: 'rgba(255,255,255,0.1)', marginBottom: 10 }} />
 
-      {/* Column headers */}
-      <div style={{ display: 'grid', gridTemplateColumns: '18px 32px 1fr 40px', gap: '0 6px', marginBottom: 6, paddingBottom: 5, borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
-        {['', 'GRP', 'PLAYERS', 'HOLE'].map((h, i) => (
-          <div key={i} style={{ fontSize: 8, fontWeight: 700, color: 'rgba(255,255,255,0.3)', textTransform: 'uppercase', letterSpacing: '0.08em', textAlign: i >= 3 ? 'right' : 'left' }}>{h}</div>
-        ))}
-      </div>
-
-      {/* Rows */}
-      <div style={{ flex: 1, overflow: 'hidden', display: 'flex', flexDirection: 'column', gap: 2 }}>
-        {groupNums.slice(0, 12).map((g, i) => {
+      {/* Rows — each group is a block: header row + 2-column player grid */}
+      <div style={{ flex: 1, overflow: 'hidden', display: 'flex', flexDirection: 'column', gap: 4 }}>
+        {groupNums.slice(0, 10).map((g, i) => {
           const members = groups[g]
           const teeTime = isShotgun
             ? calcTeeTime(event?.start_time, 0, 1)
             : calcTeeTime(event?.start_time, interval, g)
-          const names   = members.map(ep => epName(ep, { showFlight: hasFlights, tglSet })).join(' / ')
-          const hole    = isShotgun ? (holeMap[g] ? `#${holeMap[g]}` : '—') : '#1'
+          const hole = isShotgun ? (holeMap[g] ? `Hole #${holeMap[g]}` : '—') : 'Hole 1'
+          // Split players into 2 columns
+          const col1 = members.filter((_, idx) => idx % 2 === 0)
+          const col2 = members.filter((_, idx) => idx % 2 === 1)
           return (
             <div key={g} style={{
-              display: 'grid',
-              gridTemplateColumns: '18px 32px 1fr 40px',
-              gap: '0 6px',
-              alignItems: 'center',
-              padding: '5px 8px',
               borderRadius: 8,
-              background: i % 2 === 0 ? 'rgba(255,255,255,0.05)' : 'transparent',
+              background: i % 2 === 0 ? 'rgba(255,255,255,0.06)' : 'rgba(255,255,255,0.02)',
+              padding: '6px 8px',
             }}>
-              <div style={{ fontSize: 9, fontWeight: 700, color: '#D4AF37', whiteSpace: 'nowrap' }}>{teeTime?.split(' ')[0]}</div>
-              <div style={{ fontSize: 10, fontWeight: 700, color: 'rgba(255,255,255,0.5)' }}>#{g}</div>
-              <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.85)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{names}</div>
-              <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.35)', textAlign: 'right' }}>{hole}</div>
+              {/* Group header: time · group# · hole */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+                <span style={{ fontSize: 9, fontWeight: 700, color: '#D4AF37' }}>{teeTime ?? '—'}</span>
+                <span style={{ fontSize: 9, fontWeight: 700, color: 'rgba(255,255,255,0.4)' }}>Group #{g}</span>
+                <span style={{ fontSize: 9, color: 'rgba(255,255,255,0.25)', marginLeft: 'auto' }}>{hole}</span>
+              </div>
+              {/* 2-column player names */}
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '2px 8px' }}>
+                {col1.map((ep, idx) => (
+                  <div key={ep.player_id ?? idx} style={{ fontSize: 10, color: 'rgba(255,255,255,0.9)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                    {epName(ep, { showFlight: hasFlights, tglSet })}
+                  </div>
+                ))}
+                {col2.map((ep, idx) => (
+                  <div key={ep.player_id ?? idx} style={{ fontSize: 10, color: 'rgba(255,255,255,0.9)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', gridRow: idx + 1, gridColumn: 2 }}>
+                    {epName(ep, { showFlight: hasFlights, tglSet })}
+                  </div>
+                ))}
+              </div>
             </div>
           )
         })}
-        {groupNums.length > 12 && (
-          <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.3)', paddingLeft: 8, paddingTop: 4 }}>
-            + {groupNums.length - 12} more groups — see full tee sheet
+        {groupNums.length > 10 && (
+          <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.3)', paddingLeft: 4, paddingTop: 2 }}>
+            + {groupNums.length - 10} more groups — see full tee sheet
           </div>
         )}
       </div>
