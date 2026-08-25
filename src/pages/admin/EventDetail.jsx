@@ -284,7 +284,7 @@ export default function EventDetail() {
             (event.formats ?? (event.format ? [event.format] : [])).includes('ryder_cup')) && (
             <div className="border-t border-gray-100 pt-6">
               <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-widest mb-3">Match Play Pairings</h3>
-              <MatchPairingsManager eventId={event.id} eventPlayers={eventPlayers} />
+              <MatchPairingsManager event={event} eventId={event.id} eventPlayers={eventPlayers} />
             </div>
           )}
           {(event.formats ?? (event.format ? [event.format] : [])).includes('team_match_play') && (
@@ -1930,12 +1930,16 @@ function AddPlayerModal({ open, onClose, eventId, available, course, useFlights,
 
 // ─── Tab: Groups ──────────────────────────────────────────────────
 // ─── Match Pairings Manager ───────────────────────────────────────
-function MatchPairingsManager({ eventId, eventPlayers }) {
+function MatchPairingsManager({ event, eventId, eventPlayers }) {
   const [pairings,    setPairings]    = useState([])
   const [playerAId,   setPlayerAId]   = useState('')
   const [playerBId,   setPlayerBId]   = useState('')
   const [matchNumber, setMatchNumber] = useState(1)
   const [saving,      setSaving]      = useState(false)
+  const [teamAName,   setTeamAName]   = useState(event?.ryder_cup_teams?.a ?? '')
+  const [teamBName,   setTeamBName]   = useState(event?.ryder_cup_teams?.b ?? '')
+  const [savingTeams, setSavingTeams] = useState(false)
+  const isRyderCup = (event?.formats ?? []).includes('ryder_cup')
 
   async function loadPairings() {
     const { data } = await supabase
@@ -1947,6 +1951,15 @@ function MatchPairingsManager({ eventId, eventPlayers }) {
   }
 
   useEffect(() => { loadPairings() }, [eventId])
+
+  async function saveTeamNames() {
+    setSavingTeams(true)
+    await supabase.from('events').update({
+      ryder_cup_teams: { a: teamAName.trim(), b: teamBName.trim() }
+    }).eq('id', eventId)
+    setSavingTeams(false)
+    toast.success('Team names saved')
+  }
 
   // Players already paired (either as A or B)
   const pairedIds = new Set(pairings.flatMap(p => [p.player_a_id, p.player_b_id]))
@@ -1984,6 +1997,31 @@ function MatchPairingsManager({ eventId, eventPlayers }) {
 
   return (
     <div className="space-y-4">
+      {/* Ryder Cup team names */}
+      {isRyderCup && (
+        <div className="bg-white rounded-xl border border-gray-200 p-4 space-y-3">
+          <h3 className="text-sm font-semibold text-gray-800">Team Names</h3>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block text-xs font-medium text-gray-500 mb-1">Team A (Flight A)</label>
+              <input className="input w-full" value={teamAName} onChange={e => setTeamAName(e.target.value)} placeholder="e.g. USA" />
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-gray-500 mb-1">Team B (Flight B)</label>
+              <input className="input w-full" value={teamBName} onChange={e => setTeamBName(e.target.value)} placeholder="e.g. Europe" />
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={saveTeamNames}
+            disabled={savingTeams}
+            className="text-sm font-semibold text-white bg-fairway-700 hover:bg-fairway-800 disabled:opacity-50 px-4 py-1.5 rounded-lg"
+          >
+            {savingTeams ? 'Saving…' : 'Save Team Names'}
+          </button>
+        </div>
+      )}
+
       {/* Current pairings */}
       <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
         <div className="px-4 py-3 bg-gray-50 border-b border-gray-100">
@@ -2023,7 +2061,7 @@ function MatchPairingsManager({ eventId, eventPlayers }) {
           <div className="p-4 space-y-3">
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <label className="block text-xs font-medium text-gray-600 mb-1">Player A</label>
+                <label className="block text-xs font-medium text-gray-600 mb-1">{isRyderCup ? (teamAName || 'Team A') : 'Player A'}</label>
                 <select
                   className="input w-full"
                   value={playerAId}
@@ -2038,7 +2076,7 @@ function MatchPairingsManager({ eventId, eventPlayers }) {
                 </select>
               </div>
               <div>
-                <label className="block text-xs font-medium text-gray-600 mb-1">Player B</label>
+                <label className="block text-xs font-medium text-gray-600 mb-1">{isRyderCup ? (teamBName || 'Team B') : 'Player B'}</label>
                 <select
                   className="input w-full"
                   value={playerBId}
@@ -3163,7 +3201,8 @@ function TabSideGamesMain({ event, eventPlayers, course, sideGames, onUpdated })
   if (!hasSideGames) {
     return (
       <div className="text-sm text-gray-400 py-8 text-center">
-        No side games configured for this event. Add them via the Edit Event button.
+        No side games configured for this event.<br />
+        <span className="text-xs">Add side games via the <strong>Edit Event</strong> button (pencil icon), then come back here.</span>
       </div>
     )
   }
