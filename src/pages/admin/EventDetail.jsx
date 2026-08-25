@@ -2003,11 +2003,11 @@ function MatchPairingsManager({ event, eventId, eventPlayers }) {
           <h3 className="text-sm font-semibold text-gray-800">Team Names</h3>
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="block text-xs font-medium text-gray-500 mb-1">Team A (Flight A)</label>
+              <label className="block text-xs font-medium text-gray-500 mb-1">Team A</label>
               <input className="input w-full" value={teamAName} onChange={e => setTeamAName(e.target.value)} placeholder="e.g. USA" />
             </div>
             <div>
-              <label className="block text-xs font-medium text-gray-500 mb-1">Team B (Flight B)</label>
+              <label className="block text-xs font-medium text-gray-500 mb-1">Team B</label>
               <input className="input w-full" value={teamBName} onChange={e => setTeamBName(e.target.value)} placeholder="e.g. Europe" />
             </div>
           </div>
@@ -2053,7 +2053,7 @@ function MatchPairingsManager({ event, eventId, eventPlayers }) {
       </div>
 
       {/* Add pairing form */}
-      {unpairedPlayers.length >= 2 && (
+      {eventPlayers.length >= 2 && (
         <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
           <div className="px-4 py-3 bg-gray-50 border-b border-gray-100">
             <h3 className="text-sm font-semibold text-gray-800">Add Pairing</h3>
@@ -2068,7 +2068,7 @@ function MatchPairingsManager({ event, eventId, eventPlayers }) {
                   onChange={e => setPlayerAId(e.target.value)}
                 >
                   <option value="">Select player…</option>
-                  {unpairedPlayers
+                  {eventPlayers
                     .filter(ep => ep.player_id !== playerBId)
                     .map(ep => (
                       <option key={ep.player_id} value={ep.player_id}>{playerName(ep)}</option>
@@ -2083,7 +2083,7 @@ function MatchPairingsManager({ event, eventId, eventPlayers }) {
                   onChange={e => setPlayerBId(e.target.value)}
                 >
                   <option value="">Select player…</option>
-                  {unpairedPlayers
+                  {eventPlayers
                     .filter(ep => ep.player_id !== playerAId)
                     .map(ep => (
                       <option key={ep.player_id} value={ep.player_id}>{playerName(ep)}</option>
