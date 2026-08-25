@@ -779,9 +779,7 @@ const TeeSheetReelCard = forwardRef(function TeeSheetReelCard({ event, eventPlay
       {/* Header */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 14 }}>
         {logoUrl ? (
-          <div style={{ width: 40, height: 40, borderRadius: 8, background: '#0f2e22', overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            <img src={logoUrl} alt="" style={{ width: 40, height: 40, objectFit: 'contain' }} crossOrigin="anonymous" />
-          </div>
+          <img src={logoUrl} alt="" style={{ width: 40, height: 40, borderRadius: '50%', objectFit: 'cover' }} crossOrigin="anonymous" />
         ) : (
           <div style={{ width: 40, height: 40, borderRadius: 8, background: '#D4AF37', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 900, fontSize: 13, color: '#1B4332' }}>
             {(leagueName ?? 'S').slice(0, 2).toUpperCase()}
