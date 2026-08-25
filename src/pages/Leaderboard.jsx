@@ -18,7 +18,7 @@ import { FlightBadge, StatusBadge } from '../components/ui/Badge'
 import { useFeatures, useOrg } from '../lib/OrgContext'
 import { useSubdomainOrg } from '../lib/SubdomainContext'
 
-const ALL_TABS = ['18-Hole', 'Front 9', 'Back 9', 'Low Gross', 'Stableford', 'Scramble', 'Match Points', 'Team Match', 'Low Putts', 'Skins', 'Payouts', 'Team Play']
+const ALL_TABS = ['18-Hole', 'Front 9', 'Back 9', 'Low Gross', 'Stableford', 'Scramble', 'Match Points', 'Team Match', 'Low Putts', 'Skins', 'Blind Partners', 'Payouts', 'Team Play']
 
 function visibleTabs(event, hasTGL = false) {
   if (!event) return ALL_TABS
@@ -35,7 +35,8 @@ function visibleTabs(event, hasTGL = false) {
     if (tab === 'Match Points')  return formats.includes('match_points') || formats.includes('ryder_cup')
     if (tab === 'Team Match')    return formats.includes('team_match_play')
     if (tab === 'Low Putts')     return sideOpts.includes('low_putts')
-    if (tab === 'Skins')         return sideOpts.some(s => s.startsWith('skins_'))
+    if (tab === 'Skins')          return sideOpts.some(s => s.startsWith('skins_'))
+    if (tab === 'Blind Partners') return sideOpts.includes('blind_partners') && (event.side_game_entries?.blind_partner_pairs ?? []).length > 0
     if (tab === 'Team Play')      return hasTGL
     return false
   })
@@ -397,6 +398,9 @@ export default function Leaderboard() {
         {activeTab === 'Skins' && skinsResults && (
           <SkinsBoard skinsResults={skinsResults} playerMap={playerMap} />
         )}
+        {activeTab === 'Blind Partners' && (
+          <BlindPartnersLeaderboard event={event} eventPlayers={eventPlayers} allScores={allScores} course={course} />
+        )}
         {activeTab === 'Scramble' && (
           <ScrambleLeaderboard eventPlayers={eventPlayers} allScores={allScores} course={course} />
         )}
@@ -735,6 +739,84 @@ function PuttLeaderboard({ data, playerMap, allScores = [], course = null }) {
 }
 
 // ─── Skins Board ──────────────────────────────────────────────────
+// ─── Blind Partners Leaderboard ───────────────────────────────────────────────
+function BlindPartnersLeaderboard({ event, eventPlayers, allScores, course }) {
+  const pairs   = event?.side_game_entries?.blind_partner_pairs ?? []
+  const parPerHole = course?.par_per_hole ?? []
+
+  function playerNet(playerId) {
+    const scores = allScores.filter(s => s.player_id === playerId)
+    const ep     = eventPlayers.find(e => e.player_id === playerId)
+    const ch     = ep?.course_handicap ?? ep?.handicap_index ?? 0
+    const strokes= parPerHole.map((_, i) => {
+      const s = scores.find(sc => sc.hole_number === i + 1)
+      return s?.gross_score ?? null
+    })
+    const siArr  = course?.stroke_index ?? parPerHole.map((_, i) => i + 1)
+    let net = 0
+    let holesPlayed = 0
+    strokes.forEach((gross, i) => {
+      if (gross == null) return
+      holesPlayed++
+      const si    = siArr[i] ?? i + 1
+      const shots = Math.floor(ch / parPerHole.length) + (si <= (ch % parPerHole.length) ? 1 : 0)
+      net += gross - shots
+    })
+    return { net, holesPlayed }
+  }
+
+  function playerName(id) {
+    const ep = eventPlayers.find(e => e.player_id === id)
+    const p  = ep?.player ?? {}
+    return [p.first_name, p.last_name].filter(Boolean).join(' ') || '—'
+  }
+
+  const ranked = pairs.map((pair, i) => {
+    const r1 = playerNet(pair.p1)
+    const r2 = pair.p2 ? playerNet(pair.p2) : { net: 0, holesPlayed: 0 }
+    return {
+      idx: i,
+      p1: pair.p1, p2: pair.p2,
+      combinedNet: r1.net + r2.net,
+      holesPlayed: Math.max(r1.holesPlayed, r2.holesPlayed),
+    }
+  }).sort((a, b) => a.combinedNet - b.combinedNet)
+
+  if (pairs.length === 0) {
+    return <p className="text-sm text-gray-400 text-center py-8">No pairs drawn yet.</p>
+  }
+
+  return (
+    <div className="space-y-2">
+      <p className="text-xs text-gray-400 mb-3">Combined net score per pair — lowest wins.</p>
+      {ranked.map((pair, i) => {
+        const vsParTotal = pair.combinedNet - (parPerHole.reduce((a, b) => a + b, 0) * 2)
+        const color = pair.combinedNet < parPerHole.reduce((a, b) => a + b, 0) * 2
+          ? 'text-red-600' : pair.combinedNet === parPerHole.reduce((a, b) => a + b, 0) * 2
+          ? 'text-gray-600' : 'text-black'
+        return (
+          <div key={pair.idx} className="flex items-center justify-between bg-white rounded-xl px-4 py-3 shadow-sm border border-gray-100">
+            <div className="flex items-center gap-3">
+              <span className="text-sm font-bold text-gray-400 w-6">{i + 1}</span>
+              <div>
+                <div className="text-sm font-semibold text-gray-800">{playerName(pair.p1)}</div>
+                {pair.p2
+                  ? <div className="text-sm text-gray-500">{playerName(pair.p2)}</div>
+                  : <div className="text-xs text-gray-400 italic">no partner</div>
+                }
+              </div>
+            </div>
+            <div className="text-right">
+              <div className={`text-lg font-bold tabular-nums ${color}`}>{pair.combinedNet}</div>
+              <div className="text-xs text-gray-400">{pair.holesPlayed} holes</div>
+            </div>
+          </div>
+        )
+      })}
+    </div>
+  )
+}
+
 function SkinsBoard({ skinsResults, playerMap }) {
   const [flight, setFlight] = useState('A')
   const result = skinsResults[flight]

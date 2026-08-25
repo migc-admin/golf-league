@@ -3049,29 +3049,34 @@ function PayoutTable({ rows, onChange, colLabel }) {
 }
 
 // ─── Tab: Side Games ──────────────────────────────────────────────
-function BlindPartnersCard({ eventPlayers, optedInIds = [], getWinner, setWinner }) {
+function BlindPartnersCard({ event, eventPlayers, optedInIds = [], onUpdated }) {
   const drawPool = optedInIds.length > 0
     ? eventPlayers.filter(ep => optedInIds.includes(ep.player_id))
     : eventPlayers
-  const [entrants, setEntrants] = useState([])
-  const [pairs, setPairs]       = useState([]) // [{ p1, p2 }]
-  const [drawnYet, setDrawnYet] = useState(false)
 
-  function toggleEntrant(id) {
-    setEntrants(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id])
-  }
+  // Restore previously drawn pairs from DB
+  const savedPairs = event.side_game_entries?.blind_partner_pairs ?? []
+  const [pairs, setPairs]     = useState(savedPairs)
+  const [saving, setSaving]   = useState(false)
 
-  function drawPartners() {
-    const shuffled = [...entrants].sort(() => Math.random() - 0.5)
+  async function drawPartners() {
+    const ids      = drawPool.map(ep => ep.player_id)
+    const shuffled = [...ids].sort(() => Math.random() - 0.5)
     const newPairs = []
     for (let i = 0; i < shuffled.length - 1; i += 2) {
       newPairs.push({ p1: shuffled[i], p2: shuffled[i + 1] })
     }
     if (shuffled.length % 2 !== 0) {
-      newPairs.push({ p1: shuffled[shuffled.length - 1], p2: null }) // odd player out
+      newPairs.push({ p1: shuffled[shuffled.length - 1], p2: null })
     }
     setPairs(newPairs)
-    setDrawnYet(true)
+    setSaving(true)
+    const prev = event.side_game_entries ?? {}
+    await supabase.from('events').update({
+      side_game_entries: { ...prev, blind_partner_pairs: newPairs }
+    }).eq('id', event.id)
+    setSaving(false)
+    onUpdated?.()
   }
 
   function playerName(id) {
@@ -3080,75 +3085,59 @@ function BlindPartnersCard({ eventPlayers, optedInIds = [], getWinner, setWinner
     return [p.first_name, p.last_name].filter(Boolean).join(' ') || '—'
   }
 
+  const canDraw = drawPool.length >= 2
+
   return (
     <Card>
-      <CardHeader title="Blind Partners" subtitle="Separate entry — check who opted in, draw partners, then record the winning pair" />
+      <CardHeader title="Blind Partners" subtitle="Opted-in players are auto-selected — draw to assign pairs. Results appear on the leaderboard." />
       <div className="space-y-4">
-        {/* Step 1: Opt-ins */}
+        {/* Opted-in players */}
         <div>
           <div className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">
-            Step 1 — Select Entrants
-            {optedInIds.length > 0 && <span className="ml-2 text-xs font-normal text-green-600">({optedInIds.length} opted in above)</span>}
+            Entrants ({drawPool.length})
           </div>
-          <div className="grid grid-cols-2 gap-1.5">
-            {drawPool.map(ep => {
-              const id   = ep.player_id
-              const p    = ep.player ?? {}
-              const name = [p.first_name, p.last_name].filter(Boolean).join(' ') || '—'
-              return (
-                <label key={id} className="flex items-center gap-2 cursor-pointer text-sm text-gray-700">
-                  <input type="checkbox" checked={entrants.includes(id)} onChange={() => toggleEntrant(id)} className="accent-fairway-600 w-4 h-4" />
-                  {name}
-                </label>
-              )
-            })}
-          </div>
+          {drawPool.length === 0 ? (
+            <p className="text-sm text-gray-400 italic">No players have opted in yet. Add them in the Opt-in Rosters section above.</p>
+          ) : (
+            <div className="grid grid-cols-2 gap-1 mb-3">
+              {drawPool.map(ep => {
+                const p    = ep.player ?? {}
+                const name = [p.first_name, p.last_name].filter(Boolean).join(' ') || '—'
+                return (
+                  <div key={ep.player_id} className="text-sm text-gray-700 flex items-center gap-1.5">
+                    <span className="w-2 h-2 rounded-full bg-fairway-600 inline-block" />
+                    {name}
+                  </div>
+                )
+              })}
+            </div>
+          )}
           <button
             type="button"
-            disabled={entrants.length < 2}
+            disabled={!canDraw}
             onClick={drawPartners}
-            className="mt-3 text-sm font-semibold text-white bg-fairway-700 hover:bg-fairway-800 disabled:opacity-50 px-4 py-1.5 rounded-lg"
+            className="text-sm font-semibold text-white bg-fairway-700 hover:bg-fairway-800 disabled:opacity-50 px-4 py-1.5 rounded-lg"
           >
-            🎲 Draw Partners
+            🎲 {pairs.length > 0 ? 'Redraw Partners' : 'Draw Partners'}
           </button>
+          {saving && <span className="ml-3 text-xs text-gray-400">Saving…</span>}
         </div>
 
-        {/* Step 2: Drawn pairs */}
-        {drawnYet && (
+        {/* Drawn pairs */}
+        {pairs.length > 0 && (
           <div>
-            <div className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Step 2 — Drawn Pairs</div>
+            <div className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Drawn Pairs</div>
             <div className="space-y-1.5">
               {pairs.map((pair, i) => (
                 <div key={i} className="text-sm text-gray-700 bg-gray-50 rounded-lg px-3 py-1.5">
+                  <span className="font-medium text-fairway-700">Pair {i + 1}:</span>{' '}
                   {playerName(pair.p1)} &amp; {pair.p2 ? playerName(pair.p2) : <span className="text-gray-400 italic">no partner (odd number)</span>}
                 </div>
               ))}
             </div>
+            <p className="text-xs text-gray-400 mt-2">Combined net scores are ranked on the Blind Partners leaderboard tab.</p>
           </div>
         )}
-
-        {/* Step 3: Record winner */}
-        <div>
-          <div className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Step 3 — Record Winning Pair</div>
-          <div className="space-y-2">
-            <div className="flex items-center gap-4">
-              <span className="text-xs font-semibold text-gray-500 w-20">Partner 1</span>
-              <SideGameSelect
-                players={eventPlayers}
-                value={getWinner('blind_partners', null, 'partner_1')}
-                onChange={v => setWinner('blind_partners', null, v, 'partner_1')}
-              />
-            </div>
-            <div className="flex items-center gap-4">
-              <span className="text-xs font-semibold text-gray-500 w-20">Partner 2</span>
-              <SideGameSelect
-                players={eventPlayers}
-                value={getWinner('blind_partners', null, 'partner_2')}
-                onChange={v => setWinner('blind_partners', null, v, 'partner_2')}
-              />
-            </div>
-          </div>
-        </div>
       </div>
     </Card>
   )
@@ -3503,15 +3492,14 @@ function TabSideGames({ event, eventPlayers, course, sideGames, sideGameEntries 
       })()}
 
       {/* Blind Partners */}
-      {hasBlindPartners && (() => {
-        // Blind draw state — local to this render via a child component
-        return <BlindPartnersCard
+      {hasBlindPartners && (
+        <BlindPartnersCard
+          event={event}
           eventPlayers={eventPlayers}
           optedInIds={sideGameEntries.blind_partners ?? []}
-          getWinner={getWinner}
-          setWinner={setWinner}
+          onUpdated={onUpdated}
         />
-      })()}
+      )}
 
       {/* Super Skins */}
       {hasSuperSkins && (
