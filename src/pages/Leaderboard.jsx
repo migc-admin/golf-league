@@ -389,7 +389,7 @@ export default function Leaderboard() {
           <StablefordLeaderboard data={stablefordData} activeFlight={activeFlight} />
         )}
         {activeTab === 'Match Points' && matchData && (
-          <MatchPointsBoard matchData={matchData} />
+          <MatchPointsBoard matchData={matchData} event={event} />
         )}
         {activeTab === 'Team Match' && teamMatchData && (
           <TeamMatchBoard teamMatchData={teamMatchData} teamAName={teamMatchData.teamAName} teamBName={teamMatchData.teamBName} />
@@ -878,8 +878,11 @@ function StablefordLeaderboard({ data, activeFlight }) {
 }
 
 // ─── Match Points Board ───────────────────────────────────────────
-function MatchPointsBoard({ matchData }) {
+function MatchPointsBoard({ matchData, event }) {
   const { pairings, teamPoints, hasTeams, ranked } = matchData
+  const teamNames = event?.ryder_cup_teams ?? {}
+  const teamALabel = teamNames.a?.trim() || 'Flight A'
+  const teamBLabel = teamNames.b?.trim() || 'Flight B'
 
   if (!pairings.length) return (
     <div className="text-center py-12 text-gray-400">
@@ -889,7 +892,7 @@ function MatchPointsBoard({ matchData }) {
     </div>
   )
 
-  const teamLeader = teamPoints.A > teamPoints.B ? 'Flight A leads' : teamPoints.B > teamPoints.A ? 'Flight B leads' : 'All Square'
+  const teamLeader = teamPoints.A > teamPoints.B ? `${teamALabel} leads` : teamPoints.B > teamPoints.A ? `${teamBLabel} leads` : 'All Square'
 
   return (
     <div className="space-y-4">
@@ -901,13 +904,13 @@ function MatchPointsBoard({ matchData }) {
           </div>
           <div className="flex">
             <div className="flex-1 text-center py-4 bg-blue-50">
-              <div className="text-xs font-bold text-blue-600 mb-1">Flight A</div>
+              <div className="text-xs font-bold text-blue-600 mb-1">{teamALabel}</div>
               <div className="text-4xl font-black text-blue-700">{teamPoints.A}</div>
               <div className="text-xs text-blue-400 mt-0.5">matches won</div>
             </div>
             <div className="w-px bg-gray-200" />
             <div className="flex-1 text-center py-4 bg-purple-50">
-              <div className="text-xs font-bold text-purple-600 mb-1">Flight B</div>
+              <div className="text-xs font-bold text-purple-600 mb-1">{teamBLabel}</div>
               <div className="text-4xl font-black text-purple-700">{teamPoints.B}</div>
               <div className="text-xs text-purple-400 mt-0.5">matches won</div>
             </div>

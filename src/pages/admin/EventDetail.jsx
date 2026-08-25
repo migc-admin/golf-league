@@ -3210,6 +3210,12 @@ function TabSideGamesMain({ event, eventPlayers, course, sideGames, onUpdated })
   return (
     <div className="space-y-6">
       {/* ── Opt-in rosters for buy-in games ─────────────────────── */}
+      {hasSideGames && buyInGames.length === 0 && (
+        <div className="bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 text-sm text-amber-800">
+          <strong>No separate buy-in side games configured.</strong><br />
+          <span className="text-xs">To track opt-ins and pot totals, edit this event and enable "Separate buy-in" on a side game.</span>
+        </div>
+      )}
       {buyInGames.length > 0 && (
         <div>
           <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-widest mb-3">Opt-in Rosters</h3>
@@ -3283,10 +3289,11 @@ function TabSideGames({ event, eventPlayers, course, sideGames, sideGameEntries 
 
   const par3Holes = ctpConfigHoles.map(h => ({ hole: h }))
 
-  // Super CTP uses actual course par 3s (independent of payout config)
-  const superCtpHoles = (course?.par_per_hole ?? [])
+  // Super CTP: all par 3s available to select from; admin designates one hole
+  const allPar3s = (course?.par_per_hole ?? [])
     .map((p, i) => ({ hole: i + 1, par: p }))
     .filter(h => h.par === 3)
+  const superCtpDesignatedHole = event.super_ctp_hole ?? null
 
   const flightA = eventPlayers.filter(ep => ep.flight === 'A')
   const flightB = eventPlayers.filter(ep => ep.flight === 'B')
@@ -3423,18 +3430,37 @@ function TabSideGames({ event, eventPlayers, course, sideGames, sideGameEntries 
         )
       })()}
 
-      {/* Super CTP per par-3 */}
-      {hasSuperCtp && superCtpHoles.length > 0 && (() => {
+      {/* Super CTP — single designated hole */}
+      {hasSuperCtp && (() => {
         const hasSuperCtpA = sides.includes('super_ctp_a')
         const hasSuperCtpB = sides.includes('super_ctp_b')
         const perFlight = hasSuperCtpA || hasSuperCtpB
         return (
           <Card>
-            <CardHeader title="Super CTP" subtitle="Separate entry — one winner per par-3 hole" />
+            <CardHeader title="Super CTP" subtitle="Separate entry — designate one par-3 hole" />
             <div className="space-y-4">
-              {superCtpHoles.map(h => (
-                <div key={h.hole}>
-                  <div className="text-xs font-semibold text-gray-500 mb-2">Hole {h.hole}</div>
+              {/* Hole designation */}
+              <div>
+                <div className="text-xs font-semibold text-gray-500 mb-2">Designated Hole</div>
+                <select
+                  value={superCtpDesignatedHole ?? ''}
+                  onChange={async e => {
+                    const val = e.target.value ? parseInt(e.target.value, 10) : null
+                    await supabase.from('events').update({ super_ctp_hole: val }).eq('id', event.id)
+                    onUpdated()
+                  }}
+                  className="input bg-white text-sm"
+                >
+                  <option value="">— Select a par 3 hole —</option>
+                  {allPar3s.map(h => (
+                    <option key={h.hole} value={h.hole}>Hole {h.hole} (Par 3)</option>
+                  ))}
+                </select>
+              </div>
+              {/* Winner entry — only if hole is designated */}
+              {superCtpDesignatedHole && (
+                <div>
+                  <div className="text-xs font-semibold text-gray-500 mb-2">Winner — Hole {superCtpDesignatedHole}</div>
                   {perFlight ? (
                     <div className="space-y-2">
                       {hasSuperCtpA && (
@@ -3442,8 +3468,8 @@ function TabSideGames({ event, eventPlayers, course, sideGames, sideGameEntries 
                           <span className="text-xs font-semibold text-blue-600 w-16">Flight A</span>
                           <SideGameSelect
                             players={flightA.length ? flightA : eventPlayers}
-                            value={getWinner('super_ctp', h.hole, 'A')}
-                            onChange={v => setWinner('super_ctp', h.hole, v, 'A')}
+                            value={getWinner('super_ctp', superCtpDesignatedHole, 'A')}
+                            onChange={v => setWinner('super_ctp', superCtpDesignatedHole, v, 'A')}
                           />
                         </div>
                       )}
@@ -3452,8 +3478,8 @@ function TabSideGames({ event, eventPlayers, course, sideGames, sideGameEntries 
                           <span className="text-xs font-semibold text-purple-600 w-16">Flight B</span>
                           <SideGameSelect
                             players={flightB.length ? flightB : eventPlayers}
-                            value={getWinner('super_ctp', h.hole, 'B')}
-                            onChange={v => setWinner('super_ctp', h.hole, v, 'B')}
+                            value={getWinner('super_ctp', superCtpDesignatedHole, 'B')}
+                            onChange={v => setWinner('super_ctp', superCtpDesignatedHole, v, 'B')}
                           />
                         </div>
                       )}
@@ -3461,12 +3487,12 @@ function TabSideGames({ event, eventPlayers, course, sideGames, sideGameEntries 
                   ) : (
                     <SideGameSelect
                       players={eventPlayers}
-                      value={getWinner('super_ctp', h.hole, 'overall')}
-                      onChange={v => setWinner('super_ctp', h.hole, v, 'overall')}
+                      value={getWinner('super_ctp', superCtpDesignatedHole, 'overall')}
+                      onChange={v => setWinner('super_ctp', superCtpDesignatedHole, v, 'overall')}
                     />
                   )}
                 </div>
-              ))}
+              )}
             </div>
           </Card>
         )
