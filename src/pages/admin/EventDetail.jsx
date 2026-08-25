@@ -3178,6 +3178,18 @@ function TabSideGamesMain({ event, eventPlayers, course, sideGames, onUpdated })
   // Keep local state in sync when parent re-fetches event
   useEffect(() => { setEntries(event.side_game_entries ?? {}) }, [event.side_game_entries])
 
+  // Super CTP designated hole (editable inline)
+  const allPar3sMain = (course?.par_per_hole ?? [])
+    .map((par, i) => ({ hole: i + 1, par }))
+    .filter(h => h.par === 3)
+  const [superCtpHole, setSuperCtpHole] = useState(event.super_ctp_hole ?? '')
+  async function saveCtpHole(val) {
+    const num = val ? parseInt(val, 10) : null
+    setSuperCtpHole(val)
+    await supabase.from('events').update({ super_ctp_hole: num }).eq('id', event.id)
+    onUpdated?.()
+  }
+
   async function persistEntries(next) {
     setSavingEn(true)
     await supabase.from('events').update({ side_game_entries: next }).eq('id', event.id)
@@ -3236,6 +3248,21 @@ function TabSideGamesMain({ event, eventPlayers, course, sideGames, onUpdated })
                       </div>
                     )}
                   </div>
+                  {key === 'super_ctp' && (
+                    <div className="mb-3">
+                      <label className="text-xs font-semibold text-gray-500 block mb-1">Designated Hole</label>
+                      <select
+                        value={superCtpHole}
+                        onChange={e => saveCtpHole(e.target.value)}
+                        className="input bg-white text-sm"
+                      >
+                        <option value="">— Select a par 3 hole —</option>
+                        {allPar3sMain.map(h => (
+                          <option key={h.hole} value={h.hole}>Hole {h.hole} (Par 3)</option>
+                        ))}
+                      </select>
+                    </div>
+                  )}
                   <div className="grid grid-cols-2 gap-1.5">
                     {eventPlayers.map(ep => {
                       const pid  = ep.player_id
@@ -3435,63 +3462,40 @@ function TabSideGames({ event, eventPlayers, course, sideGames, sideGameEntries 
         const hasSuperCtpA = sides.includes('super_ctp_a')
         const hasSuperCtpB = sides.includes('super_ctp_b')
         const perFlight = hasSuperCtpA || hasSuperCtpB
+        const holeLabel = superCtpDesignatedHole ? `Hole ${superCtpDesignatedHole}` : 'No hole designated'
         return (
           <Card>
-            <CardHeader title="Super CTP" subtitle="Separate entry — designate one par-3 hole" />
-            <div className="space-y-4">
-              {/* Hole designation */}
-              <div>
-                <div className="text-xs font-semibold text-gray-500 mb-2">Designated Hole</div>
-                <select
-                  value={superCtpDesignatedHole ?? ''}
-                  onChange={async e => {
-                    const val = e.target.value ? parseInt(e.target.value, 10) : null
-                    await supabase.from('events').update({ super_ctp_hole: val }).eq('id', event.id)
-                    onUpdated()
-                  }}
-                  className="input bg-white text-sm"
-                >
-                  <option value="">— Select a par 3 hole —</option>
-                  {allPar3s.map(h => (
-                    <option key={h.hole} value={h.hole}>Hole {h.hole} (Par 3)</option>
-                  ))}
-                </select>
-              </div>
-              {/* Winner entry — only if hole is designated */}
-              {superCtpDesignatedHole && (
-                <div>
-                  <div className="text-xs font-semibold text-gray-500 mb-2">Winner — Hole {superCtpDesignatedHole}</div>
-                  {perFlight ? (
-                    <div className="space-y-2">
-                      {hasSuperCtpA && (
-                        <div className="flex items-center gap-4">
-                          <span className="text-xs font-semibold text-blue-600 w-16">Flight A</span>
-                          <SideGameSelect
-                            players={flightA.length ? flightA : eventPlayers}
-                            value={getWinner('super_ctp', superCtpDesignatedHole, 'A')}
-                            onChange={v => setWinner('super_ctp', superCtpDesignatedHole, v, 'A')}
-                          />
-                        </div>
-                      )}
-                      {hasSuperCtpB && (
-                        <div className="flex items-center gap-4">
-                          <span className="text-xs font-semibold text-purple-600 w-16">Flight B</span>
-                          <SideGameSelect
-                            players={flightB.length ? flightB : eventPlayers}
-                            value={getWinner('super_ctp', superCtpDesignatedHole, 'B')}
-                            onChange={v => setWinner('super_ctp', superCtpDesignatedHole, v, 'B')}
-                          />
-                        </div>
-                      )}
+            <CardHeader title="Super CTP" subtitle={holeLabel} />
+            <div className="space-y-3">
+              {perFlight ? (
+                <div className="space-y-2">
+                  {hasSuperCtpA && (
+                    <div className="flex items-center gap-4">
+                      <span className="text-xs font-semibold text-blue-600 w-16">Flight A</span>
+                      <SideGameSelect
+                        players={flightA.length ? flightA : eventPlayers}
+                        value={getWinner('super_ctp', superCtpDesignatedHole, 'A')}
+                        onChange={v => setWinner('super_ctp', superCtpDesignatedHole, v, 'A')}
+                      />
                     </div>
-                  ) : (
-                    <SideGameSelect
-                      players={eventPlayers}
-                      value={getWinner('super_ctp', superCtpDesignatedHole, 'overall')}
-                      onChange={v => setWinner('super_ctp', superCtpDesignatedHole, v, 'overall')}
-                    />
+                  )}
+                  {hasSuperCtpB && (
+                    <div className="flex items-center gap-4">
+                      <span className="text-xs font-semibold text-purple-600 w-16">Flight B</span>
+                      <SideGameSelect
+                        players={flightB.length ? flightB : eventPlayers}
+                        value={getWinner('super_ctp', superCtpDesignatedHole, 'B')}
+                        onChange={v => setWinner('super_ctp', superCtpDesignatedHole, v, 'B')}
+                      />
+                    </div>
                   )}
                 </div>
+              ) : (
+                <SideGameSelect
+                  players={eventPlayers}
+                  value={getWinner('super_ctp', superCtpDesignatedHole, 'overall')}
+                  onChange={v => setWinner('super_ctp', superCtpDesignatedHole, v, 'overall')}
+                />
               )}
             </div>
           </Card>
