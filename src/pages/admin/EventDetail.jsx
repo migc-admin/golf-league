@@ -3166,8 +3166,11 @@ function TabSideGamesMain({ event, eventPlayers, course, sideGames, onUpdated })
     return (m && PER_FLIGHT_GAME_KEYS.has(m[1])) ? m[1] : s
   }))]
 
-  // Games with a separate buy-in enabled
-  const buyInGames = baseKeys.filter(k => buyIns[k]?.enabled)
+  // Show opt-ins for any of these games when configured — no buy-in toggle required
+  const OPT_IN_GAME_KEYS = new Set(['super_ctp', 'super_skins', 'blind_partners'])
+  const optInGames = baseKeys.filter(k => OPT_IN_GAME_KEYS.has(k))
+  // Legacy: also include any games where admin explicitly enabled buy-in
+  const buyInGames = [...new Set([...optInGames, ...baseKeys.filter(k => buyIns[k]?.enabled)])]
 
   // Opt-in entries state (synced to DB)
   const [entries,  setEntries]  = useState(event.side_game_entries ?? {})
@@ -3209,13 +3212,7 @@ function TabSideGamesMain({ event, eventPlayers, course, sideGames, onUpdated })
 
   return (
     <div className="space-y-6">
-      {/* ── Opt-in rosters for buy-in games ─────────────────────── */}
-      {hasSideGames && buyInGames.length === 0 && (
-        <div className="bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 text-sm text-amber-800">
-          <strong>No separate buy-in side games configured.</strong><br />
-          <span className="text-xs">To track opt-ins and pot totals, edit this event and enable "Separate buy-in" on a side game.</span>
-        </div>
-      )}
+      {/* ── Opt-in rosters ───────────────────────────────────────── */}
       {buyInGames.length > 0 && (
         <div>
           <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-widest mb-3">Opt-in Rosters</h3>
