@@ -767,7 +767,6 @@ const TeeSheetReelCard = forwardRef(function TeeSheetReelCard({ event, eventPlay
     <div ref={ref} style={{
       width: 360,
       background: 'linear-gradient(160deg, #1B4332 0%, #0f2e22 55%, #0a1f17 100%)',
-      borderRadius: 20,
       display: 'flex',
       flexDirection: 'column',
       padding: '28px 22px 20px',
