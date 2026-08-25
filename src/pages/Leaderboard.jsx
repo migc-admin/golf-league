@@ -746,49 +746,22 @@ function PuttLeaderboard({ data, playerMap, allScores = [], course = null }) {
 // ─── Super Skins Leaderboard ──────────────────────────────────────────────────
 function SuperSkinsBoard({ event, eventPlayers, allScores, course, playerMap }) {
   const optedInIds = event?.side_game_entries?.super_skins ?? []
-  const sides      = event?.side_game_options ?? []
-  const hasA       = sides.includes('super_skins_a')
-  const hasB       = sides.includes('super_skins_b')
-  const perFlight  = hasA || hasB
-  const [flight, setFlight] = useState('A')
 
-  const filteredPlayers = optedInIds.length > 0
+  // Treat opted-in players as one pool (no flight split) — assign all to 'A' for engine
+  const pool = (optedInIds.length > 0
     ? eventPlayers.filter(ep => optedInIds.includes(ep.player_id))
     : eventPlayers
+  ).map(ep => ({ ...ep, flight: 'A' }))
 
-  if (filteredPlayers.length === 0) {
+  if (pool.length === 0) {
     return <p className="text-sm text-gray-400 text-center py-8">No players have opted in to Super Skins yet.</p>
   }
 
-  const skinsResults = {
-    A: computeSkinsForFlight(filteredPlayers, allScores, course, 'A'),
-    B: hasB ? computeSkinsForFlight(filteredPlayers, allScores, course, 'B') : computeSkinsForFlight(filteredPlayers, allScores, course, 'A'),
-  }
-  const result = skinsResults[flight]
+  const result = computeSkinsForFlight(pool, allScores, course, 'A')
   const totalSkins = Object.values(result.playerSkins).reduce((a, b) => a + b, 0)
 
   return (
     <div className="space-y-4">
-      {perFlight && (
-        <div className="flex gap-2">
-          {(hasA ? ['A'] : []).concat(hasB ? ['B'] : []).map(f => (
-            <button
-              key={f}
-              onClick={() => setFlight(f)}
-              aria-label={`View Flight ${f} super skins`}
-              aria-pressed={flight === f}
-              className={`px-4 py-1.5 rounded-full text-sm font-semibold transition-colors cursor-pointer ${
-                flight === f
-                  ? f === 'A' ? 'bg-blue-600 text-white' : 'bg-purple-600 text-white'
-                  : 'bg-white text-gray-500 border border-gray-200'
-              }`}
-            >
-              Flight {f}
-            </button>
-          ))}
-        </div>
-      )}
-
       {result.carryoverToNext && (
         <div className="bg-orange-50 border border-orange-200 rounded-lg px-4 py-3 text-sm text-orange-800">
           {result.carryoverAmount} skin{result.carryoverAmount !== 1 ? 's' : ''} carry to next event (no winner this round)
@@ -798,7 +771,7 @@ function SuperSkinsBoard({ event, eventPlayers, allScores, course, playerMap }) 
       {totalSkins > 0 && (
         <div className="card overflow-hidden p-0">
           <div className="px-4 py-3" style={{ borderBottom: '1px solid #ebe9e4', background: '#f4f3f0' }}>
-            <h3 className="font-semibold text-sm text-ink">Skins Won{perFlight ? ` — Flight ${flight}` : ''}</h3>
+            <h3 className="font-semibold text-sm text-ink">Skins Won</h3>
           </div>
           <div>
             {Object.entries(result.playerSkins)
