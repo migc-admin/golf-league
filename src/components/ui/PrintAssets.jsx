@@ -779,9 +779,9 @@ const TeeSheetReelCard = forwardRef(function TeeSheetReelCard({ event, eventPlay
       {/* Header */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 14 }}>
         {logoUrl ? (
-          <img src={logoUrl} alt="" style={{ width: 36, height: 36, borderRadius: 8, objectFit: 'cover' }} crossOrigin="anonymous" />
+          <img src={logoUrl} alt="" style={{ width: 40, height: 40, objectFit: 'contain' }} crossOrigin="anonymous" />
         ) : (
-          <div style={{ width: 36, height: 36, borderRadius: 8, background: '#D4AF37', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 900, fontSize: 13, color: '#1B4332' }}>
+          <div style={{ width: 40, height: 40, borderRadius: 8, background: '#D4AF37', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 900, fontSize: 13, color: '#1B4332' }}>
             {(leagueName ?? 'S').slice(0, 2).toUpperCase()}
           </div>
         )}
@@ -851,7 +851,11 @@ const TeeSheetReelCard = forwardRef(function TeeSheetReelCard({ event, eventPlay
         <div style={{ fontSize: 8, color: 'rgba(255,255,255,0.3)', textTransform: 'uppercase', letterSpacing: '0.08em' }}>
           {hasTgl ? '* Team Play participant · ' : ''}Powered by Scorify Golf
         </div>
-        <div style={{ fontSize: 8, color: 'rgba(255,255,255,0.2)' }}>scorifygolf.com</div>
+        {logoUrl ? (
+          <img src={logoUrl} alt="Scorify Golf" style={{ height: 22, objectFit: 'contain', opacity: 0.6 }} crossOrigin="anonymous" />
+        ) : (
+          <div style={{ fontSize: 8, color: 'rgba(255,255,255,0.2)' }}>scorifygolf.com</div>
+        )}
       </div>
     </div>
   )
