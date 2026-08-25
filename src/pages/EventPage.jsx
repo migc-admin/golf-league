@@ -29,14 +29,19 @@ const FORMAT_LABELS = {
   ryder_cup:           'Ryder Cup',
 }
 const SIDE_GAME_LABELS = {
-  skins:        'Skins',
-  skins_a:      'Skins — Flight A',
-  skins_b:      'Skins — Flight B',
-  long_drive:   'Long Drive',
-  long_drive_a: 'Long Drive — Flight A',
-  long_drive_b: 'Long Drive — Flight B',
-  low_putts:    'Low Putts',
-  ctp:          'Closest to Pin',
+  skins:           'Skins',
+  skins_a:         'Skins — Flight A',
+  skins_b:         'Skins — Flight B',
+  super_skins:     'Super Skins',
+  super_skins_a:   'Super Skins — Flight A',
+  super_skins_b:   'Super Skins — Flight B',
+  long_drive:      'Long Drive',
+  long_drive_a:    'Long Drive — Flight A',
+  long_drive_b:    'Long Drive — Flight B',
+  low_putts:       'Low Putts',
+  ctp:             'Closest to Pin',
+  super_ctp:       'Super CTP',
+  blind_partners:  'Blind Partners',
 }
 
 const BASE_TABS = [
@@ -363,10 +368,20 @@ function OverviewTab({ event, leaderboardUrl, description }) {
   const formats = (event.formats ?? (event.format ? [event.format] : []))
     .map(k => FORMAT_LABELS[k])
     .filter(Boolean)
+  const buyIns = event.side_game_buy_ins ?? {}
   const presetGames = (event.side_game_options ?? [])
-    .map(k => SIDE_GAME_LABELS[k])
+    .map(k => {
+      const label = SIDE_GAME_LABELS[k]
+      if (!label) return null
+      const baseKey = k.replace(/_[ab]$/, '')
+      return { name: label, sepEntry: !!(buyIns[baseKey]?.enabled) }
+    })
     .filter(Boolean)
-  const allCompetitions = [...formats, ...presetGames, ...customCompetitions]
+  const allCompetitions = [
+    ...formats.map(name => ({ name, sepEntry: false })),
+    ...presetGames,
+    ...customCompetitions.map(name => ({ name, sepEntry: false })),
+  ]
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
@@ -413,16 +428,18 @@ function OverviewTab({ event, leaderboardUrl, description }) {
             Competitions &amp; Side Games
           </div>
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
-            {allCompetitions.map((name, i) => (
+            {allCompetitions.map((comp, i) => (
               <span key={i} style={{
                 display: 'inline-flex', alignItems: 'center', gap: 6,
                 fontSize: 12, fontWeight: 600, color: GREEN,
                 background: '#f0fdf4', border: '1px solid #bbf7d0',
-                borderRadius: 20, padding: '5px 12px',
-                whiteSpace: 'nowrap',
-              }}>
-                <span style={{ fontSize: 12, lineHeight: 1 }}>⛳</span>
-                {name}
+                borderRadius: 20, padding: '5px 12px', whiteSpace: 'nowrap' }}>
+                <span>⛳</span>{comp.name}
+                {comp.sepEntry && (
+                  <span style={{ fontSize: 9, fontWeight: 700, background: '#D4AF37', color: '#1B4332', borderRadius: 10, padding: '1px 5px', marginLeft: 2 }}>
+                    Sep. Entry
+                  </span>
+                )}
               </span>
             ))}
           </div>

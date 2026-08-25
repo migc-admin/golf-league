@@ -32,12 +32,16 @@ const ALL_ADMIN_TABS = ['Overview', 'Players', 'Groups', 'Payout', 'Pre/Post Rou
 
 // ─── Side game helpers (shared between EditEventModal and elsewhere) ──────────
 const PER_FLIGHT_GAMES = [
-  { key: 'skins',      label: 'Skins' },
-  { key: 'long_drive', label: 'Long Drive' },
-  { key: 'low_putts',  label: 'Low Putts' },
-  { key: 'ctp',        label: 'Closest to Pin (par 3s)' },
+  { key: 'skins',       label: 'Skins' },
+  { key: 'super_skins', label: 'Super Skins' },
+  { key: 'long_drive',  label: 'Long Drive' },
+  { key: 'low_putts',   label: 'Low Putts' },
+  { key: 'ctp',         label: 'Closest to Pin (par 3s)' },
+  { key: 'super_ctp',   label: 'Super CTP (par 3s)' },
 ]
-const GROUP_GAMES = []
+const GROUP_GAMES = [
+  { key: 'blind_partners', label: 'Blind Partners' },
+]
 const PER_FLIGHT_GAME_KEYS = new Set(PER_FLIGHT_GAMES.map(g => g.key))
 
 function buildSideGameOptions(enabledGames, gameScope, numFlights) {
@@ -50,6 +54,9 @@ function buildSideGameOptions(enabledGames, gameScope, numFlights) {
     } else {
       result.push(g.key)
     }
+  }
+  for (const g of GROUP_GAMES) {
+    if (enabledGames.has(g.key)) result.push(g.key)
   }
   return result
 }
@@ -3050,7 +3057,10 @@ function TabSideGames({ event, eventPlayers, course, sideGames, onUpdated }) {
   const hasLdA     = sides.includes('long_drive_a')
   const hasLdB     = sides.includes('long_drive_b')
   const hasLd      = sides.includes('long_drive')
-  const hasCtp     = sides.some(s => s === 'ctp' || s.startsWith('ctp_'))
+  const hasCtp      = sides.some(s => s === 'ctp' || s.startsWith('ctp_'))
+  const hasSuperCtp = sides.some(s => s === 'super_ctp' || s.startsWith('super_ctp_'))
+  const hasBlindPartners = sides.includes('blind_partners')
+  const hasSuperSkins    = sides.some(s => s === 'super_skins' || s.startsWith('super_skins_'))
 
   return (
     <div className="space-y-4">
@@ -3140,6 +3150,88 @@ function TabSideGames({ event, eventPlayers, course, sideGames, onUpdated }) {
           </Card>
         )
       })()}
+
+      {/* Super CTP per par-3 */}
+      {hasSuperCtp && par3Holes.length > 0 && (() => {
+        const hasSuperCtpA = sides.includes('super_ctp_a')
+        const hasSuperCtpB = sides.includes('super_ctp_b')
+        const perFlight = hasSuperCtpA || hasSuperCtpB
+        return (
+          <Card>
+            <CardHeader title="Super CTP" subtitle="Separate entry — one winner per par-3 hole" />
+            <div className="space-y-4">
+              {par3Holes.map(h => (
+                <div key={h.hole}>
+                  <div className="text-xs font-semibold text-gray-500 mb-2">Hole {h.hole}</div>
+                  {perFlight ? (
+                    <div className="space-y-2">
+                      {hasSuperCtpA && (
+                        <div className="flex items-center gap-4">
+                          <span className="text-xs font-semibold text-blue-600 w-16">Flight A</span>
+                          <SideGameSelect
+                            players={flightA.length ? flightA : eventPlayers}
+                            value={getWinner('super_ctp', h.hole, 'A')}
+                            onChange={v => setWinner('super_ctp', h.hole, v, 'A')}
+                          />
+                        </div>
+                      )}
+                      {hasSuperCtpB && (
+                        <div className="flex items-center gap-4">
+                          <span className="text-xs font-semibold text-purple-600 w-16">Flight B</span>
+                          <SideGameSelect
+                            players={flightB.length ? flightB : eventPlayers}
+                            value={getWinner('super_ctp', h.hole, 'B')}
+                            onChange={v => setWinner('super_ctp', h.hole, v, 'B')}
+                          />
+                        </div>
+                      )}
+                    </div>
+                  ) : (
+                    <SideGameSelect
+                      players={eventPlayers}
+                      value={getWinner('super_ctp', h.hole, 'overall')}
+                      onChange={v => setWinner('super_ctp', h.hole, v, 'overall')}
+                    />
+                  )}
+                </div>
+              ))}
+            </div>
+          </Card>
+        )
+      })()}
+
+      {/* Blind Partners */}
+      {hasBlindPartners && (
+        <Card>
+          <CardHeader title="Blind Partners" subtitle="Separate entry — select the winning pair" />
+          <div className="space-y-3">
+            <div className="flex items-center gap-4">
+              <span className="text-xs font-semibold text-gray-500 w-20">Partner 1</span>
+              <SideGameSelect
+                players={eventPlayers}
+                value={getWinner('blind_partners', null, 'partner_1')}
+                onChange={v => setWinner('blind_partners', null, v, 'partner_1')}
+              />
+            </div>
+            <div className="flex items-center gap-4">
+              <span className="text-xs font-semibold text-gray-500 w-20">Partner 2</span>
+              <SideGameSelect
+                players={eventPlayers}
+                value={getWinner('blind_partners', null, 'partner_2')}
+                onChange={v => setWinner('blind_partners', null, v, 'partner_2')}
+              />
+            </div>
+          </div>
+        </Card>
+      )}
+
+      {/* Super Skins */}
+      {hasSuperSkins && (
+        <Card>
+          <CardHeader title="Super Skins" subtitle="Separate entry — results auto-computed from scoring" />
+          <p className="text-sm text-gray-500 py-2">Super Skins runs on the same scoring data as Skins. Winners are determined automatically once all scores are entered.</p>
+        </Card>
+      )}
 
       {/* Custom competitions */}
       {(event.custom_competitions ?? []).filter(c => c?.trim()).map((name, i) => (
@@ -3362,6 +3454,7 @@ function EditEventModal({ open, onClose, event, onSaved }) {
   const [holesPlayed,  setHolesPlayed]  = useState(18)
   const [useHandicaps, setUseHandicaps] = useState(true)
   const [saving,       setSaving]       = useState(false)
+  const [sideGameBuyIns, setSideGameBuyIns] = useState({})
 
   useEffect(() => {
     if (event && open) {
@@ -3392,6 +3485,7 @@ function EditEventModal({ open, onClose, event, onSaved }) {
       setCourseId(event.course_id ?? '')
       setHolesPlayed(event.holes_played ?? 18)
       setUseHandicaps(event.use_handicaps ?? true)
+      setSideGameBuyIns(event.side_game_buy_ins ?? {})
     }
   }, [event, open])
 
@@ -3405,6 +3499,12 @@ function EditEventModal({ open, onClose, event, onSaved }) {
   }
   function toggleSideGame(key) {
     setSideGames(prev => { const n = new Set(prev); n.has(key) ? n.delete(key) : n.add(key); return n })
+  }
+  function toggleBuyIn(key) {
+    setSideGameBuyIns(prev => ({ ...prev, [key]: { ...prev[key], enabled: !(prev[key]?.enabled) } }))
+  }
+  function setBuyInAmount(key, val) {
+    setSideGameBuyIns(prev => ({ ...prev, [key]: { ...prev[key], amount: val } }))
   }
 
   async function handleSave(e) {
@@ -3439,6 +3539,11 @@ function EditEventModal({ open, onClose, event, onSaved }) {
         course_id:              courseId || null,
         holes_played:           holesPlayed,
         use_handicaps:          useHandicaps,
+        side_game_buy_ins:      Object.fromEntries(
+          Object.entries(sideGameBuyIns)
+            .filter(([k, v]) => sideGames.has(k) && v?.enabled)
+            .map(([k, v]) => [k, { enabled: true, amount: v.amount !== '' && v.amount != null ? parseFloat(v.amount) : null }])
+        ),
       })
       .eq('id', event.id)
     setSaving(false)
@@ -3694,17 +3799,19 @@ function EditEventModal({ open, onClose, event, onSaved }) {
         <div>
           <label className="label">Side Games / Competitions</label>
           <div className="space-y-3 bg-gray-50 rounded-xl px-4 py-3">
-            {PER_FLIGHT_GAMES.map(opt => {
+            {[...PER_FLIGHT_GAMES, ...GROUP_GAMES].map(opt => {
               const checked = sideGames.has(opt.key)
               const scope = gameScope[opt.key] ?? 'flight'
               const flightLetters = Array.from({ length: numFlights }, (_, i) => String.fromCharCode(65 + i))
+              const isPerFlight = PER_FLIGHT_GAMES.some(g => g.key === opt.key)
+              const buyIn = sideGameBuyIns[opt.key] ?? {}
               return (
                 <div key={opt.key}>
                   <label className="flex items-center gap-2.5 cursor-pointer">
                     <input type="checkbox" checked={checked} onChange={() => toggleSideGame(opt.key)} className="accent-fairway-600 w-4 h-4" />
                     <span className="text-sm text-gray-800">{opt.label}</span>
                   </label>
-                  {checked && numFlights > 0 && (
+                  {checked && isPerFlight && numFlights > 0 && (
                     <div className="ml-6 mt-1.5 flex gap-4">
                       <label className="flex items-center gap-1.5 cursor-pointer">
                         <input type="radio" checked={scope === 'flight'}
@@ -3720,15 +3827,29 @@ function EditEventModal({ open, onClose, event, onSaved }) {
                       </label>
                     </div>
                   )}
+                  {checked && (
+                    <div className="ml-6 mt-1.5 flex items-center gap-3">
+                      <label className="flex items-center gap-1.5 cursor-pointer">
+                        <input type="checkbox" checked={buyIn.enabled ?? false} onChange={() => toggleBuyIn(opt.key)} className="accent-fairway-600 w-4 h-4" />
+                        <span className="text-xs text-gray-600">Separate buy-in</span>
+                      </label>
+                      {buyIn.enabled && (
+                        <div className="flex items-center gap-1">
+                          <span className="text-xs text-gray-400">$</span>
+                          <input
+                            type="number" min="0" step="1"
+                            value={buyIn.amount ?? ''}
+                            onChange={e => setBuyInAmount(opt.key, e.target.value)}
+                            placeholder="0"
+                            className="w-16 border border-gray-300 rounded px-2 py-0.5 text-xs focus:outline-none focus:ring-1 focus:ring-green-600"
+                          />
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </div>
               )
             })}
-            {GROUP_GAMES.map(opt => (
-              <label key={opt.key} className="flex items-center gap-2.5 cursor-pointer">
-                <input type="checkbox" checked={sideGames.has(opt.key)} onChange={() => toggleSideGame(opt.key)} className="accent-fairway-600 w-4 h-4" />
-                <span className="text-sm text-gray-800">{opt.label}</span>
-              </label>
-            ))}
           </div>
 
           {/* Custom Competitions */}

@@ -33,12 +33,15 @@ function flightLetterOf(key) {
 /** Human-readable label for any payout key */
 export function getCategoryLabel(key) {
   // CTP handled separately
-  if (key.startsWith('ctp_')) return `Closest to Pin — Hole ${key.replace('ctp_', '')} (Full Field)`
+  if (key.startsWith('ctp_'))       return `Closest to Pin — Hole ${key.replace('ctp_', '')} (Full Field)`
+  if (key.startsWith('super_ctp_')) return `Super CTP — Hole ${key.replace('super_ctp_', '')} (Full Field)`
 
   // Full-field side games
-  if (key === 'skins')      return 'Skins (Full Field)'
-  if (key === 'long_drive') return 'Long Drive (Full Field)'
-  if (key === 'low_putts')  return 'Low Putts (Full Field)'
+  if (key === 'skins')           return 'Skins (Full Field)'
+  if (key === 'super_skins')     return 'Super Skins (Full Field)'
+  if (key === 'long_drive')      return 'Long Drive (Full Field)'
+  if (key === 'low_putts')       return 'Low Putts (Full Field)'
+  if (key === 'blind_partners')  return 'Blind Partners'
 
   // No-flight scoring
   if (key === '18_net_1st') return '18-Hole Net — 1st'
@@ -55,8 +58,9 @@ export function getCategoryLabel(key) {
   // Per-flight patterns — any letter
   const fl = flightLetterOf(key)
   if (fl) {
-    if (key.startsWith('skins_'))      return `Skins — Flight ${fl}`
-    if (key.startsWith('long_drive_')) return `Long Drive — Flight ${fl}`
+    if (key.startsWith('super_skins_')) return `Super Skins — Flight ${fl}`
+    if (key.startsWith('skins_'))       return `Skins — Flight ${fl}`
+    if (key.startsWith('long_drive_'))  return `Long Drive — Flight ${fl}`
     if (key.startsWith('low_putts_'))  return `Low Putts — Flight ${fl}`
     if (key.startsWith('18_net_')) {
       const rank = key.split('_').pop()
