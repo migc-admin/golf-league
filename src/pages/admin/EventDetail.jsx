@@ -3175,11 +3175,14 @@ function TabSideGamesMain({ event, eventPlayers, course, sideGames, onUpdated })
   // Opt-in entries state (synced to DB)
   const [entries,  setEntries]  = useState(event.side_game_entries ?? {})
   const [savingEn, setSavingEn] = useState(false)
+  // Keep local state in sync when parent re-fetches event
+  useEffect(() => { setEntries(event.side_game_entries ?? {}) }, [event.side_game_entries])
 
   async function persistEntries(next) {
     setSavingEn(true)
     await supabase.from('events').update({ side_game_entries: next }).eq('id', event.id)
     setSavingEn(false)
+    onUpdated?.()
   }
 
   function toggleEntry(gameKey, playerId) {
