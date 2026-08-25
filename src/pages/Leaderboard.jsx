@@ -749,8 +749,9 @@ function SuperSkinsBoard({ event, eventPlayers, allScores, course, playerMap }) 
   const sides      = event?.side_game_options ?? []
   const hasA       = sides.includes('super_skins_a')
   const hasB       = sides.includes('super_skins_b')
+  const perFlight  = hasA || hasB
+  const [flight, setFlight] = useState('A')
 
-  // Filter to only opted-in players (or all if none opted in yet)
   const filteredPlayers = optedInIds.length > 0
     ? eventPlayers.filter(ep => optedInIds.includes(ep.player_id))
     : eventPlayers
@@ -759,39 +760,98 @@ function SuperSkinsBoard({ event, eventPlayers, allScores, course, playerMap }) 
     return <p className="text-sm text-gray-400 text-center py-8">No players have opted in to Super Skins yet.</p>
   }
 
-  const skinsA = computeSkinsForFlight(filteredPlayers, allScores, course, 'A')
-  const skinsB = hasB ? computeSkinsForFlight(filteredPlayers, allScores, course, 'B') : null
-
-  function renderFlight(result, flightLabel, labelColor) {
-    const totalSkins = Object.values(result.playerSkins).reduce((a, b) => a + b, 0)
-    const sorted = Object.entries(result.playerSkins)
-      .filter(([, count]) => count > 0)
-      .sort(([, a], [, b]) => b - a)
-
-    return (
-      <div>
-        {flightLabel && <div className={`text-xs font-bold ${labelColor} mb-2`}>{flightLabel}</div>}
-        {sorted.length === 0 ? (
-          <p className="text-sm text-gray-400 italic py-2">No skins won yet.</p>
-        ) : sorted.map(([pid, count]) => {
-          const name = playerMap[pid] ?? pid
-          return (
-            <div key={pid} className="flex items-center justify-between bg-white rounded-xl px-4 py-2.5 shadow-sm border border-gray-100 mb-2">
-              <span className="text-sm font-semibold text-gray-800">{name}</span>
-              <span className="text-sm font-bold text-fairway-700">{count} skin{count !== 1 ? 's' : ''}</span>
-            </div>
-          )
-        })}
-        <div className="text-xs text-gray-400 mt-1">{totalSkins} total skin{totalSkins !== 1 ? 's' : ''} awarded</div>
-      </div>
-    )
+  const skinsResults = {
+    A: computeSkinsForFlight(filteredPlayers, allScores, course, 'A'),
+    B: hasB ? computeSkinsForFlight(filteredPlayers, allScores, course, 'B') : computeSkinsForFlight(filteredPlayers, allScores, course, 'A'),
   }
+  const result = skinsResults[flight]
+  const totalSkins = Object.values(result.playerSkins).reduce((a, b) => a + b, 0)
 
   return (
     <div className="space-y-4">
-      <p className="text-xs text-gray-400">Super Skins — opt-in only. Runs on same hole scoring as regular skins.</p>
-      {(hasA || !hasB) && renderFlight(skinsA, hasB ? 'Flight A' : null, 'text-blue-600')}
-      {hasB && skinsB && renderFlight(skinsB, 'Flight B', 'text-purple-600')}
+      {perFlight && (
+        <div className="flex gap-2">
+          {(hasA ? ['A'] : []).concat(hasB ? ['B'] : []).map(f => (
+            <button
+              key={f}
+              onClick={() => setFlight(f)}
+              aria-label={`View Flight ${f} super skins`}
+              aria-pressed={flight === f}
+              className={`px-4 py-1.5 rounded-full text-sm font-semibold transition-colors cursor-pointer ${
+                flight === f
+                  ? f === 'A' ? 'bg-blue-600 text-white' : 'bg-purple-600 text-white'
+                  : 'bg-white text-gray-500 border border-gray-200'
+              }`}
+            >
+              Flight {f}
+            </button>
+          ))}
+        </div>
+      )}
+
+      {result.carryoverToNext && (
+        <div className="bg-orange-50 border border-orange-200 rounded-lg px-4 py-3 text-sm text-orange-800">
+          {result.carryoverAmount} skin{result.carryoverAmount !== 1 ? 's' : ''} carry to next event (no winner this round)
+        </div>
+      )}
+
+      {totalSkins > 0 && (
+        <div className="card overflow-hidden p-0">
+          <div className="px-4 py-3" style={{ borderBottom: '1px solid #ebe9e4', background: '#f4f3f0' }}>
+            <h3 className="font-semibold text-sm text-ink">Skins Won{perFlight ? ` — Flight ${flight}` : ''}</h3>
+          </div>
+          <div>
+            {Object.entries(result.playerSkins)
+              .filter(([, c]) => c > 0)
+              .sort(([, a], [, b]) => b - a)
+              .map(([pid, count]) => {
+                const p = playerMap[pid]
+                return (
+                  <div key={pid} className="flex items-center justify-between px-4 py-3" style={{ borderBottom: '1px solid #ebe9e4' }}>
+                    <span className="font-medium text-sm text-ink">
+                      {p ? `${p.last_name}, ${p.first_name}` : pid}
+                    </span>
+                    <span className="font-black text-status-active-text text-lg">{count} skin{count !== 1 ? 's' : ''}</span>
+                  </div>
+                )
+              })}
+          </div>
+        </div>
+      )}
+
+      <div className="card overflow-hidden p-0">
+        <div className="px-4 py-3" style={{ borderBottom: '1px solid #ebe9e4', background: '#f4f3f0' }}>
+          <h3 className="font-semibold text-sm text-ink">Hole-by-Hole Skins</h3>
+        </div>
+        <div>
+          {result.holes.map(h => {
+            if (h.incomplete) return null
+            const winner = h.winner ? playerMap[h.winner] : null
+            return (
+              <div key={h.hole} className="flex items-center gap-3 px-4 py-2.5" style={{ borderBottom: '1px solid #ebe9e4' }}>
+                <span className="w-8 text-sm font-semibold text-ink-muted">#{h.hole}</span>
+                {h.tied && !h.winner && (
+                  <span className="text-xs text-orange-600 font-medium">
+                    Tied — {h.carryoverIn + 1} skin{h.carryoverIn + 1 !== 1 ? 's' : ''} carried
+                  </span>
+                )}
+                {h.winner && (
+                  <>
+                    <span className="text-xs text-status-active-text font-semibold">
+                      {winner ? `${winner.last_name}, ${winner.first_name}` : h.winner}
+                    </span>
+                    <span className="ml-auto text-xs font-bold text-ink-muted">
+                      {h.skinsWon} skin{h.skinsWon !== 1 ? 's' : ''}
+                      {h.carryoverIn > 0 && <span className="text-orange-500"> (+{h.carryoverIn} carry)</span>}
+                      {h.wraparound > 0 && <span className="text-purple-500"> (+{h.wraparound} wraparound)</span>}
+                    </span>
+                  </>
+                )}
+              </div>
+            )
+          })}
+        </div>
+      </div>
     </div>
   )
 }
