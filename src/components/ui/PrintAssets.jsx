@@ -762,10 +762,9 @@ const TeeSheetReelCard = forwardRef(function TeeSheetReelCard({ event, eventPlay
   // Card is 360×640 at 1× — exported at 3× = 1080×1920
   return (
     <div ref={ref} style={{
-      width: 360, height: 640,
+      width: 360,
       background: 'linear-gradient(160deg, #1B4332 0%, #0f2e22 55%, #0a1f17 100%)',
       borderRadius: 20,
-      overflow: 'hidden',
       display: 'flex',
       flexDirection: 'column',
       padding: '28px 22px 20px',
@@ -801,8 +800,8 @@ const TeeSheetReelCard = forwardRef(function TeeSheetReelCard({ event, eventPlay
       <div style={{ height: 1, background: 'rgba(255,255,255,0.1)', marginBottom: 10 }} />
 
       {/* Rows — each group is a block: header row + 2-column player grid */}
-      <div style={{ flex: 1, overflow: 'hidden', display: 'flex', flexDirection: 'column', gap: 4 }}>
-        {groupNums.slice(0, 10).map((g, i) => {
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+        {groupNums.map((g, i) => {
           const members = groups[g]
           const teeTime = isShotgun
             ? calcTeeTime(event?.start_time, 0, 1)
@@ -839,11 +838,6 @@ const TeeSheetReelCard = forwardRef(function TeeSheetReelCard({ event, eventPlay
             </div>
           )
         })}
-        {groupNums.length > 10 && (
-          <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.3)', paddingLeft: 4, paddingTop: 2 }}>
-            + {groupNums.length - 10} more groups — see full tee sheet
-          </div>
-        )}
       </div>
 
       {/* Footer */}
