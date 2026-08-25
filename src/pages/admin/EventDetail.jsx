@@ -28,7 +28,7 @@ import PrintAssets from '../../components/ui/PrintAssets'
 import { atLimit, getLimit, nextTier, TIER_LABELS } from '../../lib/features'
 
 // Collapsed from 7 → 4 tabs: Players = Registrations + Players & Flights; Payout = Config + Side Games + Summary
-const ALL_ADMIN_TABS = ['Overview', 'Players', 'Groups', 'Payout', 'Pre/Post Round', 'Team Play']
+const ALL_ADMIN_TABS = ['Overview', 'Players', 'Groups', 'Side Games', 'Payout', 'Pre/Post Round', 'Team Play']
 
 // ─── Side game helpers (shared between EditEventModal and elsewhere) ──────────
 const PER_FLIGHT_GAMES = [
@@ -296,18 +296,22 @@ export default function EventDetail() {
         </div>
       )}
 
+      {activeTab === 'Side Games' && (
+        <TabSideGamesMain
+          event={event}
+          eventPlayers={eventPlayers}
+          course={course}
+          sideGames={sideGames}
+          onUpdated={load}
+        />
+      )}
+
       {activeTab === 'Payout' && (
         <div className="space-y-6">
           <div id="payout-config">
             <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-widest mb-3">Payout Config</h3>
             <TabPayoutConfig event={event} eventPlayers={eventPlayers} course={course} onUpdated={load} />
           </div>
-          {((event?.side_game_options ?? []).length > 0 || (event?.custom_competitions ?? []).some(c => c?.trim())) && (
-            <div id="side-games" className="border-t border-gray-100 pt-6">
-              <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-widest mb-3">Side Games</h3>
-              <TabSideGames event={event} eventPlayers={eventPlayers} course={course} sideGames={sideGames} onUpdated={load} />
-            </div>
-          )}
           <div id="payout-summary" className="border-t border-gray-100 pt-6">
             <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-widest mb-3">Payout Summary</h3>
             <TabPayoutSummary event={event} eventPlayers={eventPlayers} allScores={allScores} sideGames={sideGames} course={course} />
@@ -3007,7 +3011,10 @@ function PayoutTable({ rows, onChange, colLabel }) {
 }
 
 // ─── Tab: Side Games ──────────────────────────────────────────────
-function BlindPartnersCard({ eventPlayers, getWinner, setWinner }) {
+function BlindPartnersCard({ eventPlayers, optedInIds = [], getWinner, setWinner }) {
+  const drawPool = optedInIds.length > 0
+    ? eventPlayers.filter(ep => optedInIds.includes(ep.player_id))
+    : eventPlayers
   const [entrants, setEntrants] = useState([])
   const [pairs, setPairs]       = useState([]) // [{ p1, p2 }]
   const [drawnYet, setDrawnYet] = useState(false)
@@ -3041,9 +3048,12 @@ function BlindPartnersCard({ eventPlayers, getWinner, setWinner }) {
       <div className="space-y-4">
         {/* Step 1: Opt-ins */}
         <div>
-          <div className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Step 1 — Select Entrants</div>
+          <div className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">
+            Step 1 — Select Entrants
+            {optedInIds.length > 0 && <span className="ml-2 text-xs font-normal text-green-600">({optedInIds.length} opted in above)</span>}
+          </div>
           <div className="grid grid-cols-2 gap-1.5">
-            {eventPlayers.map(ep => {
+            {drawPool.map(ep => {
               const id   = ep.player_id
               const p    = ep.player ?? {}
               const name = [p.first_name, p.last_name].filter(Boolean).join(' ') || '—'
@@ -3106,7 +3116,126 @@ function BlindPartnersCard({ eventPlayers, getWinner, setWinner }) {
   )
 }
 
-function TabSideGames({ event, eventPlayers, course, sideGames, onUpdated }) {
+// ─── Tab: Side Games (opt-ins + draw + winner entry) ─────────────────────────
+function TabSideGamesMain({ event, eventPlayers, course, sideGames, onUpdated }) {
+  const sides   = event.side_game_options ?? []
+  const buyIns  = event.side_game_buy_ins ?? {}
+  const hasSideGames = sides.length > 0 || (event.custom_competitions ?? []).some(c => c?.trim())
+
+  // Derive unique base keys from side_game_options
+  const baseKeys = [...new Set(sides.map(s => {
+    const m = s.match(/^(.+)_([a-z])$/)
+    return (m && PER_FLIGHT_GAME_KEYS.has(m[1])) ? m[1] : s
+  }))]
+
+  // Games with a separate buy-in enabled
+  const buyInGames = baseKeys.filter(k => buyIns[k]?.enabled)
+
+  // Opt-in entries state (synced to DB)
+  const [entries,  setEntries]  = useState(event.side_game_entries ?? {})
+  const [savingEn, setSavingEn] = useState(false)
+
+  async function persistEntries(next) {
+    setSavingEn(true)
+    await supabase.from('events').update({ side_game_entries: next }).eq('id', event.id)
+    setSavingEn(false)
+  }
+
+  function toggleEntry(gameKey, playerId) {
+    setEntries(prev => {
+      const cur  = prev[gameKey] ?? []
+      const next = cur.includes(playerId) ? cur.filter(id => id !== playerId) : [...cur, playerId]
+      const updated = { ...prev, [gameKey]: next }
+      persistEntries(updated)
+      return updated
+    })
+  }
+
+  function gameLabel(key) {
+    const MAP = {
+      skins: 'Skins', super_skins: 'Super Skins', long_drive: 'Long Drive',
+      low_putts: 'Low Putts', ctp: 'Closest to Pin', super_ctp: 'Super CTP',
+      blind_partners: 'Blind Partners',
+    }
+    return MAP[key] ?? key
+  }
+
+  if (!hasSideGames) {
+    return (
+      <div className="text-sm text-gray-400 py-8 text-center">
+        No side games configured for this event. Add them via the Edit Event button.
+      </div>
+    )
+  }
+
+  return (
+    <div className="space-y-6">
+      {/* ── Opt-in rosters for buy-in games ─────────────────────── */}
+      {buyInGames.length > 0 && (
+        <div>
+          <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-widest mb-3">Opt-in Rosters</h3>
+          <div className="space-y-4">
+            {buyInGames.map(key => {
+              const opted  = entries[key] ?? []
+              const amount = buyIns[key]?.amount ?? null
+              const pot    = amount != null ? opted.length * amount : null
+              return (
+                <Card key={key}>
+                  <div className="flex items-center justify-between mb-3">
+                    <CardHeader title={gameLabel(key)} subtitle={amount != null ? `$${amount} buy-in per player` : 'Separate buy-in'} />
+                    {pot != null && (
+                      <div className="text-right">
+                        <div className="text-xs text-gray-400">Pot</div>
+                        <div className="text-lg font-bold text-green-700">${pot.toFixed(2)}</div>
+                        <div className="text-xs text-gray-400">{opted.length} entrant{opted.length !== 1 ? 's' : ''}</div>
+                      </div>
+                    )}
+                  </div>
+                  <div className="grid grid-cols-2 gap-1.5">
+                    {eventPlayers.map(ep => {
+                      const pid  = ep.player_id
+                      const p    = ep.player ?? {}
+                      const name = [p.first_name, p.last_name].filter(Boolean).join(' ') || '—'
+                      return (
+                        <label key={pid} className="flex items-center gap-2 cursor-pointer text-sm text-gray-700">
+                          <input
+                            type="checkbox"
+                            checked={opted.includes(pid)}
+                            onChange={() => toggleEntry(key, pid)}
+                            className="accent-fairway-600 w-4 h-4"
+                          />
+                          {name}
+                        </label>
+                      )
+                    })}
+                  </div>
+                  {savingEn && <p className="text-xs text-gray-400 mt-2">Saving…</p>}
+                </Card>
+              )
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* ── Winner entry ─────────────────────────────────────────── */}
+      {hasSideGames && (
+        <div>
+          <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-widest mb-3">Winner Entry</h3>
+          <TabSideGames
+            event={event}
+            eventPlayers={eventPlayers}
+            course={course}
+            sideGames={sideGames}
+            sideGameEntries={entries}
+            onUpdated={onUpdated}
+          />
+        </div>
+      )}
+    </div>
+  )
+}
+
+function TabSideGames({ event, eventPlayers, course, sideGames, sideGameEntries = {}, onUpdated }) {
   // Only show CTP holes that were explicitly configured in Payout Config
   const ctpConfigHoles = Object.keys(event.payout_config ?? {})
     .filter(k => k.startsWith('ctp_'))
@@ -3309,6 +3438,7 @@ function TabSideGames({ event, eventPlayers, course, sideGames, onUpdated }) {
         // Blind draw state — local to this render via a child component
         return <BlindPartnersCard
           eventPlayers={eventPlayers}
+          optedInIds={sideGameEntries.blind_partners ?? []}
           getWinner={getWinner}
           setWinner={setWinner}
         />
