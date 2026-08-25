@@ -448,8 +448,9 @@ export default function PrintAssets({ type, event, eventPlayers = [], tglSelecti
   const date       = shortDate(event?.event_date)
   const interval   = event?.tee_time_interval_mins ?? 10
 
-  const pngRef  = useRef(null)
-  const reelRef = useRef(null)
+  const pngRef      = useRef(null)
+  const reelRef     = useRef(null)   // modal preview
+  const captureRef  = useRef(null)   // off-screen capture target
   const [downloadingPng,  setDownloadingPng]  = useState(false)
   const [downloadingReel, setDownloadingReel] = useState(false)
   const [showReel,        setShowReel]        = useState(false)
@@ -466,12 +467,13 @@ export default function PrintAssets({ type, event, eventPlayers = [], tglSelecti
   }
 
   const handleDownloadReel = async () => {
-    if (!reelRef.current || downloadingReel) return
+    const el = captureRef.current
+    if (!el || downloadingReel) return
     setDownloadingReel(true)
     try {
-      const canvas = await html2canvas(reelRef.current, { scale: 3, useCORS: true, backgroundColor: null, logging: false })
+      const dataUrl = await toPng(el, { pixelRatio: 3, cacheBust: true, skipFonts: false })
       const eventName = event?.name ?? `Event_${event?.event_number ?? 'event'}`
-      downloadPng(canvas.toDataURL('image/png'), `${eventName.replace(/\s+/g, '_')}_tee-sheet-reel.png`)
+      downloadPng(dataUrl, `${eventName.replace(/\s+/g, '_')}_tee-sheet-reel.png`)
     } catch (err) {
       console.error('IG Reel export failed:', err)
     } finally {
@@ -712,6 +714,14 @@ export default function PrintAssets({ type, event, eventPlayers = [], tglSelecti
           <div ref={pngRef}>
             <TeeSheetPage forPng event={event} eventPlayers={eventPlayers} tglSelections={tglSelections} />
           </div>
+        </div>,
+        document.body
+      )}
+
+      {/* Off-screen capture target — positioned just off right edge so toPng renders fully */}
+      {type === 'tee_sheet' && createPortal(
+        <div style={{ position: 'fixed', top: 0, left: '100vw', pointerEvents: 'none', zIndex: -1 }}>
+          <TeeSheetReelCard ref={captureRef} event={event} eventPlayers={eventPlayers} tglSelections={tglSelections} />
         </div>,
         document.body
       )}
