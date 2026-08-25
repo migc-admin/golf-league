@@ -207,9 +207,16 @@ export function computeMatchPoints(eventPlayers, allScores, course, storedPairin
     }
   }
 
-  const hasTeams = pairings.some(p => p.playerA.flight !== p.playerB.flight)
+  // Team A = playerA side of each pairing, Team B = playerB side — not flight-based
+  const hasTeams = storedPairings.length > 0 || pairings.some(p => p.playerA.flight !== p.playerB.flight)
   let teamA = 0, teamB = 0
-  if (hasTeams) {
+  if (storedPairings.length > 0) {
+    // Use pairing position: playerA → Team A, playerB → Team B
+    for (const result of pairings) {
+      teamA += result.pointsA
+      teamB += result.pointsB
+    }
+  } else if (hasTeams) {
     for (const ep of eventPlayers) {
       const pts = playerPoints[ep.player_id] ?? 0
       if (ep.flight === 'A') teamA += pts

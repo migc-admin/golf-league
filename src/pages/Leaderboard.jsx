@@ -1078,8 +1078,9 @@ function MatchPointsBoard({ matchData, event }) {
           ? (pair.winner === 'A' ? stylesA.status.win : pair.winner === 'B' ? stylesB.status.win : 'bg-gray-200 text-gray-700')
           : (leaderSide === 'A' ? stylesA.status.lead : leaderSide === 'B' ? stylesB.status.lead : 'bg-gray-100 text-gray-600')
 
-        const labelA = pair.playerA.flight ? (pair.playerA.flight === 'A' ? teamALabel : teamBLabel) : null
-        const labelB = pair.playerB.flight ? (pair.playerB.flight === 'A' ? teamALabel : teamBLabel) : null
+        // playerA is always Team A, playerB always Team B — show team name if set
+        const labelA = teamALabel || null
+        const labelB = teamBLabel || null
 
         return (
           <div key={idx} className="bg-white rounded-xl border border-gray-200 overflow-hidden">
