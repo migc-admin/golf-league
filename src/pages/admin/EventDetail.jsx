@@ -3050,7 +3050,7 @@ function TabSideGames({ event, eventPlayers, course, sideGames, onUpdated }) {
   const hasLdA     = sides.includes('long_drive_a')
   const hasLdB     = sides.includes('long_drive_b')
   const hasLd      = sides.includes('long_drive')
-  const hasCtp     = sides.includes('ctp')
+  const hasCtp     = sides.some(s => s === 'ctp' || s.startsWith('ctp_'))
 
   return (
     <div className="space-y-4">
@@ -3093,23 +3093,53 @@ function TabSideGames({ event, eventPlayers, course, sideGames, onUpdated }) {
       )}
 
       {/* CTP per par-3 */}
-      {hasCtp && par3Holes.length > 0 && (
-        <Card>
-          <CardHeader title="Closest to Pin" subtitle="One winner per par-3 hole" />
-          <div className="space-y-3">
-            {par3Holes.map(h => (
-              <div key={h.hole} className="flex items-center gap-4">
-                <span className="text-sm font-medium text-gray-700 w-16">Hole {h.hole}</span>
-                <SideGameSelect
-                  players={eventPlayers}
-                  value={getWinner('ctp', h.hole)}
-                  onChange={v => setWinner('ctp', h.hole, v, 'overall')}
-                />
-              </div>
-            ))}
-          </div>
-        </Card>
-      )}
+      {hasCtp && par3Holes.length > 0 && (() => {
+        const hasCtpA = sides.includes('ctp_a')
+        const hasCtpB = sides.includes('ctp_b')
+        const perFlight = hasCtpA || hasCtpB
+        return (
+          <Card>
+            <CardHeader title="Closest to Pin" subtitle="One winner per par-3 hole" />
+            <div className="space-y-4">
+              {par3Holes.map(h => (
+                <div key={h.hole}>
+                  <div className="text-xs font-semibold text-gray-500 mb-2">Hole {h.hole}</div>
+                  {perFlight ? (
+                    <div className="space-y-2">
+                      {hasCtpA && (
+                        <div className="flex items-center gap-4">
+                          <span className="text-xs font-semibold text-blue-600 w-16">Flight A</span>
+                          <SideGameSelect
+                            players={flightA.length ? flightA : eventPlayers}
+                            value={getWinner('ctp', h.hole, 'A')}
+                            onChange={v => setWinner('ctp', h.hole, v, 'A')}
+                          />
+                        </div>
+                      )}
+                      {hasCtpB && (
+                        <div className="flex items-center gap-4">
+                          <span className="text-xs font-semibold text-purple-600 w-16">Flight B</span>
+                          <SideGameSelect
+                            players={flightB.length ? flightB : eventPlayers}
+                            value={getWinner('ctp', h.hole, 'B')}
+                            onChange={v => setWinner('ctp', h.hole, v, 'B')}
+                          />
+                        </div>
+                      )}
+                    </div>
+                  ) : (
+                    <SideGameSelect
+                      players={eventPlayers}
+                      value={getWinner('ctp', h.hole, 'overall')}
+                      onChange={v => setWinner('ctp', h.hole, v, 'overall')}
+                    />
+                  )}
+                </div>
+              ))}
+            </div>
+          </Card>
+        )
+      })()}
 
       {/* Custom competitions */}
       {(event.custom_competitions ?? []).filter(c => c?.trim()).map((name, i) => (
@@ -3296,6 +3326,11 @@ const EDIT_FORMAT_OPTIONS = [
     { value: 'best_ball_4', label: 'Best Ball — 4 Person', tip: 'Each player plays their own ball; team records the lowest net score on each hole. 4-person teams.' },
     { value: 'scramble',    label: 'Scramble',             tip: 'Everyone tees off, choose the best shot, all play from that spot until holed. One team score per hole.' },
     { value: 'shamble',     label: 'Shamble',              tip: 'Best drive selected, then each player plays their own ball into the hole from that spot.' },
+  ]},
+  { group: 'Match Play', options: [
+    { value: 'match_points',    label: 'Individual Match Play', tip: 'Players are paired by handicap. Win a hole = 1 UP, tie = halved, lose = 1 DOWN. Match ends when lead exceeds holes remaining.' },
+    { value: 'ryder_cup',       label: 'Ryder Cup / Team Cup',  tip: 'Flight A vs Flight B team match. Pairs compete hole-by-hole; flight aggregate points determine the winner.' },
+    { value: 'team_match_play', label: 'Best Ball Match Play',  tip: 'Groups of 4 split into 2-person teams. Best net score per team per hole. Team with most holes won wins the match.' },
   ]},
 ]
 

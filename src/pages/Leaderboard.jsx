@@ -4,7 +4,7 @@
  * Tabs: 18-Hole | Front 9 | Back 9 | Low Putts | Skins
  */
 
-import { useEffect, useState, useRef } from 'react'
+import { useEffect, useState, useRef, useCallback } from 'react'
 import { useParams, Link, useNavigate, useLocation, useSearchParams } from 'react-router-dom'
 import { Helmet } from 'react-helmet-async'
 import { supabase } from '../lib/supabase'
@@ -78,6 +78,7 @@ export default function Leaderboard() {
   const [tglLocked,     setTglLocked]     = useState(false)
   const [orgLogo,       setOrgLogo]       = useState(org?.logo_url ?? null)
   const [orgName,       setOrgName]       = useState(org?.name ?? null)
+  const [showReel,      setShowReel]      = useState(false)
 
   const subRef = useRef(null)
   const tabs   = event ? visibleTabs(event, hasFeature('tgl') && tglTeams.length > 0 && tglSelections.length > 0) : ALL_TABS
@@ -249,7 +250,17 @@ export default function Leaderboard() {
             )}
           </div>
           <div className="flex flex-col items-end gap-1.5 shrink-0">
-            <StatusBadge status={event.status} />
+            <div className="flex items-center gap-2">
+              <StatusBadge status={event.status} />
+              <button
+                onClick={() => setShowReel(true)}
+                title="Export IG Reel"
+                className="flex items-center gap-1 text-xs font-semibold px-2 py-1 rounded-lg border border-gray-200 text-ink-muted hover:text-ink hover:bg-surface-high transition-colors"
+              >
+                <svg width="12" height="12" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2M12 4v12m0 0l-4-4m4 4l4-4"/></svg>
+                Share
+              </button>
+            </div>
             <Link
               to={subdomainOrg
                 ? `/${event.league?.slug}/${event.slug}/schedule`
@@ -415,7 +426,192 @@ export default function Leaderboard() {
         )}
       </div>
     </div>
+
+    {showReel && leaderboards && (
+      <IGReelModal
+        event={event}
+        leaderboards={leaderboards}
+        activeTab={activeTab}
+        activeFlight={activeFlight}
+        orgLogo={orgLogo}
+        orgName={orgName}
+        onClose={() => setShowReel(false)}
+      />
+    )}
     </>
+  )
+}
+
+// ─── IG Reel Export ───────────────────────────────────────────────
+function IGReelModal({ event, leaderboards, activeTab, activeFlight, orgLogo, orgName, onClose }) {
+  const cardRef  = useRef(null)
+  const [saving, setSaving] = useState(false)
+
+  const flightRows = (() => {
+    const map = {
+      '18-Hole': leaderboards.full?.[activeFlight],
+      'Front 9': leaderboards.front9?.[activeFlight],
+      'Back 9':  leaderboards.back9?.[activeFlight],
+      'Low Gross': leaderboards.grossFull?.[activeFlight],
+    }
+    return (map[activeTab] ?? leaderboards.full?.A ?? []).slice(0, 8)
+  })()
+
+  const vsKey = activeTab === 'Low Gross' ? 'grossVsPar' : activeTab === 'Front 9' ? 'f9VsPar' : activeTab === 'Back 9' ? 'b9VsPar' : 'netVsPar'
+  const eventName = event.name ?? `Event #${event.event_number}`
+  const courseName = event.course?.name ?? ''
+  const eventDate = new Date(event.event_date + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+
+  async function handleDownload() {
+    if (!cardRef.current) return
+    setSaving(true)
+    try {
+      const html2canvas = (await import('html2canvas')).default
+      const canvas = await html2canvas(cardRef.current, {
+        scale: 3,
+        useCORS: true,
+        backgroundColor: null,
+        logging: false,
+      })
+      const link = document.createElement('a')
+      link.download = `${eventName.replace(/\s+/g, '_')}_leaderboard.png`
+      link.href = canvas.toDataURL('image/png')
+      link.click()
+    } catch (err) {
+      console.error('Export failed:', err)
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  return (
+    <div
+      onClick={onClose}
+      style={{ position: 'fixed', inset: 0, zIndex: 9999, background: 'rgba(0,0,0,0.75)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: 16, gap: 16 }}
+    >
+      {/* Card preview */}
+      <div onClick={e => e.stopPropagation()}>
+        <div
+          ref={cardRef}
+          style={{
+            width: 360, height: 640,
+            background: 'linear-gradient(160deg, #1B4332 0%, #0f2e22 55%, #0a1f17 100%)',
+            borderRadius: 20,
+            overflow: 'hidden',
+            display: 'flex',
+            flexDirection: 'column',
+            padding: '28px 24px 24px',
+            fontFamily: 'system-ui, -apple-system, sans-serif',
+            boxSizing: 'border-box',
+            position: 'relative',
+          }}
+        >
+          {/* Decorative gold accent bar */}
+          <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 4, background: 'linear-gradient(90deg, #D4AF37, #f0d060, #D4AF37)' }} />
+
+          {/* Header */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 16 }}>
+            {orgLogo ? (
+              <img src={orgLogo} alt="" style={{ width: 36, height: 36, borderRadius: 8, objectFit: 'cover' }} crossOrigin="anonymous" />
+            ) : (
+              <div style={{ width: 36, height: 36, borderRadius: 8, background: '#D4AF37', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 900, fontSize: 13, color: '#1B4332' }}>
+                {(orgName ?? 'S').slice(0, 2).toUpperCase()}
+              </div>
+            )}
+            <div>
+              <div style={{ color: '#D4AF37', fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em' }}>
+                {orgName ?? 'Scorify Golf'}
+              </div>
+              <div style={{ color: 'rgba(255,255,255,0.55)', fontSize: 10, marginTop: 1 }}>scorifygolf.com</div>
+            </div>
+          </div>
+
+          {/* Event info */}
+          <div style={{ marginBottom: 20 }}>
+            <div style={{ color: '#fff', fontSize: 20, fontWeight: 900, letterSpacing: '-0.02em', lineHeight: 1.2 }}>{eventName}</div>
+            <div style={{ color: '#D4AF37', fontSize: 12, fontWeight: 600, marginTop: 4 }}>{courseName} · {eventDate}</div>
+            <div style={{ color: 'rgba(255,255,255,0.4)', fontSize: 10, marginTop: 3 }}>
+              {activeTab} {flightRows.length && event.use_flights ? `— Flight ${activeFlight}` : ''}
+            </div>
+          </div>
+
+          {/* Divider */}
+          <div style={{ height: 1, background: 'rgba(255,255,255,0.1)', marginBottom: 14 }} />
+
+          {/* Column headers */}
+          <div style={{ display: 'grid', gridTemplateColumns: '28px 1fr 36px 36px', gap: '0 8px', marginBottom: 8, paddingBottom: 6, borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
+            {['POS','PLAYER','NET','THRU'].map(h => (
+              <div key={h} style={{ fontSize: 9, fontWeight: 700, color: 'rgba(255,255,255,0.35)', textTransform: 'uppercase', letterSpacing: '0.08em', textAlign: h === 'NET' || h === 'THRU' ? 'right' : 'left' }}>{h}</div>
+            ))}
+          </div>
+
+          {/* Rows */}
+          <div style={{ flex: 1, overflow: 'hidden', display: 'flex', flexDirection: 'column', gap: 2 }}>
+            {flightRows.map((p, i) => {
+              const vs = p[vsKey]
+              const vsDisplay = vs == null ? '—' : vs === 0 ? 'E' : `${vs > 0 ? '+' : ''}${vs}`
+              const vsColor = vs == null ? 'rgba(255,255,255,0.4)' : vs < 0 ? '#4ade80' : vs === 0 ? '#fff' : 'rgba(255,255,255,0.6)'
+              const isFirst = p.rank === 1
+              const name = `${p.player?.first_name ?? ''} ${p.player?.last_name ?? ''}`.trim()
+              const thru = p.holesCompleted === 18 ? 'F' : (p.holesCompleted || '—')
+              return (
+                <div key={p.player_id} style={{
+                  display: 'grid',
+                  gridTemplateColumns: '28px 1fr 36px 36px',
+                  gap: '0 8px',
+                  alignItems: 'center',
+                  padding: '7px 10px',
+                  borderRadius: 10,
+                  background: isFirst ? 'rgba(212,175,55,0.12)' : i % 2 === 0 ? 'rgba(255,255,255,0.04)' : 'transparent',
+                  border: isFirst ? '1px solid rgba(212,175,55,0.25)' : '1px solid transparent',
+                }}>
+                  <div style={{ fontSize: 11, fontWeight: 700, color: isFirst ? '#D4AF37' : 'rgba(255,255,255,0.45)' }}>
+                    {flightRows.filter(x => x.rank === p.rank).length > 1 ? `T${p.rank}` : `${p.rank}`}
+                  </div>
+                  <div style={{ fontSize: 12, fontWeight: isFirst ? 700 : 500, color: isFirst ? '#fff' : 'rgba(255,255,255,0.8)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                    {name}
+                  </div>
+                  <div style={{ fontSize: 13, fontWeight: 700, color: vsColor, textAlign: 'right' }}>{vsDisplay}</div>
+                  <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.4)', textAlign: 'right' }}>{thru}</div>
+                </div>
+              )
+            })}
+            {flightRows.length === 0 && (
+              <div style={{ textAlign: 'center', color: 'rgba(255,255,255,0.4)', fontSize: 13, paddingTop: 40 }}>No scores yet</div>
+            )}
+          </div>
+
+          {/* Footer */}
+          <div style={{ marginTop: 16, paddingTop: 12, borderTop: '1px solid rgba(255,255,255,0.08)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.3)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.1em' }}>
+              Powered by Scorify Golf
+            </div>
+            <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.25)' }}>scorifygolf.com</div>
+          </div>
+        </div>
+      </div>
+
+      {/* Controls */}
+      <div onClick={e => e.stopPropagation()} style={{ display: 'flex', gap: 10 }}>
+        <button
+          onClick={handleDownload}
+          disabled={saving}
+          style={{ background: '#1B4332', color: '#fff', fontWeight: 700, fontSize: 14, padding: '12px 28px', borderRadius: 12, border: 'none', cursor: saving ? 'not-allowed' : 'pointer', opacity: saving ? 0.7 : 1, display: 'flex', alignItems: 'center', gap: 8 }}
+        >
+          <svg width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2M12 4v12m0 0l-4-4m4 4l4-4"/></svg>
+          {saving ? 'Exporting…' : 'Download PNG (1080×1920)'}
+        </button>
+        <button
+          onClick={onClose}
+          style={{ background: 'rgba(255,255,255,0.1)', color: '#fff', fontWeight: 600, fontSize: 14, padding: '12px 20px', borderRadius: 12, border: '1px solid rgba(255,255,255,0.15)', cursor: 'pointer' }}
+        >
+          Close
+        </button>
+      </div>
+      <p style={{ color: 'rgba(255,255,255,0.4)', fontSize: 11, textAlign: 'center' }}>
+        Shows {activeTab} · {event.use_flights ? `Flight ${activeFlight}` : 'All players'} · Top {Math.min(flightRows.length, 8)} results
+      </p>
+    </div>
   )
 }
 

@@ -408,16 +408,22 @@ function OverviewTab({ event, leaderboardUrl, description }) {
       )}
 
       {allCompetitions.length > 0 && (
-        <div style={{ background: '#fff', borderRadius: 16, padding: '20px 24px', border: '1px solid #e5e7eb' }}>
+        <div style={{ background: '#fff', borderRadius: 16, padding: '18px 24px', border: '1px solid #e5e7eb' }}>
           <div style={{ fontSize: 10, fontWeight: 700, color: '#9ca3af', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 12 }}>
             Competitions &amp; Side Games
           </div>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
             {allCompetitions.map((name, i) => (
-              <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 10, fontSize: 14, color: '#111827' }}>
-                <span style={{ color: '#16a34a', fontSize: 16, lineHeight: 1 }}>⛳</span>
+              <span key={i} style={{
+                display: 'inline-flex', alignItems: 'center', gap: 6,
+                fontSize: 12, fontWeight: 600, color: GREEN,
+                background: '#f0fdf4', border: '1px solid #bbf7d0',
+                borderRadius: 20, padding: '5px 12px',
+                whiteSpace: 'nowrap',
+              }}>
+                <span style={{ fontSize: 12, lineHeight: 1 }}>⛳</span>
                 {name}
-              </div>
+              </span>
             ))}
           </div>
         </div>
