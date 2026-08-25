@@ -729,13 +729,6 @@ export default function PrintAssets({ type, event, eventPlayers = [], tglSelecti
         />
       )}
 
-      {/* Off-screen reel card for capture */}
-      {type === 'tee_sheet' && createPortal(
-        <div style={{ position: 'fixed', top: '-99999px', left: '-99999px', pointerEvents: 'none', zIndex: -1 }}>
-          <TeeSheetReelCard ref={reelRef} event={event} eventPlayers={eventPlayers} tglSelections={tglSelections} />
-        </div>,
-        document.body
-      )}
     </>
   )
 }
