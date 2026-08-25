@@ -341,7 +341,7 @@ export default function EventDetail() {
         />
       )}
 
-      {printAsset && <PrintAssets type={printAsset} event={event} eventPlayers={eventPlayers} onClose={() => setPrintAsset(null)} />}
+      {printAsset && <PrintAssets type={printAsset} event={event} eventPlayers={eventPlayers} tglSelections={tglSelections} onClose={() => setPrintAsset(null)} />}
     </div>
   )
 }
