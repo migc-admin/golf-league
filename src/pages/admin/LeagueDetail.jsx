@@ -376,12 +376,16 @@ function LeagueModal({ open, onClose, editing, orgId, orgSlug, onSaved }) {
 
 // Side games that can apply per-flight OR to the whole group
 const PER_FLIGHT_GAMES = [
-  { key: 'skins',      label: 'Skins',                      pro: true },
-  { key: 'long_drive', label: 'Long Drive',                 pro: true },
-  { key: 'low_putts',  label: 'Low Putts',                  pro: true },
-  { key: 'ctp',        label: 'Closest to Pin (par 3s)',    pro: true },
+  { key: 'skins',       label: 'Skins',                       pro: true },
+  { key: 'super_skins', label: 'Super Skins',                 pro: true },
+  { key: 'long_drive',  label: 'Long Drive',                  pro: true },
+  { key: 'low_putts',   label: 'Low Putts',                   pro: true },
+  { key: 'ctp',         label: 'Closest to Pin (par 3s)',     pro: true },
+  { key: 'super_ctp',   label: 'Super CTP (par 3s)',          pro: true },
 ]
-const GROUP_GAMES = []
+const GROUP_GAMES = [
+  { key: 'blind_partners', label: 'Blind Partners', pro: true },
+]
 
 const PER_FLIGHT_GAME_KEYS = new Set(PER_FLIGHT_GAMES.map(g => g.key))
 
@@ -396,6 +400,9 @@ function buildSideGameOptions(enabledGames, gameScope, numFlights) {
     } else {
       result.push(g.key)
     }
+  }
+  for (const g of GROUP_GAMES) {
+    if (enabledGames.has(g.key)) result.push(g.key)
   }
   return result
 }
@@ -474,6 +481,7 @@ function EventModal({ open, onClose, league, orgTier, onSaved }) {
   const [holesPlayed,   setHolesPlayed]   = useState(18)
   const [useHandicaps,  setUseHandicaps]  = useState(true)
   const [saving,        setSaving]        = useState(false)
+  const [sideGameBuyIns, setSideGameBuyIns] = useState({})
 
   useEffect(() => {
     if (!open) return
@@ -492,6 +500,7 @@ function EventModal({ open, onClose, league, orgTier, onSaved }) {
     setScheduleItems([])
     setHolesPlayed(18)
     setUseHandicaps(true)
+    setSideGameBuyIns({})
   }, [open, league])
 
   function toggleFormat(key) {
@@ -499,6 +508,12 @@ function EventModal({ open, onClose, league, orgTier, onSaved }) {
   }
   function toggleSideGame(key) {
     setSideGames(prev => { const next = new Set(prev); next.has(key) ? next.delete(key) : next.add(key); return next })
+  }
+  function toggleBuyIn(key) {
+    setSideGameBuyIns(prev => ({ ...prev, [key]: { ...prev[key], enabled: !(prev[key]?.enabled) } }))
+  }
+  function setBuyInAmount(key, val) {
+    setSideGameBuyIns(prev => ({ ...prev, [key]: { ...prev[key], amount: val } }))
   }
 
   async function handleSave(e) {
@@ -534,6 +549,11 @@ function EventModal({ open, onClose, league, orgTier, onSaved }) {
       holes_played:           holesPlayed,
       use_handicaps:          useHandicaps,
       status:                 'upcoming',
+      side_game_buy_ins:      Object.fromEntries(
+        Object.entries(sideGameBuyIns)
+          .filter(([k, v]) => sideGames.has(k) && v?.enabled)
+          .map(([k, v]) => [k, { enabled: true, amount: v.amount !== '' && v.amount != null ? parseFloat(v.amount) : null }])
+      ),
     })
     setSaving(false)
     if (error) toast.error(error.message)
@@ -668,11 +688,13 @@ function EventModal({ open, onClose, league, orgTier, onSaved }) {
           <label className="label">Side Games / Competitions</label>
           <div className="space-y-3 bg-gray-50 rounded-xl px-4 py-3">
             {/* Per-flight eligible games */}
-            {PER_FLIGHT_GAMES.map(opt => {
+            {[...PER_FLIGHT_GAMES, ...GROUP_GAMES].map(opt => {
               const locked = opt.pro && !canUsePro
               const checked = sideGames.has(opt.key)
               const scope = gameScope[opt.key] ?? 'flight'
               const flightLetters = Array.from({ length: numFlights }, (_, i) => String.fromCharCode(65 + i))
+              const isPerFlight = PER_FLIGHT_GAMES.some(g => g.key === opt.key)
+              const buyIn = sideGameBuyIns[opt.key] ?? {}
               return (
                 <div key={opt.key} className={locked ? 'opacity-50' : ''}>
                   <label className="flex items-center gap-2.5 cursor-pointer">
@@ -682,7 +704,7 @@ function EventModal({ open, onClose, league, orgTier, onSaved }) {
                     <span className="text-sm text-gray-800">{opt.label}</span>
                     {locked && <span className="text-xs font-semibold px-1.5 py-0.5 rounded-full" style={{ background: '#eff6ff', color: '#1d4ed8' }}>Pro</span>}
                   </label>
-                  {checked && numFlights > 0 && (
+                  {checked && isPerFlight && numFlights > 0 && (
                     <div className="ml-6 mt-1.5 flex gap-4">
                       <label className="flex items-center gap-1.5 cursor-pointer">
                         <input type="radio" checked={scope === 'flight'}
@@ -698,20 +720,27 @@ function EventModal({ open, onClose, league, orgTier, onSaved }) {
                       </label>
                     </div>
                   )}
+                  {checked && (
+                    <div className="ml-6 mt-1.5 flex items-center gap-3">
+                      <label className="flex items-center gap-1.5 cursor-pointer">
+                        <input type="checkbox" checked={buyIn.enabled ?? false} onChange={() => toggleBuyIn(opt.key)} className="accent-fairway-600 w-4 h-4" />
+                        <span className="text-xs text-gray-600">Separate buy-in</span>
+                      </label>
+                      {buyIn.enabled && (
+                        <div className="flex items-center gap-1">
+                          <span className="text-xs text-gray-400">$</span>
+                          <input
+                            type="number" min="0" step="1"
+                            value={buyIn.amount ?? ''}
+                            onChange={e => setBuyInAmount(opt.key, e.target.value)}
+                            placeholder="0"
+                            className="w-16 border border-gray-300 rounded px-2 py-0.5 text-xs focus:outline-none focus:ring-1 focus:ring-green-600"
+                          />
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </div>
-              )
-            })}
-            {/* Always-group games */}
-            {GROUP_GAMES.map(opt => {
-              const locked = opt.pro && !canUsePro
-              return (
-                <label key={opt.key} className={`flex items-center gap-2.5 cursor-pointer ${locked ? 'opacity-50' : ''}`}>
-                  <input type="checkbox" checked={sideGames.has(opt.key)}
-                    onChange={() => !locked && toggleSideGame(opt.key)}
-                    disabled={locked} className="accent-fairway-600 w-4 h-4" />
-                  <span className="text-sm text-gray-800">{opt.label}</span>
-                  {locked && <span className="text-xs font-semibold px-1.5 py-0.5 rounded-full" style={{ background: '#eff6ff', color: '#1d4ed8' }}>Pro</span>}
-                </label>
               )
             })}
           </div>

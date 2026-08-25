@@ -3007,6 +3007,105 @@ function PayoutTable({ rows, onChange, colLabel }) {
 }
 
 // ─── Tab: Side Games ──────────────────────────────────────────────
+function BlindPartnersCard({ eventPlayers, getWinner, setWinner }) {
+  const [entrants, setEntrants] = useState([])
+  const [pairs, setPairs]       = useState([]) // [{ p1, p2 }]
+  const [drawnYet, setDrawnYet] = useState(false)
+
+  function toggleEntrant(id) {
+    setEntrants(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id])
+  }
+
+  function drawPartners() {
+    const shuffled = [...entrants].sort(() => Math.random() - 0.5)
+    const newPairs = []
+    for (let i = 0; i < shuffled.length - 1; i += 2) {
+      newPairs.push({ p1: shuffled[i], p2: shuffled[i + 1] })
+    }
+    if (shuffled.length % 2 !== 0) {
+      newPairs.push({ p1: shuffled[shuffled.length - 1], p2: null }) // odd player out
+    }
+    setPairs(newPairs)
+    setDrawnYet(true)
+  }
+
+  function playerName(id) {
+    const ep = eventPlayers.find(e => e.player_id === id)
+    const p  = ep?.player ?? {}
+    return [p.first_name, p.last_name].filter(Boolean).join(' ') || '—'
+  }
+
+  return (
+    <Card>
+      <CardHeader title="Blind Partners" subtitle="Separate entry — check who opted in, draw partners, then record the winning pair" />
+      <div className="space-y-4">
+        {/* Step 1: Opt-ins */}
+        <div>
+          <div className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Step 1 — Select Entrants</div>
+          <div className="grid grid-cols-2 gap-1.5">
+            {eventPlayers.map(ep => {
+              const id   = ep.player_id
+              const p    = ep.player ?? {}
+              const name = [p.first_name, p.last_name].filter(Boolean).join(' ') || '—'
+              return (
+                <label key={id} className="flex items-center gap-2 cursor-pointer text-sm text-gray-700">
+                  <input type="checkbox" checked={entrants.includes(id)} onChange={() => toggleEntrant(id)} className="accent-fairway-600 w-4 h-4" />
+                  {name}
+                </label>
+              )
+            })}
+          </div>
+          <button
+            type="button"
+            disabled={entrants.length < 2}
+            onClick={drawPartners}
+            className="mt-3 text-sm font-semibold text-white bg-fairway-700 hover:bg-fairway-800 disabled:opacity-50 px-4 py-1.5 rounded-lg"
+          >
+            🎲 Draw Partners
+          </button>
+        </div>
+
+        {/* Step 2: Drawn pairs */}
+        {drawnYet && (
+          <div>
+            <div className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Step 2 — Drawn Pairs</div>
+            <div className="space-y-1.5">
+              {pairs.map((pair, i) => (
+                <div key={i} className="text-sm text-gray-700 bg-gray-50 rounded-lg px-3 py-1.5">
+                  {playerName(pair.p1)} &amp; {pair.p2 ? playerName(pair.p2) : <span className="text-gray-400 italic">no partner (odd number)</span>}
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Step 3: Record winner */}
+        <div>
+          <div className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Step 3 — Record Winning Pair</div>
+          <div className="space-y-2">
+            <div className="flex items-center gap-4">
+              <span className="text-xs font-semibold text-gray-500 w-20">Partner 1</span>
+              <SideGameSelect
+                players={eventPlayers}
+                value={getWinner('blind_partners', null, 'partner_1')}
+                onChange={v => setWinner('blind_partners', null, v, 'partner_1')}
+              />
+            </div>
+            <div className="flex items-center gap-4">
+              <span className="text-xs font-semibold text-gray-500 w-20">Partner 2</span>
+              <SideGameSelect
+                players={eventPlayers}
+                value={getWinner('blind_partners', null, 'partner_2')}
+                onChange={v => setWinner('blind_partners', null, v, 'partner_2')}
+              />
+            </div>
+          </div>
+        </div>
+      </div>
+    </Card>
+  )
+}
+
 function TabSideGames({ event, eventPlayers, course, sideGames, onUpdated }) {
   // Only show CTP holes that were explicitly configured in Payout Config
   const ctpConfigHoles = Object.keys(event.payout_config ?? {})
@@ -3015,6 +3114,11 @@ function TabSideGames({ event, eventPlayers, course, sideGames, onUpdated }) {
     .sort((a, b) => a - b)
 
   const par3Holes = ctpConfigHoles.map(h => ({ hole: h }))
+
+  // Super CTP uses actual course par 3s (independent of payout config)
+  const superCtpHoles = (course?.par_per_hole ?? [])
+    .map((p, i) => ({ hole: i + 1, par: p }))
+    .filter(h => h.par === 3)
 
   const flightA = eventPlayers.filter(ep => ep.flight === 'A')
   const flightB = eventPlayers.filter(ep => ep.flight === 'B')
@@ -3152,7 +3256,7 @@ function TabSideGames({ event, eventPlayers, course, sideGames, onUpdated }) {
       })()}
 
       {/* Super CTP per par-3 */}
-      {hasSuperCtp && par3Holes.length > 0 && (() => {
+      {hasSuperCtp && superCtpHoles.length > 0 && (() => {
         const hasSuperCtpA = sides.includes('super_ctp_a')
         const hasSuperCtpB = sides.includes('super_ctp_b')
         const perFlight = hasSuperCtpA || hasSuperCtpB
@@ -3160,7 +3264,7 @@ function TabSideGames({ event, eventPlayers, course, sideGames, onUpdated }) {
           <Card>
             <CardHeader title="Super CTP" subtitle="Separate entry — one winner per par-3 hole" />
             <div className="space-y-4">
-              {par3Holes.map(h => (
+              {superCtpHoles.map(h => (
                 <div key={h.hole}>
                   <div className="text-xs font-semibold text-gray-500 mb-2">Hole {h.hole}</div>
                   {perFlight ? (
@@ -3201,29 +3305,14 @@ function TabSideGames({ event, eventPlayers, course, sideGames, onUpdated }) {
       })()}
 
       {/* Blind Partners */}
-      {hasBlindPartners && (
-        <Card>
-          <CardHeader title="Blind Partners" subtitle="Separate entry — select the winning pair" />
-          <div className="space-y-3">
-            <div className="flex items-center gap-4">
-              <span className="text-xs font-semibold text-gray-500 w-20">Partner 1</span>
-              <SideGameSelect
-                players={eventPlayers}
-                value={getWinner('blind_partners', null, 'partner_1')}
-                onChange={v => setWinner('blind_partners', null, v, 'partner_1')}
-              />
-            </div>
-            <div className="flex items-center gap-4">
-              <span className="text-xs font-semibold text-gray-500 w-20">Partner 2</span>
-              <SideGameSelect
-                players={eventPlayers}
-                value={getWinner('blind_partners', null, 'partner_2')}
-                onChange={v => setWinner('blind_partners', null, v, 'partner_2')}
-              />
-            </div>
-          </div>
-        </Card>
-      )}
+      {hasBlindPartners && (() => {
+        // Blind draw state — local to this render via a child component
+        return <BlindPartnersCard
+          eventPlayers={eventPlayers}
+          getWinner={getWinner}
+          setWinner={setWinner}
+        />
+      })()}
 
       {/* Super Skins */}
       {hasSuperSkins && (
