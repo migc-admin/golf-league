@@ -7,6 +7,8 @@ import { useEffect, useState } from 'react'
 import { useParams, useSearchParams, Link } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { useSubdomainOrg } from '../lib/SubdomainContext'
+import Countdown from '../components/Countdown'
+import Marquee from '../components/ui/Marquee'
 
 const GREEN = '#1B4332'
 const GOLD  = '#D4AF37'
@@ -134,6 +136,10 @@ export default function EventPage() {
     ? Math.max(0, event.registration_spots - (playerCount ?? 0))
     : null
 
+  const eventDateTime = event.event_date
+    ? new Date(`${event.event_date}T${(event.start_time ?? '00:00:00').slice(0, 8)}`)
+    : null
+
   return (
     <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column', background: '#f9f8f5', fontFamily: 'system-ui, -apple-system, sans-serif' }}>
 
@@ -202,6 +208,11 @@ export default function EventPage() {
                 </div>
               </MetaRow>
             </div>
+
+            {/* Countdown clock — shown while event is upcoming */}
+            {eventDateTime && event.status !== 'complete' && (
+              <Countdown targetDate={eventDateTime} />
+            )}
 
             {/* Registration CTA — show whenever reg is available (upcoming or active) */}
             {regUrl && event.status !== 'complete' && (
@@ -273,7 +284,7 @@ export default function EventPage() {
       <div style={{ maxWidth: 1100, margin: '0 auto', width: '100%', padding: 'clamp(20px,4vw,32px) clamp(16px,4vw,40px)', flex: 1, boxSizing: 'border-box' }}>
 
         {activeTab === 'overview' && (
-          <OverviewTab event={event} leaderboardUrl={leaderboardUrl} description={description} />
+          <OverviewTab event={event} leaderboardUrl={leaderboardUrl} description={description} courseAddress={courseAddress} mapsUrl={mapsUrl} />
         )}
 
         {activeTab === 'pairings' && (
@@ -327,42 +338,44 @@ export default function EventPage() {
 
 // ─── Sponsor tiles ────────────────────────────────────────────────────────────
 function SponsorBar({ sponsors }) {
+  const tiles = sponsors.map((s, i) => {
+    const tile = (
+      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', background: '#f9f8f5', border: '1px solid #e5e7eb', borderRadius: 14, padding: '20px 24px 14px', minWidth: 140, gap: 10 }}>
+        {s.logo_url ? (
+          <img src={s.logo_url} alt={s.name ?? 'Sponsor'} style={{ height: 72, maxWidth: 160, objectFit: 'contain' }} />
+        ) : (
+          <div style={{ height: 72, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <span style={{ fontSize: 13, fontWeight: 700, color: '#374151', textAlign: 'center' }}>{s.name}</span>
+          </div>
+        )}
+        {s.logo_url && s.name && (
+          <span style={{ fontSize: 11, fontWeight: 500, color: '#6b7280', textAlign: 'center' }}>{s.name}</span>
+        )}
+      </div>
+    )
+    return s.url ? (
+      <a key={i} href={s.url} target="_blank" rel="noopener noreferrer" style={{ textDecoration: 'none', marginRight: 16 }}>{tile}</a>
+    ) : (
+      <div key={i} style={{ marginRight: 16 }}>{tile}</div>
+    )
+  })
+
   return (
     <div style={{ background: '#fff', borderTop: '1px solid #e5e7eb', padding: '24px clamp(16px,4vw,40px)' }}>
       <div style={{ maxWidth: 1100, margin: '0 auto' }}>
         <div style={{ fontSize: 10, fontWeight: 700, color: '#9ca3af', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: 16 }}>
           Sponsored by
         </div>
-        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 16 }}>
-          {sponsors.map((s, i) => {
-            const tile = (
-              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', background: '#f9f8f5', border: '1px solid #e5e7eb', borderRadius: 14, padding: '20px 24px 14px', minWidth: 140, gap: 10 }}>
-                {s.logo_url ? (
-                  <img src={s.logo_url} alt={s.name ?? 'Sponsor'} style={{ height: 72, maxWidth: 160, objectFit: 'contain' }} />
-                ) : (
-                  <div style={{ height: 72, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                    <span style={{ fontSize: 13, fontWeight: 700, color: '#374151', textAlign: 'center' }}>{s.name}</span>
-                  </div>
-                )}
-                {s.logo_url && s.name && (
-                  <span style={{ fontSize: 11, fontWeight: 500, color: '#6b7280', textAlign: 'center' }}>{s.name}</span>
-                )}
-              </div>
-            )
-            return s.url ? (
-              <a key={i} href={s.url} target="_blank" rel="noopener noreferrer" style={{ textDecoration: 'none' }}>{tile}</a>
-            ) : (
-              <div key={i}>{tile}</div>
-            )
-          })}
-        </div>
+        <Marquee pauseOnHover duration={Math.max(20, sponsors.length * 5)} fadeAmount={5}>
+          {tiles}
+        </Marquee>
       </div>
     </div>
   )
 }
 
 // ─── Overview Tab ─────────────────────────────────────────────────────────────
-function OverviewTab({ event, leaderboardUrl, description }) {
+function OverviewTab({ event, leaderboardUrl, description, courseAddress, mapsUrl }) {
   const scheduleItems = (event.schedule_items ?? []).filter(s => s.label?.trim())
   const customCompetitions = (event.custom_competitions ?? []).filter(c => c?.trim())
   const formats = (event.formats ?? (event.format ? [event.format] : []))
@@ -388,7 +401,7 @@ function OverviewTab({ event, leaderboardUrl, description }) {
 
       {description && (
         <div style={{ background: '#fff', borderRadius: 16, padding: '20px 24px', border: '1px solid #e5e7eb' }}>
-          <div style={{ fontSize: 10, fontWeight: 700, color: '#9ca3af', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 10 }}>About this Event</div>
+          <div style={{ fontSize: 10, fontWeight: 700, color: '#9ca3af', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 10 }}>Event Details</div>
           <p style={{ fontSize: 14, lineHeight: 1.7, color: '#374151', margin: 0 }}
             dangerouslySetInnerHTML={{ __html:
               description
@@ -443,6 +456,29 @@ function OverviewTab({ event, leaderboardUrl, description }) {
               </span>
             ))}
           </div>
+        </div>
+      )}
+
+      {courseAddress && (
+        <div style={{ background: '#fff', borderRadius: 16, padding: '20px 24px', border: '1px solid #e5e7eb' }}>
+          <div style={{ fontSize: 10, fontWeight: 700, color: '#9ca3af', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 14 }}>
+            Course Map
+          </div>
+          <div style={{ borderRadius: 12, overflow: 'hidden', border: '1px solid #e5e7eb' }}>
+            <iframe
+              title="Course location map"
+              src={`https://www.google.com/maps?q=${encodeURIComponent(courseAddress)}&output=embed`}
+              width="100%"
+              height="320"
+              style={{ display: 'block', border: 0 }}
+              loading="lazy"
+              referrerPolicy="no-referrer-when-downgrade"
+            />
+          </div>
+          <a href={mapsUrl} target="_blank" rel="noopener noreferrer"
+            style={{ display: 'inline-block', marginTop: 10, fontSize: 12, fontWeight: 600, color: GREEN, textDecoration: 'underline' }}>
+            Open in Google Maps →
+          </a>
         </div>
       )}
 
