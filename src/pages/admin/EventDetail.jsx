@@ -200,10 +200,10 @@ export default function EventDetail() {
       </nav>
 
       {/* Header */}
-      <div className="flex items-start justify-between gap-4">
-        <div>
-          <div className="flex items-center gap-3">
-            <h1 className="text-2xl font-bold text-gray-900">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between sm:gap-4">
+        <div className="min-w-0">
+          <div className="flex flex-wrap items-center gap-2">
+            <h1 className="text-xl sm:text-2xl font-bold text-gray-900 leading-tight">
               {event.league?.name} — {event.name ? event.name : `Event #${event.event_number}`}
             </h1>
             <StatusBadge status={event.status} />
@@ -212,7 +212,7 @@ export default function EventDetail() {
             {event.course?.name} · {formatDate(event.event_date)} · Entry: ${event.entry_fee}
           </p>
         </div>
-        <div className="flex gap-2 shrink-0 flex-wrap justify-end">
+        <div className="flex gap-2 shrink-0 flex-wrap">
           <a href={`/${orgSlug}/${event.league?.slug}/${event.slug}/event`} target="_blank" rel="noopener noreferrer" className="btn-secondary btn-sm btn">
             Event Page ↗
           </a>
