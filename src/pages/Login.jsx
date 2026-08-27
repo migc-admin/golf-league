@@ -85,7 +85,7 @@ export default function Login() {
 
         {/* Logo + wordmark */}
         <div className="text-center mb-10">
-          <img src="/logo.png" alt="Scorify Golf" className="w-16 h-16 object-contain mx-auto mb-4" />
+          <img src="/logo.png" alt="Scorify Golf" className="w-16 h-16 object-contain mx-auto mb-4" loading="lazy" />
           <h1 className="text-ink font-bold mb-1" style={{ fontSize: '1.5rem', letterSpacing: '-0.03em' }}>
             Scorify Golf
           </h1>

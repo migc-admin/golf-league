@@ -31,6 +31,7 @@ import FAQ            from './pages/FAQ'
 import Help           from './pages/Help'
 import Privacy        from './pages/Privacy'
 import RefundPolicy   from './pages/RefundPolicy'
+import Terms          from './pages/Terms'
 import DisputeTemplate from './pages/admin/DisputeTemplate'
 import Roadmap        from './pages/Roadmap'
 
@@ -110,6 +111,7 @@ export default function App() {
         <Route path="/roadmap"        element={<Roadmap />} />
         <Route path="/help"           element={<Help />} />
         <Route path="/privacy"        element={<Privacy />} />
+        <Route path="/terms"          element={<Terms />} />
         <Route path="/refund-policy"  element={<RefundPolicy />} />
 
         <Route path="/" element={<Navigate to="/home" replace />} />

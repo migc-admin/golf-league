@@ -22,6 +22,7 @@ const MENU_ITEMS = [
     title: 'Legal',
     links: [
       { text: 'Privacy Policy',  url: '/privacy'        },
+      { text: 'Terms of Service', url: '/terms'          },
       { text: 'Refund Policy',   url: '/refund-policy'  },
     ],
   },
@@ -102,6 +103,11 @@ export default function Footer() {
               onMouseEnter={e => e.currentTarget.style.color = '#ffffff'}
               onMouseLeave={e => e.currentTarget.style.color = '#86868b'}>
               Privacy Policy
+            </Link>
+            <Link to="/terms" className="text-xs transition-colors" style={{ color: '#86868b' }}
+              onMouseEnter={e => e.currentTarget.style.color = '#ffffff'}
+              onMouseLeave={e => e.currentTarget.style.color = '#86868b'}>
+              Terms of Service
             </Link>
           </div>
         </div>
