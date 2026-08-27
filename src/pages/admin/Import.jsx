@@ -1174,6 +1174,7 @@ function ImportPastResults() {
 
       // Import each player row
       let playerOk = 0, playerErr = 0
+      const playerErrMessages = []
       for (const row of eventRows) {
         const first  = row.player_first?.trim()
         const last   = row.player_last?.trim()
@@ -1185,6 +1186,7 @@ function ImportPastResults() {
 
         if (!first || !last || isNaN(front) || isNaN(back)) {
           playerErr++
+          playerErrMessages.push(`${first ?? '?'} ${last ?? '?'}: missing name or scores`)
           continue
         }
 
@@ -1202,12 +1204,17 @@ function ImportPastResults() {
             .from('players')
             .insert({ first_name: first, last_name: last, org_id: orgId })
             .select('id').single()
-          if (pErr) { playerErr++; continue }
+          if (pErr) {
+            console.error(`[PastResults] player insert failed for ${first} ${last}:`, pErr)
+            playerErrMessages.push(`${first} ${last}: ${pErr.message}`)
+            playerErr++
+            continue
+          }
           playerId = newP.id
         }
 
         // Upsert event_player (handicap_index is NOT NULL — use ch or 0 as fallback)
-        const { data: ep, error: epErr } = await supabase
+        const { error: epErr } = await supabase
           .from('event_players')
           .upsert({
             event_id:                eventId,
@@ -1217,9 +1224,13 @@ function ImportPastResults() {
             course_handicap:         ch,
             flight,
           }, { onConflict: 'event_id,player_id' })
-          .select('id').single()
 
-        if (epErr) { playerErr++; continue }
+        if (epErr) {
+          console.error(`[PastResults] event_players upsert failed for ${first} ${last}:`, epErr)
+          playerErrMessages.push(`${first} ${last} (roster): ${epErr.message}`)
+          playerErr++
+          continue
+        }
 
         // Delete any existing scores for this player/event (re-import safe)
         await supabase.from('scores').delete()
@@ -1239,16 +1250,22 @@ function ImportPastResults() {
         }))
 
         const { error: scErr } = await supabase.from('scores').insert(scoreRows)
-        if (scErr) { playerErr++; continue }
+        if (scErr) {
+          console.error(`[PastResults] scores insert failed for ${first} ${last}:`, scErr)
+          playerErrMessages.push(`${first} ${last} (scores): ${scErr.message}`)
+          playerErr++
+          continue
+        }
 
         playerOk++
       }
 
+      const firstErrMsg = playerErrMessages[0] ?? null
       eventResults.push({
         event:   eventName,
         date:    eventDate,
         status:  playerErr === 0 ? 'imported' : playerOk > 0 ? 'partial' : 'error',
-        message: `${playerOk} players imported${playerErr > 0 ? `, ${playerErr} errors` : ''}`,
+        message: `${playerOk} players imported${playerErr > 0 ? `, ${playerErr} error(s)${firstErrMsg ? `: ${firstErrMsg}` : ''}` : ''}`,
         eventId,
       })
     }
