@@ -24,14 +24,16 @@ export default function Login() {
   async function redirectAfterAuth(userId) {
     const { data: prof } = await supabase
       .from('profiles')
-      .select('org_id')
+      .select('org_id, role')
       .eq('id', userId)
       .maybeSingle()
 
     if (!prof?.org_id) {
       navigate('/onboarding', { replace: true })
+    } else if (prof?.role === 'admin') {
+      navigate(from && from !== '/login' ? from : '/admin', { replace: true })
     } else {
-      navigate(from === '/login' ? '/home' : from, { replace: true })
+      navigate(from && from !== '/login' ? from : '/home', { replace: true })
     }
   }
 
