@@ -852,6 +852,29 @@ function Skeleton() {
   )
 }
 
+// ─── Shareable Wager Link ─────────────────────────────────────────────────────
+function ShareableWagerLink({ eventId }) {
+  const [copied, setCopied] = useState(false)
+  const url = `${window.location.origin}/wager/${eventId}`
+
+  function copy() {
+    navigator.clipboard.writeText(url).then(() => {
+      setCopied(true)
+      setTimeout(() => setCopied(false), 2000)
+    })
+  }
+
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', gap: 8, background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: 10, padding: '10px 14px', marginBottom: 16 }}>
+      <span style={{ fontSize: 11, color: '#16a34a', fontWeight: 600, flexShrink: 0 }}>🔗 Share link:</span>
+      <span style={{ fontSize: 11, color: '#374151', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{url}</span>
+      <button onClick={copy} style={{ fontSize: 11, fontWeight: 700, color: copied ? '#16a34a' : GREEN, background: 'none', border: 'none', cursor: 'pointer', flexShrink: 0 }}>
+        {copied ? '✓ Copied' : 'Copy'}
+      </button>
+    </div>
+  )
+}
+
 // ─── Wager Tab ────────────────────────────────────────────────────────────────
 function emptyPick() {
   return { id: crypto.randomUUID(), playerId: '', position: 'win', amount: '' }
@@ -859,8 +882,9 @@ function emptyPick() {
 
 function WagerTab({ event, eventPlayers }) {
   const players = eventPlayers
-    .map(ep => ep.player)
+    .map(ep => ep.player && typeof ep.player === 'object' ? { ...ep.player, id: ep.player.id ?? ep.player_id } : null)
     .filter(Boolean)
+    .filter(p => p.id)
     .sort((a, b) => a.last_name.localeCompare(b.last_name))
 
   const [bettorName, setBettorName] = useState('')
@@ -869,7 +893,7 @@ function WagerTab({ event, eventPlayers }) {
   const [submitted,  setSubmitted]  = useState(false)
   const [wagers,     setWagers]     = useState([])
   const [loadingBoard, setLoadingBoard] = useState(true)
-  const [activeSection, setActiveSection] = useState('place') // 'place' | 'board'
+  const [activeSection, setActiveSection] = useState('board') // 'board' | 'place'
 
   // Load existing wagers for the board view
   useEffect(() => {
@@ -949,9 +973,9 @@ function WagerTab({ event, eventPlayers }) {
     <div style={{ maxWidth: 560, margin: '0 auto' }}>
 
       {/* Section toggle */}
-      <div style={{ display: 'flex', background: '#f3f4f6', borderRadius: 12, padding: 4, marginBottom: 24 }}>
-        {[['place', '🎲 Place a Bet'], ['board', '📋 Wager Board']].map(([key, label]) => (
-          <button key={key} onClick={() => setActiveSection(key)} style={{
+      <div style={{ display: 'flex', background: '#f3f4f6', borderRadius: 12, padding: 4, marginBottom: 16 }}>
+        {[['board', '📋 Wager Board'], ['place', '🎲 Place a Bet']].map(([key, label]) => (
+          <button key={key} onClick={() => { setActiveSection(key); setSubmitted(false) }} style={{
             flex: 1, padding: '8px 0', fontSize: 13, fontWeight: 700, border: 'none', cursor: 'pointer', borderRadius: 9, transition: 'all 0.15s',
             background: activeSection === key ? '#fff' : 'transparent',
             color: activeSection === key ? GREEN : '#6b7280',
@@ -959,6 +983,9 @@ function WagerTab({ event, eventPlayers }) {
           }}>{label}</button>
         ))}
       </div>
+
+      {/* Shareable direct link */}
+      <ShareableWagerLink eventId={event.id} />
 
       {/* ── Place a Bet ── */}
       {activeSection === 'place' && !submitted && (
