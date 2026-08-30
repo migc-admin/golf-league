@@ -50,7 +50,7 @@ const BASE_TABS = [
   { key: 'overview',  label: 'Overview'  },
   { key: 'pairings',  label: 'Pairings'  },
   { key: 'photos',    label: 'Photos'    },
-  { key: 'wager',     label: '🎲 Wager'  },
+  { key: 'wager',     label: 'Wager'  },
 ]
 
 const MIGC_ORG = '5c7121f0-6a05-4222-9787-25245008f1da'
@@ -866,7 +866,7 @@ function ShareableWagerLink({ eventId }) {
 
   return (
     <div style={{ display: 'flex', alignItems: 'center', gap: 8, background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: 10, padding: '10px 14px', marginBottom: 16 }}>
-      <span style={{ fontSize: 11, color: '#16a34a', fontWeight: 600, flexShrink: 0 }}>🔗 Share link:</span>
+      <span style={{ fontSize: 11, color: '#16a34a', fontWeight: 600, flexShrink: 0 }}>Share link:</span>
       <span style={{ fontSize: 11, color: '#374151', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{url}</span>
       <button onClick={copy} style={{ fontSize: 11, fontWeight: 700, color: copied ? '#16a34a' : GREEN, background: 'none', border: 'none', cursor: 'pointer', flexShrink: 0 }}>
         {copied ? '✓ Copied' : 'Copy'}
@@ -974,7 +974,7 @@ function WagerTab({ event, eventPlayers }) {
 
       {/* Section toggle */}
       <div style={{ display: 'flex', background: '#f3f4f6', borderRadius: 12, padding: 4, marginBottom: 16 }}>
-        {[['board', '📋 Wager Board'], ['place', '🎲 Place a Bet']].map(([key, label]) => (
+        {[['board', 'Wager Board'], ['place', 'Place a Bet']].map(([key, label]) => (
           <button key={key} onClick={() => { setActiveSection(key); setSubmitted(false) }} style={{
             flex: 1, padding: '8px 0', fontSize: 13, fontWeight: 700, border: 'none', cursor: 'pointer', borderRadius: 9, transition: 'all 0.15s',
             background: activeSection === key ? '#fff' : 'transparent',
