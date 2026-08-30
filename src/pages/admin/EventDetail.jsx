@@ -3906,7 +3906,7 @@ function EditEventModal({ open, onClose, event, onSaved }) {
           <div className="space-y-3 bg-gray-50 rounded-xl px-4 py-3">
             <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Wagering</p>
             <a
-              href={`/wager/${event.id}/board`}
+              href={`/wager/${event?.id}/board`}
               target="_blank"
               rel="noopener noreferrer"
               className="inline-flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold text-white"
