@@ -3902,7 +3902,7 @@ function EditEventModal({ open, onClose, event, onSaved }) {
         </div>
 
         {/* Wager Board — MIGC only */}
-        {org?.id === '5c7121f0-6a05-4222-9787-25245008f1da' && (
+        {org?.id === '5c7121f0-6a05-4222-9787-25245008f1da' && event?.id && (
           <div className="space-y-3 bg-gray-50 rounded-xl px-4 py-3">
             <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Wagering</p>
             <a
