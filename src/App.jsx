@@ -32,6 +32,8 @@ import Help           from './pages/Help'
 import Privacy        from './pages/Privacy'
 import RefundPolicy   from './pages/RefundPolicy'
 import Terms          from './pages/Terms'
+import Wager          from './pages/Wager'
+import WagerAdmin     from './pages/WagerAdmin'
 import DisputeTemplate from './pages/admin/DisputeTemplate'
 import Roadmap        from './pages/Roadmap'
 
@@ -107,6 +109,8 @@ export default function App() {
         {/* Public event registration — no auth required */}
         <Route path="/register/:leagueSlug/:eventSlug" element={<Register />} />
         <Route path="/reset-password" element={<ResetPassword />} />
+        <Route path="/wager/:eventId" element={<Wager />} />
+        <Route path="/wager/:eventId/board" element={<WagerAdmin />} />
         <Route path="/faq"            element={<FAQ />} />
         <Route path="/roadmap"        element={<Roadmap />} />
         <Route path="/help"           element={<Help />} />

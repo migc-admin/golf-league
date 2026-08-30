@@ -50,7 +50,10 @@ const BASE_TABS = [
   { key: 'overview',  label: 'Overview'  },
   { key: 'pairings',  label: 'Pairings'  },
   { key: 'photos',    label: 'Photos'    },
+  { key: 'wager',     label: '🎲 Wager'  },
 ]
+
+const MIGC_ORG = '5c7121f0-6a05-4222-9787-25245008f1da'
 
 export default function EventPage() {
   const subdomainOrg = useSubdomainOrg()
@@ -72,7 +75,7 @@ export default function EventPage() {
         if (directEventId) {
           const { data } = await supabase
             .from('events')
-            .select('*, course:courses(name, address), league:leagues(name, season_year, slug, logo_url)')
+            .select('*, course:courses(name, address), league:leagues(name, season_year, slug, logo_url, org_id)')
             .eq('id', directEventId).single()
           ev = data
         } else {
@@ -80,7 +83,7 @@ export default function EventPage() {
           if (!league) { setLoading(false); return }
           const { data } = await supabase
             .from('events')
-            .select('*, course:courses(name, address), league:leagues(name, season_year, slug, logo_url)')
+            .select('*, course:courses(name, address), league:leagues(name, season_year, slug, logo_url, org_id)')
             .eq('league_id', league.id).eq('slug', eventSlug).single()
           ev = data
         }
@@ -238,7 +241,7 @@ export default function EventPage() {
 
             {/* Tab bar */}
             <div className="event-tab-bar" style={{ borderTop: '1px solid #e5e7eb', marginLeft: 'clamp(-16px,-4vw,-44px)', marginRight: 'clamp(-16px,-4vw,-44px)' }}>
-              {BASE_TABS.map(tab => (
+              {BASE_TABS.filter(tab => tab.key !== 'wager' || event.league?.org_id === MIGC_ORG).map(tab => (
                 <button key={tab.key} onClick={() => setActiveTab(tab.key)}
                   style={{
                     padding: '13px 24px',
@@ -293,6 +296,10 @@ export default function EventPage() {
 
         {activeTab === 'photos' && (
           <PhotosTab photos={photos} eventId={event.id} onUploaded={photo => setEvent(prev => ({ ...prev, photos: [...(prev.photos ?? []), photo] }))} />
+        )}
+
+        {activeTab === 'wager' && event.league?.org_id === MIGC_ORG && (
+          <WagerTab event={event} eventPlayers={eventPlayers} />
         )}
 
 
@@ -841,6 +848,303 @@ function Skeleton() {
       <div style={{ maxWidth: 1100, margin: '0 auto', padding: '28px 40px', display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 14 }}>
         {[0,1,2].map(i => <div key={i} style={{ height: 120, borderRadius: 16, background: '#e5e7eb' }} />)}
       </div>
+    </div>
+  )
+}
+
+// ─── Wager Tab ────────────────────────────────────────────────────────────────
+function emptyPick() {
+  return { id: crypto.randomUUID(), playerId: '', position: 'win', amount: '' }
+}
+
+function WagerTab({ event, eventPlayers }) {
+  const players = eventPlayers
+    .map(ep => ep.player)
+    .filter(Boolean)
+    .sort((a, b) => a.last_name.localeCompare(b.last_name))
+
+  const [bettorName, setBettorName] = useState('')
+  const [picks,      setPicks]      = useState([emptyPick()])
+  const [submitting, setSubmitting] = useState(false)
+  const [submitted,  setSubmitted]  = useState(false)
+  const [wagers,     setWagers]     = useState([])
+  const [loadingBoard, setLoadingBoard] = useState(true)
+  const [activeSection, setActiveSection] = useState('place') // 'place' | 'board'
+
+  // Load existing wagers for the board view
+  useEffect(() => {
+    async function loadWagers() {
+      const { data } = await supabase.from('wagers').select('*').eq('event_id', event.id).order('created_at', { ascending: false })
+      setWagers(data ?? [])
+      setLoadingBoard(false)
+    }
+    loadWagers()
+    const interval = setInterval(loadWagers, 30000)
+    return () => clearInterval(interval)
+  }, [event.id])
+
+  function updatePick(id, field, value) {
+    setPicks(prev => prev.map(p => p.id === id ? { ...p, [field]: value } : p))
+  }
+  function addPick() { setPicks(prev => [...prev, emptyPick()]) }
+  function removePick(id) { setPicks(prev => prev.filter(p => p.id !== id)) }
+
+  const validPicks = picks.filter(p => p.playerId && p.amount && parseFloat(p.amount) >= 5)
+  const total = validPicks.reduce((sum, p) => sum + parseFloat(p.amount), 0)
+
+  function playerName(id) {
+    const p = players.find(pl => pl.id === id)
+    return p ? `${p.first_name} ${p.last_name}` : '—'
+  }
+
+  function buildVenmoUrl() {
+    if (!event?.venmo_handle) return null
+    const eventLabel = event.name ?? `Event #${event.event_number}`
+    const note = validPicks.map(p => `${playerName(p.playerId)} ${p.position.toUpperCase()} $${parseFloat(p.amount).toFixed(0)}`).join(', ')
+    const memo = `${eventLabel} – ${bettorName.trim()} | ${note}`
+    return `https://venmo.com/?txn=pay&recipients=${encodeURIComponent(event.venmo_handle)}&amount=${total.toFixed(2)}&note=${encodeURIComponent(memo)}`
+  }
+
+  async function handleSubmit(e) {
+    e.preventDefault()
+    if (!bettorName.trim()) { alert('Enter your name.'); return }
+    if (validPicks.length === 0) { alert('Add at least one pick ($5 minimum).'); return }
+    setSubmitting(true)
+    const rows = validPicks.map(p => ({
+      event_id:    event.id,
+      bettor_name: bettorName.trim(),
+      pick_1st:    p.position === 'win'   ? p.playerId : null,
+      pick_2nd:    p.position === 'place' ? p.playerId : null,
+      amount:      parseFloat(p.amount),
+      venmo_sent:  true,
+    }))
+    const { error } = await supabase.from('wagers').insert(rows)
+    setSubmitting(false)
+    if (error) { alert('Submission failed: ' + error.message); return }
+    // Refresh board
+    const { data } = await supabase.from('wagers').select('*').eq('event_id', event.id).order('created_at', { ascending: false })
+    setWagers(data ?? [])
+    setSubmitted(true)
+  }
+
+  // Board data
+  const totalPot = wagers.reduce((sum, w) => sum + parseFloat(w.amount), 0)
+  const winTotals = {}, placeTotals = {}
+  for (const w of wagers) {
+    if (w.pick_1st) winTotals[w.pick_1st]   = (winTotals[w.pick_1st]   ?? 0) + parseFloat(w.amount)
+    if (w.pick_2nd) placeTotals[w.pick_2nd] = (placeTotals[w.pick_2nd] ?? 0) + parseFloat(w.amount)
+  }
+  const allPickedIds = [...new Set([...Object.keys(winTotals), ...Object.keys(placeTotals)])]
+    .sort((a, b) => ((winTotals[b] ?? 0) + (placeTotals[b] ?? 0)) - ((winTotals[a] ?? 0) + (placeTotals[a] ?? 0)))
+
+  const byBettor = {}
+  for (const w of [...wagers].reverse()) {
+    if (!byBettor[w.bettor_name]) byBettor[w.bettor_name] = []
+    byBettor[w.bettor_name].push(w)
+  }
+
+  const venmoUrl = submitted ? buildVenmoUrl() : null
+
+  return (
+    <div style={{ maxWidth: 560, margin: '0 auto' }}>
+
+      {/* Section toggle */}
+      <div style={{ display: 'flex', background: '#f3f4f6', borderRadius: 12, padding: 4, marginBottom: 24 }}>
+        {[['place', '🎲 Place a Bet'], ['board', '📋 Wager Board']].map(([key, label]) => (
+          <button key={key} onClick={() => setActiveSection(key)} style={{
+            flex: 1, padding: '8px 0', fontSize: 13, fontWeight: 700, border: 'none', cursor: 'pointer', borderRadius: 9, transition: 'all 0.15s',
+            background: activeSection === key ? '#fff' : 'transparent',
+            color: activeSection === key ? GREEN : '#6b7280',
+            boxShadow: activeSection === key ? '0 1px 4px rgba(0,0,0,0.1)' : 'none',
+          }}>{label}</button>
+        ))}
+      </div>
+
+      {/* ── Place a Bet ── */}
+      {activeSection === 'place' && !submitted && (
+        <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+          <div style={{ background: '#fff', borderRadius: 16, border: '1px solid #e5e7eb', padding: 20 }}>
+            <label style={{ display: 'block', fontSize: 11, fontWeight: 700, color: '#6b7280', marginBottom: 6, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Your Name</label>
+            <input type="text" value={bettorName} onChange={e => setBettorName(e.target.value)} placeholder="First Last" required
+              style={{ width: '100%', padding: '10px 14px', borderRadius: 10, border: '1px solid #e5e7eb', fontSize: 14, boxSizing: 'border-box', outline: 'none' }} />
+          </div>
+
+          <div style={{ background: '#fff', borderRadius: 16, border: '1px solid #e5e7eb', padding: 20 }}>
+            <p style={{ fontSize: 11, fontWeight: 700, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 16 }}>Your Picks</p>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+              {picks.map((pick, idx) => (
+                <div key={pick.id}>
+                  {picks.length > 1 && (
+                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}>
+                      <span style={{ fontSize: 11, color: '#9ca3af', fontWeight: 600 }}>Pick {idx + 1}</span>
+                      <button type="button" onClick={() => removePick(pick.id)} style={{ fontSize: 11, color: '#f87171', background: 'none', border: 'none', cursor: 'pointer' }}>Remove</button>
+                    </div>
+                  )}
+                  <select value={pick.playerId} onChange={e => updatePick(pick.id, 'playerId', e.target.value)} required
+                    style={{ width: '100%', padding: '10px 14px', borderRadius: 10, border: '1px solid #e5e7eb', fontSize: 14, marginBottom: 8, boxSizing: 'border-box', background: '#fff' }}>
+                    <option value="">Select a player…</option>
+                    {players.map(p => <option key={p.id} value={p.id}>{p.first_name} {p.last_name}</option>)}
+                  </select>
+                  <div style={{ display: 'flex', gap: 8 }}>
+                    <div style={{ display: 'flex', borderRadius: 10, border: '1px solid #e5e7eb', overflow: 'hidden', flexShrink: 0 }}>
+                      {[['win','WIN'],['place','PLACE']].map(([val, label]) => (
+                        <button key={val} type="button" onClick={() => updatePick(pick.id, 'position', val)}
+                          style={{ padding: '10px 14px', fontSize: 12, fontWeight: 700, border: 'none', cursor: 'pointer', transition: 'all 0.15s',
+                            background: pick.position === val ? GREEN : '#f9f9f9', color: pick.position === val ? '#fff' : '#6b7280' }}>
+                          {label}
+                        </button>
+                      ))}
+                    </div>
+                    <div style={{ position: 'relative', flex: 1 }}>
+                      <span style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', color: '#9ca3af', fontSize: 14 }}>$</span>
+                      <input type="number" min="5" step="5" value={pick.amount} onChange={e => updatePick(pick.id, 'amount', e.target.value)} placeholder="0" required
+                        style={{ width: '100%', paddingLeft: 26, paddingRight: 12, paddingTop: 10, paddingBottom: 10, borderRadius: 10, border: '1px solid #e5e7eb', fontSize: 14, boxSizing: 'border-box', outline: 'none' }} />
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+            <p style={{ fontSize: 11, color: '#9ca3af', textAlign: 'center', margin: '12px 0 4px' }}>Minimum $5 · $5 increments only</p>
+            <button type="button" onClick={addPick}
+              style={{ width: '100%', marginTop: 8, padding: '10px 0', borderRadius: 10, border: `1px solid ${GREEN}`, background: 'transparent', color: GREEN, fontSize: 13, fontWeight: 700, cursor: 'pointer' }}>
+              + Add Another Pick
+            </button>
+          </div>
+
+          {validPicks.length > 0 && (
+            <div style={{ background: '#fefce8', border: '1px solid #fde68a', borderRadius: 12, padding: '12px 16px' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 14, fontWeight: 700, color: '#92400e' }}>
+                <span>Total Wager</span><span>${total.toFixed(2)}</span>
+              </div>
+              {event.venmo_handle && <p style={{ fontSize: 11, color: '#9ca3af', marginTop: 4 }}>You'll pay @{event.venmo_handle} via Venmo after submitting.</p>}
+            </div>
+          )}
+
+          <button type="submit" disabled={submitting || validPicks.length === 0}
+            style={{ width: '100%', padding: '14px 0', borderRadius: 12, border: 'none', background: GREEN, color: '#fff', fontSize: 14, fontWeight: 700, cursor: 'pointer', opacity: (submitting || validPicks.length === 0) ? 0.5 : 1 }}>
+            {submitting ? 'Submitting…' : 'Submit Picks'}
+          </button>
+        </form>
+      )}
+
+      {/* ── Confirmation ── */}
+      {activeSection === 'place' && submitted && (
+        <div style={{ background: '#fff', borderRadius: 16, border: '1px solid #e5e7eb', padding: 28, textAlign: 'center' }}>
+          <div style={{ fontSize: 48, marginBottom: 12 }}>🏌️</div>
+          <h3 style={{ fontSize: 18, fontWeight: 700, color: GREEN, marginBottom: 6 }}>You're in!</h3>
+          <div style={{ background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: 12, padding: 16, margin: '16px 0', textAlign: 'left' }}>
+            {validPicks.map(p => (
+              <div key={p.id} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, marginBottom: 6 }}>
+                <span style={{ color: '#374151' }}>
+                  {playerName(p.playerId)}
+                  <span style={{ marginLeft: 8, fontSize: 10, fontWeight: 700, padding: '2px 6px', borderRadius: 4,
+                    background: p.position === 'win' ? '#dcfce7' : '#dbeafe', color: p.position === 'win' ? '#16a34a' : '#1d4ed8' }}>
+                    {p.position === 'win' ? 'WIN' : 'PLACE'}
+                  </span>
+                </span>
+                <span style={{ fontWeight: 700 }}>${parseFloat(p.amount).toFixed(2)}</span>
+              </div>
+            ))}
+            <div style={{ borderTop: '1px solid #bbf7d0', marginTop: 8, paddingTop: 8, display: 'flex', justifyContent: 'space-between', fontWeight: 700, color: GREEN }}>
+              <span>Total</span><span>${total.toFixed(2)}</span>
+            </div>
+          </div>
+          {venmoUrl
+            ? <a href={venmoUrl} target="_blank" rel="noopener noreferrer"
+                style={{ display: 'block', padding: '12px 0', borderRadius: 12, background: '#3D95CE', color: '#fff', fontWeight: 700, fontSize: 14, textDecoration: 'none', marginBottom: 8 }}>
+                💸 Pay ${total.toFixed(2)} via Venmo
+              </a>
+            : <p style={{ fontSize: 13, color: '#6b7280' }}>Send ${total.toFixed(2)} to @{event.venmo_handle}</p>
+          }
+          <button onClick={() => { setSubmitted(false); setPicks([emptyPick()]); setBettorName('') }}
+            style={{ fontSize: 12, color: '#9ca3af', background: 'none', border: 'none', cursor: 'pointer', marginTop: 8 }}>
+            Place another bet
+          </button>
+        </div>
+      )}
+
+      {/* ── Wager Board ── */}
+      {activeSection === 'board' && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+          {/* Summary */}
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 12 }}>
+            {[['Total Pot', `$${totalPot.toFixed(2)}`], ['Bets', wagers.length], ['Bettors', Object.keys(byBettor).length]].map(([label, val]) => (
+              <div key={label} style={{ background: '#fff', borderRadius: 14, border: '1px solid #e5e7eb', padding: '14px 12px', textAlign: 'center' }}>
+                <p style={{ fontSize: 10, color: '#9ca3af', marginBottom: 4, textTransform: 'uppercase', letterSpacing: '0.05em' }}>{label}</p>
+                <p style={{ fontSize: 20, fontWeight: 700, color: GREEN }}>{val}</p>
+              </div>
+            ))}
+          </div>
+
+          {/* Odds */}
+          {allPickedIds.length > 0 && (
+            <div style={{ background: '#fff', borderRadius: 16, border: '1px solid #e5e7eb', overflow: 'hidden' }}>
+              <div style={{ padding: '14px 18px', borderBottom: '1px solid #f3f4f6' }}>
+                <p style={{ fontSize: 13, fontWeight: 700, color: '#111' }}>Live Odds</p>
+                <p style={{ fontSize: 11, color: '#9ca3af', marginTop: 2 }}>Parimutuel · refreshes every 30s</p>
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr auto auto', padding: '8px 18px', fontSize: 10, fontWeight: 700, color: '#9ca3af', textTransform: 'uppercase', letterSpacing: '0.05em', gap: 12 }}>
+                <span>Player</span><span>WIN</span><span>PLACE</span>
+              </div>
+              {allPickedIds.map((id, idx) => {
+                const wAmt = winTotals[id] ?? 0
+                const pAmt = placeTotals[id] ?? 0
+                const winOdds = wAmt > 0 ? (totalPot / wAmt).toFixed(2) : null
+                const placeOdds = pAmt > 0 ? (totalPot / pAmt).toFixed(2) : null
+                return (
+                  <div key={id} style={{ display: 'grid', gridTemplateColumns: '1fr auto auto', padding: '10px 18px', borderTop: '1px solid #f9f9f9', gap: 12, alignItems: 'center' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                      {idx < 3 && <span style={{ width: 18, height: 18, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 10, fontWeight: 700, color: '#fff',
+                        background: idx === 0 ? '#D4AF37' : idx === 1 ? '#9ca3af' : '#b45309' }}>{idx+1}</span>}
+                      <span style={{ fontSize: 13, fontWeight: 600, color: '#111' }}>{playerName(id)}</span>
+                    </div>
+                    <div style={{ textAlign: 'right', minWidth: 52 }}>
+                      {winOdds ? <><span style={{ fontSize: 12, fontWeight: 700, color: '#16a34a' }}>${wAmt.toFixed(0)}</span><br/><span style={{ fontSize: 10, color: '#9ca3af' }}>{winOdds}x</span></> : <span style={{ fontSize: 11, color: '#e5e7eb' }}>—</span>}
+                    </div>
+                    <div style={{ textAlign: 'right', minWidth: 52 }}>
+                      {placeOdds ? <><span style={{ fontSize: 12, fontWeight: 700, color: '#1d4ed8' }}>${pAmt.toFixed(0)}</span><br/><span style={{ fontSize: 10, color: '#9ca3af' }}>{placeOdds}x</span></> : <span style={{ fontSize: 11, color: '#e5e7eb' }}>—</span>}
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+          )}
+
+          {/* All bets */}
+          <div style={{ background: '#fff', borderRadius: 16, border: '1px solid #e5e7eb', overflow: 'hidden' }}>
+            <div style={{ padding: '14px 18px', borderBottom: '1px solid #f3f4f6' }}>
+              <p style={{ fontSize: 13, fontWeight: 700, color: '#111' }}>All Bets</p>
+            </div>
+            {wagers.length === 0
+              ? <p style={{ padding: '24px 18px', fontSize: 13, color: '#9ca3af', textAlign: 'center' }}>No bets yet.</p>
+              : Object.entries(byBettor).map(([name, ws]) => {
+                  const bt = ws.reduce((s, w) => s + parseFloat(w.amount), 0)
+                  return (
+                    <div key={name} style={{ padding: '14px 18px', borderTop: '1px solid #f9f9f9' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
+                        <span style={{ fontSize: 13, fontWeight: 700, color: '#111' }}>{name}</span>
+                        <span style={{ fontSize: 13, fontWeight: 700, color: GREEN }}>${bt.toFixed(2)}</span>
+                      </div>
+                      {ws.map(w => (
+                        <div key={w.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                            <span style={{ fontSize: 10, fontWeight: 700, padding: '2px 6px', borderRadius: 4,
+                              background: w.pick_1st ? '#dcfce7' : '#dbeafe', color: w.pick_1st ? '#16a34a' : '#1d4ed8' }}>
+                              {w.pick_1st ? 'WIN' : 'PLACE'}
+                            </span>
+                            <span style={{ fontSize: 12, color: '#374151' }}>{playerName(w.pick_1st ?? w.pick_2nd)}</span>
+                          </div>
+                          <span style={{ fontSize: 12, color: '#6b7280' }}>${parseFloat(w.amount).toFixed(2)}</span>
+                        </div>
+                      ))}
+                    </div>
+                  )
+                })
+            }
+          </div>
+          <p style={{ fontSize: 11, color: '#c7c7cc', textAlign: 'center' }}>Auto-refreshes every 30 seconds</p>
+        </div>
+      )}
     </div>
   )
 }
