@@ -952,7 +952,9 @@ function WagerTab({ event, eventPlayers }) {
   }
 
   // Board data
-  const totalPot = wagers.reduce((sum, w) => sum + parseFloat(w.amount), 0)
+  const totalPot   = wagers.reduce((sum, w) => sum + parseFloat(w.amount), 0)
+  const winPool    = wagers.filter(w => w.pick_1st).reduce((sum, w) => sum + parseFloat(w.amount), 0)
+  const placePool  = wagers.filter(w => w.pick_2nd).reduce((sum, w) => sum + parseFloat(w.amount), 0)
   const winTotals = {}, placeTotals = {}
   for (const w of wagers) {
     if (w.pick_1st) winTotals[w.pick_1st]   = (winTotals[w.pick_1st]   ?? 0) + parseFloat(w.amount)
@@ -1116,8 +1118,8 @@ function WagerTab({ event, eventPlayers }) {
               {allPickedIds.map((id, idx) => {
                 const wAmt = winTotals[id] ?? 0
                 const pAmt = placeTotals[id] ?? 0
-                const winOdds = wAmt > 0 ? (totalPot / wAmt).toFixed(2) : null
-                const placeOdds = pAmt > 0 ? (totalPot / pAmt).toFixed(2) : null
+                const winOdds   = wAmt > 0 && winPool   > 0 ? (winPool   / wAmt).toFixed(2) : null
+                const placeOdds = pAmt > 0 && placePool > 0 ? (placePool / pAmt).toFixed(2) : null
                 return (
                   <div key={id} style={{ display: 'grid', gridTemplateColumns: '1fr auto auto', padding: '10px 18px', borderTop: '1px solid #f9f9f9', gap: 12, alignItems: 'center' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>

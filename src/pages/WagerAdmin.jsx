@@ -82,7 +82,9 @@ export default function WagerAdmin() {
     </div>
   )
 
-  const totalPot = wagers.reduce((sum, w) => sum + parseFloat(w.amount), 0)
+  const totalPot  = wagers.reduce((sum, w) => sum + parseFloat(w.amount), 0)
+  const winPool   = wagers.filter(w => w.pick_1st).reduce((sum, w) => sum + parseFloat(w.amount), 0)
+  const placePool = wagers.filter(w => w.pick_2nd).reduce((sum, w) => sum + parseFloat(w.amount), 0)
 
   // Tally win and place amounts per player
   const winTotals   = {}
@@ -155,8 +157,8 @@ export default function WagerAdmin() {
               {allPickedIds.map((id, idx) => {
                 const wAmt = winTotals[id]   ?? 0
                 const pAmt = placeTotals[id] ?? 0
-                const winOdds   = wAmt > 0 && totalPot > 0 ? (totalPot / wAmt).toFixed(2) : null
-                const placeOdds = pAmt > 0 && totalPot > 0 ? (totalPot / pAmt).toFixed(2) : null
+                const winOdds   = wAmt > 0 && winPool   > 0 ? (winPool   / wAmt).toFixed(2) : null
+                const placeOdds = pAmt > 0 && placePool > 0 ? (placePool / pAmt).toFixed(2) : null
                 return (
                   <div key={id} className="grid grid-cols-4 px-5 py-3 items-center">
                     <div className="col-span-2 flex items-center gap-2">
@@ -193,8 +195,20 @@ export default function WagerAdmin() {
 
         {/* All bets by bettor */}
         <div style={{ background: '#fff', borderRadius: '1.25rem', border: '1px solid #ebe9e4' }}>
-          <div className="px-5 py-4 border-b border-gray-100">
+          <div className="px-5 py-4 border-b border-gray-100 flex justify-between items-center">
             <h2 className="text-sm font-bold text-gray-900">All Bets</h2>
+            {wagers.length > 0 && (
+              <button
+                onClick={async () => {
+                  if (!window.confirm(`Delete all ${wagers.length} bet(s) for this event? This cannot be undone.`)) return
+                  await supabase.from('wagers').delete().eq('event_id', eventId)
+                  setWagers([])
+                }}
+                className="text-xs font-semibold text-red-500 hover:text-red-700"
+              >
+                Clear All
+              </button>
+            )}
           </div>
           {wagers.length === 0 ? (
             <p className="px-5 py-6 text-sm text-gray-400 text-center">No bets placed yet.</p>
@@ -217,7 +231,20 @@ export default function WagerAdmin() {
                             </span>
                             <span className="text-gray-700">{players[w.pick_1st ?? w.pick_2nd] ?? '—'}</span>
                           </div>
-                          <span className="text-gray-500">${parseFloat(w.amount).toFixed(2)}</span>
+                          <div className="flex items-center gap-3">
+                            <span className="text-gray-500">${parseFloat(w.amount).toFixed(2)}</span>
+                            <button
+                              onClick={async () => {
+                                if (!window.confirm('Delete this bet?')) return
+                                await supabase.from('wagers').delete().eq('id', w.id)
+                                setWagers(prev => prev.filter(x => x.id !== w.id))
+                              }}
+                              className="text-red-400 hover:text-red-600 font-bold leading-none"
+                              title="Delete bet"
+                            >
+                              ×
+                            </button>
+                          </div>
                         </div>
                       ))}
                     </div>
