@@ -997,10 +997,10 @@ function buildSkinsGrid({ event, course, flightPlayers, allScores, flight, orgNa
   backGroup.forEach(({ hole })  => hr.appendChild(mkTh(hole, { bg: '#2D6A4F' })))
   hr.appendChild(mkTh('In',     { bg: '#1a3d2a' }))
   hr.appendChild(mkTh('In Net', { bg: '#1a3d2a' }))
-  hr.appendChild(mkTh('Grs',   { bg: '#1a3d2a' }))
-  hr.appendChild(mkTh('HC',    { bg: '#1a3d2a' }))
-  hr.appendChild(mkTh('Net',   { bg: '#1a3d2a' }))
-  hr.appendChild(mkTh('Putts', { bg: '#1a3d2a' }))
+  hr.appendChild(mkTh('Grs',      { bg: '#1a3d2a' }))
+  hr.appendChild(mkTh('HC',       { bg: '#1a3d2a' }))
+  hr.appendChild(mkTh('Net Scr',  { bg: '#1a3d2a' }))
+  hr.appendChild(mkTh('Putts',    { bg: '#1a3d2a' }))
   tbl.appendChild(hr)
 
   // SI sub-row
@@ -1019,6 +1019,31 @@ function buildSkinsGrid({ event, course, flightPlayers, allScores, flight, orgNa
   siRow.appendChild(mkTd('', { bg: '#3a5a4a' }))
   siRow.appendChild(mkTd('', { bg: '#3a5a4a' }))
   tbl.appendChild(siRow)
+
+  // Carryover row — shows how many skins were carrying into each hole
+  const carryoverRow = document.createElement('tr')
+  carryoverRow.appendChild(mkTd('Carryover', { bg: '#fef9ec', color: '#92400e', align: 'left', bold: true, fs: '9px' }))
+  carryoverRow.appendChild(mkTd('', { bg: '#fef9ec' }))
+  carryoverRow.appendChild(mkTd('', { bg: '#fef9ec' }))
+  const carryoverByHole = {}
+  skinsHoles.forEach(r => { carryoverByHole[r.hole] = r.carryoverIn ?? 0 })
+  frontGroup.forEach(({ hole }) => {
+    const c = carryoverByHole[hole] ?? 0
+    carryoverRow.appendChild(mkTd(c > 0 ? `+${c}` : '', { bg: c > 0 ? '#fef3c7' : '#fef9ec', color: '#92400e', bold: c > 0, fs: '9px' }))
+  })
+  carryoverRow.appendChild(mkTd('', { bg: '#fef9ec' }))
+  carryoverRow.appendChild(mkTd('', { bg: '#fef9ec' }))
+  backGroup.forEach(({ hole }) => {
+    const c = carryoverByHole[hole] ?? 0
+    carryoverRow.appendChild(mkTd(c > 0 ? `+${c}` : '', { bg: c > 0 ? '#fef3c7' : '#fef9ec', color: '#92400e', bold: c > 0, fs: '9px' }))
+  })
+  carryoverRow.appendChild(mkTd('', { bg: '#fef9ec' }))
+  carryoverRow.appendChild(mkTd('', { bg: '#fef9ec' }))
+  carryoverRow.appendChild(mkTd('', { bg: '#fef9ec' }))
+  carryoverRow.appendChild(mkTd('', { bg: '#fef9ec' }))
+  carryoverRow.appendChild(mkTd('', { bg: '#fef9ec' }))
+  carryoverRow.appendChild(mkTd('', { bg: '#fef9ec' }))
+  tbl.appendChild(carryoverRow)
 
   // Flight section header
   if (flight) {

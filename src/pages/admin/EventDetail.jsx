@@ -499,7 +499,7 @@ function exportHandicapCSV(event, eventPlayers, allScores, course) {
       const cap = pars[h] + 2 + strokes
       const adj = Math.min(gross, cap)
       adjScores.push(adj)
-      if (adj < gross) cappedHoles.push(`H${h + 1}:${gross}→${adj}`)
+      if (adj < gross) cappedHoles.push(`H${h + 1}:${gross}->${adj}`)
     }
 
     const f9Vals = adjScores.slice(0, 9).filter(v => v !== null)
@@ -524,7 +524,8 @@ function exportHandicapCSV(event, eventPlayers, allScores, course) {
     }).join(',')
   ).join('\n')
 
-  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' })
+  const BOM = '\uFEFF'
+  const blob = new Blob([BOM + csv], { type: 'text/csv;charset=utf-8;' })
   const url = URL.createObjectURL(blob)
   const link = document.createElement('a')
   const evPart = (event.name ?? `event_${event.event_number}`).replace(/[^a-z0-9]/gi, '_').toLowerCase()
