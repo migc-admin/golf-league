@@ -458,7 +458,6 @@ async function exportScoresCSV(event, eventPlayers, allScores, course, sideGames
 }
 
 function exportHandicapCSV(event, eventPlayers, allScores, course) {
-
   const pars = course?.par_per_hole ?? Array(18).fill(0)
   const sis  = course?.stroke_index ?? Array(18).fill(0)
 
@@ -475,31 +474,26 @@ function exportHandicapCSV(event, eventPlayers, allScores, course) {
       return fa !== 0 ? fa : (a.adjusted_handicap_index ?? 999) - (b.adjusted_handicap_index ?? 999)
     })
 
-  const holeHeaders = Array.from({ length: 18 }, (_, i) => `H${i + 1}`)
-  const headers = ['Player', 'Flight', 'CH', ...holeHeaders, 'Adj F9', 'Adj B9', 'Adj Total', 'Adjustments']
-
-  const parRow = ['Par', '', '', ...pars, pars.slice(0, 9).reduce((a, b) => a + b, 0), pars.slice(9).reduce((a, b) => a + b, 0), pars.reduce((a, b) => a + b, 0), '']
-  const siRow  = ['S.I.', '', '', ...sis, '', '', '', '']
-
-  const dataRows = players.map(ep => {
+  // Build per-player data with capped hole flags
+  const playerRows = players.map(ep => {
     const ch = parseInt(ep.course_handicap) || parseInt(ep.adjusted_handicap_index) || 0
     const scores = scoreMap[ep.player_id] ?? {}
     const pName = [ep.player?.first_name, ep.player?.last_name].filter(Boolean).join(' ')
     const playerSis = getStrokeIndexForTee(course, ep.tee)
 
-    const adjScores = []
-    const cappedHoles = []
+    const adjScores = []   // adjusted score per hole (or null)
+    const capped    = []   // true if that hole was capped
 
     for (let h = 0; h < 18; h++) {
       const gross = scores[h + 1] ?? null
-      if (gross === null) { adjScores.push(null); continue }
+      if (gross === null) { adjScores.push(null); capped.push(false); continue }
       const full = Math.floor(ch / 18)
       const rem  = ch % 18
       const strokes = full + (playerSis[h] <= rem ? 1 : 0)
       const cap = pars[h] + 2 + strokes
       const adj = Math.min(gross, cap)
       adjScores.push(adj)
-      if (adj < gross) cappedHoles.push(`H${h + 1}:${gross}->${adj}`)
+      capped.push(adj < gross)
     }
 
     const f9Vals = adjScores.slice(0, 9).filter(v => v !== null)
@@ -507,29 +501,89 @@ function exportHandicapCSV(event, eventPlayers, allScores, course) {
     const adjF9  = f9Vals.length === 9 ? f9Vals.reduce((a, b) => a + b, 0) : ''
     const adjB9  = b9Vals.length === 9 ? b9Vals.reduce((a, b) => a + b, 0) : ''
     const adjTot = adjF9 !== '' && adjB9 !== '' ? adjF9 + adjB9 : ''
+    const adjNotes = Array.from({ length: 18 }, (_, h) => {
+      const gross = scores[h + 1] ?? null
+      return capped[h] && gross !== null ? `H${h + 1}:${gross}->${adjScores[h]}` : null
+    }).filter(Boolean).join(', ')
 
-    return [
-      pName, ep.flight ?? '', ch,
-      ...adjScores.map(v => v ?? ''),
-      adjF9, adjB9, adjTot,
-      cappedHoles.join(', ') || '',
-    ]
+    return { pName, flight: ep.flight ?? '', ch, adjScores, capped, adjF9, adjB9, adjTot, adjNotes }
   })
 
-  const allRows = [headers, parRow, siRow, ...dataRows]
-  const csv = allRows.map(row =>
-    row.map(cell => {
-      const s = String(cell ?? '')
-      return s.includes(',') || s.includes('"') || s.includes('\n') ? `"${s.replace(/"/g, '""')}"` : s
-    }).join(',')
-  ).join('\n')
+  // Build HTML table so Excel renders cell colors
+  const GRN  = '#1B4332'
+  const GOLD = '#C9A84C'
+  const AMBER_BG = '#FEF3C7'
+  const AMBER_FG = '#92400E'
 
-  const BOM = '\uFEFF'
-  const blob = new Blob([BOM + csv], { type: 'text/csv;charset=utf-8;' })
+  function th(text, bg = GRN, color = '#fff', align = 'center') {
+    return `<th style="background:${bg};color:${color};font-weight:bold;text-align:${align};padding:4px 6px;border:1px solid #aaa;white-space:nowrap">${text}</th>`
+  }
+  function td(text, bg = '#fff', color = '#111', bold = false, align = 'center') {
+    return `<td style="background:${bg};color:${color};font-weight:${bold ? 'bold' : 'normal'};text-align:${align};padding:3px 5px;border:1px solid #ddd;white-space:nowrap">${text ?? ''}</td>`
+  }
+
+  const holeNums = Array.from({ length: 18 }, (_, i) => i + 1)
+  const headerRow = `<tr>
+    ${th('Player', GRN, '#fff', 'left')}
+    ${th('Flight')}${th('CH')}
+    ${holeNums.map(h => th(`H${h}`, '#2D6A4F')).join('')}
+    ${th('Adj F9', '#1a3d2a')}${th('Adj B9', '#1a3d2a')}${th('Adj Total', '#1a3d2a')}
+    ${th('Adjustments', GRN, GOLD, 'left')}
+  </tr>`
+
+  const parRowHtml = `<tr>
+    ${td('Par', '#f0f4f2', GRN, true, 'left')}
+    ${td('', '#f0f4f2')}${td('', '#f0f4f2')}
+    ${pars.map(p => td(p, '#f0f4f2', GRN)).join('')}
+    ${td(pars.slice(0,9).reduce((a,b)=>a+b,0), '#f0f4f2', GRN, true)}
+    ${td(pars.slice(9).reduce((a,b)=>a+b,0), '#f0f4f2', GRN, true)}
+    ${td(pars.reduce((a,b)=>a+b,0), '#f0f4f2', GRN, true)}
+    ${td('', '#f0f4f2')}
+  </tr>`
+
+  const siRowHtml = `<tr>
+    ${td('S.I.', '#3a5a4a', '#cde', true, 'left')}
+    ${td('', '#3a5a4a')}${td('', '#3a5a4a')}
+    ${sis.map(s => td(s, '#3a5a4a', '#cde')).join('')}
+    ${td('', '#3a5a4a')}${td('', '#3a5a4a')}${td('', '#3a5a4a')}${td('', '#3a5a4a')}
+  </tr>`
+
+  const dataHtml = playerRows.map((r, i) => {
+    const rowBg = i % 2 === 0 ? '#fff' : '#f7f7f5'
+    const holeCells = r.adjScores.map((adj, h) => {
+      if (adj === null) return td('', rowBg)
+      return r.capped[h]
+        ? td(adj, AMBER_BG, AMBER_FG, true)
+        : td(adj, rowBg)
+    }).join('')
+    return `<tr>
+      ${td(r.pName, rowBg, '#111', true, 'left')}
+      ${td(r.flight, rowBg)}${td(r.ch, rowBg)}
+      ${holeCells}
+      ${td(r.adjF9, '#e8f0e8', GRN, true)}
+      ${td(r.adjB9, '#e8f0e8', GRN, true)}
+      ${td(r.adjTot, '#dceee6', GRN, true)}
+      ${td(r.adjNotes || '', rowBg, '#555', false, 'left')}
+    </tr>`
+  }).join('')
+
+  const evPart = (event.name ?? `event_${event.event_number}`).replace(/[^a-z0-9]/gi, '_').toLowerCase()
+  const eventDate = event.event_date ?? ''
+
+  const html = `
+    <html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel" xmlns="http://www.w3.org/TR/REC-html40">
+    <head><meta charset="UTF-8">
+    <style>body{font-family:Arial,sans-serif;font-size:11px}table{border-collapse:collapse}</style>
+    </head><body>
+    <h3 style="color:${GRN};margin-bottom:4px">${event.name ?? `Event #${event.event_number}`} — Handicap Entry</h3>
+    <p style="color:#666;font-size:10px;margin-top:0">${eventDate} · Amber = score capped for handicap purposes</p>
+    <table>${headerRow}${parRowHtml}${siRowHtml}${dataHtml}</table>
+    </body></html>`
+
+  const blob = new Blob([html], { type: 'application/vnd.ms-excel;charset=utf-8;' })
   const url = URL.createObjectURL(blob)
   const link = document.createElement('a')
-  const evPart = (event.name ?? `event_${event.event_number}`).replace(/[^a-z0-9]/gi, '_').toLowerCase()
-  link.download = `handicap_entry_${evPart}.csv`
+  link.download = `handicap_entry_${evPart}.xls`
   link.href = url
   link.click()
   URL.revokeObjectURL(url)
@@ -1181,8 +1235,8 @@ function TabPostRound({ event, eventPlayers, allScores, course, sideGames, orgNa
         </div>
         <div className="flex items-center justify-between border-t border-gray-200 pt-3">
           <div>
-            <div className="text-sm font-medium text-gray-800">Handicap Entry (CSV)</div>
-            <div className="text-xs text-gray-400 mt-0.5">USGA adjusted scores per hole for handicap posting</div>
+            <div className="text-sm font-medium text-gray-800">Handicap Entry (Excel)</div>
+            <div className="text-xs text-gray-400 mt-0.5">USGA adjusted scores per hole — amber cells indicate capped scores</div>
           </div>
           <Button size="sm" variant="secondary" onClick={() => exportHandicapCSV(event, eventPlayers, allScores, course)}>
             Download
