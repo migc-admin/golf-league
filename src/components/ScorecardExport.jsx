@@ -992,11 +992,11 @@ function buildSkinsGrid({ event, course, flightPlayers, allScores, flight, orgNa
   hr.appendChild(mkTh('Skins'))
   hr.appendChild(mkTh('Win $'))
   frontGroup.forEach(({ hole }) => hr.appendChild(mkTh(hole, { bg: '#2D6A4F' })))
-  hr.appendChild(mkTh('Out',    { bg: '#1a3d2a' }))
-  hr.appendChild(mkTh('Out Net',{ bg: '#1a3d2a' }))
+  hr.appendChild(mkTh('Out Net', { bg: '#1a3d2a' }))
+  hr.appendChild(mkTh('Out Grs', { bg: '#1a3d2a' }))
   backGroup.forEach(({ hole })  => hr.appendChild(mkTh(hole, { bg: '#2D6A4F' })))
-  hr.appendChild(mkTh('In',     { bg: '#1a3d2a' }))
-  hr.appendChild(mkTh('In Net', { bg: '#1a3d2a' }))
+  hr.appendChild(mkTh('In Net',  { bg: '#1a3d2a' }))
+  hr.appendChild(mkTh('In Grs',  { bg: '#1a3d2a' }))
   hr.appendChild(mkTh('Grs',      { bg: '#1a3d2a' }))
   hr.appendChild(mkTh('HC',       { bg: '#1a3d2a' }))
   hr.appendChild(mkTh('Net Scr',  { bg: '#1a3d2a' }))
@@ -1019,6 +1019,23 @@ function buildSkinsGrid({ event, course, flightPlayers, allScores, flight, orgNa
   siRow.appendChild(mkTd('', { bg: '#3a5a4a' }))
   siRow.appendChild(mkTd('', { bg: '#3a5a4a' }))
   tbl.appendChild(siRow)
+
+  // Par row
+  const parRow = document.createElement('tr')
+  parRow.appendChild(mkTd('Par', { bg: '#f0f4f2', color: GREEN, align: 'left', bold: true, fs: '9px' }))
+  parRow.appendChild(mkTd('', { bg: '#f0f4f2' }))
+  parRow.appendChild(mkTd('', { bg: '#f0f4f2' }))
+  frontGroup.forEach(({ par }) => parRow.appendChild(mkTd(par, { bg: '#f0f4f2', color: GREEN, fs: '9px' })))
+  parRow.appendChild(mkTd(pars.slice(0,9).reduce((a,b)=>a+b,0), { bg: '#f0f4f2', color: GREEN, bold: true, fs: '9px' }))
+  parRow.appendChild(mkTd('', { bg: '#f0f4f2' }))
+  backGroup.forEach(({ par }) => parRow.appendChild(mkTd(par, { bg: '#f0f4f2', color: GREEN, fs: '9px' })))
+  parRow.appendChild(mkTd(pars.slice(9).reduce((a,b)=>a+b,0), { bg: '#f0f4f2', color: GREEN, bold: true, fs: '9px' }))
+  parRow.appendChild(mkTd('', { bg: '#f0f4f2' }))
+  parRow.appendChild(mkTd(pars.reduce((a,b)=>a+b,0), { bg: '#f0f4f2', color: GREEN, bold: true, fs: '9px' }))
+  parRow.appendChild(mkTd('', { bg: '#f0f4f2' }))
+  parRow.appendChild(mkTd('', { bg: '#f0f4f2' }))
+  parRow.appendChild(mkTd('', { bg: '#f0f4f2' }))
+  tbl.appendChild(parRow)
 
   // Carryover row — shows how many skins were carrying into each hole
   const carryoverRow = document.createElement('tr')
@@ -1077,20 +1094,20 @@ function buildSkinsGrid({ event, course, flightPlayers, allScores, flight, orgNa
     tr.appendChild(mkTd(skinsWon > 0 ? `$${winAmt.toFixed(0)}` : '', { bg: skinsWon > 0 ? '#eaf4ea' : rowBg, bold: skinsWon > 0, color: skinsWon > 0 ? SKIN_COLOR : '#111' }))
 
     frontGroup.forEach(({ hole }) => {
-      const gross = grossByHole[hole]
-      const won   = skinWinnerByHole[hole] === ep.player_id
-      tr.appendChild(mkTd(gross ?? '', { bg: won ? SKIN_BG : rowBg, bold: won, color: won ? SKIN_COLOR : '#111' }))
+      const net  = pd.netByHole[hole]
+      const won  = skinWinnerByHole[hole] === ep.player_id
+      tr.appendChild(mkTd(net ?? '', { bg: won ? SKIN_BG : rowBg, bold: won, color: won ? SKIN_COLOR : '#111' }))
     })
+    tr.appendChild(mkTd(frontNet || '', { bg: '#dceee6', bold: true, color: GREEN }))
     tr.appendChild(mkTd(frontGross || '', { bg: '#e8f0e8', bold: true }))
-    tr.appendChild(mkTd(frontNet   || '', { bg: '#dceee6', bold: true, color: GREEN }))
 
     backGroup.forEach(({ hole }) => {
-      const gross = grossByHole[hole]
-      const won   = skinWinnerByHole[hole] === ep.player_id
-      tr.appendChild(mkTd(gross ?? '', { bg: won ? SKIN_BG : rowBg, bold: won, color: won ? SKIN_COLOR : '#111' }))
+      const net  = pd.netByHole[hole]
+      const won  = skinWinnerByHole[hole] === ep.player_id
+      tr.appendChild(mkTd(net ?? '', { bg: won ? SKIN_BG : rowBg, bold: won, color: won ? SKIN_COLOR : '#111' }))
     })
+    tr.appendChild(mkTd(backNet || '', { bg: '#dceee6', bold: true, color: GREEN }))
     tr.appendChild(mkTd(backGross || '', { bg: '#e8f0e8', bold: true }))
-    tr.appendChild(mkTd(backNet   || '', { bg: '#dceee6', bold: true, color: GREEN }))
     tr.appendChild(mkTd(totalGross || '', { bg: '#e8f0e8', bold: true }))
     tr.appendChild(mkTd(ch || '—', { bg: '#e8f0e8' }))
     tr.appendChild(mkTd(net !== '' ? net : '', { bg: '#dceee6', bold: true, color: GREEN }))
@@ -1104,7 +1121,7 @@ function buildSkinsGrid({ event, course, flightPlayers, allScores, flight, orgNa
   // Footer
   const footer = el('div', { marginTop: '10px' })
   footer.appendChild(txt(
-    `Green highlight = hole where player won a skin. Net scores use course handicap; unresolved carryover after hole 18 awarded to first skin winner of the round.`,
+    `Hole scores shown are NET (gross minus handicap strokes). Green highlight = skin winner. Carryover row shows skins accumulated into that hole. Unresolved carryover after H18 awarded to first skin winner of the round.`,
     { fontSize: '9px', color: '#888', display: 'block' }
   ))
   footer.appendChild(txt(
