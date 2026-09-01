@@ -1177,7 +1177,7 @@ export function ExportResultsButton({ event, eventPlayers, allScores, course, si
       const dataUrl = await toPng(pageEl, {
         pixelRatio: 2,
         cacheBust: true,
-        backgroundColor: '#f5f0e8',
+        backgroundColor: '#ffffff',
       })
 
       const link = document.createElement('a')
@@ -1278,7 +1278,7 @@ function buildResultsCard({ event, eventPlayers, allScores, course, sideGames, o
   // ── Wrapper ──────────────────────────────────────────────────────
   const wrap = el('div', {
     width: RES_W + 'px',
-    background: BONE_BG,
+    background: '#ffffff',
     fontFamily: FONT,
     padding: RES_PAD + 'px',
     boxSizing: 'border-box',
@@ -1287,22 +1287,22 @@ function buildResultsCard({ event, eventPlayers, allScores, course, sideGames, o
   // ── Header ───────────────────────────────────────────────────────
   const header = el('div', {
     background: GREEN,
-    borderRadius: '12px',
-    padding: '14px 20px',
+    borderRadius: '8px',
+    padding: '10px 16px',
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'space-between',
     marginBottom: '16px',
   })
   const hLeft = el('div', {})
-  hLeft.appendChild(txt(orgName ?? 'Scorify Golf', { color: GOLD, fontSize: '18px', fontWeight: '800', display: 'block', letterSpacing: '0.02em' }))
-  hLeft.appendChild(txt(`Event #${event.event_number} — Tournament Results`, { color: 'rgba(255,255,255,0.9)', fontSize: '13px', display: 'block', marginTop: '3px' }))
-  hLeft.appendChild(txt(`${course.name ?? ''} · ${eventDate}`, { color: 'rgba(255,255,255,0.55)', fontSize: '11px', display: 'block', marginTop: '3px' }))
+  hLeft.appendChild(txt(orgName ?? 'Scorify Golf', { color: GOLD, fontSize: '16px', fontWeight: '700', display: 'block' }))
+  hLeft.appendChild(txt(`Event #${event.event_number} · Tournament Results`, { color: 'rgba(255,255,255,0.85)', fontSize: '12px', display: 'block', marginTop: '3px' }))
+  hLeft.appendChild(txt(`${course.name ?? ''} · ${eventDate}`, { color: 'rgba(255,255,255,0.6)', fontSize: '10px', display: 'block', marginTop: '3px' }))
   header.appendChild(hLeft)
   if (orgLogoUrl) {
     const logoImg = document.createElement('img')
     logoImg.src = orgLogoUrl
-    logoImg.style.cssText = `width:56px;height:56px;border-radius:50%;object-fit:cover;border:2px solid ${GOLD}`
+    logoImg.style.cssText = `width:52px;height:52px;border-radius:50%;object-fit:cover;border:2px solid ${GOLD}`
     header.appendChild(logoImg)
   }
   wrap.appendChild(header)
@@ -1938,7 +1938,7 @@ export function ExportTeamPlayButton({ event, eventPlayers, allScores, course, t
       const dataUrl = await toPng(pageEl, {
         pixelRatio: 2,
         cacheBust: true,
-        backgroundColor: '#f5f0e8',
+        backgroundColor: '#ffffff',
       })
 
       const link = document.createElement('a')
@@ -2016,34 +2016,33 @@ function buildTeamPlayCard({ event, eventPlayers, allScores, course, tglTeams, t
   // ── Outer wrapper ────────────────────────────────────────────────
   const wrap = el('div', {
     width: `${W}px`, fontFamily: FONT,
-    background: BONE, padding: `${PAD_CARD}px`,
+    background: '#ffffff', padding: `${PAD_CARD}px`,
     boxSizing: 'border-box',
   })
 
   // ── Header ───────────────────────────────────────────────────────
   const hdr = el('div', {
-    display: 'flex', alignItems: 'center', gap: '16px',
-    marginBottom: '20px', paddingBottom: '16px',
-    borderBottom: `3px solid ${GOLD}`,
+    background: GREEN, borderRadius: '8px', padding: '10px 16px',
+    display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+    marginBottom: '16px',
   })
+  const hdrText = el('div', {})
+  hdrText.appendChild(txt(orgName ?? event.league?.name ?? '', {
+    display: 'block', fontSize: '16px', fontWeight: '700', color: GOLD,
+  }))
+  hdrText.appendChild(txt(`Event #${event.event_number} · Team Play Results`, {
+    display: 'block', fontSize: '12px', color: 'rgba(255,255,255,0.85)', marginTop: '3px',
+  }))
+  hdrText.appendChild(txt(`${course?.name ?? ''} · ${eventDate}`, {
+    display: 'block', fontSize: '10px', color: 'rgba(255,255,255,0.6)', marginTop: '3px',
+  }))
+  hdr.appendChild(hdrText)
   if (orgLogoUrl) {
     const logo = document.createElement('img')
     logo.src = orgLogoUrl
-    Object.assign(logo.style, { width: '52px', height: '52px', borderRadius: '50%', objectFit: 'cover', flexShrink: '0' })
+    logo.style.cssText = `width:52px;height:52px;border-radius:50%;object-fit:cover;border:2px solid ${GOLD}`
     hdr.appendChild(logo)
   }
-  const hdrText = el('div', { flex: '1' })
-  hdrText.appendChild(txt(orgName ?? event.league?.name ?? '', {
-    display: 'block', fontSize: '13px', fontWeight: '700',
-    color: GOLD, textTransform: 'uppercase', letterSpacing: '0.06em',
-  }))
-  hdrText.appendChild(txt(event.name ?? `Event #${event.event_number}`, {
-    display: 'block', fontSize: '22px', fontWeight: '800', color: GREEN, lineHeight: '1.15',
-  }))
-  hdrText.appendChild(txt(`Team Play Results · ${eventDate}`, {
-    display: 'block', fontSize: '12px', color: '#6b7280', marginTop: '2px',
-  }))
-  hdr.appendChild(hdrText)
   wrap.appendChild(hdr)
 
   // ── Teams ─────────────────────────────────────────────────────────
