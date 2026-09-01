@@ -222,6 +222,11 @@ export default function EventDetail() {
           <Link to={`/${orgSlug}/${event.league?.slug}/${event.slug}/leaderboard`} className="btn-secondary btn-sm btn">
             Leaderboard ↗
           </Link>
+          {event.league?.org_id === '5c7121f0-6a05-4222-9787-25245008f1da' && (
+            <a href={`/wager/${event.id}/board`} target="_blank" rel="noopener noreferrer" className="btn-secondary btn-sm btn">
+              Wager Board ↗
+            </a>
+          )}
           <EventStatusControl event={event} onUpdated={load} />
         </div>
       </div>
