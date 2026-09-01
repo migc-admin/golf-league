@@ -167,22 +167,32 @@ export default function WagerAdmin() {
       const bestNet    = allSorted[0][1]
       const topPlayers = allSorted.filter(([, net]) => net === bestNet).map(([id]) => id)
 
-      // WIN: which top players had WIN bets?
-      const winBetPlayers = topPlayers.filter(id => winTotals[id] != null)
-      if (winBetPlayers.length > 0) {
-        const perShare = Math.floor((winPool / winBetPlayers.length) * 100) / 100
-        winResults = { winners: winBetPlayers, net: bestNet, perShare, matched: true }
-      } else {
-        winResults = { winners: [], net: bestNet, matched: false, topPlayers }
+      // Proportional payout helper:
+      // Each winning bettor receives (their bet / total bet on winning player(s)) × full pool
+      function calcBettorPayouts(pool, bettorRows) {
+        const totalStake = bettorRows.reduce((s, w) => s + parseFloat(w.amount), 0)
+        return bettorRows.map(w => ({
+          name:   w.bettor_name,
+          pid:    w.pick_1st ?? w.pick_2nd,
+          bet:    parseFloat(w.amount),
+          payout: Math.floor((parseFloat(w.amount) / totalStake) * pool * 100) / 100,
+        }))
       }
 
-      // PLACE: same logic independently
-      const placeBetPlayers = topPlayers.filter(id => placeTotals[id] != null)
-      if (placeBetPlayers.length > 0) {
-        const perShare = Math.floor((placePool / placeBetPlayers.length) * 100) / 100
-        placeResults = { winners: placeBetPlayers, net: bestNet, perShare, matched: true }
+      // WIN
+      const winBettors = active.filter(w => w.pick_1st && topPlayers.includes(w.pick_1st))
+      if (winBettors.length > 0) {
+        winResults = { net: bestNet, matched: true, bettors: calcBettorPayouts(winPool, winBettors) }
       } else {
-        placeResults = { winners: [], net: bestNet, matched: false, topPlayers }
+        winResults = { net: bestNet, matched: false, topPlayers }
+      }
+
+      // PLACE
+      const placeBettors = active.filter(w => w.pick_2nd && topPlayers.includes(w.pick_2nd))
+      if (placeBettors.length > 0) {
+        placeResults = { net: bestNet, matched: true, bettors: calcBettorPayouts(placePool, placeBettors) }
+      } else {
+        placeResults = { net: bestNet, matched: false, topPlayers }
       }
     }
   }
@@ -359,16 +369,27 @@ export default function WagerAdmin() {
                 if (res.matched) {
                   return (
                     <div key={label} style={{ background: bg, border: `1px solid ${border}`, borderRadius: 10, padding: '12px 14px' }}>
-                      <div style={{ fontSize: 11, fontWeight: 700, color, marginBottom: 6 }}>{label} · Low net {res.net}</div>
-                      {res.winners.map(id => (
-                        <div key={id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
-                          <span style={{ fontSize: 14, fontWeight: 700, color: '#111' }}>{playerName(id)}</span>
-                          <span style={{ fontSize: 14, fontWeight: 900, color }}>{fmt(res.perShare)}</span>
-                        </div>
-                      ))}
-                      {res.winners.length > 1 && (
-                        <div style={{ fontSize: 11, color: '#9ca3af', marginTop: 4 }}>Split {res.winners.length} ways · {fmt(res.perShare)} each</div>
-                      )}
+                      <div style={{ fontSize: 11, fontWeight: 700, color, marginBottom: 8 }}>{label} · Low net {res.net} · {res.bettors.length} winner{res.bettors.length !== 1 ? 's' : ''}</div>
+                      <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
+                        <thead>
+                          <tr style={{ borderBottom: `1px solid ${border}` }}>
+                            <th style={{ textAlign: 'left', padding: '4px 0', color, fontWeight: 700 }}>Bettor</th>
+                            <th style={{ textAlign: 'left', padding: '4px 0', color, fontWeight: 700 }}>Picked</th>
+                            <th style={{ textAlign: 'right', padding: '4px 0', color, fontWeight: 700 }}>Bet</th>
+                            <th style={{ textAlign: 'right', padding: '4px 0', color, fontWeight: 700 }}>Payout</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {res.bettors.map((b, i) => (
+                            <tr key={i} style={{ borderBottom: `1px solid ${border}` }}>
+                              <td style={{ padding: '6px 0', fontWeight: 700, color: '#111' }}>{b.name}</td>
+                              <td style={{ padding: '6px 0', color: '#374151' }}>{playerName(b.pid)}</td>
+                              <td style={{ padding: '6px 0', textAlign: 'right', color: '#6b7280' }}>{fmt(b.bet)}</td>
+                              <td style={{ padding: '6px 0', textAlign: 'right', fontWeight: 900, color }}>{fmt(b.payout)}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
                     </div>
                   )
                 }
