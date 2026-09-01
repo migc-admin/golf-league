@@ -3405,11 +3405,13 @@ function TabSideGames({ event, eventPlayers, course, sideGames, sideGameEntries 
   }
 
   function getWinner(gameType, holeNumber, flight) {
-    return sideGames.find(g =>
+    const record = sideGames.find(g =>
       g.game_type === gameType
       && g.hole_number === (holeNumber ?? null)
       && (flight ? g.flight === flight : true)
-    )?.winner_player_id ?? ''
+    )
+    if (!record) return ''
+    return record.winner_player_id ?? 'NO_WINNER'
   }
 
   const sides      = event.side_game_options ?? []
