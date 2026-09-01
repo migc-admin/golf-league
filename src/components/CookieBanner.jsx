@@ -94,7 +94,6 @@ export default function CookieBanner() {
         {/* Header */}
         <div className="px-6 pt-5 pb-4 border-b" style={{ borderColor: '#ebe9e4' }}>
           <div className="flex items-center gap-2 mb-1">
-            <span className="text-lg">🍪</span>
             <h2 className="font-bold text-gray-900 text-base">Cookie Preferences</h2>
           </div>
           <p className="text-sm text-gray-500 leading-relaxed">

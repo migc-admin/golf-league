@@ -234,7 +234,6 @@ export default function Wager() {
         {/* Betting closed */}
         {getBettingClosedReason(event) && (
           <div style={{ background: '#fff', borderRadius: 14, border: '1px solid #e5e7eb', padding: '28px 20px', textAlign: 'center' }}>
-            <div style={{ fontSize: 22, marginBottom: 8 }}>⛳</div>
             <div style={{ fontSize: 15, fontWeight: 700, color: '#374151', marginBottom: 6 }}>Betting is closed</div>
             <div style={{ fontSize: 13, color: '#9ca3af' }}>{getBettingClosedReason(event)}</div>
           </div>
@@ -365,7 +364,6 @@ export default function Wager() {
         {/* Confirmation */}
         {!getBettingClosedReason(event) && submitted && (
           <div style={{ background: '#fff', borderRadius: 14, border: '1px solid #e5e7eb', padding: 20, textAlign: 'center' }}>
-            <div style={{ fontSize: 28, marginBottom: 8 }}>✓</div>
             <div style={{ fontSize: 16, fontWeight: 700, color: GREEN, marginBottom: 4 }}>Bet Submitted!</div>
             <div style={{ fontSize: 13, color: '#6b7280', marginBottom: 16 }}>Good luck, {bettorName}.</div>
 

@@ -466,7 +466,7 @@ function OverviewTab({ event, leaderboardUrl, description, courseAddress, mapsUr
                 fontSize: 12, fontWeight: 600, color: GREEN,
                 background: '#f0fdf4', border: '1px solid #bbf7d0',
                 borderRadius: 20, padding: '5px 12px', whiteSpace: 'nowrap' }}>
-                <span>⛳</span>{comp.name}
+                {comp.name}
                 {comp.sepEntry && (
                   <span style={{ fontSize: 9, fontWeight: 700, background: '#D4AF37', color: '#1B4332', borderRadius: 10, padding: '1px 5px', marginLeft: 2 }}>
                     Sep. Entry
@@ -709,7 +709,6 @@ function GroupList({ eventPlayers, event }) {
   if (sorted.length === 0 || ungrouped.length > 0) {
     return (
       <div style={{ textAlign: 'center', paddingTop: 80, paddingBottom: 80 }}>
-        <div style={{ fontSize: 44, marginBottom: 12 }}>⛳</div>
         <div style={{ fontSize: 17, fontWeight: 700, color: '#111827', marginBottom: 6 }}>Pairings not posted yet</div>
         <div style={{ fontSize: 14, color: '#86868b' }}>Check back closer to the event.</div>
       </div>

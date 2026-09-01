@@ -370,7 +370,6 @@ export default function LeagueHome({ orgSlug, leagueSlug, initialTab = 'events' 
               {/* Money list */}
               {standings.length === 0 ? (
                 <div className="bg-white border rounded-xl p-10 text-center">
-                  <div className="text-4xl mb-3">🏆</div>
                   <p className="text-gray-500 font-medium">No earnings data yet</p>
                   <p className="text-sm text-gray-400 mt-1">Standings are calculated from completed events with payout configurations.</p>
                 </div>

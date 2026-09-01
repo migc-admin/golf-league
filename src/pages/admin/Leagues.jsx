@@ -104,7 +104,6 @@ export default function Leagues() {
         </div>
       ) : leagues.length === 0 ? (
         <Card className="text-center py-16">
-          <div className="text-4xl mb-3">🏌️</div>
           <p className="text-ink-muted font-medium">No leagues yet</p>
           <Button className="mt-4" onClick={() => setLeagueModal(true)}>Create First League</Button>
         </Card>

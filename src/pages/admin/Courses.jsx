@@ -199,7 +199,6 @@ export default function Courses() {
         </div>
       ) : courses.length === 0 ? (
         <Card className="text-center py-12">
-          <div className="text-4xl mb-3">🏌️</div>
           <p className="text-gray-500 font-medium">No courses yet</p>
           <Button className="mt-4" onClick={() => { setEditing(null); setModal(true) }}>Add Course</Button>
         </Card>
