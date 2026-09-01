@@ -17,6 +17,19 @@ const STEP      = 5
 
 function fmt(n) { return `$${Number(n).toFixed(2)}` }
 
+function isTeeTimePast(event) {
+  if (!event.event_date || !event.start_time) return false
+  const teeTime = new Date(`${event.event_date}T${event.start_time.slice(0, 8)}`)
+  return Date.now() >= teeTime.getTime() - 10 * 60 * 1000
+}
+
+function getBettingClosedReason(event) {
+  if (event.status === 'complete') return 'This event has been completed.'
+  if (isTeeTimePast(event)) return 'Betting closed 10 minutes before tee time.'
+  if (event.wagers_closed) return 'Betting has been closed by the admin.'
+  return null
+}
+
 export default function Wager() {
   const { eventId } = useParams()
 
@@ -219,16 +232,16 @@ export default function Wager() {
         )}
 
         {/* Betting closed */}
-        {event.status === 'complete' && (
+        {getBettingClosedReason(event) && (
           <div style={{ background: '#fff', borderRadius: 14, border: '1px solid #e5e7eb', padding: '28px 20px', textAlign: 'center' }}>
             <div style={{ fontSize: 22, marginBottom: 8 }}>⛳</div>
             <div style={{ fontSize: 15, fontWeight: 700, color: '#374151', marginBottom: 6 }}>Betting is closed</div>
-            <div style={{ fontSize: 13, color: '#9ca3af' }}>This event has been completed. No new bets can be placed.</div>
+            <div style={{ fontSize: 13, color: '#9ca3af' }}>{getBettingClosedReason(event)}</div>
           </div>
         )}
 
         {/* Bet form */}
-        {event.status !== 'complete' && !submitted && (
+        {!getBettingClosedReason(event) && !submitted && (
           <form onSubmit={handleSubmit} style={{ background: '#fff', borderRadius: 14, border: '1px solid #e5e7eb', overflow: 'hidden' }}>
             <div style={{ background: GREEN, padding: '10px 16px' }}>
               <span style={{ color: GOLD, fontWeight: 700, fontSize: 13 }}>Place a Bet</span>
@@ -350,7 +363,7 @@ export default function Wager() {
         )}
 
         {/* Confirmation */}
-        {event.status !== 'complete' && submitted && (
+        {!getBettingClosedReason(event) && submitted && (
           <div style={{ background: '#fff', borderRadius: 14, border: '1px solid #e5e7eb', padding: 20, textAlign: 'center' }}>
             <div style={{ fontSize: 28, marginBottom: 8 }}>✓</div>
             <div style={{ fontSize: 16, fontWeight: 700, color: GREEN, marginBottom: 4 }}>Bet Submitted!</div>
