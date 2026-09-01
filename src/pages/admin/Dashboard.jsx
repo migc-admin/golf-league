@@ -14,6 +14,7 @@ export default function Dashboard() {
   const [stats,         setStats]         = useState(null)
   const [orgSlug,       setOrgSlug]       = useState(null)
   const [loading,       setLoading]       = useState(true)
+  const [loadError,     setLoadError]     = useState(null)
   const [searchParams, setSearchParams]   = useSearchParams()
   const showUpgradeBanner = searchParams.get('upgraded') === 'true'
 
@@ -21,6 +22,7 @@ export default function Dashboard() {
     async function load() {
       if (!user) return
 
+      try {
       const { data: profile } = await supabase
         .from('profiles').select('org_id').eq('id', user.id).single()
       if (!profile?.org_id) { setLoading(false); return }
@@ -30,9 +32,9 @@ export default function Dashboard() {
       if (orgData?.slug) setOrgSlug(orgData.slug)
 
       const [
-        { count: playerCount },
-        { count: eventCount },
-        { data: leagueRows },
+        { count: playerCount, error: e1 },
+        { count: eventCount,  error: e2 },
+        { data: leagueRows,   error: e3 },
       ] = await Promise.all([
         supabase.from('players').select('*', { count: 'exact', head: true }).eq('org_id', profile.org_id),
         supabase.from('events').select('*', { count: 'exact', head: true }),
@@ -42,6 +44,8 @@ export default function Dashboard() {
           .eq('org_id', profile.org_id)
           .order('season_year', { ascending: false }),
       ])
+
+      if (e1 || e2 || e3) throw new Error((e1 || e2 || e3).message)
 
       setStats({ players: playerCount ?? 0, events: eventCount ?? 0, leagues: leagueRows?.length ?? 0 })
 
@@ -64,11 +68,16 @@ export default function Dashboard() {
       }
 
       setLoading(false)
+      } catch (err) {
+        setLoadError('Failed to load dashboard data. Please refresh.')
+        setLoading(false)
+      }
     }
     load()
   }, [user])
 
   if (loading) return <DashboardSkeleton />
+  if (loadError) return <div className="text-center py-16 text-red-600 font-medium">{loadError}</div>
 
   return (
     <div className="space-y-6">

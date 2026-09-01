@@ -17,6 +17,7 @@
     "@sentry/react": "^10.70.0",
     "@supabase/supabase-js": "^2.39.3",
     "canvas-confetti": "^1.9.4",
+    "dompurify": "^3.4.14",
     "framer-motion": "^12.42.2",
     "html-to-image": "^1.11.13",
     "html2canvas": "^1.4.1",

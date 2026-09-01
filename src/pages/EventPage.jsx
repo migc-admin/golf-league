@@ -5,6 +5,7 @@
 
 import { useEffect, useState } from 'react'
 import { useParams, useSearchParams, Link } from 'react-router-dom'
+import DOMPurify from 'dompurify'
 import { supabase } from '../lib/supabase'
 import { useSubdomainOrg } from '../lib/SubdomainContext'
 import Countdown from '../components/Countdown'
@@ -12,7 +13,7 @@ import Marquee from '../components/ui/Marquee'
 
 const GREEN    = '#1B4332'
 const GOLD     = '#D4AF37'
-const MIGC_ORG = '5c7121f0-6a05-4222-9787-25245008f1da'
+const MIGC_ORG = import.meta.env.VITE_MIGC_ORG_ID
 
 const FORMAT_LABELS = {
   net_stroke:          'Net Stroke Play — Overall',
@@ -423,11 +424,14 @@ function OverviewTab({ event, leaderboardUrl, description, courseAddress, mapsUr
           <div style={{ fontSize: 10, fontWeight: 700, color: '#9ca3af', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 10 }}>Event Details</div>
           <p style={{ fontSize: 14, lineHeight: 1.7, color: '#374151', margin: 0 }}
             dangerouslySetInnerHTML={{ __html:
-              description
-                .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
-                .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
-                .replace(/\*(.+?)\*/g, '<em>$1</em>')
-                .replace(/\n/g, '<br/>')
+              DOMPurify.sanitize(
+                description
+                  .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+                  .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+                  .replace(/\*(.+?)\*/g, '<em>$1</em>')
+                  .replace(/\n/g, '<br/>'),
+                { ALLOWED_TAGS: ['strong', 'em', 'br'], ALLOWED_ATTR: [] }
+              )
             }}
           />
         </div>

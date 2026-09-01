@@ -72,6 +72,7 @@ export default function Upgrade() {
         setOrgId(data?.org_id ?? null)
         setLoading(false)
       })
+      .catch(() => setLoading(false))
   }, [user])
 
   function handleSelect(planId) {

@@ -1,5 +1,3 @@
-// Change 1: CardHeader title uses Manrope
-// Change 4: .card shadow updated in index.css
 
 export default function Card({ children, className = '', ...props }) {
   return (

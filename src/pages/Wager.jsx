@@ -9,7 +9,7 @@ import { useEffect, useState } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 
-const MIGC_ORG  = '5c7121f0-6a05-4222-9787-25245008f1da'
+const MIGC_ORG  = import.meta.env.VITE_MIGC_ORG_ID
 const GREEN     = '#1B4332'
 const GOLD      = '#C9A84C'
 const MIN_BET   = 5

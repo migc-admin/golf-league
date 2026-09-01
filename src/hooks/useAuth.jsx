@@ -87,10 +87,10 @@ export function AuthProvider({ children }) {
     return data
   }
 
-  function signOut() {
+  async function signOut() {
     setUser(null)
     setProfile(null)
-    supabase.auth.signOut()
+    await supabase.auth.signOut()
   }
 
   const isAdmin       = profile?.role === 'admin'
