@@ -219,7 +219,13 @@ export default function Wager() {
         )}
 
         {/* Bet form or confirmation */}
-        {!submitted ? (
+        {event.status === 'complete' ? (
+          <div style={{ background: '#fff', borderRadius: 14, border: '1px solid #e5e7eb', padding: '28px 20px', textAlign: 'center' }}>
+            <div style={{ fontSize: 22, marginBottom: 8 }}>⛳</div>
+            <div style={{ fontSize: 15, fontWeight: 700, color: '#374151', marginBottom: 6 }}>Betting is closed</div>
+            <div style={{ fontSize: 13, color: '#9ca3af' }}>This event has been completed. No new bets can be placed.</div>
+          </div>
+        ) : !submitted ? (
           <form onSubmit={handleSubmit} style={{ background: '#fff', borderRadius: 14, border: '1px solid #e5e7eb', overflow: 'hidden' }}>
             <div style={{ background: GREEN, padding: '10px 16px' }}>
               <span style={{ color: GOLD, fontWeight: 700, fontSize: 13 }}>Place a Bet</span>
@@ -375,7 +381,7 @@ export default function Wager() {
               </Link>
             </div>
           </div>
-        )}
+        ) : null}
 
         <p style={{ fontSize: 10, color: '#9ca3af', textAlign: 'center' }}>
           Full pool paid to winner(s). If no one picks the winner, funds roll to the club. Bets are final once submitted.

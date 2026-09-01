@@ -32,8 +32,9 @@ export default function WagerAdmin() {
   const [wagers,        setWagers]        = useState([])
   const [loading,       setLoading]       = useState(true)
   const [error,         setError]         = useState(null)
-  const [acting,        setActing]        = useState(null)   // id being soft-deleted or restored
+  const [acting,        setActing]        = useState(null)
   const [showDeleted,   setShowDeleted]   = useState(false)
+  const [scores,        setScores]        = useState([])   // loaded when event is complete
 
   async function loadData() {
     const { data: ev } = await supabase
@@ -50,11 +51,21 @@ export default function WagerAdmin() {
 
     const { data: eps } = await supabase
       .from('event_players')
-      .select('player_id, player:players(first_name, last_name)')
+      .select('player_id, course_handicap, adjusted_handicap_index, player:players(first_name, last_name)')
       .eq('event_id', eventId)
     setPlayers(eps ?? [])
 
     setWagers(await fetchWagers(eventId))
+
+    // Load scores only for completed events (used to determine winners)
+    if (ev.status === 'complete') {
+      const { data: sc } = await supabase
+        .from('scores')
+        .select('player_id, gross_score')
+        .eq('event_id', eventId)
+      setScores(sc ?? [])
+    }
+
     setLoading(false)
   }
 
@@ -100,6 +111,52 @@ export default function WagerAdmin() {
 
   const active  = wagers.filter(w => !w.deleted_at)
   const deleted = wagers.filter(w =>  w.deleted_at)
+
+  // ── Winner calculation (completed events only) ────────────────────
+  // Net total per player = sum(gross_score) - course_handicap
+  let winResults  = null
+  let placeResults = null
+  if (event.status === 'complete' && scores.length > 0) {
+    // gross totals
+    const grossByPlayer = {}
+    for (const s of scores) {
+      if (s.gross_score != null)
+        grossByPlayer[s.player_id] = (grossByPlayer[s.player_id] ?? 0) + s.gross_score
+    }
+    // net = gross - course_handicap
+    const netByPlayer = {}
+    for (const ep of players) {
+      if (grossByPlayer[ep.player_id] != null) {
+        const ch = ep.course_handicap ?? ep.adjusted_handicap_index ?? 0
+        netByPlayer[ep.player_id] = grossByPlayer[ep.player_id] - ch
+      }
+    }
+
+    const winPlayerIds   = [...new Set(active.filter(w => w.pick_1st).map(w => w.pick_1st))]
+    const placePlayerIds = [...new Set(active.filter(w => w.pick_2nd).map(w => w.pick_2nd))]
+
+    function sortByNet(ids) {
+      return ids
+        .filter(id => netByPlayer[id] != null)
+        .sort((a, b) => netByPlayer[a] - netByPlayer[b])
+    }
+
+    const sortedWin   = sortByNet(winPlayerIds)
+    const sortedPlace = sortByNet(placePlayerIds)
+
+    if (sortedWin.length > 0) {
+      const bestNet  = netByPlayer[sortedWin[0]]
+      const winners  = sortedWin.filter(id => netByPlayer[id] === bestNet)
+      const perShare = Math.floor((winPool / winners.length) * 100) / 100
+      winResults = { winners, net: bestNet, perShare }
+    }
+    if (sortedPlace.length > 0) {
+      const bestNet  = netByPlayer[sortedPlace[0]]
+      const winners  = sortedPlace.filter(id => netByPlayer[id] === bestNet)
+      const perShare = Math.floor((placePool / winners.length) * 100) / 100
+      placeResults = { winners, net: bestNet, perShare }
+    }
+  }
 
   // Pool math — active only
   const winPool   = active.filter(w => w.pick_1st).reduce((s, w) => s + parseFloat(w.amount), 0)
@@ -239,6 +296,43 @@ export default function WagerAdmin() {
                 })}
               </tbody>
             </table>
+          </div>
+        )}
+
+        {/* Results — completed events only */}
+        {event.status === 'complete' && (winResults || placeResults) && (
+          <div style={{ background: '#fff', borderRadius: 14, border: '1px solid #e5e7eb', overflow: 'hidden' }}>
+            <div style={{ background: GREEN, padding: '10px 16px' }}>
+              <span style={{ color: GOLD, fontWeight: 700, fontSize: 13 }}>Wager Results</span>
+              <span style={{ color: 'rgba(255,255,255,0.55)', fontSize: 11, marginLeft: 8 }}>Based on low net score</span>
+            </div>
+            <div style={{ padding: '14px 16px', display: 'flex', flexDirection: 'column', gap: 10 }}>
+              {[
+                { label: 'WIN Pool', res: winResults, color: '#16a34a', bg: '#f0fdf4', border: '#bbf7d0' },
+                { label: 'PLACE Pool', res: placeResults, color: '#1d4ed8', bg: '#eff6ff', border: '#bfdbfe' },
+              ].map(({ label, res, color, bg, border }) => res && (
+                <div key={label} style={{ background: bg, border: `1px solid ${border}`, borderRadius: 10, padding: '12px 14px' }}>
+                  <div style={{ fontSize: 11, fontWeight: 700, color, marginBottom: 6 }}>{label} · Net {res.net}</div>
+                  {res.winners.map(id => (
+                    <div key={id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
+                      <span style={{ fontSize: 14, fontWeight: 700, color: '#111' }}>{playerName(id)}</span>
+                      <span style={{ fontSize: 14, fontWeight: 900, color }}>{fmt(res.perShare)}</span>
+                    </div>
+                  ))}
+                  {res.winners.length > 1 && (
+                    <div style={{ fontSize: 11, color: '#9ca3af', marginTop: 4 }}>
+                      Pool split {res.winners.length} ways · {fmt(res.perShare)} each
+                    </div>
+                  )}
+                </div>
+              ))}
+              {(!winResults || winResults.winners.length === 0) && (
+                <div style={{ fontSize: 12, color: '#9ca3af' }}>WIN pool: no bets matched — funds roll to the club.</div>
+              )}
+              {(!placeResults || placeResults.winners.length === 0) && (
+                <div style={{ fontSize: 12, color: '#9ca3af' }}>PLACE pool: no bets matched — funds roll to the club.</div>
+              )}
+            </div>
           </div>
         )}
 
