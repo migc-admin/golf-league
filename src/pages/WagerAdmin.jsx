@@ -119,9 +119,9 @@ export default function WagerAdmin() {
     setWagers(await fetchWagers(eventId))
   }
 
-  if (authLoading || loading) return <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'sans-serif', color: '#6b7280' }}>Loading…</div>
-  if (!isAdmin) return <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'sans-serif', flexDirection: 'column', gap: 8 }}><div style={{ fontSize: 18, fontWeight: 700, color: '#dc2626' }}>Access Denied</div><div style={{ fontSize: 13, color: '#6b7280' }}>Admin login required.</div><a href="/login" style={{ marginTop: 12, fontSize: 13, fontWeight: 600, color: GREEN }}>Sign in →</a></div>
-  if (error) return <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'sans-serif', color: '#dc2626' }}>{error}</div>
+  if (authLoading || loading) return <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: "'Schibsted Grotesk', sans-serif", color: '#6b7280' }}>Loading…</div>
+  if (!isAdmin) return <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: "'Schibsted Grotesk', sans-serif", flexDirection: 'column', gap: 8 }}><div style={{ fontSize: 18, fontWeight: 700, color: '#dc2626' }}>Access Denied</div><div style={{ fontSize: 13, color: '#6b7280' }}>Admin login required.</div><a href="/login" style={{ marginTop: 12, fontSize: 13, fontWeight: 600, color: GREEN }}>Sign in →</a></div>
+  if (error) return <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: "'Schibsted Grotesk', sans-serif", color: '#dc2626' }}>{error}</div>
 
   const active  = wagers.filter(w => !w.deleted_at)
   const deleted = wagers.filter(w =>  w.deleted_at)
@@ -340,7 +340,7 @@ export default function WagerAdmin() {
   )
 
   return (
-    <div style={{ minHeight: '100vh', background: '#f9f8f5', fontFamily: 'Arial, Helvetica, sans-serif' }}>
+    <div style={{ minHeight: '100vh', background: '#f9f8f5', fontFamily: "'Schibsted Grotesk', sans-serif" }}>
       {/* Header */}
       <div style={{ background: GREEN, padding: '14px 20px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
         <div>
