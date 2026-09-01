@@ -72,6 +72,18 @@ export default function Wager() {
       setLoading(false)
     }
     load()
+
+    // Poll every 15 seconds so deletes and new bets appear without a manual refresh
+    async function refreshWagers() {
+      const { data: ws } = await supabase
+        .from('wagers')
+        .select('*')
+        .eq('event_id', eventId)
+        .order('created_at')
+      setWagers(ws ?? [])
+    }
+    const interval = setInterval(refreshWagers, 15000)
+    return () => clearInterval(interval)
   }, [eventId])
 
   // ── Odds computation ─────────────────────────────────────────────

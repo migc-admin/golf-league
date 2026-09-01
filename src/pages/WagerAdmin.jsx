@@ -52,7 +52,14 @@ export default function WagerAdmin() {
     setLoading(false)
   }
 
-  useEffect(() => { loadData() }, [eventId])
+  useEffect(() => {
+    loadData()
+    const interval = setInterval(async () => {
+      const { data: ws } = await supabase.from('wagers').select('*').eq('event_id', eventId).order('created_at')
+      setWagers(ws ?? [])
+    }, 15000)
+    return () => clearInterval(interval)
+  }, [eventId])
 
   function playerName(pid) {
     if (!pid) return '—'
