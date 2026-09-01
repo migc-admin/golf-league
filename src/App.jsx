@@ -34,6 +34,8 @@ import RefundPolicy   from './pages/RefundPolicy'
 import Terms          from './pages/Terms'
 import DisputeTemplate from './pages/admin/DisputeTemplate'
 import Roadmap        from './pages/Roadmap'
+import Wager          from './pages/Wager'
+import WagerAdmin     from './pages/WagerAdmin'
 
 function OrgRouteWrapper({ children }) {
   const { orgSlug } = useParams()
@@ -97,6 +99,10 @@ export default function App() {
           <Route path=":orgSlug/:leagueSlug"            element={<OrgRouteWrapper><Leagues /></OrgRouteWrapper>} />
           <Route path=":orgSlug/:leagueSlug/:eventSlug" element={<OrgRouteWrapper><EventDetail /></OrgRouteWrapper>} />
         </Route>
+
+        {/* Wager board — public, MIGC-only */}
+        <Route path="/wager/:eventId"       element={<Wager />} />
+        <Route path="/wager/:eventId/board" element={<WagerAdmin />} />
 
         {/* Join via access code — no auth required */}
         <Route path="/join/:eventId" element={<ScorecardJoin />} />

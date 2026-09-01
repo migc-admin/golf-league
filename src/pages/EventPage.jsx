@@ -10,8 +10,9 @@ import { useSubdomainOrg } from '../lib/SubdomainContext'
 import Countdown from '../components/Countdown'
 import Marquee from '../components/ui/Marquee'
 
-const GREEN = '#1B4332'
-const GOLD  = '#D4AF37'
+const GREEN    = '#1B4332'
+const GOLD     = '#D4AF37'
+const MIGC_ORG = '5c7121f0-6a05-4222-9787-25245008f1da'
 
 const FORMAT_LABELS = {
   net_stroke:          'Net Stroke Play — Overall',
@@ -72,7 +73,7 @@ export default function EventPage() {
         if (directEventId) {
           const { data } = await supabase
             .from('events')
-            .select('*, course:courses(name, address), league:leagues(name, season_year, slug, logo_url)')
+            .select('*, course:courses(name, address), league:leagues(name, season_year, slug, logo_url, org_id)')
             .eq('id', directEventId).single()
           ev = data
         } else {
@@ -80,7 +81,7 @@ export default function EventPage() {
           if (!league) { setLoading(false); return }
           const { data } = await supabase
             .from('events')
-            .select('*, course:courses(name, address), league:leagues(name, season_year, slug, logo_url)')
+            .select('*, course:courses(name, address), league:leagues(name, season_year, slug, logo_url, org_id)')
             .eq('league_id', league.id).eq('slug', eventSlug).single()
           ev = data
         }
@@ -284,7 +285,7 @@ export default function EventPage() {
       <div style={{ maxWidth: 1100, margin: '0 auto', width: '100%', padding: 'clamp(20px,4vw,32px) clamp(16px,4vw,40px)', flex: 1, boxSizing: 'border-box' }}>
 
         {activeTab === 'overview' && (
-          <OverviewTab event={event} leaderboardUrl={leaderboardUrl} description={description} courseAddress={courseAddress} mapsUrl={mapsUrl} />
+          <OverviewTab event={event} leaderboardUrl={leaderboardUrl} description={description} courseAddress={courseAddress} mapsUrl={mapsUrl} eventId={eid} />
         )}
 
         {activeTab === 'pairings' && (
@@ -375,7 +376,7 @@ function SponsorBar({ sponsors }) {
 }
 
 // ─── Overview Tab ─────────────────────────────────────────────────────────────
-function OverviewTab({ event, leaderboardUrl, description, courseAddress, mapsUrl }) {
+function OverviewTab({ event, leaderboardUrl, description, courseAddress, mapsUrl, eventId }) {
   const scheduleItems = (event.schedule_items ?? []).filter(s => s.label?.trim())
   const customCompetitions = (event.custom_competitions ?? []).filter(c => c?.trim())
   const formats = (event.formats ?? (event.format ? [event.format] : []))
@@ -396,8 +397,26 @@ function OverviewTab({ event, leaderboardUrl, description, courseAddress, mapsUr
     ...customCompetitions.map(name => ({ name, sepEntry: false })),
   ]
 
+  const isMIGC = event.league?.org_id === MIGC_ORG
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+
+      {isMIGC && eventId && (
+        <a
+          href={`/wager/${eventId}`}
+          style={{
+            display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+            background: GREEN, borderRadius: 14, padding: '16px 20px', textDecoration: 'none',
+          }}
+        >
+          <div>
+            <div style={{ color: '#C9A84C', fontWeight: 800, fontSize: 15 }}>🎰 Place a Bet</div>
+            <div style={{ color: 'rgba(255,255,255,0.7)', fontSize: 12, marginTop: 2 }}>Parimutuel wager board · Venmo or cash</div>
+          </div>
+          <div style={{ color: '#C9A84C', fontWeight: 900, fontSize: 20 }}>→</div>
+        </a>
+      )}
 
       {description && (
         <div style={{ background: '#fff', borderRadius: 16, padding: '20px 24px', border: '1px solid #e5e7eb' }}>
