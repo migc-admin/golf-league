@@ -1259,7 +1259,7 @@ function buildResultsCard({ event, eventPlayers, allScores, course, sideGames, o
       if (!catAmt[baseKey]) catAmt[baseKey] = {}
       catAmt[baseKey][cat.playerId] = cat.amount
     } else if (cat.isTied && cat.playerIds?.length > 1) {
-      const split = Math.round(cat.amount / cat.playerIds.length)
+      const split = Math.floor((cat.amount / cat.playerIds.length) * 100) / 100
       if (!catAmt[cat.key]) catAmt[cat.key] = {}
       cat.playerIds.forEach(pid => { catAmt[cat.key][pid] = split })
     } else {
@@ -1272,7 +1272,7 @@ function buildResultsCard({ event, eventPlayers, allScores, course, sideGames, o
   function display(pid, categoryKey) {
     const name = playerName(pid)
     const amt = categoryKey ? catAmt[categoryKey]?.[pid] : undefined
-    return amt ? `${name} ($${Math.round(amt)})` : name
+    return amt ? `${name} ($${Number.isInteger(amt) ? amt : amt.toFixed(2)})` : name
   }
 
   // ── Wrapper ──────────────────────────────────────────────────────
@@ -1507,8 +1507,8 @@ function buildAllFormatsTable(scoringFormats, formatLabels, leaderboards, flight
   const leaderKeyMap = { net_stroke: 'full', net_stroke_front9: 'front9', net_stroke_back9: 'back9' }
   const fmtPrefixMap = { net_stroke: '18_net', net_stroke_front9: 'f9', net_stroke_back9: 'b9' }
 
-  const SCORE_LABELS = ['Out', 'In', 'Putts']
-  const colsPerFlight = 1 + SCORE_LABELS.length  // player + Out + In + Putts
+  const SCORE_LABELS = ['Out', 'In']
+  const colsPerFlight = 1 + SCORE_LABELS.length  // player + Out + In
   const totalCols = 1 + flights.length * colsPerFlight
 
   const tbl = document.createElement('table')
@@ -1591,30 +1591,67 @@ function buildAllFormatsTable(scoringFormats, formatLabels, leaderboards, flight
         const tied = list.filter(p => p.rank === rank)
         const entry = tied[0] ?? null
 
-        // Player name cell
-        const tdPlayer = document.createElement('td')
-        tdPlayer.style.cssText = `padding:${R_PAD};font-size:${R_FS};color:#111;background:${rowBg};border-bottom:${R_DIV};overflow:hidden;border-left:2px solid #d0ddd0;`
-        if (tied.length === 0) {
-          tdPlayer.style.color = '#ccc'; tdPlayer.textContent = '—'
-        } else if (tied.length === 1) {
-          tdPlayer.textContent = displayFn(tied[0].player_id, rank, fl, fmtPrefix)
-          tdPlayer.style.fontWeight = '700'
-        } else {
-          tdPlayer.innerHTML = tied.map(p => `<strong>${displayFn(p.player_id, rank, fl, fmtPrefix)}</strong>`).join(' <span style="color:#aaa">/</span> ')
-          tdPlayer.style.fontSize = '11px'
-        }
-        tr.appendChild(tdPlayer)
+        if (tied.length <= 1) {
+          // Player name cell
+          const tdPlayer = document.createElement('td')
+          tdPlayer.style.cssText = `padding:${R_PAD};font-size:${R_FS};color:${tied.length === 0 ? '#ccc' : '#111'};background:${rowBg};border-bottom:${R_DIV};overflow:hidden;border-left:2px solid #d0ddd0;font-weight:700;`
+          tdPlayer.textContent = tied.length === 0 ? '—' : displayFn(tied[0].player_id, rank, fl, fmtPrefix)
+          tr.appendChild(tdPlayer)
 
-        // Score cells: Out | In | Putts
-        const scoreVals = getScoreVals(fmt, entry)
-        scoreVals.forEach(val => {
-          const tdScore = document.createElement('td')
-          tdScore.style.cssText = `padding:${R_PAD};font-size:12px;color:${val !== null ? '#374151' : '#d1d5db'};background:${rowBg};border-bottom:${R_DIV};text-align:center;font-weight:600;`
-          tdScore.textContent = val !== null ? String(val) : '—'
-          tr.appendChild(tdScore)
-        })
+          // Score cells: Out | In
+          const scoreVals = getScoreVals(fmt, entry).slice(0, 2)
+          scoreVals.forEach(val => {
+            const tdScore = document.createElement('td')
+            tdScore.style.cssText = `padding:${R_PAD};font-size:12px;color:${val !== null ? '#374151' : '#d1d5db'};background:${rowBg};border-bottom:${R_DIV};text-align:center;font-weight:600;`
+            tdScore.textContent = val !== null ? String(val) : '—'
+            tr.appendChild(tdScore)
+          })
+        } else {
+          // First tied player in this row
+          const first = tied[0]
+          const tdPlayer = document.createElement('td')
+          tdPlayer.style.cssText = `padding:${R_PAD};font-size:${R_FS};color:#111;background:${rowBg};border-bottom:none;overflow:hidden;border-left:2px solid #d0ddd0;font-weight:700;`
+          tdPlayer.textContent = displayFn(first.player_id, rank, fl, fmtPrefix)
+          tr.appendChild(tdPlayer)
+          const scoreVals = getScoreVals(fmt, entry).slice(0, 2)
+          scoreVals.forEach(val => {
+            const tdScore = document.createElement('td')
+            tdScore.style.cssText = `padding:${R_PAD};font-size:12px;color:${val !== null ? '#374151' : '#d1d5db'};background:${rowBg};border-bottom:none;text-align:center;font-weight:600;`
+            tdScore.textContent = val !== null ? String(val) : '—'
+            tr.appendChild(tdScore)
+          })
+        }
       })
       tbody.appendChild(tr)
+
+      // Extra rows for additional tied players (one per tied player after the first)
+      const maxExtra = Math.max(...flights.map(fl => Math.max(0, (lb[fl] ?? []).filter(p => p.rank === rank).length - 1)))
+      for (let extra = 1; extra <= maxExtra; extra++) {
+        const extraTr = document.createElement('tr')
+        const tdLabel = document.createElement('td')
+        tdLabel.style.cssText = `padding:${R_PAD};background:${rowBg};border-bottom:${R_DIV};`
+        tdLabel.textContent = ''
+        extraTr.appendChild(tdLabel)
+
+        flights.forEach(fl => {
+          const tied = (lb[fl] ?? []).filter(p => p.rank === rank)
+          const player = tied[extra] ?? null
+          const entry = tied[0] ?? null
+          const tdPlayer = document.createElement('td')
+          tdPlayer.style.cssText = `padding:${R_PAD};font-size:${R_FS};color:${player ? '#111' : 'transparent'};background:${rowBg};border-bottom:${R_DIV};overflow:hidden;border-left:2px solid #d0ddd0;font-weight:700;`
+          tdPlayer.textContent = player ? displayFn(player.player_id, rank, fl, fmtPrefix) : ''
+          extraTr.appendChild(tdPlayer)
+          const scoreVals = getScoreVals(fmt, player ? entry : null).slice(0, 2)
+          scoreVals.forEach(val => {
+            const tdScore = document.createElement('td')
+            tdScore.style.cssText = `padding:${R_PAD};font-size:12px;color:#d1d5db;background:${rowBg};border-bottom:${R_DIV};text-align:center;`
+            tdScore.textContent = '—'
+            tr.appendChild(tdScore)
+            extraTr.appendChild(tdScore.cloneNode(true))
+          })
+        })
+        tbody.appendChild(extraTr)
+      }
     }
   })
 
@@ -1631,9 +1668,9 @@ function buildAllFormatsTableFullField(scoringFormats, formatLabels, leaderboard
   const tbl = document.createElement('table')
   tbl.style.cssText = 'width:100%;border-collapse:collapse;font-size:12px;table-layout:fixed;'
 
-  // 5-column layout: Result | Player | Out | In | Putts
+  // 4-column layout: Result | Player | Out | In
   const cg = document.createElement('colgroup')
-  ;[18, 46, 12, 12, 12].forEach(pct => {
+  ;[18, 52, 15, 15].forEach(pct => {
     const c = document.createElement('col'); c.style.width = pct + '%'; cg.appendChild(c)
   })
   tbl.appendChild(cg)
@@ -1641,7 +1678,7 @@ function buildAllFormatsTableFullField(scoringFormats, formatLabels, leaderboard
   // Header row
   const thead = document.createElement('thead')
   const hr = document.createElement('tr')
-  ;['Result', 'Player', 'Out', 'In', 'Putts'].forEach((h, i) => {
+  ;['Result', 'Player', 'Out', 'In'].forEach((h, i) => {
     const th = document.createElement('th')
     th.style.cssText = `padding:7px 14px;text-align:${i <= 1 ? 'left' : 'center'};background:#e4ede4;color:${GREEN};font-size:${R_LABEL};font-weight:800;border-bottom:${R_DIV};letter-spacing:0.04em;text-transform:uppercase;`
     th.textContent = h
@@ -1662,36 +1699,44 @@ function buildAllFormatsTableFullField(scoringFormats, formatLabels, leaderboard
     // Format label spanning all 5 cols
     const fmtTr = document.createElement('tr')
     const fmtTd = document.createElement('td')
-    fmtTd.colSpan = 5
+    fmtTd.colSpan = 4
     fmtTd.style.cssText = `padding:7px 14px;background:rgba(27,67,50,0.06);border-top:${fmtIdx > 0 ? '2px solid #d0ddd0' : 'none'};border-bottom:${R_DIV};font-size:11px;font-weight:800;color:${GREEN};text-transform:uppercase;letter-spacing:0.07em;`
     fmtTd.textContent = formatLabels[fmt]
     fmtTr.appendChild(fmtTd)
     tbody.appendChild(fmtTr)
 
-    items.forEach((item, idx) => {
-      const tr = document.createElement('tr')
-      const rowBg = idx % 2 === 0 ? R_ODD : R_EVEN
+    // Group items by rank so tied players each get their own row
+    const rankGroups = {}
+    items.forEach(item => { if (!rankGroups[item.rank]) rankGroups[item.rank] = []; rankGroups[item.rank].push(item) })
+    const ranks = [...new Set(items.map(i => i.rank))].sort((a, b) => a - b)
 
-      const tdRank = document.createElement('td')
-      tdRank.style.cssText = `padding:${R_PAD};font-size:12px;font-weight:700;color:#374151;background:${rowBg};border-bottom:${R_DIV};`
-      tdRank.textContent = RANK_LABELS[item.rank - 1] ?? `${item.rank}th Place`
+    ranks.forEach((rank, rankIdx) => {
+      const tied = rankGroups[rank]
+      tied.forEach((item, tiedIdx) => {
+        const tr = document.createElement('tr')
+        const rowBg = rankIdx % 2 === 0 ? R_ODD : R_EVEN
 
-      const tdName = document.createElement('td')
-      tdName.style.cssText = `padding:${R_PAD};font-size:${R_FS};font-weight:700;color:#111;background:${rowBg};border-bottom:${R_DIV};`
-      tdName.textContent = displayFn(item.player_id, item.rank, fmtPrefix)
+        const tdRank = document.createElement('td')
+        tdRank.style.cssText = `padding:${R_PAD};font-size:12px;font-weight:700;color:#374151;background:${rowBg};border-bottom:${tiedIdx === tied.length - 1 ? R_DIV : 'none'};`
+        tdRank.textContent = tiedIdx === 0 ? (RANK_LABELS[rank - 1] ?? `${rank}th Place`) : ''
 
-      tr.appendChild(tdRank)
-      tr.appendChild(tdName)
+        const tdName = document.createElement('td')
+        tdName.style.cssText = `padding:${R_PAD};font-size:${R_FS};font-weight:700;color:#111;background:${rowBg};border-bottom:${tiedIdx === tied.length - 1 ? R_DIV : 'none'};`
+        tdName.textContent = displayFn(item.player_id, item.rank, fmtPrefix)
 
-      const scoreVals = getScoreVals(fmt, item)
-      scoreVals.forEach(val => {
-        const tdScore = document.createElement('td')
-        tdScore.style.cssText = `padding:${R_PAD};font-size:12px;color:${val !== null ? '#374151' : '#d1d5db'};background:${rowBg};border-bottom:${R_DIV};text-align:center;font-weight:600;`
-        tdScore.textContent = val !== null ? String(val) : '—'
-        tr.appendChild(tdScore)
+        tr.appendChild(tdRank)
+        tr.appendChild(tdName)
+
+        const scoreVals = getScoreVals(fmt, item).slice(0, 2)
+        scoreVals.forEach(val => {
+          const tdScore = document.createElement('td')
+          tdScore.style.cssText = `padding:${R_PAD};font-size:12px;color:${val !== null ? '#374151' : '#d1d5db'};background:${rowBg};border-bottom:${tiedIdx === tied.length - 1 ? R_DIV : 'none'};text-align:center;font-weight:600;`
+          tdScore.textContent = val !== null ? String(val) : '—'
+          tr.appendChild(tdScore)
+        })
+
+        tbody.appendChild(tr)
       })
-
-      tbody.appendChild(tr)
     })
   })
 

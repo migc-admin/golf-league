@@ -433,7 +433,7 @@ async function exportScoresCSV(event, eventPlayers, allScores, course, sideGames
   const payoutRows = []
   for (const cat of byCategory) {
     const playerIds = cat.playerIds ?? (cat.playerId ? [cat.playerId] : [])
-    const perPlayer = playerIds.length > 0 ? Math.round((cat.amount / playerIds.length) * 100) / 100 : cat.amount
+    const perPlayer = playerIds.length > 0 ? Math.floor((cat.amount / playerIds.length) * 100) / 100 : cat.amount
     for (const pid of playerIds) {
       const p = playerMap[pid]
       const name = p ? `${p.first_name} ${p.last_name}` : pid
@@ -1229,7 +1229,7 @@ function TabPostRound({ event, eventPlayers, allScores, course, sideGames, orgNa
             <div className="text-sm font-medium text-gray-800">Scores Export (CSV)</div>
             <div className="text-xs text-gray-400 mt-0.5">All player scores, net, gross — one row per player per hole</div>
           </div>
-          <Button size="sm" variant="secondary" onClick={() => exportScoresCSV(event, eventPlayers, allScores, course)}>
+          <Button size="sm" variant="secondary" onClick={() => exportScoresCSV(event, eventPlayers, allScores, course, sideGames)}>
             Download
           </Button>
         </div>
@@ -3378,6 +3378,8 @@ function TabSideGames({ event, eventPlayers, course, sideGames, sideGameEntries 
   const flightB = eventPlayers.filter(ep => ep.flight === 'B')
 
   async function setWinner(gameType, holeNumber, playerId, flight) {
+    const resolvedId = playerId === 'NO_WINNER' ? null : (playerId || null)
+    playerId = resolvedId
     const existing = sideGames.find(
       g => g.game_type === gameType
         && g.hole_number === (holeNumber ?? null)
@@ -3598,7 +3600,8 @@ function SideGameSelect({ players, value, onChange }) {
       onChange={e => onChange(e.target.value)}
       className="input bg-white max-w-xs"
     >
-      <option value="">— No winner yet —</option>
+      <option value="">— Select winner —</option>
+      <option value="NO_WINNER">No Winner</option>
       {players.map(ep => (
         <option key={ep.player_id} value={ep.player_id}>
           {ep.player?.first_name} {ep.player?.last_name}
