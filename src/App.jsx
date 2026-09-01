@@ -100,9 +100,9 @@ export default function App() {
           <Route path=":orgSlug/:leagueSlug/:eventSlug" element={<OrgRouteWrapper><EventDetail /></OrgRouteWrapper>} />
         </Route>
 
-        {/* Wager board — public, MIGC-only */}
+        {/* Wager — public bet page; board is admin-only */}
         <Route path="/wager/:eventId"       element={<Wager />} />
-        <Route path="/wager/:eventId/board" element={<WagerAdmin />} />
+        <Route path="/wager/:eventId/board" element={<ProtectedRoute><WagerAdmin /></ProtectedRoute>} />
 
         {/* Join via access code — no auth required */}
         <Route path="/join/:eventId" element={<ScorecardJoin />} />

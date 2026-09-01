@@ -6,6 +6,7 @@
 import { useEffect, useState } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
+import { useAuth } from '../hooks/useAuth'
 
 const MIGC_ORG = '5c7121f0-6a05-4222-9787-25245008f1da'
 const GREEN    = '#1B4332'
@@ -24,6 +25,7 @@ async function fetchWagers(eventId) {
 
 export default function WagerAdmin() {
   const { eventId } = useParams()
+  const { isAdmin, loading: authLoading } = useAuth()
 
   const [event,         setEvent]         = useState(null)
   const [players,       setPlayers]       = useState([])
@@ -92,7 +94,8 @@ export default function WagerAdmin() {
     setWagers(await fetchWagers(eventId))
   }
 
-  if (loading) return <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'sans-serif', color: '#6b7280' }}>Loading…</div>
+  if (authLoading || loading) return <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'sans-serif', color: '#6b7280' }}>Loading…</div>
+  if (!isAdmin) return <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'sans-serif', color: '#dc2626', flexDirection: 'column', gap: 8 }}><div style={{ fontSize: 18, fontWeight: 700 }}>Access Denied</div><div style={{ fontSize: 13, color: '#6b7280' }}>Admin login required to view this page.</div><a href="/login" style={{ marginTop: 12, fontSize: 13, fontWeight: 600, color: '#1B4332' }}>Sign in →</a></div>
   if (error)   return <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'sans-serif', color: '#dc2626' }}>{error}</div>
 
   const active  = wagers.filter(w => !w.deleted_at)
