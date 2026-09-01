@@ -141,8 +141,8 @@ export default function Wager() {
     const { error: insErr } = await supabase.from('wagers').insert(rows)
     if (insErr) { alert('Error saving bet: ' + insErr.message); setSubmitting(false); return }
 
-    // Reload board
-    const { data: ws } = await supabase.from('wagers').select('*').eq('event_id', eventId).order('created_at')
+    // Reload board (exclude soft-deleted)
+    const { data: ws } = await supabase.from('wagers').select('*').eq('event_id', eventId).is('deleted_at', null).order('created_at')
     setWagers(ws ?? [])
 
     if (payMethod === 'venmo') {
