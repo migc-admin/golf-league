@@ -61,11 +61,12 @@ export default function Wager() {
         .order('flight').order('adjusted_handicap_index')
       setPlayers((eps ?? []).filter(ep => ep.player && typeof ep.player === 'object'))
 
-      // Load live wagers for board
+      // Load live wagers for board (exclude soft-deleted)
       const { data: ws } = await supabase
         .from('wagers')
         .select('*')
         .eq('event_id', eventId)
+        .is('deleted_at', null)
         .order('created_at')
       setWagers(ws ?? [])
 
@@ -79,6 +80,7 @@ export default function Wager() {
         .from('wagers')
         .select('*')
         .eq('event_id', eventId)
+        .is('deleted_at', null)
         .order('created_at')
       setWagers(ws ?? [])
     }
