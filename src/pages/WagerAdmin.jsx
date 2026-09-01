@@ -141,8 +141,12 @@ export default function WagerAdmin() {
   const allPickedIds = [...new Set([...Object.keys(winTotals), ...Object.keys(placeTotals)])]
     .sort((a, b) => ((winTotals[b] ?? 0) + (placeTotals[b] ?? 0)) - ((winTotals[a] ?? 0) + (placeTotals[a] ?? 0)))
 
-  // ── Winner calculation ────────────────────────────────────────────
-  // Find actual low-net winner from all scored players, then check if anyone bet on them.
+  // ── Winner calculation ─────────────────────────────────────────────
+  // WIN:   pays bettors who picked the 1st place (lowest net) finisher
+  // PLACE: North American pari-mutuel — selection must finish 1st OR 2nd.
+  //        Pool is split 50/50 between the 1st-place group and 2nd-place group.
+  //        Each bettor gets their stake back + proportional share of their group's profit half.
+  //        Dead heats: tied players share their group's half proportionally.
   let winResults   = null
   let placeResults = null
 
@@ -160,39 +164,103 @@ export default function WagerAdmin() {
       }
     }
 
-    // All players sorted by net (lowest first)
+    // Sort all scored players by net ascending
     const allSorted = Object.entries(netByPlayer).sort((a, b) => a[1] - b[1])
+    if (allSorted.length === 0) { /* no scores yet */ }
+    else {
+      // 1st place: lowest net (may be multiple tied)
+      const net1 = allSorted[0][1]
+      const place1Players = allSorted.filter(([, n]) => n === net1).map(([id]) => id)
 
-    if (allSorted.length > 0) {
-      const bestNet    = allSorted[0][1]
-      const topPlayers = allSorted.filter(([, net]) => net === bestNet).map(([id]) => id)
-
-      // Proportional payout helper:
-      // Each winning bettor receives (their bet / total bet on winning player(s)) × full pool
-      function calcBettorPayouts(pool, bettorRows) {
-        const totalStake = bettorRows.reduce((s, w) => s + parseFloat(w.amount), 0)
-        return bettorRows.map(w => ({
-          name:   w.bettor_name,
-          pid:    w.pick_1st ?? w.pick_2nd,
-          bet:    parseFloat(w.amount),
-          payout: Math.floor((parseFloat(w.amount) / totalStake) * pool * 100) / 100,
-        }))
+      // 2nd place: next distinct net score (may be multiple tied)
+      // If 2+ players tie for 1st, they occupy both 1st and 2nd — no separate 2nd group
+      const twoWayTieForFirst = place1Players.length >= 2
+      let place2Players = []
+      let net2 = null
+      if (!twoWayTieForFirst) {
+        const secondEntry = allSorted.find(([, n]) => n > net1)
+        if (secondEntry) {
+          net2 = secondEntry[1]
+          place2Players = allSorted.filter(([, n]) => n === net2).map(([id]) => id)
+        }
       }
 
-      // WIN
-      const winBettors = active.filter(w => w.pick_1st && topPlayers.includes(w.pick_1st))
+      // ── WIN pool ──────────────────────────────────────────────────
+      const winBettors = active.filter(w => w.pick_1st && place1Players.includes(w.pick_1st))
       if (winBettors.length > 0) {
-        winResults = { net: bestNet, matched: true, bettors: calcBettorPayouts(winPool, winBettors) }
+        const totalStake = winBettors.reduce((s, w) => s + parseFloat(w.amount), 0)
+        winResults = {
+          net: net1,
+          matched: true,
+          bettors: winBettors.map(w => ({
+            name:   w.bettor_name,
+            pid:    w.pick_1st,
+            bet:    parseFloat(w.amount),
+            payout: Math.floor((parseFloat(w.amount) / totalStake) * winPool * 100) / 100,
+          })),
+        }
       } else {
-        winResults = { net: bestNet, matched: false, topPlayers }
+        winResults = { net: net1, matched: false, topPlayers: place1Players }
       }
 
-      // PLACE
-      const placeBettors = active.filter(w => w.pick_2nd && topPlayers.includes(w.pick_2nd))
-      if (placeBettors.length > 0) {
-        placeResults = { net: bestNet, matched: true, bettors: calcBettorPayouts(placePool, placeBettors) }
+      // ── PLACE pool ────────────────────────────────────────────────
+      // Group 1 = bettors who picked 1st place finisher(s)
+      // Group 2 = bettors who picked 2nd place finisher(s)
+      // (If 2-way tie for 1st, group1 = tied player A bettors, group2 = tied player B bettors)
+      let g1Players, g2Players
+      if (twoWayTieForFirst) {
+        // Two tied players fill 1st and 2nd — treat each tied player as their own group
+        g1Players = [place1Players[0]]
+        g2Players = place1Players.slice(1) // remaining tied players
       } else {
-        placeResults = { net: bestNet, matched: false, topPlayers }
+        g1Players = place1Players
+        g2Players = place2Players
+      }
+
+      const g1Bettors = active.filter(w => w.pick_2nd && g1Players.includes(w.pick_2nd))
+      const g2Bettors = active.filter(w => w.pick_2nd && g2Players.includes(w.pick_2nd))
+      const s1 = g1Bettors.reduce((s, w) => s + parseFloat(w.amount), 0)
+      const s2 = g2Bettors.reduce((s, w) => s + parseFloat(w.amount), 0)
+
+      const hasG1 = g1Bettors.length > 0
+      const hasG2 = g2Bettors.length > 0
+
+      if (!hasG1 && !hasG2) {
+        // Nobody bet on 1st or 2nd place finishers
+        placeResults = {
+          net: net1, net2: twoWayTieForFirst ? net1 : net2,
+          matched: false,
+          topPlayers: [...g1Players, ...g2Players],
+        }
+      } else {
+        // Profit = pool minus stakes returned to both groups
+        const stakesReturned = (hasG1 ? s1 : 0) + (hasG2 ? s2 : 0)
+        const profit = placePool - stakesReturned
+        // Each group gets half the profit (if the other group has no bettors, their half rolls to club)
+        const halfProfit = profit / 2
+
+        function placePayouts(bettors, groupStake, groupHalfProfit) {
+          return bettors.map(w => {
+            const bet = parseFloat(w.amount)
+            const profitShare = groupStake > 0 ? Math.floor((bet / groupStake) * groupHalfProfit * 100) / 100 : 0
+            return {
+              name:   w.bettor_name,
+              pid:    w.pick_2nd,
+              bet,
+              payout: Math.floor((bet + profitShare) * 100) / 100,
+            }
+          })
+        }
+
+        placeResults = {
+          net: net1,
+          net2: twoWayTieForFirst ? net1 : net2,
+          twoWayTie: twoWayTieForFirst,
+          matched: true,
+          g1: { players: g1Players, bettors: hasG1 ? placePayouts(g1Bettors, s1, halfProfit) : [], hasMatch: hasG1 },
+          g2: { players: g2Players, bettors: hasG2 ? placePayouts(g2Bettors, s2, halfProfit) : [], hasMatch: hasG2 },
+          halfRollsToClub: (!hasG1 || !hasG2),
+        }
       }
     }
   }
@@ -204,6 +272,29 @@ export default function WagerAdmin() {
   const eventDate = event.event_date
     ? new Date(event.event_date + 'T00:00:00').toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' })
     : ''
+
+  const BettorTable = ({ bettors, color, border, playerName }) => (
+    <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
+      <thead>
+        <tr style={{ borderBottom: `1px solid ${border}` }}>
+          <th style={{ textAlign: 'left',  padding: '4px 0', color, fontWeight: 700 }}>Bettor</th>
+          <th style={{ textAlign: 'left',  padding: '4px 0', color, fontWeight: 700 }}>Picked</th>
+          <th style={{ textAlign: 'right', padding: '4px 0', color, fontWeight: 700 }}>Stake</th>
+          <th style={{ textAlign: 'right', padding: '4px 0', color, fontWeight: 700 }}>Payout</th>
+        </tr>
+      </thead>
+      <tbody>
+        {bettors.map((b, i) => (
+          <tr key={i} style={{ borderBottom: `1px solid ${border}` }}>
+            <td style={{ padding: '6px 0', fontWeight: 700, color: '#111' }}>{b.name}</td>
+            <td style={{ padding: '6px 0', color: '#374151' }}>{playerName(b.pid)}</td>
+            <td style={{ padding: '6px 0', textAlign: 'right', color: '#6b7280' }}>{fmt(b.bet)}</td>
+            <td style={{ padding: '6px 0', textAlign: 'right', fontWeight: 900, color }}>{fmt(b.payout)}</td>
+          </tr>
+        ))}
+      </tbody>
+    </table>
+  )
 
   const BetRow = ({ w, isDeleted }) => (
     <tr style={{ borderTop: '1px solid #f3f4f6', background: isDeleted ? '#fef2f2' : 'transparent', opacity: isDeleted ? 0.75 : 1 }}>
@@ -360,49 +451,76 @@ export default function WagerAdmin() {
                 {event.status === 'complete' ? 'Final · Low net score' : 'Live · Updates as scores are entered'}
               </span>
             </div>
-            <div style={{ padding: '14px 16px', display: 'flex', flexDirection: 'column', gap: 10 }}>
-              {[
-                { label: 'WIN Pool', res: winResults,   pool: winPool,   color: '#16a34a', bg: '#f0fdf4', border: '#bbf7d0' },
-                { label: 'PLACE Pool', res: placeResults, pool: placePool, color: '#1d4ed8', bg: '#eff6ff', border: '#bfdbfe' },
-              ].map(({ label, res, pool, color, bg, border }) => {
-                if (!res) return null
-                if (res.matched) {
-                  return (
-                    <div key={label} style={{ background: bg, border: `1px solid ${border}`, borderRadius: 10, padding: '12px 14px' }}>
-                      <div style={{ fontSize: 11, fontWeight: 700, color, marginBottom: 8 }}>{label} · Low net {res.net} · {res.bettors.length} winner{res.bettors.length !== 1 ? 's' : ''}</div>
-                      <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
-                        <thead>
-                          <tr style={{ borderBottom: `1px solid ${border}` }}>
-                            <th style={{ textAlign: 'left', padding: '4px 0', color, fontWeight: 700 }}>Bettor</th>
-                            <th style={{ textAlign: 'left', padding: '4px 0', color, fontWeight: 700 }}>Picked</th>
-                            <th style={{ textAlign: 'right', padding: '4px 0', color, fontWeight: 700 }}>Bet</th>
-                            <th style={{ textAlign: 'right', padding: '4px 0', color, fontWeight: 700 }}>Payout</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {res.bettors.map((b, i) => (
-                            <tr key={i} style={{ borderBottom: `1px solid ${border}` }}>
-                              <td style={{ padding: '6px 0', fontWeight: 700, color: '#111' }}>{b.name}</td>
-                              <td style={{ padding: '6px 0', color: '#374151' }}>{playerName(b.pid)}</td>
-                              <td style={{ padding: '6px 0', textAlign: 'right', color: '#6b7280' }}>{fmt(b.bet)}</td>
-                              <td style={{ padding: '6px 0', textAlign: 'right', fontWeight: 900, color }}>{fmt(b.payout)}</td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
-                  )
-                }
-                return (
-                  <div key={label} style={{ background: '#f9fafb', border: '1px solid #e5e7eb', borderRadius: 10, padding: '12px 14px' }}>
-                    <div style={{ fontSize: 11, fontWeight: 700, color: '#9ca3af', marginBottom: 4 }}>{label} · Low net {res.net}</div>
-                    <div style={{ fontSize: 13, color: '#6b7280' }}>
-                      Low net: <strong>{res.topPlayers.map(id => playerName(id)).join(', ')}</strong> — no bets placed on {res.topPlayers.length === 1 ? 'this player' : 'these players'}.
-                    </div>
-                    <div style={{ fontSize: 12, color: '#9ca3af', marginTop: 4 }}>{fmt(pool)} rolls to the club.</div>
+            <div style={{ padding: '14px 16px', display: 'flex', flexDirection: 'column', gap: 12 }}>
+
+              {/* WIN results */}
+              {winResults && (() => {
+                const color = '#16a34a', bg = '#f0fdf4', border = '#bbf7d0'
+                if (winResults.matched) return (
+                  <div style={{ background: bg, border: `1px solid ${border}`, borderRadius: 10, padding: '12px 14px' }}>
+                    <div style={{ fontSize: 11, fontWeight: 700, color, marginBottom: 8 }}>WIN Pool · 1st place net {winResults.net}</div>
+                    <BettorTable bettors={winResults.bettors} color={color} border={border} playerName={playerName} />
                   </div>
                 )
-              })}
+                return (
+                  <div style={{ background: '#f9fafb', border: '1px solid #e5e7eb', borderRadius: 10, padding: '12px 14px' }}>
+                    <div style={{ fontSize: 11, fontWeight: 700, color: '#9ca3af', marginBottom: 4 }}>WIN Pool · 1st place net {winResults.net}</div>
+                    <div style={{ fontSize: 13, color: '#6b7280' }}>Winner: <strong>{winResults.topPlayers.map(id => playerName(id)).join(', ')}</strong> — no WIN bets placed on {winResults.topPlayers.length === 1 ? 'this player' : 'these players'}.</div>
+                    <div style={{ fontSize: 12, color: '#9ca3af', marginTop: 4 }}>{fmt(winPool)} rolls to the club.</div>
+                  </div>
+                )
+              })()}
+
+              {/* PLACE results */}
+              {placeResults && (() => {
+                const color = '#1d4ed8', bg = '#eff6ff', border = '#bfdbfe'
+                if (!placeResults.matched) return (
+                  <div style={{ background: '#f9fafb', border: '1px solid #e5e7eb', borderRadius: 10, padding: '12px 14px' }}>
+                    <div style={{ fontSize: 11, fontWeight: 700, color: '#9ca3af', marginBottom: 4 }}>PLACE Pool · No matched bets</div>
+                    <div style={{ fontSize: 13, color: '#6b7280' }}>1st/2nd: <strong>{placeResults.topPlayers.map(id => playerName(id)).join(', ')}</strong> — no PLACE bets on these players.</div>
+                    <div style={{ fontSize: 12, color: '#9ca3af', marginTop: 4 }}>{fmt(placePool)} rolls to the club.</div>
+                  </div>
+                )
+                return (
+                  <div style={{ background: bg, border: `1px solid ${border}`, borderRadius: 10, padding: '12px 14px' }}>
+                    <div style={{ fontSize: 11, fontWeight: 700, color, marginBottom: 2 }}>
+                      PLACE Pool · {placeResults.twoWayTie ? `Tied for 1st — net ${placeResults.net}` : `1st net ${placeResults.net} · 2nd net ${placeResults.net2}`}
+                    </div>
+                    <div style={{ fontSize: 10, color, marginBottom: 8 }}>Pool split 50/50 between 1st-place and 2nd-place bettors · Each bettor gets stake back + proportional share of profit</div>
+
+                    {/* Group 1 — 1st place */}
+                    {placeResults.g1.hasMatch ? (
+                      <>
+                        <div style={{ fontSize: 11, fontWeight: 700, color: '#374151', margin: '6px 0 4px' }}>
+                          1st place — {placeResults.g1.players.map(id => playerName(id)).join(' / ')}
+                        </div>
+                        <BettorTable bettors={placeResults.g1.bettors} color={color} border={border} playerName={playerName} />
+                      </>
+                    ) : (
+                      <div style={{ fontSize: 12, color: '#9ca3af', margin: '6px 0' }}>
+                        1st place ({placeResults.g1.players.map(id => playerName(id)).join(', ')}) — no PLACE bets · half pool rolls to club.
+                      </div>
+                    )}
+
+                    {/* Group 2 — 2nd place */}
+                    {placeResults.g2.players.length > 0 && (
+                      placeResults.g2.hasMatch ? (
+                        <>
+                          <div style={{ fontSize: 11, fontWeight: 700, color: '#374151', margin: '10px 0 4px' }}>
+                            2nd place — {placeResults.g2.players.map(id => playerName(id)).join(' / ')}
+                          </div>
+                          <BettorTable bettors={placeResults.g2.bettors} color={color} border={border} playerName={playerName} />
+                        </>
+                      ) : (
+                        <div style={{ fontSize: 12, color: '#9ca3af', margin: '6px 0' }}>
+                          2nd place ({placeResults.g2.players.map(id => playerName(id)).join(', ')}) — no PLACE bets · half pool rolls to club.
+                        </div>
+                      )
+                    )}
+                  </div>
+                )
+              })()}
+
             </div>
           </div>
         )}
