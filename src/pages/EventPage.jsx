@@ -380,9 +380,13 @@ function SponsorBar({ sponsors }) {
 function OverviewTab({ event, leaderboardUrl, description, courseAddress, mapsUrl, eventId }) {
   const scheduleItems = (event.schedule_items ?? []).filter(s => s.label?.trim())
   const customCompetitions = (event.custom_competitions ?? []).filter(c => c?.trim())
-  const formats = (event.formats ?? (event.format ? [event.format] : []))
-    .map(k => FORMAT_LABELS[k])
-    .filter(Boolean)
+  // Strip per-flight suffix (e.g. net_stroke_a → net_stroke) before label lookup,
+  // then deduplicate so the same format only appears once in the list.
+  const formats = [...new Set(
+    (event.formats ?? (event.format ? [event.format] : []))
+      .map(k => FORMAT_LABELS[k] ?? FORMAT_LABELS[k.replace(/_[a-z]$/, '')])
+      .filter(Boolean)
+  )]
   const buyIns = event.side_game_buy_ins ?? {}
   const presetGames = (event.side_game_options ?? [])
     .map(k => {
