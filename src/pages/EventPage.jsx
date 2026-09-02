@@ -400,7 +400,7 @@ function OverviewTab({ event, leaderboardUrl, description, courseAddress, mapsUr
     ...formats.map(name => ({ name, sepEntry: false })),
     ...presetGames,
     ...customCompetitions.map(name => ({ name, sepEntry: false })),
-  ]
+  ].sort((a, b) => (a.sepEntry ? 1 : 0) - (b.sepEntry ? 1 : 0))
 
   const isMIGC = event.league?.org_id === MIGC_ORG
 
