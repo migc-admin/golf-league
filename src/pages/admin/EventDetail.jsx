@@ -3081,6 +3081,8 @@ function TabPayoutConfig({ event, eventPlayers, course, onUpdated }) {
 
 function PayoutTable({ rows, onChange, colLabel }) {
   if (rows.length === 0) return <p className="px-4 py-3 text-xs text-gray-400">None</p>
+  const totalPerPlayer = rows.reduce((sum, r) => sum + (r.val || 0), 0)
+  const totalPot       = rows.reduce((sum, r) => sum + r.total, 0)
   return (
     <table className="w-full text-sm">
       <thead>
@@ -3112,6 +3114,14 @@ function PayoutTable({ rows, onChange, colLabel }) {
           </tr>
         ))}
       </tbody>
+      <tfoot>
+        <tr className="border-t border-gray-200 bg-gray-50 text-xs font-semibold text-gray-700">
+          <td className="px-4 py-2">Total</td>
+          <td className="px-3 py-2 tabular-nums">${totalPerPlayer.toFixed(2)} / player</td>
+          <td className="px-3 py-2" />
+          <td className="px-3 py-2 text-right tabular-nums">${totalPot.toFixed(2)}</td>
+        </tr>
+      </tfoot>
     </table>
   )
 }
