@@ -3748,6 +3748,39 @@ function EventStatusControl({ event, onUpdated }) {
 }
 
 // ─── Edit Event Modal ──────────────────────────────────────────────
+
+// Format keys that support per-flight scoring (Overall only — not Front9/Back9/Nassau)
+const PER_FLIGHT_FORMAT_KEYS = new Set(['net_stroke', 'low_gross'])
+
+/** Expand formats + formatScope into the formats array saved to DB */
+function buildFormatsArray(enabledFormats, formatScope, numFlights) {
+  const result = []
+  const letters = Array.from({ length: numFlights }, (_, i) => String.fromCharCode(65 + i))
+  for (const fmt of enabledFormats) {
+    if (numFlights > 0 && PER_FLIGHT_FORMAT_KEYS.has(fmt) && (formatScope[fmt] ?? 'group') === 'flight') {
+      letters.forEach(l => result.push(`${fmt}_${l.toLowerCase()}`))
+    } else {
+      result.push(fmt)
+    }
+  }
+  return result
+}
+
+/** Parse saved formats array back into { formats: Set, formatScope: {} } */
+function parseFormatsArray(arr) {
+  const fmts = new Set()
+  const scope = {}
+  for (const f of arr ?? []) {
+    const m = f.match(/^(.+)_([a-z])$/)
+    if (m && PER_FLIGHT_FORMAT_KEYS.has(m[1])) {
+      fmts.add(m[1]); scope[m[1]] = 'flight'
+    } else {
+      fmts.add(f)
+    }
+  }
+  return { formats: fmts, formatScope: scope }
+}
+
 const EDIT_FORMAT_OPTIONS = [
   { group: 'Net Stroke Play', options: [
     { value: 'net_stroke',        label: 'Net — Overall (18)', tip: 'All 18 holes. Net score = gross minus course handicap. Lowest net wins.' },
@@ -3791,6 +3824,7 @@ function EditEventModal({ open, onClose, event, onSaved }) {
   const [startTime,   setStartTime]   = useState('')
   const [interval,    setInterval]    = useState(10)
   const [formats,      setFormats]      = useState(new Set(['net_stroke']))
+  const [formatScope,  setFormatScope]  = useState({})   // { format_key: 'flight'|'group' }
   const [payoutPlaces, setPayoutPlaces] = useState({})
   const [sideGames,    setSideGames]    = useState(new Set())
   const [gameScope,    setGameScope]    = useState({})
@@ -3826,7 +3860,9 @@ function EditEventModal({ open, onClose, event, onSaved }) {
       setScheduleItems(event.schedule_items ?? [])
       setStartTime(event.start_time ? event.start_time.slice(0, 5) : '')
       setInterval(event.tee_time_interval_mins ?? 10)
-      setFormats(new Set(event.formats?.length ? event.formats : [event.format ?? 'net_stroke']))
+      const parsedFmts = parseFormatsArray(event.formats?.length ? event.formats : [event.format ?? 'net_stroke'])
+      setFormats(parsedFmts.formats)
+      setFormatScope(parsedFmts.formatScope)
       setPayoutPlaces(event.payout_places ?? {})
       const parsed = parseSideGameOptions(event.side_game_options)
       setSideGames(parsed.games)
@@ -3864,7 +3900,7 @@ function EditEventModal({ open, onClose, event, onSaved }) {
     e.preventDefault()
     if (formats.size === 0) return
     setSaving(true)
-    const formatsArr = [...formats]
+    const formatsArr = buildFormatsArray(formats, formatScope, numFlights)
     const { error } = await supabase.from('events')
       .update({
         event_date:             eventDate,
@@ -4115,32 +4151,55 @@ function EditEventModal({ open, onClose, event, onSaved }) {
               <div key={group.group}>
                 <div className="text-xs text-gray-400 font-medium uppercase tracking-wide mb-1.5">{group.group}</div>
                 <div className="space-y-2">
-                  {group.options.map(opt => (
-                    <div key={opt.value} className="flex items-center gap-2.5">
-                      <input type="checkbox" checked={formats.has(opt.value)} onChange={() => toggleFormat(opt.value)} className="accent-fairway-600 w-4 h-4 shrink-0 cursor-pointer" />
-                      <span className="text-sm text-gray-800 cursor-pointer" onClick={() => toggleFormat(opt.value)}>{opt.label}</span>
-                      {opt.tip && (
-                        <span className="relative group/tip shrink-0">
-                          <span className="text-gray-400 hover:text-fairway-600 cursor-default text-xs font-bold select-none">ⓘ</span>
-                          <span className="absolute left-5 top-1/2 -translate-y-1/2 z-50 hidden group-hover/tip:block w-64 bg-gray-900 text-white text-xs rounded-lg px-3 py-2 leading-relaxed shadow-xl pointer-events-none">
-                            {opt.tip}
-                          </span>
-                        </span>
-                      )}
-                      {formats.has(opt.value) && (
-                        <div className="ml-auto flex items-center gap-1.5 shrink-0">
-                          <span className="text-xs text-gray-400">Places to pay:</span>
-                          <select
-                            value={payoutPlaces[opt.value] ?? 1}
-                            onChange={e => setPayoutPlaces(prev => ({ ...prev, [opt.value]: Number(e.target.value) }))}
-                            className="text-xs border border-gray-300 rounded px-1.5 py-0.5 bg-white"
-                          >
-                            {PLACES_OPTIONS.map(n => <option key={n} value={n}>{n}</option>)}
-                          </select>
+                  {group.options.map(opt => {
+                    const isPerFlightEligible = PER_FLIGHT_FORMAT_KEYS.has(opt.value)
+                    const fmtScope = formatScope[opt.value] ?? 'group'
+                    const flightLetters = Array.from({ length: numFlights }, (_, i) => String.fromCharCode(65 + i))
+                    return (
+                      <div key={opt.value}>
+                        <div className="flex items-center gap-2.5">
+                          <input type="checkbox" checked={formats.has(opt.value)} onChange={() => toggleFormat(opt.value)} className="accent-fairway-600 w-4 h-4 shrink-0 cursor-pointer" />
+                          <span className="text-sm text-gray-800 cursor-pointer" onClick={() => toggleFormat(opt.value)}>{opt.label}</span>
+                          {opt.tip && (
+                            <span className="relative group/tip shrink-0">
+                              <span className="text-gray-400 hover:text-fairway-600 cursor-default text-xs font-bold select-none">ⓘ</span>
+                              <span className="absolute left-5 top-1/2 -translate-y-1/2 z-50 hidden group-hover/tip:block w-64 bg-gray-900 text-white text-xs rounded-lg px-3 py-2 leading-relaxed shadow-xl pointer-events-none">
+                                {opt.tip}
+                              </span>
+                            </span>
+                          )}
+                          {formats.has(opt.value) && (
+                            <div className="ml-auto flex items-center gap-1.5 shrink-0">
+                              <span className="text-xs text-gray-400">Places to pay:</span>
+                              <select
+                                value={payoutPlaces[opt.value] ?? 1}
+                                onChange={e => setPayoutPlaces(prev => ({ ...prev, [opt.value]: Number(e.target.value) }))}
+                                className="text-xs border border-gray-300 rounded px-1.5 py-0.5 bg-white"
+                              >
+                                {PLACES_OPTIONS.map(n => <option key={n} value={n}>{n}</option>)}
+                              </select>
+                            </div>
+                          )}
                         </div>
-                      )}
-                    </div>
-                  ))}
+                        {formats.has(opt.value) && isPerFlightEligible && numFlights > 0 && (
+                          <div className="ml-6 mt-1.5 flex gap-4">
+                            <label className="flex items-center gap-1.5 cursor-pointer">
+                              <input type="radio" checked={fmtScope === 'group'}
+                                onChange={() => setFormatScope(prev => ({ ...prev, [opt.value]: 'group' }))}
+                                className="accent-fairway-600" />
+                              <span className="text-xs text-gray-600">Whole group</span>
+                            </label>
+                            <label className="flex items-center gap-1.5 cursor-pointer">
+                              <input type="radio" checked={fmtScope === 'flight'}
+                                onChange={() => setFormatScope(prev => ({ ...prev, [opt.value]: 'flight' }))}
+                                className="accent-fairway-600" />
+                              <span className="text-xs text-gray-600">Per flight ({flightLetters.join(', ')})</span>
+                            </label>
+                          </div>
+                        )}
+                      </div>
+                    )
+                  })}
                 </div>
               </div>
             ))}
