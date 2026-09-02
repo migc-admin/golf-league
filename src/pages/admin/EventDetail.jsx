@@ -3749,8 +3749,8 @@ function EventStatusControl({ event, onUpdated }) {
 
 // ─── Edit Event Modal ──────────────────────────────────────────────
 
-// Format keys that support per-flight scoring (Overall only — not Front9/Back9/Nassau)
-const PER_FLIGHT_FORMAT_KEYS = new Set(['net_stroke', 'low_gross'])
+// Format keys that support per-flight scoring
+const PER_FLIGHT_FORMAT_KEYS = new Set(['net_stroke', 'net_stroke_front9', 'net_stroke_back9', 'low_gross', 'gross_stroke_front9', 'gross_stroke_back9'])
 
 /** Expand formats + formatScope into the formats array saved to DB */
 function buildFormatsArray(enabledFormats, formatScope, numFlights) {

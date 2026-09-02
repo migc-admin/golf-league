@@ -390,7 +390,7 @@ const GROUP_GAMES = [
 const PER_FLIGHT_GAME_KEYS = new Set(PER_FLIGHT_GAMES.map(g => g.key))
 
 // Format keys that support per-flight scoring
-const PER_FLIGHT_FORMAT_KEYS = new Set(['net_stroke', 'low_gross'])
+const PER_FLIGHT_FORMAT_KEYS = new Set(['net_stroke', 'net_stroke_front9', 'net_stroke_back9', 'low_gross', 'gross_stroke_front9', 'gross_stroke_back9'])
 
 function buildFormatsArray(enabledFormats, formatScope, numFlights) {
   const result = []
