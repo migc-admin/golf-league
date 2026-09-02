@@ -3920,7 +3920,7 @@ function EditEventModal({ open, onClose, event, onSaved }) {
         tournament_fee:         tournamentFee !== '' ? Math.round(parseFloat(tournamentFee) * 100) / 100 : null,
         start_time:             startTime || null,
         tee_time_interval_mins: parseInt(interval, 10),
-        format:                 formatsArr[0],
+        format:                 formatsArr[0]?.replace(/_[a-z]$/, '') ?? formatsArr[0],
         formats:                formatsArr,
         side_game_options:      buildSideGameOptions(sideGames, gameScope, numFlights),
         payout_places:          Object.keys(payoutPlaces).length > 0 ? payoutPlaces : null,

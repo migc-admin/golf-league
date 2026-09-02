@@ -248,9 +248,11 @@ export default function Leaderboard() {
             <div className="text-xs text-ink-muted mt-0.5 truncate">
               {event.league?.name} · Event #{event.event_number} · {formatDate(event.event_date)}
             </div>
-            {event.format && event.format !== 'net_stroke' && (
-              <div className="text-xs text-ink-muted mt-0.5">{FORMAT_LABELS[event.format] ?? event.format}</div>
-            )}
+            {event.format && event.format !== 'net_stroke' && (() => {
+              const baseKey = event.format.replace(/_[a-z]$/, '')
+              const label = FORMAT_LABELS[baseKey] ?? FORMAT_LABELS[event.format]
+              return label ? <div className="text-xs text-ink-muted mt-0.5">{label}</div> : null
+            })()}
           </div>
           <div className="flex flex-col items-end gap-1.5 shrink-0">
             <StatusBadge status={event.status} />

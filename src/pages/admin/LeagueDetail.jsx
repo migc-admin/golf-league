@@ -561,7 +561,7 @@ function EventModal({ open, onClose, league, orgTier, onSaved }) {
       entry_fee:              Math.round(parseFloat(entryFee) * 100) / 100,
       payout_basis:           payoutBasis,
       payout_fixed_total:     payoutBasis === 'fixed' ? parseFloat(payoutFixed) || 0 : null,
-      format:                 formatsArr[0],
+      format:                 formatsArr[0]?.replace(/_[a-z]$/, '') ?? formatsArr[0],
       formats:                formatsArr,
       use_flights:            numFlights > 0,
       num_flights:            numFlights > 0 ? numFlights : null,
