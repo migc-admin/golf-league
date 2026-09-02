@@ -130,6 +130,10 @@ function defaultForKey(key) {
  * Build the set of active payout keys for an event based on its formats/side games.
  * Uses num_flights (integer) for number of competitive flights.
  * Uses payout_places (jsonb) for how many places to pay per format.
+ *
+ * Format keys without a flight-letter suffix (e.g. 'net_stroke') indicate
+ * "whole group" scoring. Flight-suffixed keys (e.g. 'net_stroke_a') indicate
+ * per-flight scoring for that specific flight.
  */
 export function activePayoutKeys(event) {
   const formats    = event.formats ?? (event.format ? [event.format] : ['net_stroke'])
@@ -142,41 +146,44 @@ export function activePayoutKeys(event) {
   const payoutPlaces = event.payout_places ?? {}
   const keys = []
 
-  if (formats.includes('net_stroke')) {
-    const places = Math.min(payoutPlaces.net_stroke ?? 3, 3)
-    const placeKeys = Array.from({ length: places }, (_, i) => ['1st','2nd','3rd'][i])
-    if (hasFlights) {
-      flightLetters.forEach(l => placeKeys.forEach(p => keys.push(`18_net_${l}_${p}`)))
-    } else {
-      placeKeys.forEach(p => keys.push(`18_net_${p}`))
-    }
+  // Helper: push ranked keys (e.g. baseKey='18_net_a', placeCount=3 → '18_net_a_1st' etc.)
+  function addRanked(baseKey, placeCount, maxPlaces) {
+    const n = Math.min(placeCount, maxPlaces)
+    Array.from({ length: n }, (_, i) => ['1st','2nd','3rd'][i]).forEach(p => keys.push(`${baseKey}_${p}`))
   }
-  if (formats.includes('low_gross')) {
-    const places = Math.min(payoutPlaces.low_gross ?? 3, 3)
-    const placeKeys = Array.from({ length: places }, (_, i) => ['1st','2nd','3rd'][i])
-    if (hasFlights) {
-      flightLetters.forEach(l => placeKeys.forEach(p => keys.push(`18_gross_${l}_${p}`)))
-    } else {
-      placeKeys.forEach(p => keys.push(`18_gross_${p}`))
+
+  for (const fmt of formats) {
+    // Net Stroke Play — Full 18
+    if (fmt === 'net_stroke') {
+      // Whole-group (no flight letter): always use full-field keys
+      addRanked('18_net', payoutPlaces.net_stroke ?? 3, 3)
+    } else if (/^net_stroke_[a-z]$/.test(fmt)) {
+      // Per-flight: one format key per flight letter
+      addRanked(`18_net_${fmt.slice(-1)}`, payoutPlaces.net_stroke ?? 3, 3)
     }
-  }
-  if (formats.includes('net_stroke_front9')) {
-    const places = Math.min(payoutPlaces.net_stroke_front9 ?? 2, 2)
-    const placeKeys = Array.from({ length: places }, (_, i) => ['1st','2nd'][i])
-    if (hasFlights) {
-      flightLetters.forEach(l => placeKeys.forEach(p => keys.push(`f9_${l}_${p}`)))
-    } else {
-      placeKeys.forEach(p => keys.push(`f9_${p}`))
+
+    // Low Gross — Full 18
+    else if (fmt === 'low_gross') {
+      addRanked('18_gross', payoutPlaces.low_gross ?? 3, 3)
+    } else if (/^low_gross_[a-z]$/.test(fmt)) {
+      addRanked(`18_gross_${fmt.slice(-1)}`, payoutPlaces.low_gross ?? 3, 3)
     }
-  }
-  if (formats.includes('net_stroke_back9')) {
-    const places = Math.min(payoutPlaces.net_stroke_back9 ?? 2, 2)
-    const placeKeys = Array.from({ length: places }, (_, i) => ['1st','2nd'][i])
-    if (hasFlights) {
-      flightLetters.forEach(l => placeKeys.forEach(p => keys.push(`b9_${l}_${p}`)))
-    } else {
-      placeKeys.forEach(p => keys.push(`b9_${p}`))
+
+    // Net Front 9
+    else if (fmt === 'net_stroke_front9') {
+      addRanked('f9', payoutPlaces.net_stroke_front9 ?? 2, 2)
+    } else if (/^net_stroke_front9_[a-z]$/.test(fmt)) {
+      addRanked(`f9_${fmt.slice(-1)}`, payoutPlaces.net_stroke_front9 ?? 2, 2)
     }
+
+    // Net Back 9
+    else if (fmt === 'net_stroke_back9') {
+      addRanked('b9', payoutPlaces.net_stroke_back9 ?? 2, 2)
+    } else if (/^net_stroke_back9_[a-z]$/.test(fmt)) {
+      addRanked(`b9_${fmt.slice(-1)}`, payoutPlaces.net_stroke_back9 ?? 2, 2)
+    }
+
+    // Gross Front 9 / Gross Back 9 — scoring only, no dedicated payout keys
   }
 
   // Skins — any flight letter or whole-group (from side_game_options)

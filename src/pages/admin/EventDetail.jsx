@@ -3757,7 +3757,7 @@ function buildFormatsArray(enabledFormats, formatScope, numFlights) {
   const result = []
   const letters = Array.from({ length: numFlights }, (_, i) => String.fromCharCode(65 + i))
   for (const fmt of enabledFormats) {
-    if (numFlights > 0 && PER_FLIGHT_FORMAT_KEYS.has(fmt) && (formatScope[fmt] ?? 'group') === 'flight') {
+    if (numFlights > 0 && PER_FLIGHT_FORMAT_KEYS.has(fmt) && (formatScope[fmt] ?? 'flight') === 'flight') {
       letters.forEach(l => result.push(`${fmt}_${l.toLowerCase()}`))
     } else {
       result.push(fmt)
@@ -4153,7 +4153,7 @@ function EditEventModal({ open, onClose, event, onSaved }) {
                 <div className="space-y-2">
                   {group.options.map(opt => {
                     const isPerFlightEligible = PER_FLIGHT_FORMAT_KEYS.has(opt.value)
-                    const fmtScope = formatScope[opt.value] ?? 'group'
+                    const fmtScope = formatScope[opt.value] ?? 'flight'
                     const flightLetters = Array.from({ length: numFlights }, (_, i) => String.fromCharCode(65 + i))
                     return (
                       <div key={opt.value}>
