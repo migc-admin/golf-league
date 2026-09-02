@@ -205,10 +205,16 @@ export default function Leaderboard() {
   })()
 
   const playerMap  = Object.fromEntries(eventPlayers.map(ep => [ep.player_id, ep.player]))
-  // Derive active flight letters from players actually assigned, sorted alphabetically
-  const flightLetters = [...new Set(
+  // Derive flight letters from player assignments first, fall back to event.num_flights config
+  const assignedFlights = [...new Set(
     eventPlayers.filter(ep => !ep.is_guest && ep.flight).map(ep => ep.flight)
   )].sort()
+  const numFlightsConfig = event?.num_flights ?? (event?.use_flights ? 2 : 0)
+  const flightLetters = assignedFlights.length > 0
+    ? assignedFlights
+    : numFlightsConfig > 0
+      ? Array.from({ length: numFlightsConfig }, (_, i) => String.fromCharCode(65 + i))
+      : []
   const hasFlights = flightLetters.length > 0
 
   const pageTitle = event
