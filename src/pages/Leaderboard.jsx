@@ -22,7 +22,9 @@ const ALL_TABS = ['18-Hole', 'Front 9', 'Back 9', 'Low Gross', 'Stableford', 'Sc
 
 function visibleTabs(event, hasTGL = false) {
   if (!event) return ALL_TABS
-  const formats  = event.formats ?? (event.format ? [event.format] : ['net_stroke'])
+  const rawFormats = event.formats ?? (event.format ? [event.format] : ['net_stroke'])
+  // Normalise: strip per-flight suffix so 'net_stroke_a' matches 'net_stroke'
+  const formats  = rawFormats.map(k => k.replace(/_[a-z]$/, ''))
   const sideOpts = event.side_game_options ?? []
   return ALL_TABS.filter(tab => {
     if (tab === 'Payouts')       return event.status === 'complete'
