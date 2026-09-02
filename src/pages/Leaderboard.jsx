@@ -205,7 +205,11 @@ export default function Leaderboard() {
   })()
 
   const playerMap  = Object.fromEntries(eventPlayers.map(ep => [ep.player_id, ep.player]))
-  const hasFlights = eventPlayers.some(ep => !ep.is_guest && (ep.flight === 'A' || ep.flight === 'B'))
+  // Derive active flight letters from players actually assigned, sorted alphabetically
+  const flightLetters = [...new Set(
+    eventPlayers.filter(ep => !ep.is_guest && ep.flight).map(ep => ep.flight)
+  )].sort()
+  const hasFlights = flightLetters.length > 0
 
   const pageTitle = event
     ? `${event.league?.name ?? ''} — ${event.name ?? `Event #${event.event_number}`} Leaderboard | Scorify Golf`
@@ -298,7 +302,7 @@ export default function Leaderboard() {
       {/* Flight toggle — only shown when flights are in use */}
       {hasFlights && !['Low Putts', 'Skins', 'Match Points', 'Team Match', 'Payouts', 'Scramble'].includes(activeTab) && (
         <div className="max-w-2xl mx-auto px-4 pt-4 flex gap-2">
-          {['A', 'B'].map(f => (
+          {flightLetters.map(f => (
             <button
               key={f}
               onClick={() => setActiveFlight(f)}
@@ -306,9 +310,7 @@ export default function Leaderboard() {
               aria-pressed={activeFlight === f}
               className={`px-4 py-1.5 rounded-full text-sm font-semibold transition-colors cursor-pointer ${
                 activeFlight === f
-                  ? f === 'A'
-                    ? 'bg-blue-50 text-blue-700'
-                    : 'bg-purple-50 text-purple-700'
+                  ? ['bg-blue-50 text-blue-700', 'bg-purple-50 text-purple-700', 'bg-emerald-50 text-emerald-700', 'bg-amber-50 text-amber-700'][flightLetters.indexOf(f)] ?? 'bg-gray-100 text-gray-700'
                   : 'text-ink-muted hover:text-ink hover:bg-surface-high'
               }`}
             >
