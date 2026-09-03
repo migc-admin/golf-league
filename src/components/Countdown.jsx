@@ -31,23 +31,22 @@ export default function Countdown({ targetDate, label = 'Countdown to First Tee 
 
   return (
     <div style={{
-      display: 'flex', alignItems: 'center', gap: 14,
-      background: GREEN, borderRadius: 14, padding: '14px 20px',
+      background: GREEN, borderRadius: 14, padding: '12px 16px',
       marginBottom: 20,
     }}>
       {label && (
-        <div style={{ fontSize: 11, fontWeight: 700, color: 'rgba(255,255,255,0.6)', textTransform: 'uppercase', letterSpacing: '0.08em', flexShrink: 0 }}>
+        <div style={{ fontSize: 10, fontWeight: 700, color: 'rgba(255,255,255,0.6)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 10, textAlign: 'center' }}>
           {label}
         </div>
       )}
-      <div style={{ display: 'flex', gap: 10, marginLeft: 'auto' }}>
+      <div style={{ display: 'flex', gap: 8, justifyContent: 'center' }}>
         <Unit value={remaining.days}    label="Days"    />
         <Sep />
         <Unit value={remaining.hours}   label="Hours"   />
         <Sep />
-        <Unit value={remaining.minutes} label="Minutes" />
+        <Unit value={remaining.minutes} label="Min"     />
         <Sep />
-        <Unit value={remaining.seconds} label="Seconds" />
+        <Unit value={remaining.seconds} label="Sec"     />
       </div>
     </div>
   )

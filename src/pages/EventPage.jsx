@@ -148,13 +148,6 @@ export default function EventPage() {
       {/* ── Hero ──────────────────────────────────────────────────────────────── */}
       <div style={{ background: '#fff', borderBottom: '1px solid #e5e7eb' }}>
 
-        {/* Cover photo — mobile only, centered contained */}
-        {coverImage && (
-          <div className="event-cover-mobile" style={{ display: 'flex', justifyContent: 'center', padding: '20px 16px 0' }}>
-            <img src={coverImage} alt={eventName} style={{ maxWidth: 340, width: '100%', height: 'auto', borderRadius: 12, boxShadow: '0 4px 20px rgba(0,0,0,0.12)', display: 'block' }} />
-          </div>
-        )}
-
         <div className="event-hero-grid" style={{
           maxWidth: 1100, margin: '0 auto', width: '100%',
           display: 'grid',
@@ -318,10 +311,8 @@ export default function EventPage() {
           text-decoration: none !important;
           pointer-events: none;
         }
-        .event-cover-mobile { display: flex; }
         .event-cover-desktop { display: none; }
         @media (min-width: 768px) {
-          .event-cover-mobile { display: none; }
           .event-cover-desktop { display: flex !important; }
         }
         @media (max-width: 767px) {
