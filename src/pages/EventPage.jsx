@@ -151,7 +151,7 @@ export default function EventPage() {
         <div className="event-hero-grid" style={{
           maxWidth: 1100, margin: '0 auto', width: '100%',
           display: 'grid',
-          gridTemplateColumns: coverImage ? 'minmax(0,1fr) min(380px,40%)' : '1fr',
+          gridTemplateColumns: coverImage ? 'minmax(0,1fr) min(460px,46%)' : '1fr',
         }}>
 
           {/* Left panel */}

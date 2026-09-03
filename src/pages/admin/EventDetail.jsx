@@ -216,12 +216,6 @@ export default function EventDetail() {
           <a href={`/${orgSlug}/${event.league?.slug}/${event.slug}/event`} target="_blank" rel="noopener noreferrer" className="btn-secondary btn-sm btn">
             Event Page ↗
           </a>
-          <Link to={`/${orgSlug}/${event.league?.slug}/${event.slug}/schedule`} className="btn-secondary btn-sm btn">
-            Pairings ↗
-          </Link>
-          <Link to={`/${orgSlug}/${event.league?.slug}/${event.slug}/leaderboard`} className="btn-secondary btn-sm btn">
-            Leaderboard ↗
-          </Link>
           {event.league?.org_id === import.meta.env.VITE_MIGC_ORG_ID && (
             <a href={`/wager/${event.id}/board`} target="_blank" rel="noopener noreferrer" className="btn-secondary btn-sm btn">
               Wager Board ↗
