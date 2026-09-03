@@ -269,7 +269,7 @@ export default function EventPage() {
           {coverImage && (
             <div style={{ display: 'none', alignItems: 'center', justifyContent: 'center', padding: 'clamp(20px,4vw,44px) clamp(16px,4vw,44px) clamp(20px,4vw,44px) 0' }} className="event-cover-desktop">
               <img src={coverImage} alt={eventName}
-                style={{ width: '100%', height: 'auto', borderRadius: 14, boxShadow: '0 6px 32px rgba(0,0,0,0.14)', display: 'block' }} />
+                style={{ width: '100%', height: 'auto', boxShadow: '0 6px 32px rgba(0,0,0,0.14)', display: 'block' }} />
             </div>
           )}
         </div>
@@ -398,7 +398,7 @@ function OverviewTab({ event, leaderboardUrl, description, courseAddress, mapsUr
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
 
-      {isMIGC && eventId && (
+      {isMIGC && eventId && event.status === 'active' && (
         <a
           href={`/wager/${eventId}`}
           style={{
