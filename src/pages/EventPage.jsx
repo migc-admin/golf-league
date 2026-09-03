@@ -148,17 +148,17 @@ export default function EventPage() {
       {/* ── Hero ──────────────────────────────────────────────────────────────── */}
       <div style={{ background: '#fff', borderBottom: '1px solid #e5e7eb' }}>
 
-        {/* Cover photo — mobile only, full-width banner */}
+        {/* Cover photo — mobile only, centered contained */}
         {coverImage && (
-          <div className="event-cover-mobile" style={{ width: '100%', height: 200, overflow: 'hidden' }}>
-            <img src={coverImage} alt={eventName} style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
+          <div className="event-cover-mobile" style={{ display: 'flex', justifyContent: 'center', padding: '20px 16px 0' }}>
+            <img src={coverImage} alt={eventName} style={{ maxWidth: 340, width: '100%', height: 'auto', borderRadius: 12, boxShadow: '0 4px 20px rgba(0,0,0,0.12)', display: 'block' }} />
           </div>
         )}
 
         <div className="event-hero-grid" style={{
           maxWidth: 1100, margin: '0 auto', width: '100%',
           display: 'grid',
-          gridTemplateColumns: coverImage ? 'minmax(0,1fr) min(420px,45%)' : '1fr',
+          gridTemplateColumns: coverImage ? 'minmax(0,1fr) min(380px,40%)' : '1fr',
         }}>
 
           {/* Left panel */}
@@ -274,9 +274,9 @@ export default function EventPage() {
 
           {/* Right: Cover photo — desktop only */}
           {coverImage && (
-            <div style={{ position: 'relative', overflow: 'hidden', display: 'none' }} className="event-cover-desktop">
+            <div style={{ display: 'none', alignItems: 'center', justifyContent: 'center', padding: 'clamp(20px,4vw,44px) clamp(16px,4vw,44px) clamp(20px,4vw,44px) 0' }} className="event-cover-desktop">
               <img src={coverImage} alt={eventName}
-                style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block', minHeight: 360 }} />
+                style={{ width: '100%', height: 'auto', borderRadius: 14, boxShadow: '0 6px 32px rgba(0,0,0,0.14)', display: 'block' }} />
             </div>
           )}
         </div>
@@ -318,11 +318,11 @@ export default function EventPage() {
           text-decoration: none !important;
           pointer-events: none;
         }
-        .event-cover-mobile { display: block; }
+        .event-cover-mobile { display: flex; }
         .event-cover-desktop { display: none; }
         @media (min-width: 768px) {
           .event-cover-mobile { display: none; }
-          .event-cover-desktop { display: block !important; }
+          .event-cover-desktop { display: flex !important; }
         }
         @media (max-width: 767px) {
           .event-hero-grid { grid-template-columns: 1fr !important; }
