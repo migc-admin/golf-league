@@ -2321,13 +2321,6 @@ async function clearNoShow(playerId, eventId) {
 function TabGroups({ event, eventPlayers, onUpdated, orgSlug, allScores, course }) {
   const isShotgun    = event?.shotgun_start ?? false
   const [noShowLoading, setNoShowLoading] = useState(null)
-  const [isMobile, setIsMobile] = useState(() => window.matchMedia('(max-width: 767px)').matches)
-  useEffect(() => {
-    const mq = window.matchMedia('(max-width: 767px)')
-    const handler = e => setIsMobile(e.matches)
-    mq.addEventListener('change', handler)
-    return () => mq.removeEventListener('change', handler)
-  }, [])
 
   async function handleNoShow(ep) {
     if (!window.confirm(`Mark ${ep.player?.first_name} ${ep.player?.last_name} as a no-show? This will record par+2 for all 18 holes.`)) return
@@ -2600,7 +2593,7 @@ function TabGroups({ event, eventPlayers, onUpdated, orgSlug, allScores, course 
       {/* Toolbar */}
       <div className="flex items-center justify-between flex-wrap gap-2">
         <p className="text-sm text-gray-600">
-          {isMobile ? 'Assign players to groups.' : 'Drag players into groups.'} {numGroups} group{numGroups !== 1 ? 's' : ''} for {totalPlayers} player{totalPlayers !== 1 ? 's' : ''}.
+          Drag players into groups. {numGroups} group{numGroups !== 1 ? 's' : ''} for {totalPlayers} player{totalPlayers !== 1 ? 's' : ''}.
         </p>
         <div className="flex items-center gap-2 shrink-0">
           {saving && <span className="text-xs text-gray-400">Saving…</span>}
@@ -2638,45 +2631,6 @@ function TabGroups({ event, eventPlayers, onUpdated, orgSlug, allScores, course 
         </div>
       )}
 
-      {/* ── Mobile: dropdown assignment ── */}
-      {isMobile && (
-        <div className="space-y-2">
-          {[...eventPlayers].sort((a, b) => {
-            const an = `${a.player?.last_name} ${a.player?.first_name}`
-            const bn = `${b.player?.last_name} ${b.player?.first_name}`
-            return an.localeCompare(bn)
-          }).map(ep => {
-            const name = `${ep.player?.first_name ?? ''} ${ep.player?.last_name ?? ''}`.trim()
-            const currentGroup = ep.group_number ?? ''
-            return (
-              <div key={ep.id} className="flex items-center justify-between gap-3 bg-white border border-gray-200 rounded-xl px-4 py-2.5">
-                <span className="text-sm font-medium text-gray-800 truncate">{name}</span>
-                <select
-                  value={currentGroup}
-                  onChange={async e => {
-                    const val = e.target.value
-                    const groupNum = val === '' ? null : parseInt(val, 10)
-                    const { error } = await supabase.from('event_players')
-                      .update({ group_number: groupNum, group_order: groupNum ? 0 : null })
-                      .eq('id', ep.id)
-                    if (error) toast.error(error.message)
-                    else onUpdated()
-                  }}
-                  className="input py-1 text-sm w-32 shrink-0 bg-white"
-                >
-                  <option value="">Unassigned</option>
-                  {Array.from({ length: numGroups }, (_, i) => i + 1).map(g => (
-                    <option key={g} value={g}>Group {g}</option>
-                  ))}
-                </select>
-              </div>
-            )
-          })}
-        </div>
-      )}
-
-      {/* ── Desktop: drag-and-drop ── */}
-      {!isMobile && (
       <DndContext
         sensors={sensors}
         collisionDetection={closestCenter}
@@ -2746,7 +2700,6 @@ function TabGroups({ event, eventPlayers, onUpdated, orgSlug, allScores, course 
           {activeEp ? <DragCard ep={activeEp} /> : null}
         </DragOverlay>
       </DndContext>
-      )}
     </div>
   )
 }
