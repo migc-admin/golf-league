@@ -209,10 +209,6 @@ export default function Home() {
       }
       return
     }
-    if (profile?.role === 'admin') {
-      navigate('/admin', { replace: true })
-      return
-    }
     loadEvents()
   }, [user, profile, loading, profileLoading])
 

@@ -216,6 +216,8 @@ export default function Leaderboard() {
       ? Array.from({ length: numFlightsConfig }, (_, i) => String.fromCharCode(65 + i))
       : []
   const hasFlights = flightLetters.length > 0
+  const nonGuestPlayers = eventPlayers.filter(ep => !ep.is_guest)
+  const allGrouped = nonGuestPlayers.length > 0 && nonGuestPlayers.every(ep => ep.group_number)
 
   const pageTitle = event
     ? `${event.league?.name ?? ''} — ${event.name ?? `Event #${event.event_number}`} Leaderboard | Scorify Golf`
@@ -328,7 +330,17 @@ export default function Leaderboard() {
 
       {/* Content */}
       <div className="max-w-2xl mx-auto px-4 py-4">
-        {leaderboards && (
+        {/* Gate: require all non-guest players to have a group before showing scored tabs */}
+        {!allGrouped && ['18-Hole', 'Front 9', 'Back 9', 'Low Gross', 'Stableford', 'Scramble', 'Match Points', 'Team Match', 'Low Putts', 'Skins', 'Super Skins', 'Blind Partners'].includes(activeTab) && (
+          <div className="flex flex-col items-center justify-center py-16 gap-3 text-center">
+            <div style={{ fontSize: 40 }}>⛳</div>
+            <div className="font-semibold text-ink text-base">Pairings Not Yet Finalized</div>
+            <div className="text-ink-muted text-sm max-w-xs">
+              Leaderboard will appear once all players have been assigned to groups.
+            </div>
+          </div>
+        )}
+        {leaderboards && allGrouped && (
           <>
             {activeTab === '18-Hole' && (
               <NetLeaderboard
@@ -397,41 +409,41 @@ export default function Leaderboard() {
             {activeTab === 'Low Putts' && (
               <PuttLeaderboard data={leaderboards.putts} playerMap={playerMap} allScores={allScores} course={course} />
             )}
+            {activeTab === 'Stableford' && stablefordData && (
+              <StablefordLeaderboard data={stablefordData} activeFlight={activeFlight} />
+            )}
+            {activeTab === 'Match Points' && matchData && (
+              <MatchPointsBoard matchData={matchData} event={event} />
+            )}
+            {activeTab === 'Team Match' && teamMatchData && (
+              <TeamMatchBoard teamMatchData={teamMatchData} teamAName={teamMatchData.teamAName} teamBName={teamMatchData.teamBName} />
+            )}
+            {activeTab === 'Skins' && skinsResults && (
+              <SkinsBoard skinsResults={skinsResults} playerMap={playerMap} />
+            )}
+            {activeTab === 'Super Skins' && (
+              <SuperSkinsBoard event={event} eventPlayers={eventPlayers} allScores={allScores} course={course} playerMap={playerMap} />
+            )}
+            {activeTab === 'Blind Partners' && (
+              <BlindPartnersLeaderboard event={event} eventPlayers={eventPlayers} allScores={allScores} course={course} />
+            )}
+            {activeTab === 'Scramble' && (
+              <ScrambleLeaderboard eventPlayers={eventPlayers} allScores={allScores} course={course} />
+            )}
+            {activeTab === 'Payouts' && (
+              <PayoutsBoard
+                event={event}
+                eventPlayers={eventPlayers}
+                leaderboards={leaderboards}
+                sideGames={sideGames}
+                skinsResults={skinsResults}
+                playerMap={playerMap}
+              />
+            )}
+            {activeTab === 'Team Play' && (
+              <TGLBoard tglData={tglData} locked={tglLocked} />
+            )}
           </>
-        )}
-        {activeTab === 'Stableford' && stablefordData && (
-          <StablefordLeaderboard data={stablefordData} activeFlight={activeFlight} />
-        )}
-        {activeTab === 'Match Points' && matchData && (
-          <MatchPointsBoard matchData={matchData} event={event} />
-        )}
-        {activeTab === 'Team Match' && teamMatchData && (
-          <TeamMatchBoard teamMatchData={teamMatchData} teamAName={teamMatchData.teamAName} teamBName={teamMatchData.teamBName} />
-        )}
-        {activeTab === 'Skins' && skinsResults && (
-          <SkinsBoard skinsResults={skinsResults} playerMap={playerMap} />
-        )}
-        {activeTab === 'Super Skins' && (
-          <SuperSkinsBoard event={event} eventPlayers={eventPlayers} allScores={allScores} course={course} playerMap={playerMap} />
-        )}
-        {activeTab === 'Blind Partners' && (
-          <BlindPartnersLeaderboard event={event} eventPlayers={eventPlayers} allScores={allScores} course={course} />
-        )}
-        {activeTab === 'Scramble' && (
-          <ScrambleLeaderboard eventPlayers={eventPlayers} allScores={allScores} course={course} />
-        )}
-        {activeTab === 'Payouts' && (
-          <PayoutsBoard
-            event={event}
-            eventPlayers={eventPlayers}
-            leaderboards={leaderboards}
-            sideGames={sideGames}
-            skinsResults={skinsResults}
-            playerMap={playerMap}
-          />
-        )}
-        {activeTab === 'Team Play' && (
-          <TGLBoard tglData={tglData} locked={tglLocked} />
         )}
       </div>
     </div>
