@@ -288,7 +288,7 @@ export default function LeagueHome({ orgSlug, leagueSlug, initialTab = 'events' 
               marginBottom: -1,
             }}
           >
-            {tab === 'events' ? 'Events' : 'Season Standings'}
+            {tab === 'events' ? 'Events' : 'Season'}
           </button>
         ))}
       </div>
@@ -321,9 +321,21 @@ export default function LeagueHome({ orgSlug, leagueSlug, initialTab = 'events' 
         </>
       )}
 
-      {/* Standings tab */}
+      {/* Season tab */}
       {activeTab === 'standings' && (
-        <div className="space-y-6">
+        <div className="space-y-8">
+
+          {/* Past events — shown first */}
+          {past.length > 0 && (
+            <section>
+              <h2 className="text-lg font-bold text-gray-700 mb-4">Past Results</h2>
+              <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                {past.map(ev => <EventCard key={ev.id} event={ev} leagueSlug={leagueSlug} muted />)}
+              </div>
+            </section>
+          )}
+
+          {/* Season standings */}
           {standingsLoading ? (
             <div className="flex items-center justify-center py-16">
               <svg className="animate-spin h-7 w-7" style={{ color: GREEN }} fill="none" viewBox="0 0 24 24">
@@ -392,6 +404,7 @@ export default function LeagueHome({ orgSlug, leagueSlug, initialTab = 'events' 
         </div>
       )}
     </LeagueLayout>
+
   )
 }
 
