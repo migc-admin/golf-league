@@ -3228,7 +3228,7 @@ function TabSideGamesMain({ event, eventPlayers, course, sideGames, onUpdated })
   }))]
 
   // Show opt-ins for any of these games when configured — no buy-in toggle required
-  const OPT_IN_GAME_KEYS = new Set(['super_ctp', 'super_skins', 'blind_partners'])
+  const OPT_IN_GAME_KEYS = new Set(['super_ctp', 'super_skins'])
   const optInGames = baseKeys.filter(k => OPT_IN_GAME_KEYS.has(k))
   // Legacy: also include any games where admin explicitly enabled buy-in
   const buyInGames = [...new Set([...optInGames, ...baseKeys.filter(k => buyIns[k]?.enabled)])]
