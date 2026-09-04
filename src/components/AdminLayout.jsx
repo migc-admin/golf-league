@@ -203,11 +203,17 @@ function GlobalSidebar({ org, user, profile, tier, isOwner, onSignOut, onClose }
 }
 
 // ─── Event context sidebar ────────────────────────────────────────────────────
-function EventSidebar({ org, eventName, eventStatus, basePath, onClose, onSignOut, user, profile }) {
+function EventSidebar({ org, eventName, eventStatus, sideGameOptions = [], basePath, onClose, onSignOut, user, profile }) {
   const [searchParams, setSearchParams] = useSearchParams()
   const activeTab = searchParams.get('tab') ?? 'Overview'
   const location  = useLocation()
   const initials  = (profile?.full_name ?? user?.email ?? '?').split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase()
+
+  // Strip flight suffixes to get base keys for filtering
+  const activeSideGameKeys = new Set(sideGameOptions.map(s => {
+    const m = s.match(/^(.+)_([a-z])$/)
+    return m ? m[1] : s
+  }))
 
   function tabClass(key) {
     return `flex items-center gap-2.5 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${
@@ -244,33 +250,54 @@ function EventSidebar({ org, eventName, eventStatus, basePath, onClose, onSignOu
 
       {/* Tab nav */}
       <nav className="flex-1 px-3 py-4 space-y-0.5 overflow-y-auto">
-        {EVENT_TABS.map(({ key, label, icon: Icon, sub }) => (
-          <div key={key}>
-            <button
-              onClick={() => { setSearchParams({ tab: key }); onClose?.() }}
-              className={tabClass(key)}
-              style={{ width: '100%', textAlign: 'left' }}>
-              <Icon className="w-4 h-4 shrink-0" />
-              {label}
-            </button>
-            {/* Sub-items — shown when this tab is active */}
-            {activeTab === key && sub?.length > 0 && (
-              <div className="ml-7 mt-0.5 space-y-0.5 relative">
-                <div className="absolute top-0 bottom-0 left-[3px] border-l border-ink/[0.06]" />
-                {sub.map(({ label: subLabel, anchor }) => (
-                  <a
-                    key={anchor}
-                    href={`#${anchor}`}
-                    onClick={onClose}
-                    className="flex items-center gap-2 pl-3 pr-3 py-1.5 rounded-md text-xs font-medium text-ink-muted hover:text-ink hover:bg-ink/[0.04] transition-colors"
-                  >
-                    {subLabel}
-                  </a>
-                ))}
-              </div>
-            )}
-          </div>
-        ))}
+        {EVENT_TABS.map(({ key, label, icon: Icon, sub }) => {
+          // For Side Games tab, filter sub-items to only those relevant to this event
+          const SIDE_GAME_ANCHOR_KEYS = {
+            'opt-ins':        null,          // always show if there are opt-in games (super_ctp, super_skins)
+            'blind-partners': 'blind_partners',
+            'super-ctp':      'super_ctp',
+            'super-skins':    'super_skins',
+          }
+          const filteredSub = key === 'Side Games'
+            ? sub.filter(({ anchor }) => {
+                const gameKey = SIDE_GAME_ANCHOR_KEYS[anchor]
+                if (gameKey === null) {
+                  // Opt-Ins: show only if super_ctp or super_skins are active
+                  return activeSideGameKeys.has('super_ctp') || activeSideGameKeys.has('super_skins')
+                }
+                if (gameKey === undefined) return true
+                return activeSideGameKeys.has(gameKey)
+              })
+            : sub
+
+          return (
+            <div key={key}>
+              <button
+                onClick={() => { setSearchParams({ tab: key }); onClose?.() }}
+                className={tabClass(key)}
+                style={{ width: '100%', textAlign: 'left' }}>
+                <Icon className="w-4 h-4 shrink-0" />
+                {label}
+              </button>
+              {/* Sub-items — shown when this tab is active */}
+              {activeTab === key && filteredSub?.length > 0 && (
+                <div className="ml-7 mt-0.5 space-y-0.5 relative">
+                  <div className="absolute top-0 bottom-0 left-[3px] border-l border-ink/[0.06]" />
+                  {filteredSub.map(({ label: subLabel, anchor }) => (
+                    <a
+                      key={anchor}
+                      href={`#${anchor}`}
+                      onClick={onClose}
+                      className="flex items-center gap-2 pl-3 pr-3 py-1.5 rounded-md text-xs font-medium text-ink-muted hover:text-ink hover:bg-ink/[0.04] transition-colors"
+                    >
+                      {subLabel}
+                    </a>
+                  ))}
+                </div>
+              )}
+            </div>
+          )
+        })}
       </nav>
 
       {/* Bottom */}
@@ -345,11 +372,11 @@ export default function AdminLayout({ children }) {
     if (!isEventRoute || !eventSlug) { setEventMeta(null); return }
     supabase
       .from('events')
-      .select('name, event_number, status')
+      .select('name, event_number, status, side_game_options')
       .eq('slug', eventSlug)
       .single()
       .then(({ data }) => {
-        if (data) setEventMeta({ name: data.name ?? `Event #${data.event_number}`, status: data.status })
+        if (data) setEventMeta({ name: data.name ?? `Event #${data.event_number}`, status: data.status, sideGameOptions: data.side_game_options ?? [] })
       })
   }, [isEventRoute, eventSlug])
 
@@ -364,11 +391,11 @@ export default function AdminLayout({ children }) {
   const sharedProps = { org, user, profile, onSignOut: handleSignOut }
 
   const sidebarContent = isEventRoute
-    ? <EventSidebar {...sharedProps} eventName={eventMeta?.name ?? '…'} eventStatus={eventMeta?.status} basePath={basePath} onClose={() => setDrawerOpen(false)} />
+    ? <EventSidebar {...sharedProps} eventName={eventMeta?.name ?? '…'} eventStatus={eventMeta?.status} sideGameOptions={eventMeta?.sideGameOptions ?? []} basePath={basePath} onClose={() => setDrawerOpen(false)} />
     : <GlobalSidebar {...sharedProps} tier={tier} isOwner={isOwner} onClose={() => setDrawerOpen(false)} />
 
   const sidebarDesktop = isEventRoute
-    ? <EventSidebar {...sharedProps} eventName={eventMeta?.name ?? '…'} eventStatus={eventMeta?.status} basePath={basePath} />
+    ? <EventSidebar {...sharedProps} eventName={eventMeta?.name ?? '…'} eventStatus={eventMeta?.status} sideGameOptions={eventMeta?.sideGameOptions ?? []} basePath={basePath} />
     : <GlobalSidebar {...sharedProps} tier={tier} isOwner={isOwner} />
 
   return (
