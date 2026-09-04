@@ -3688,7 +3688,7 @@ function TabSideGames({ event, eventPlayers, course, sideGames, sideGameEntries 
         <BlindPartnersCard
           event={event}
           eventPlayers={eventPlayers}
-          optedInIds={sideGameEntries.blind_partners ?? []}
+          optedInIds={[]}
           onUpdated={onUpdated}
         />
       )}
