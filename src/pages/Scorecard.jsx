@@ -132,14 +132,14 @@ export default function Scorecard() {
         const { data: ep } = await supabase
           .from('event_players')
           .select('event_id, event:events(id, status)')
-          .eq('is_scorekeeper', true)
+          .not('group_number', 'is', null)
           .eq('player_id', profile?.player_id)
           .in('event.status', ['active'])
           .limit(1)
           .single()
 
         if (!ep) {
-          setError("You're not assigned as scorekeeper for any active event.")
+          setError("You're not assigned to a group for any active event.")
           setLoading(false)
           return
         }
@@ -180,23 +180,21 @@ export default function Scorecard() {
         myPlayerId = pByEmail?.id ?? null
       }
 
-      // Find this user's group and scorekeeper status
+      // Find this user's group
       let groupNum = guestGroupNum  // guests already have their group from sessionStorage
-      let userIsScorekeeper = guestGroupNum != null  // guests are assumed scorekeepers
 
       if (!guestGroupNum && myPlayerId) {
         const { data: myEp } = await supabase
           .from('event_players')
-          .select('group_number, is_scorekeeper')
+          .select('group_number')
           .eq('event_id', evId)
           .eq('player_id', myPlayerId)
           .maybeSingle()
-        groupNum          = myEp?.group_number ?? null
-        userIsScorekeeper = myEp?.is_scorekeeper ?? false
+        groupNum = myEp?.group_number ?? null
       }
 
-      // Admins can always edit; others must be the assigned scorekeeper or guest
-      const editAllowed = isAdmin || userIsScorekeeper || guestGroupNum != null
+      // Admins can always edit; others must be part of a group (or a guest)
+      const editAllowed = isAdmin || groupNum != null || guestGroupNum != null
       setCanEdit(editAllowed)
 
       // Resolve scorer identity for audit log
@@ -528,7 +526,7 @@ export default function Scorecard() {
         )}
         {!canEdit && !isComplete && (
           <div className="px-4 py-2 text-xs text-center font-medium" style={{ background: '#f4f3f0', color: '#86868b' }}>
-            View only — you are not the assigned scorekeeper for this group
+            View only — you are not in this group
           </div>
         )}
 

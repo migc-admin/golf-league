@@ -2467,14 +2467,6 @@ function TabGroups({ event, eventPlayers, onUpdated, orgSlug, allScores, course 
     return parseInt(a.replace('group-', ''), 10) - parseInt(b.replace('group-', ''), 10)
   })
 
-  async function toggleScorekeeper(ep) {
-    const { error } = await supabase.from('event_players')
-      .update({ is_scorekeeper: !ep.is_scorekeeper })
-      .eq('id', ep.id)
-    if (error) toast.error(error.message)
-    else onUpdated()
-  }
-
   const [showAutoAssign, setShowAutoAssign] = useState(false)
   const [autoMethod,     setAutoMethod]     = useState('random')
   const [autoLoading,    setAutoLoading]    = useState(false)
@@ -2523,13 +2515,6 @@ function TabGroups({ event, eventPlayers, onUpdated, orgSlug, allScores, course 
           )
         )
       )
-      // Auto-assign first in each group as scorekeeper
-      await Promise.all(
-        buckets.map(bucket => bucket[0]
-          ? supabase.from('event_players').update({ is_scorekeeper: true }).eq('id', bucket[0].id)
-          : Promise.resolve()
-        )
-      )
       setShowAutoAssign(false)
       onUpdated()
       toast.success(`${players.length} players assigned to ${ng} groups`)
@@ -2543,7 +2528,7 @@ function TabGroups({ event, eventPlayers, onUpdated, orgSlug, allScores, course 
   async function clearAllGroups() {
     await Promise.all(
       eventPlayers.map(ep =>
-        supabase.from('event_players').update({ group_number: null, group_order: null, is_scorekeeper: false }).eq('id', ep.id)
+        supabase.from('event_players').update({ group_number: null, group_order: null }).eq('id', ep.id)
       )
     )
     onUpdated()
@@ -2642,7 +2627,6 @@ function TabGroups({ event, eventPlayers, onUpdated, orgSlug, allScores, course 
             holeAssignments={holeAssignments}
             isShotgun={false}
             scorerByGroup={{}}
-            onToggleSK={toggleScorekeeper}
             allScores={allScores}
             showNoShow={event.status === 'active'}
             noShowLoading={noShowLoading}
@@ -2669,7 +2653,6 @@ function TabGroups({ event, eventPlayers, onUpdated, orgSlug, allScores, course 
                 scorerByGroup={scorerByGroup}
                 groupNum={g}
                 onSetGroupHole={setGroupHole}
-                onToggleSK={toggleScorekeeper}
                 allScores={allScores}
                 showNoShow={event.status === 'active'}
                 noShowLoading={noShowLoading}
@@ -2698,7 +2681,7 @@ function TabGroups({ event, eventPlayers, onUpdated, orgSlug, allScores, course 
   )
 }
 
-function DroppableGroup({ id, title, subtitle, members, isShotgun, holeAssignments, scorerByGroup, groupNum, onSetGroupHole, onToggleSK, allScores, showNoShow, noShowLoading, onNoShow, onClearNoShow, onReturnToPool }) {
+function DroppableGroup({ id, title, subtitle, members, isShotgun, holeAssignments, scorerByGroup, groupNum, onSetGroupHole, allScores, showNoShow, noShowLoading, onNoShow, onClearNoShow, onReturnToPool }) {
   const { setNodeRef, isOver } = useDroppable({ id })
 
   const scored = groupNum && scorerByGroup[groupNum] ? [...scorerByGroup[groupNum]].join(', ') : null
@@ -2737,7 +2720,6 @@ function DroppableGroup({ id, title, subtitle, members, isShotgun, holeAssignmen
             <SortablePlayerCard
               key={ep.id}
               ep={ep}
-              onToggleSK={onToggleSK}
               isNoShow={isPlayerNoShow(ep.player_id, allScores)}
               showNoShow={showNoShow}
               noShowLoading={noShowLoading === ep.player_id}
@@ -2755,7 +2737,7 @@ function DroppableGroup({ id, title, subtitle, members, isShotgun, holeAssignmen
   )
 }
 
-function SortablePlayerCard({ ep, onToggleSK, isNoShow, showNoShow, noShowLoading, onNoShow, onClearNoShow, onReturnToPool }) {
+function SortablePlayerCard({ ep, isNoShow, showNoShow, noShowLoading, onNoShow, onClearNoShow, onReturnToPool }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: ep.id })
   const style = {
     transform: CSS.Transform.toString(transform),
@@ -2773,7 +2755,6 @@ function SortablePlayerCard({ ep, onToggleSK, isNoShow, showNoShow, noShowLoadin
           <span className="text-sm font-medium text-gray-900">{ep.player?.first_name} {ep.player?.last_name}</span>
           {isNoShow && <span className="ml-2 text-xs font-semibold px-1.5 py-0.5 rounded-full" style={{ background: '#fef3c7', color: '#92400e' }}>No Show</span>}
           {ep.flight && !isNoShow && <span className="ml-1"><FlightBadge flight={ep.flight} /></span>}
-          {ep.is_scorekeeper && <span className="ml-1 text-xs font-bold text-fairway-700">SK</span>}
         </div>
       </div>
       <div className="flex items-center gap-1.5">

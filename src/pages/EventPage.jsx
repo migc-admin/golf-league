@@ -757,7 +757,6 @@ function GroupList({ eventPlayers, event }) {
                   <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                     {ep.flight && <FlightBadge flight={ep.flight} />}
                     <span style={{ fontSize: 14, fontWeight: 600, color: '#111827' }}>{ep.player?.first_name} {ep.player?.last_name}</span>
-                    {ep.is_scorekeeper && <span style={{ fontSize: 11, fontWeight: 700, padding: '2px 6px', borderRadius: 6, background: '#f0fdf4', color: GREEN }}>SK</span>}
                   </div>
                   <span style={{ fontSize: 12, color: '#9ca3af', fontWeight: 500 }}>CH {ep.course_handicap ?? ep.handicap_index ?? '—'}</span>
                 </div>

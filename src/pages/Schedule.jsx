@@ -333,7 +333,6 @@ function MatchupPlayer({ ep, flight }) {
     <div>
       <div className={`font-semibold text-sm ${color}`}>
         {ep.player?.first_name} {ep.player?.last_name}
-        {ep.is_scorekeeper && <span className="ml-1.5 text-xs font-normal text-gray-400">(SK)</span>}
       </div>
       <div className="text-xs text-gray-400 mt-0.5">
         HI {ep.handicap_index} · CH {ep.course_handicap}
@@ -356,11 +355,6 @@ function PlayerRow({ ep }) {
         <div>
           <div className="font-semibold text-sm text-gray-900">
             {ep.player?.first_name} {ep.player?.last_name}
-            {ep.is_scorekeeper && (
-              <span className="ml-2 text-xs font-normal text-fairway-600 bg-fairway-50 px-1.5 py-0.5 rounded">
-                Scorekeeper
-              </span>
-            )}
           </div>
           <div className="text-xs text-gray-400 mt-0.5">
             Handicap Index {ep.handicap_index}
