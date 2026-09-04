@@ -1080,12 +1080,13 @@ function AdminScoreEditor({ event, eventPlayers, allScores, course, onClose, onS
 // ─── Edit Handicap Modal ─────────────────────────────────────────────
 function EditHandicapModal({ ep, course, onClose, onSaved }) {
   // Resolve tee-specific values for this player's assigned tee (computed before state)
+  // Par is course-level only; slope/rating are per-tee
   const activeTee = ep.tee && course?.tees?.length
-    ? (course.tees.find(t => t.name === ep.tee) ?? null)
+    ? (course.tees.find(t => t.name?.toLowerCase() === ep.tee?.toLowerCase()) ?? null)
     : null
   const chSlope  = activeTee?.slope  ?? course?.slope  ?? null
   const chRating = activeTee?.rating ?? course?.rating ?? null
-  const chPar    = activeTee?.par    ?? course?.par    ?? null
+  const chPar    = course?.par ?? null
   const teeName  = ep.tee ?? null
 
   const hiInit   = ep.handicap_index ?? ''
@@ -1744,12 +1745,13 @@ function AddPlayerModal({ open, onClose, eventId, available, course, defaultTeeN
   const [search,  setSearch]  = useState('')
 
   // Resolve tee-specific slope/rating/par for CH calculation
+  // Par is course-level only; slope/rating are per-tee
   const activeTee = defaultTeeName && course?.tees?.length
-    ? (course.tees.find(t => t.name === defaultTeeName) ?? null)
+    ? (course.tees.find(t => t.name?.toLowerCase() === defaultTeeName?.toLowerCase()) ?? null)
     : null
   const chSlope  = activeTee?.slope  ?? course?.slope  ?? null
   const chRating = activeTee?.rating ?? course?.rating ?? null
-  const chPar    = activeTee?.par    ?? course?.par    ?? null
+  const chPar    = course?.par ?? null
 
   useEffect(() => {
     if (!open) { setBulk({}); setSearch('') }
