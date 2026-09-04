@@ -885,12 +885,24 @@ function BlindPartnersLeaderboard({ event, eventPlayers, allScores, course }) {
     return [p.first_name, p.last_name].filter(Boolean).join(' ') || '—'
   }
 
+  const oddConfig = event?.side_game_entries?.blind_partner_odd ?? null
+
   const ranked = pairs.map((pair, i) => {
     const r1 = playerNet(pair.p1)
-    const r2 = pair.p2 ? playerNet(pair.p2) : { net: 0, holesPlayed: 0 }
+    let r2
+    if (pair.p2) {
+      r2 = playerNet(pair.p2)
+    } else if (oddConfig?.type === 'ghost' && oddConfig.score !== '' && oddConfig.score != null) {
+      r2 = { net: Number(oddConfig.score), holesPlayed: 18 }
+    } else if (oddConfig?.type === 'blind' && oddConfig.player_id) {
+      r2 = playerNet(oddConfig.player_id)
+    } else {
+      r2 = { net: 0, holesPlayed: 0 }
+    }
     return {
       idx: i,
       p1: pair.p1, p2: pair.p2,
+      oddConfig: !pair.p2 ? oddConfig : null,
       combinedNet: r1.net + r2.net,
       holesPlayed: Math.max(r1.holesPlayed, r2.holesPlayed),
     }
@@ -916,7 +928,11 @@ function BlindPartnersLeaderboard({ event, eventPlayers, allScores, course }) {
                 <div className="text-sm font-semibold text-gray-800">{playerName(pair.p1)}</div>
                 {pair.p2
                   ? <div className="text-sm font-semibold text-gray-800">{playerName(pair.p2)}</div>
-                  : <div className="text-xs text-gray-400 italic">no partner</div>
+                  : pair.oddConfig?.type === 'ghost'
+                    ? <div className="text-xs text-amber-600 italic">👻 Ghost ({pair.oddConfig.score ?? '?'} net)</div>
+                    : pair.oddConfig?.type === 'blind' && pair.oddConfig.player_id
+                      ? <div className="text-xs text-amber-600 italic">🔀 {playerName(pair.oddConfig.player_id)}'s score</div>
+                      : <div className="text-xs text-gray-400 italic">no partner assigned</div>
                 }
               </div>
             </div>

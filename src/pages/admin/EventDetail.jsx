@@ -3126,10 +3126,20 @@ function BlindPartnersCard({ event, eventPlayers, optedInIds = [], onUpdated }) 
     ? eventPlayers.filter(ep => optedInIds.includes(ep.player_id))
     : eventPlayers
 
-  // Restore previously drawn pairs from DB
+  // Restore previously drawn pairs and odd-player config from DB
   const savedPairs = event.side_game_entries?.blind_partner_pairs ?? []
+  const savedOdd   = event.side_game_entries?.blind_partner_odd ?? null
   const [pairs, setPairs]     = useState(savedPairs)
   const [saving, setSaving]   = useState(false)
+  const [oddConfig, setOddConfig] = useState(savedOdd ?? { type: 'ghost', score: '', player_id: '' })
+  const [savingOdd, setSavingOdd] = useState(false)
+
+  // Keep local state in sync if parent re-fetches
+  useEffect(() => {
+    setPairs(event.side_game_entries?.blind_partner_pairs ?? [])
+    const od = event.side_game_entries?.blind_partner_odd
+    if (od) setOddConfig(od)
+  }, [event.side_game_entries])
 
   async function drawPartners() {
     const ids      = drawPool.map(ep => ep.player_id)
@@ -3151,25 +3161,37 @@ function BlindPartnersCard({ event, eventPlayers, optedInIds = [], onUpdated }) 
     onUpdated?.()
   }
 
+  async function saveOddConfig(next) {
+    setSavingOdd(true)
+    const prev = event.side_game_entries ?? {}
+    await supabase.from('events').update({
+      side_game_entries: { ...prev, blind_partner_odd: next }
+    }).eq('id', event.id)
+    setSavingOdd(false)
+    onUpdated?.()
+  }
+
   function playerName(id) {
     const ep = eventPlayers.find(e => e.player_id === id)
     const p  = ep?.player ?? {}
     return [p.first_name, p.last_name].filter(Boolean).join(' ') || '—'
   }
 
-  const canDraw = drawPool.length >= 2
+  const canDraw   = drawPool.length >= 2
+  const oddPair   = pairs.find(p => p.p2 === null)
+  const oddPlayer = oddPair ? eventPlayers.find(ep => ep.player_id === oddPair.p1) : null
 
   return (
     <Card>
-      <CardHeader title="Blind Partners" subtitle="Opted-in players are auto-selected — draw to assign pairs. Results appear on the leaderboard." />
+      <CardHeader title="Blind Partners" subtitle="All players are included — draw to assign pairs. Results appear on the leaderboard." />
       <div className="space-y-4">
-        {/* Opted-in players */}
+        {/* Entrant list */}
         <div>
           <div className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">
             Entrants ({drawPool.length})
           </div>
           {drawPool.length === 0 ? (
-            <p className="text-sm text-gray-400 italic">No players have opted in yet. Add them in the Opt-in Rosters section above.</p>
+            <p className="text-sm text-gray-400 italic">No players in this event yet.</p>
           ) : (
             <div className="grid grid-cols-2 gap-1 mb-3">
               {drawPool.map(ep => {
@@ -3203,11 +3225,101 @@ function BlindPartnersCard({ event, eventPlayers, optedInIds = [], onUpdated }) 
               {pairs.map((pair, i) => (
                 <div key={i} className="text-sm text-gray-700 bg-gray-50 rounded-lg px-3 py-1.5">
                   <span className="font-medium text-fairway-700">Pair {i + 1}:</span>{' '}
-                  {playerName(pair.p1)} &amp; {pair.p2 ? playerName(pair.p2) : <span className="text-gray-400 italic">no partner (odd number)</span>}
+                  {playerName(pair.p1)} &amp; {pair.p2
+                    ? playerName(pair.p2)
+                    : <span className="text-amber-600 font-medium italic">odd player out</span>
+                  }
                 </div>
               ))}
             </div>
             <p className="text-xs text-gray-400 mt-2">Combined net scores are ranked on the Blind Partners leaderboard tab.</p>
+          </div>
+        )}
+
+        {/* Odd player out config — only shown when draw produces an odd pair */}
+        {oddPlayer && (
+          <div className="border border-amber-200 bg-amber-50 rounded-xl px-4 py-3 space-y-3">
+            <div>
+              <div className="text-xs font-semibold text-amber-700 uppercase tracking-wide mb-0.5">Odd Player Out</div>
+              <div className="text-sm font-medium text-gray-800">
+                {(() => { const p = oddPlayer.player ?? {}; return [p.first_name, p.last_name].filter(Boolean).join(' ') || '—' })()}
+              </div>
+              <div className="text-xs text-gray-500 mt-0.5">Choose how to assign a partner score for this player.</div>
+            </div>
+
+            {/* Type toggle */}
+            <div className="flex gap-3">
+              {[{ val: 'ghost', label: '👻 Ghost Score' }, { val: 'blind', label: '🔀 Blind Score' }].map(opt => (
+                <label key={opt.val} className="flex items-center gap-1.5 text-sm cursor-pointer">
+                  <input
+                    type="radio"
+                    name="oddType"
+                    value={opt.val}
+                    checked={oddConfig.type === opt.val}
+                    onChange={() => {
+                      const next = { ...oddConfig, type: opt.val }
+                      setOddConfig(next)
+                      saveOddConfig(next)
+                    }}
+                    className="accent-fairway-700"
+                  />
+                  <span className="font-medium text-gray-700">{opt.label}</span>
+                </label>
+              ))}
+            </div>
+
+            {/* Ghost: preset net score */}
+            {oddConfig.type === 'ghost' && (
+              <div className="flex items-center gap-2">
+                <label className="text-xs text-gray-600 font-medium">Preset net score:</label>
+                <input
+                  type="number"
+                  value={oddConfig.score ?? ''}
+                  placeholder="e.g. 72"
+                  onChange={e => setOddConfig(prev => ({ ...prev, score: e.target.value }))}
+                  onBlur={e => {
+                    const next = { ...oddConfig, score: e.target.value ? Number(e.target.value) : '' }
+                    setOddConfig(next)
+                    saveOddConfig(next)
+                  }}
+                  className="w-20 border border-gray-200 rounded-lg px-2 py-1 text-sm text-center"
+                />
+                <span className="text-xs text-gray-400">net strokes</span>
+              </div>
+            )}
+
+            {/* Blind: pick a player from the field */}
+            {oddConfig.type === 'blind' && (
+              <div className="flex items-center gap-2 flex-wrap">
+                <label className="text-xs text-gray-600 font-medium">Partner's score drawn from:</label>
+                <select
+                  value={oddConfig.player_id ?? ''}
+                  onChange={e => {
+                    const next = { ...oddConfig, player_id: e.target.value }
+                    setOddConfig(next)
+                    saveOddConfig(next)
+                  }}
+                  className="border border-gray-200 rounded-lg px-2 py-1 text-sm"
+                >
+                  <option value="">— select player —</option>
+                  {drawPool
+                    .filter(ep => ep.player_id !== oddPair.p1)
+                    .map(ep => {
+                      const p = ep.player ?? {}
+                      return (
+                        <option key={ep.player_id} value={ep.player_id}>
+                          {[p.first_name, p.last_name].filter(Boolean).join(' ') || ep.player_id}
+                        </option>
+                      )
+                    })}
+                </select>
+                {oddConfig.player_id && (
+                  <span className="text-xs text-gray-400">Their net score counts as the partner's score.</span>
+                )}
+              </div>
+            )}
+
+            {savingOdd && <span className="text-xs text-gray-400">Saving…</span>}
           </div>
         )}
       </div>
