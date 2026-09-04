@@ -1079,18 +1079,30 @@ function AdminScoreEditor({ event, eventPlayers, allScores, course, onClose, onS
 
 // ─── Edit Handicap Modal ─────────────────────────────────────────────
 function EditHandicapModal({ ep, course, onClose, onSaved }) {
-  const [hi, setHi] = useState(ep.handicap_index ?? '')
-  const [ch, setCh] = useState(ep.course_handicap ?? '')
-  const [autoCalc, setAutoCalc] = useState(false)
+  // Resolve tee-specific values for this player's assigned tee (computed before state)
+  const activeTee = ep.tee && course?.tees?.length
+    ? (course.tees.find(t => t.name === ep.tee) ?? null)
+    : null
+  const chSlope  = activeTee?.slope  ?? course?.slope  ?? null
+  const chRating = activeTee?.rating ?? course?.rating ?? null
+  const chPar    = activeTee?.par    ?? course?.par    ?? null
+  const teeName  = ep.tee ?? null
+
+  const hiInit   = ep.handicap_index ?? ''
+  const chInit   = (chSlope && chRating && chPar && hiInit !== '')
+    ? Math.round((parseFloat(hiInit) * chSlope / 113) + (chRating - chPar))
+    : (ep.course_handicap ?? '')
+
+  const [hi, setHi] = useState(String(hiInit))
+  const [ch, setCh] = useState(String(chInit))
+  const [autoCalc, setAutoCalc] = useState(true)
   const [saving, setSaving] = useState(false)
 
   // Auto-calculate CH from HI whenever HI changes and autoCalc is on
   const calcCh = useCallback((hiVal) => {
-    if (!course) return ''
-    const { slope, rating, par } = course
-    if (!slope || !rating || !par) return ''
-    return Math.round((parseFloat(hiVal) * slope / 113) + (rating - par))
-  }, [course])
+    if (!chSlope || !chRating || !chPar) return ''
+    return Math.round((parseFloat(hiVal) * chSlope / 113) + (chRating - chPar))
+  }, [chSlope, chRating, chPar])
 
   function handleHiChange(val) {
     setHi(val)
@@ -1157,9 +1169,10 @@ function EditHandicapModal({ ep, course, onClose, onSaved }) {
             placeholder="e.g. 16"
             readOnly={autoCalc}
           />
-          {autoCalc && course && (
+          {autoCalc && chSlope && (
             <p className="text-xs text-gray-400 mt-1">
-              Calculated: ({hi} × {course.slope} / 113) + ({course.rating} − {course.par})
+              {teeName && <span className="font-medium">{teeName} tee — </span>}
+              ({hi} × {chSlope} / 113) + ({chRating} − {chPar})
             </p>
           )}
         </div>
