@@ -62,6 +62,7 @@ export default function Scorecard() {
   const [showScorecard, setShowScorecard] = useState(false)
   const [isComplete,    setIsComplete]    = useState(false)
   const [canEdit,       setCanEdit]       = useState(false)
+  const [groupNum,      setGroupNum]      = useState(null)
   const [enteredBy,     setEnteredBy]     = useState(null)   // name/email of scorer
   const [conflicts,     setConflicts]     = useState([])     // conflicting holes detected
   const [showReconcile, setShowReconcile] = useState(false)  // paper scorecard confirmation
@@ -196,6 +197,7 @@ export default function Scorecard() {
       // Admins can always edit; others must be part of a group (or a guest)
       const editAllowed = isAdmin || groupNum != null || guestGroupNum != null
       setCanEdit(editAllowed)
+      setGroupNum(groupNum ?? guestGroupNum)
 
       // Resolve scorer identity for audit log
       const guestSession = readGuestSession()
@@ -473,6 +475,7 @@ export default function Scorecard() {
         onSignOut={user ? handleSignOut : null}
         orgSlug={orgSlug}
         numHoles={numHoles}
+        groupNum={groupNum}
       />
     )
   }
@@ -933,8 +936,35 @@ function PlayerScoreCard({ ep, hole, par, si, score, allHoleScores, courseStroke
 }
 
 // ─── Traditional Scorecard View (vertical: holes=rows, players=cols) ──
-function TraditionalScorecard({ event, course, groupPlayers, scores, isComplete, canEdit, onEdit, homeLink, onSignOut, trackPutts, orgSlug, numHoles = 18 }) {
+function TraditionalScorecard({ event, course, groupPlayers, scores, isComplete, canEdit, onEdit, homeLink, onSignOut, trackPutts, orgSlug, numHoles = 18, groupNum }) {
   const pars  = course.par_per_hole ?? Array(numHoles).fill(4)
+
+  // Notes — stored in event.side_game_entries.group_notes[groupNum]
+  const savedNote = groupNum != null ? (event?.side_game_entries?.group_notes?.[String(groupNum)] ?? '') : ''
+  const [note,        setNote]        = useState(savedNote)
+  const [noteSaving,  setNoteSaving]  = useState(false)
+  const [noteSaved,   setNoteSaved]   = useState(false)
+  const noteTimer = useRef(null)
+
+  async function saveNote(val) {
+    setNoteSaving(true)
+    setNoteSaved(false)
+    const prev = event?.side_game_entries ?? {}
+    const prevNotes = prev.group_notes ?? {}
+    await supabase.from('events').update({
+      side_game_entries: { ...prev, group_notes: { ...prevNotes, [String(groupNum)]: val } }
+    }).eq('id', event.id)
+    setNoteSaving(false)
+    setNoteSaved(true)
+    clearTimeout(noteTimer.current)
+    noteTimer.current = setTimeout(() => setNoteSaved(false), 2000)
+  }
+
+  function handleNoteChange(e) {
+    setNote(e.target.value)
+    clearTimeout(noteTimer.current)
+    noteTimer.current = setTimeout(() => saveNote(e.target.value), 800)
+  }
 
   // Build per-player totals
   const playerData = groupPlayers.map(ep => {
@@ -1186,6 +1216,25 @@ function TraditionalScorecard({ event, course, groupPlayers, scores, isComplete,
           </span>
         </div>
         <p className="text-center text-xs text-ink-muted mt-1">Net score vs par</p>
+
+        {/* Notes */}
+        {groupNum != null && (
+          <div className="mt-4 bg-white rounded-2xl shadow px-4 py-3">
+            <div className="flex items-center justify-between mb-2">
+              <div className="text-xs font-semibold text-ink-muted uppercase tracking-wide">Group Notes</div>
+              {noteSaving && <span className="text-xs text-ink-muted">Saving…</span>}
+              {noteSaved  && <span className="text-xs text-green-600">Saved ✓</span>}
+            </div>
+            <textarea
+              value={note}
+              onChange={handleNoteChange}
+              disabled={!canEdit}
+              placeholder={canEdit ? 'Add notes for your group — CTP hole, special rules, wagers…' : 'No notes for this group.'}
+              rows={4}
+              className="w-full text-sm text-ink rounded-lg border border-gray-200 px-3 py-2 resize-none focus:outline-none focus:ring-1 focus:ring-fairway-600 disabled:bg-gray-50 disabled:text-ink-muted"
+            />
+          </div>
+        )}
       </div>
     </div>
   )
