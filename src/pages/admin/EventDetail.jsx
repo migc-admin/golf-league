@@ -1708,6 +1708,7 @@ function TabFlights({ event, eventPlayers, course, allPlayers, onUpdated }) {
         eventId={event.id}
         available={available}
         course={course}
+        defaultTeeName={event.tee_flight_a ?? null}
         useFlights={useFlights}
         useHandicaps={event.use_handicaps ?? true}
         onSaved={onUpdated}
@@ -1723,11 +1724,19 @@ function TabFlights({ event, eventPlayers, course, allPlayers, onUpdated }) {
   )
 }
 
-function AddPlayerModal({ open, onClose, eventId, available, course, useFlights, useHandicaps = true, onSaved }) {
+function AddPlayerModal({ open, onClose, eventId, available, course, defaultTeeName, useFlights, useHandicaps = true, onSaved }) {
   // bulk: { [playerId]: { hi, flight, checked } }
   const [bulk,    setBulk]    = useState({})
   const [saving,  setSaving]  = useState(false)
   const [search,  setSearch]  = useState('')
+
+  // Resolve tee-specific slope/rating/par for CH calculation
+  const activeTee = defaultTeeName && course?.tees?.length
+    ? (course.tees.find(t => t.name === defaultTeeName) ?? null)
+    : null
+  const chSlope  = activeTee?.slope  ?? course?.slope  ?? null
+  const chRating = activeTee?.rating ?? course?.rating ?? null
+  const chPar    = activeTee?.par    ?? course?.par    ?? null
 
   useEffect(() => {
     if (!open) { setBulk({}); setSearch('') }
@@ -1750,19 +1759,19 @@ function AddPlayerModal({ open, onClose, eventId, available, course, useFlights,
       const current = prev[playerId] ?? { hi: '', flight: '', autoHC: true, ch: '' }
       const updated = { ...current, [field]: value }
       // Recompute auto CH when HI changes
-      if (field === 'hi' && updated.autoHC && course) {
+      if (field === 'hi' && updated.autoHC && chSlope && chRating && chPar) {
         const hi = parseFloat(value)
         if (!isNaN(hi)) {
-          updated.ch = Math.round((hi * course.slope / 113) + (course.rating - course.par))
+          updated.ch = Math.round((hi * chSlope / 113) + (chRating - chPar))
         } else {
           updated.ch = ''
         }
       }
       // When toggling autoHC on, recompute
-      if (field === 'autoHC' && value === true && course) {
+      if (field === 'autoHC' && value === true && chSlope && chRating && chPar) {
         const hi = parseFloat(current.hi)
         if (!isNaN(hi)) {
-          updated.ch = Math.round((hi * course.slope / 113) + (course.rating - course.par))
+          updated.ch = Math.round((hi * chSlope / 113) + (chRating - chPar))
         }
       }
       return { ...prev, [playerId]: updated }
@@ -1821,9 +1830,8 @@ function AddPlayerModal({ open, onClose, eventId, available, course, useFlights,
       } else {
         const hiVal = parseFloat(hi)
         let course_handicap = null
-        if (autoHC && course) {
-          const { slope, rating, par } = course
-          course_handicap = Math.round((hiVal * slope / 113) + (rating - par))
+        if (autoHC && chSlope && chRating && chPar) {
+          course_handicap = Math.round((hiVal * chSlope / 113) + (chRating - chPar))
         } else if (!autoHC && ch !== '') {
           course_handicap = parseInt(ch, 10)
         }
