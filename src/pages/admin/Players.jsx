@@ -26,20 +26,54 @@ export default function Players() {
   const [activeTab,    setActiveTab]    = useState('Roster')
   const [orgId,        setOrgId]        = useState(null)
   const [orgTier,      setOrgTier]      = useState(null)
+  const [leagues,      setLeagues]      = useState([])
+  const [participation, setParticipation] = useState({})   // playerId → { [leagueId]: { events, guestEvents } }
+  const [leagueFilter, setLeagueFilter] = useState('all')
+  const [sort,         setSort]         = useState({ key: 'name', dir: 'asc' })
 
   async function load() {
     const { data: adminProfile } = await supabase
       .from('profiles').select('org_id').eq('id', (await supabase.auth.getUser()).data.user?.id).single()
     const currentOrgId = adminProfile?.org_id ?? null
 
-    const [{ data: p }, { data: pr }] = await Promise.all([
+    const [{ data: p }, { data: pr }, { data: lg }] = await Promise.all([
       supabase.from('players').select('*').order('first_name'),
       currentOrgId
         ? supabase.from('profiles').select('*').eq('org_id', currentOrgId).order('full_name')
         : Promise.resolve({ data: [] }),
+      currentOrgId
+        // Oldest first — the org's original league is the default "home" league for members.
+        ? supabase.from('leagues').select('id, name, season_year, created_at').eq('org_id', currentOrgId).order('created_at', { ascending: true })
+        : Promise.resolve({ data: [] }),
     ])
+
+    // Derive league membership from event participation:
+    // event_players → events → leagues
+    const part = {}
+    const leagueList = lg ?? []
+    if (leagueList.length) {
+      const { data: evs } = await supabase
+        .from('events').select('id, league_id').in('league_id', leagueList.map(l => l.id))
+      const evLeague = Object.fromEntries((evs ?? []).map(e => [e.id, e.league_id]))
+      const eventIds = Object.keys(evLeague)
+      if (eventIds.length) {
+        const { data: eps } = await supabase
+          .from('event_players').select('player_id, event_id, is_guest').in('event_id', eventIds)
+        for (const ep of eps ?? []) {
+          const lid = evLeague[ep.event_id]
+          if (!lid || !ep.player_id) continue
+          const byLeague = (part[ep.player_id] ??= {})
+          const rec = (byLeague[lid] ??= { events: 0, guestEvents: 0 })
+          rec.events += 1
+          if (ep.is_guest) rec.guestEvents += 1
+        }
+      }
+    }
+
     setPlayers(p ?? [])
     setProfiles(pr ?? [])
+    setLeagues(leagueList)
+    setParticipation(part)
     setLoading(false)
   }
 
@@ -57,10 +91,122 @@ export default function Players() {
     fetchOrg()
   }, [user])
 
-  const filtered = players.filter(p =>
-    `${p.first_name} ${p.last_name} ${p.email ?? ''}`.toLowerCase()
+  // One entry per league name — a league running multiple seasons collapses into a
+  // single group so a player isn't badged once per season.
+  const leagueGroups = leagues
+    .filter((l, i, arr) => arr.findIndex(x => x.name === l.name) === i)
+    .map(l => ({ name: l.name, ids: leagues.filter(x => x.name === l.name).map(x => x.id) }))
+
+  // The org's original league — members belong here by default.
+  const primaryLeague = leagueGroups[0] ?? null
+
+  // Roster-level guest designation, set on the player record via the Edit modal.
+  const isGuestPlayer = p => p.intended_role === 'guest'
+
+  function leagueSummary(p) {
+    const part = participation[p.id] ?? {}
+    const rows = leagueGroups
+      .map(g => {
+        let events = 0, guestEvents = 0
+        for (const id of g.ids) {
+          const rec = part[id]
+          if (rec) { events += rec.events; guestEvents += rec.guestEvents }
+        }
+        return { name: g.name, ids: g.ids, events, guestEvents }
+      })
+      .filter(r => r.events > 0)
+      .sort((a, b) => b.events - a.events)
+
+    // Members belong to the primary league whether or not they've played an event yet.
+    if (!isGuestPlayer(p) && primaryLeague && !rows.some(r => r.name === primaryLeague.name)) {
+      rows.unshift({ ...primaryLeague, events: 0, guestEvents: 0 })
+    }
+
+    return rows.map(r => ({ ...r, guestOnly: r.events > 0 && r.guestEvents === r.events }))
+  }
+
+  function totalEvents(playerId) {
+    return Object.values(participation[playerId] ?? {}).reduce((n, r) => n + r.events, 0)
+  }
+
+  function matchesLeagueFilter(p) {
+    if (leagueFilter === 'all')    return true
+    if (leagueFilter === 'none')   return totalEvents(p.id) === 0
+    if (leagueFilter === 'guests') return isGuestPlayer(p) || leagueSummary(p).some(s => s.guestOnly)
+    return leagueSummary(p).some(s => s.ids.includes(leagueFilter))
+  }
+
+  const searched = players.filter(p =>
+    `${p.first_name} ${p.last_name} ${p.email ?? ''} ${p.ghin_number ?? ''} ${p.phone ?? ''}`.toLowerCase()
       .includes(search.toLowerCase())
   )
+
+  // Value a row sorts by, per column. Blanks sort last regardless of direction.
+  function sortValue(p, key) {
+    if (key === 'league') return leagueSummary(p).map(s => s.name).join(', ')
+    if (key === 'name')   return `${p.last_name} ${p.first_name}`.toLowerCase()
+    if (key === 'events') return totalEvents(p.id)
+    return (p[key] ?? '').toString().toLowerCase()
+  }
+
+  const filtered = searched.filter(matchesLeagueFilter).sort((a, b) => {
+    const av = sortValue(a, sort.key)
+    const bv = sortValue(b, sort.key)
+    const blank = v => v === '' || v == null
+    if (blank(av) !== blank(bv)) return blank(av) ? 1 : -1
+    const cmp = typeof av === 'number' ? av - bv : av.localeCompare(bv)
+    return sort.dir === 'asc' ? cmp : -cmp
+  })
+
+  function toggleSort(key) {
+    setSort(s => s.key === key
+      ? { key, dir: s.dir === 'asc' ? 'desc' : 'asc' }
+      : { key, dir: key === 'events' ? 'desc' : 'asc' })
+  }
+
+  function exportLeagueLabel(p) {
+    if (isGuestPlayer(p)) return 'Guest'
+    const summary = leagueSummary(p)
+    // If a player spans multiple leagues, default the export to their primary league only.
+    const row = summary.length > 1
+      ? (summary.find(s => s.name === primaryLeague?.name) ?? summary[0])
+      : summary[0]
+    if (!row) return ''
+    return row.guestOnly ? `${row.name} (guest)` : row.name
+  }
+
+  function exportCsv() {
+    const rows = filtered.map(p => [
+      exportLeagueLabel(p),
+      `${p.first_name} ${p.last_name}`,
+      p.email ?? '',
+      p.phone ?? '',
+      p.ghin_number ?? '',
+      totalEvents(p.id),
+    ])
+    const esc = v => `"${String(v).replace(/"/g, '""')}"`
+    const csv = [['League', 'Name', 'Email', 'Phone', 'GHIN', 'Events'], ...rows]
+      .map(r => r.map(esc).join(',')).join('\r\n')
+
+    const url  = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8;' }))
+    const a    = document.createElement('a')
+    a.href     = url
+    a.download = `players-${new Date().toISOString().slice(0, 10)}.csv`
+    a.click()
+    URL.revokeObjectURL(url)
+    toast.success(`Exported ${filtered.length} player${filtered.length !== 1 ? 's' : ''}`)
+  }
+
+  const filterChips = [
+    { key: 'all',    label: 'All Players', count: searched.length },
+    ...leagueGroups.map(g => ({
+      key:   g.ids[0],
+      label: g.name,
+      count: searched.filter(p => leagueSummary(p).some(s => s.name === g.name)).length,
+    })),
+    { key: 'guests', label: 'Guests',    count: searched.filter(p => isGuestPlayer(p) || leagueSummary(p).some(s => s.guestOnly)).length },
+    { key: 'none',   label: 'No Events', count: searched.filter(p => totalEvents(p.id) === 0).length },
+  ]
 
   async function handleDelete(id) {
     if (!confirm('Remove this player from the global roster?')) return
@@ -71,11 +217,12 @@ export default function Players() {
 
   async function handleMerge(sourceId, targetId) {
     // Copy supplemental fields from source → target if target is missing them
-    const { data: source } = await supabase.from('players').select('email, ghin_number').eq('id', sourceId).single()
-    const { data: target } = await supabase.from('players').select('email, ghin_number').eq('id', targetId).single()
+    const { data: source } = await supabase.from('players').select('email, phone, ghin_number').eq('id', sourceId).single()
+    const { data: target } = await supabase.from('players').select('email, phone, ghin_number').eq('id', targetId).single()
     if (source && target) {
       const patch = {}
       if (!target.email      && source.email)       patch.email       = source.email
+      if (!target.phone      && source.phone)       patch.phone       = source.phone
       if (!target.ghin_number && source.ghin_number) patch.ghin_number = source.ghin_number
       if (Object.keys(patch).length) {
         await supabase.from('players').update(patch).eq('id', targetId)
@@ -112,7 +259,10 @@ export default function Players() {
           <p className="text-sm text-gray-500 mt-0.5">Roster &amp; user account management</p>
         </div>
         {activeTab === 'Roster' && (
-          <Button onClick={() => { setEditing(null); setModal(true) }}>+ Add Player</Button>
+          <div className="flex items-center gap-2">
+            <Button variant="secondary" onClick={exportCsv} disabled={filtered.length === 0}>Export CSV</Button>
+            <Button onClick={() => { setEditing(null); setModal(true) }}>+ Add Player</Button>
+          </div>
         )}
       </div>
 
@@ -136,13 +286,34 @@ export default function Players() {
       {/* ── Roster Tab ── */}
       {activeTab === 'Roster' && (
         <>
-          <input
-            type="search"
-            value={search}
-            onChange={e => setSearch(e.target.value)}
-            placeholder="Search players…"
-            className="input w-full sm:w-72"
-          />
+          <div className="flex flex-col gap-3">
+            <input
+              type="search"
+              value={search}
+              onChange={e => setSearch(e.target.value)}
+              placeholder="Search name, email, or GHIN…"
+              className="input w-full sm:w-72"
+            />
+
+            <div className="flex flex-wrap gap-1.5">
+              {filterChips.map(chip => (
+                <button
+                  key={chip.key}
+                  onClick={() => setLeagueFilter(chip.key)}
+                  className={`text-xs font-medium rounded-full px-3 py-1.5 border transition-colors ${
+                    leagueFilter === chip.key
+                      ? 'bg-gray-900 text-white border-gray-900'
+                      : 'bg-white text-gray-600 border-gray-200 hover:border-gray-400'
+                  }`}
+                >
+                  {chip.label}
+                  <span className={leagueFilter === chip.key ? 'ml-1.5 text-gray-300' : 'ml-1.5 text-gray-400'}>
+                    {chip.count}
+                  </span>
+                </button>
+              ))}
+            </div>
+          </div>
 
           {loading ? (
             <div className="space-y-2 animate-pulse">
@@ -150,30 +321,113 @@ export default function Players() {
             </div>
           ) : filtered.length === 0 ? (
             <Card className="text-center py-10">
-              <p className="text-gray-500">{search ? 'No players match your search.' : 'No players yet.'}</p>
-              {!search && <Button className="mt-3" onClick={() => { setEditing(null); setModal(true) }}>Add First Player</Button>}
+              <p className="text-gray-500">
+                {search || leagueFilter !== 'all' ? 'No players match these filters.' : 'No players yet.'}
+              </p>
+              {!search && leagueFilter === 'all' && (
+                <Button className="mt-3" onClick={() => { setEditing(null); setModal(true) }}>Add First Player</Button>
+              )}
             </Card>
           ) : (
             <Card className="overflow-hidden p-0">
-              <div className="divide-y divide-gray-100">
-                {filtered.map(p => (
-                  <div key={p.id} className="flex items-center justify-between px-5 py-3.5">
-                    <div>
-                      <div className="font-medium text-gray-900">{p.first_name} {p.last_name}</div>
-                      <div className="text-xs text-gray-500 flex items-center gap-3 mt-0.5">
-                        {p.email && <span>{p.email}</span>}
-                        {p.ghin_number && <span>GHIN: {p.ghin_number}</span>}
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <Button variant="secondary" size="sm" onClick={() => { setEditing(p); setModal(true) }}>Edit</Button>
-                      <Button variant="danger" size="sm" onClick={() => handleDelete(p.id)}>Remove</Button>
-                    </div>
-                  </div>
-                ))}
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="bg-gray-50 border-b border-gray-200 text-left">
+                      {[
+                        { key: 'league',      label: 'League', pad: 'px-5' },
+                        { key: 'name',        label: 'Name'   },
+                        { key: 'email',       label: 'Email'  },
+                        { key: 'phone',       label: 'Phone'  },
+                        { key: 'ghin_number', label: 'GHIN'   },
+                        { key: 'events',      label: 'Events', align: 'text-right' },
+                      ].map(col => (
+                        <th key={col.key} className={`${col.pad ?? 'px-4'} py-2.5 ${col.align ?? ''}`}>
+                          <button
+                            onClick={() => toggleSort(col.key)}
+                            className={`inline-flex items-center gap-1 text-xs font-semibold uppercase tracking-wide transition-colors ${
+                              sort.key === col.key ? 'text-gray-900' : 'text-gray-500 hover:text-gray-700'
+                            }`}
+                          >
+                            {col.label}
+                            <span className={sort.key === col.key ? 'text-gray-400' : 'text-gray-300'}>
+                              {sort.key === col.key ? (sort.dir === 'asc' ? '▲' : '▼') : '↕'}
+                            </span>
+                          </button>
+                        </th>
+                      ))}
+                      <th className="px-5 py-2.5" />
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-100">
+                    {filtered.map(p => {
+                      const summary = leagueSummary(p)
+                      return (
+                        <tr key={p.id} className="hover:bg-gray-50">
+                          <td className="px-5 py-3 align-middle">
+                            {isGuestPlayer(p) ? (
+                              <span
+                                title={summary.length
+                                  ? `Guest — played in ${summary.map(s => s.name).join(', ')}`
+                                  : 'Guest — no events yet'}
+                                className="text-xs font-medium rounded-full px-2 py-0.5 border whitespace-nowrap bg-purple-50 text-purple-700 border-purple-200"
+                              >
+                                Guest
+                              </span>
+                            ) : summary.length === 0 ? (
+                              <span className="text-xs text-gray-400">—</span>
+                            ) : (
+                              <div className="flex flex-wrap gap-1">
+                                {summary.map(s => (
+                                  <span
+                                    key={s.name}
+                                    title={s.events === 0
+                                      ? 'Member — no events played yet'
+                                      : s.guestOnly
+                                        ? `Guest only — ${s.events} event${s.events !== 1 ? 's' : ''}`
+                                        : `${s.events} event${s.events !== 1 ? 's' : ''}`}
+                                    className={`text-xs font-medium rounded-full px-2 py-0.5 border whitespace-nowrap ${
+                                      s.guestOnly
+                                        ? 'bg-purple-50 text-purple-700 border-purple-200'
+                                        : 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                                    }`}
+                                  >
+                                    {s.name}{s.guestOnly && ' · guest'}
+                                  </span>
+                                ))}
+                              </div>
+                            )}
+                          </td>
+                          <td className="px-4 py-3 font-medium text-gray-900 whitespace-nowrap">
+                            {p.first_name} {p.last_name}
+                          </td>
+                          <td className="px-4 py-3 text-gray-600">
+                            {p.email || <span className="text-gray-300">—</span>}
+                          </td>
+                          <td className="px-4 py-3 text-gray-600 tabular-nums whitespace-nowrap">
+                            {p.phone || <span className="text-gray-300">—</span>}
+                          </td>
+                          <td className="px-4 py-3 text-gray-600 tabular-nums">
+                            {p.ghin_number || <span className="text-gray-300">—</span>}
+                          </td>
+                          <td className="px-4 py-3 text-gray-600 tabular-nums text-right">
+                            {totalEvents(p.id)}
+                          </td>
+                          <td className="px-5 py-3">
+                            <div className="flex items-center justify-end gap-2">
+                              <Button variant="secondary" size="sm" onClick={() => { setEditing(p); setModal(true) }}>Edit</Button>
+                              <Button variant="danger" size="sm" onClick={() => handleDelete(p.id)}>Remove</Button>
+                            </div>
+                          </td>
+                        </tr>
+                      )
+                    })}
+                  </tbody>
+                </table>
               </div>
               <div className="px-5 py-2 bg-gray-50 text-xs text-gray-400 border-t border-gray-100">
                 {filtered.length} player{filtered.length !== 1 ? 's' : ''}
+                {leagueFilter !== 'all' && ` · filtered from ${searched.length}`}
               </div>
             </Card>
           )}
@@ -512,7 +766,7 @@ function RoleBadge({ role }) {
 }
 
 function PlayerModal({ open, onClose, editing, orgId, onSaved, onOpenMerge }) {
-  const [form,   setForm]   = useState({ first_name: '', last_name: '', email: '', ghin_number: '', intended_role: 'player' })
+  const [form,   setForm]   = useState({ first_name: '', last_name: '', email: '', phone: '', ghin_number: '', intended_role: 'player' })
   const [saving, setSaving] = useState(false)
 
   useEffect(() => {
@@ -520,10 +774,11 @@ function PlayerModal({ open, onClose, editing, orgId, onSaved, onOpenMerge }) {
       first_name:    editing.first_name,
       last_name:     editing.last_name,
       email:         editing.email ?? '',
+      phone:         editing.phone ?? '',
       ghin_number:   editing.ghin_number ?? '',
       intended_role: editing.intended_role ?? 'player',
     })
-    else setForm({ first_name: '', last_name: '', email: '', ghin_number: '', intended_role: 'player' })
+    else setForm({ first_name: '', last_name: '', email: '', phone: '', ghin_number: '', intended_role: 'player' })
   }, [editing, open])
 
   function setField(k, v) { setForm(f => ({ ...f, [k]: v })) }
@@ -543,6 +798,7 @@ function PlayerModal({ open, onClose, editing, orgId, onSaved, onOpenMerge }) {
       first_name:    form.first_name.trim(),
       last_name:     form.last_name.trim(),
       email:         form.email.trim() || null,
+      phone:         form.phone.trim() || null,
       ghin_number:   form.ghin_number.trim() || null,
       intended_role: form.intended_role,
     }
@@ -576,6 +832,7 @@ function PlayerModal({ open, onClose, editing, orgId, onSaved, onOpenMerge }) {
           <Input label="Last Name"  value={form.last_name}  onChange={e => setField('last_name',  e.target.value)} required />
         </div>
         <Input label="Email (optional)"       type="email" value={form.email}       onChange={e => setField('email',       e.target.value)} placeholder="player@example.com" />
+        <Input label="Phone (optional)"       type="tel"   value={form.phone}       onChange={e => setField('phone',       e.target.value)} placeholder="(555) 123-4567" />
         <Input label="GHIN Number (optional)"             value={form.ghin_number} onChange={e => setField('ghin_number', e.target.value)} placeholder="1234567" />
         <div>
           <label className="label">Role</label>
