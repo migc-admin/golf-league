@@ -141,9 +141,21 @@ export default function Players() {
       .includes(search.toLowerCase())
   )
 
+  // A single, stable league row per player — their primary league when they span more
+  // than one. Used for both sorting and CSV export, so both stay consistent with each
+  // other regardless of leagueSummary()'s event-count ordering.
+  function primaryLeagueRow(p) {
+    if (isGuestPlayer(p)) return null
+    const summary = leagueSummary(p)
+    if (summary.length === 0) return null
+    return summary.length > 1
+      ? (summary.find(s => s.name === primaryLeague?.name) ?? summary[0])
+      : summary[0]
+  }
+
   // Value a row sorts by, per column. Blanks sort last regardless of direction.
   function sortValue(p, key) {
-    if (key === 'league') return leagueSummary(p).map(s => s.name).join(', ')
+    if (key === 'league') return (isGuestPlayer(p) ? 'Guest' : primaryLeagueRow(p)?.name ?? '').toLowerCase()
     if (key === 'name')   return `${p.last_name} ${p.first_name}`.toLowerCase()
     if (key === 'events') return totalEvents(p.id)
     return (p[key] ?? '').toString().toLowerCase()
@@ -166,11 +178,7 @@ export default function Players() {
 
   function exportLeagueLabel(p) {
     if (isGuestPlayer(p)) return 'Guest'
-    const summary = leagueSummary(p)
-    // If a player spans multiple leagues, default the export to their primary league only.
-    const row = summary.length > 1
-      ? (summary.find(s => s.name === primaryLeague?.name) ?? summary[0])
-      : summary[0]
+    const row = primaryLeagueRow(p)
     if (!row) return ''
     return row.guestOnly ? `${row.name} (guest)` : row.name
   }
