@@ -2,13 +2,14 @@ import { useState } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { useAuth } from '../hooks/useAuth'
 import { supabase } from '../lib/supabase'
+import { safeInternalPath } from '../lib/safeRedirect'
 import toast from 'react-hot-toast'
 
 export default function Login() {
   const { user, signIn } = useAuth()
   const navigate  = useNavigate()
   const location  = useLocation()
-  const from      = location.state?.from?.pathname ?? '/home'
+  const from      = safeInternalPath(location.state?.from?.pathname, '/home')
 
   const [mode,        setMode]        = useState('signin') // 'signin' | 'signup' | 'reset'
   const [email,       setEmail]       = useState('')

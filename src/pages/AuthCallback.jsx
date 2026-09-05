@@ -7,12 +7,15 @@ import { useEffect } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { useAuth } from '../hooks/useAuth'
 import { supabase } from '../lib/supabase'
+import { safeInternalPath } from '../lib/safeRedirect'
 
 export default function AuthCallback() {
   const { user, loading } = useAuth()
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
-  const from = searchParams.get('from')
+  // `from` comes from the URL query string, so it's attacker-influenceable —
+  // constrain it to an internal path before ever navigating to it.
+  const from = safeInternalPath(searchParams.get('from'), null)
 
   useEffect(() => {
     if (loading) return
