@@ -399,7 +399,7 @@ export default function Players() {
                             )}
                           </td>
                           <td className="px-4 py-3 font-medium text-gray-900 whitespace-nowrap">
-                            {p.first_name} {p.last_name}
+                            {p.last_name}, {p.first_name}
                           </td>
                           <td className="px-4 py-3 text-gray-600">
                             {p.email || <span className="text-gray-300">—</span>}
