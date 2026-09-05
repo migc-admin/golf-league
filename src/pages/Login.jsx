@@ -10,11 +10,12 @@ export default function Login() {
   const location  = useLocation()
   const from      = location.state?.from?.pathname ?? '/home'
 
-  const [mode,     setMode]     = useState('signin') // 'signin' | 'signup' | 'reset'
-  const [email,    setEmail]    = useState('')
-  const [password, setPassword] = useState('')
-  const [name,     setName]     = useState('')
-  const [loading,  setLoading]  = useState(false)
+  const [mode,        setMode]        = useState('signin') // 'signin' | 'signup' | 'reset'
+  const [email,       setEmail]       = useState('')
+  const [password,    setPassword]    = useState('')
+  const [name,        setName]        = useState('')
+  const [loading,     setLoading]     = useState(false)
+  const [googleLoading, setGoogleLoading] = useState(false)
 
   // If already logged in, send to right place
   if (user) {
@@ -34,6 +35,25 @@ export default function Login() {
       navigate(from && from !== '/login' ? from : '/admin', { replace: true })
     } else {
       navigate(from && from !== '/login' ? from : '/home', { replace: true })
+    }
+  }
+
+  async function handleGoogleSignIn() {
+    setGoogleLoading(true)
+    try {
+      // `from` is lost across the full-page OAuth redirect, so carry it via query param
+      // and let /auth/callback restore it before routing.
+      const redirectTo = `${window.location.origin}/auth/callback` +
+        (from && from !== '/login' ? `?from=${encodeURIComponent(from)}` : '')
+      const { error } = await supabase.auth.signInWithOAuth({
+        provider: 'google',
+        options: { redirectTo },
+      })
+      if (error) throw error
+      // On success the browser navigates away to Google; nothing left to do here.
+    } catch (err) {
+      toast.error(err.message ?? 'Google sign-in failed')
+      setGoogleLoading(false)
     }
   }
 
@@ -119,6 +139,43 @@ export default function Login() {
                 </button>
               ))}
             </div>
+          )}
+
+          {mode !== 'reset' && (
+            <>
+              <button
+                type="button"
+                onClick={handleGoogleSignIn}
+                disabled={googleLoading || loading}
+                className="w-full flex items-center justify-center gap-2 rounded-xl py-2.5 text-sm font-semibold mb-5 transition-colors"
+                style={{ border: '1px solid #dcdcdc', color: '#1d1d1f', background: '#ffffff' }}
+              >
+                {googleLoading ? (
+                  <span className="flex items-center gap-2">
+                    <svg className="animate-spin h-4 w-4" fill="none" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                    </svg>
+                    Redirecting…
+                  </span>
+                ) : (
+                  <>
+                    <svg width="18" height="18" viewBox="0 0 18 18" aria-hidden="true">
+                      <path fill="#4285F4" d="M17.64 9.2c0-.64-.06-1.25-.16-1.84H9v3.48h4.84a4.14 4.14 0 01-1.8 2.72v2.26h2.9c1.7-1.56 2.7-3.87 2.7-6.62z"/>
+                      <path fill="#34A853" d="M9 18c2.43 0 4.47-.8 5.96-2.18l-2.9-2.26c-.8.54-1.84.86-3.06.86-2.35 0-4.34-1.59-5.05-3.72H.96v2.33A9 9 0 009 18z"/>
+                      <path fill="#FBBC05" d="M3.95 10.7A5.4 5.4 0 013.68 9c0-.59.1-1.17.27-1.7V4.97H.96A9 9 0 000 9c0 1.45.35 2.83.96 4.03l2.99-2.33z"/>
+                      <path fill="#EA4335" d="M9 3.58c1.32 0 2.51.45 3.44 1.35l2.58-2.58C13.46.89 11.43 0 9 0A9 9 0 00.96 4.97l2.99 2.33C4.66 5.17 6.65 3.58 9 3.58z"/>
+                    </svg>
+                    Continue with Google
+                  </>
+                )}
+              </button>
+              <div className="flex items-center gap-3 mb-5">
+                <div className="flex-1 h-px" style={{ background: '#ebe9e4' }} />
+                <span className="text-xs text-ink-muted">or</span>
+                <div className="flex-1 h-px" style={{ background: '#ebe9e4' }} />
+              </div>
+            </>
           )}
 
           {mode === 'reset' && (

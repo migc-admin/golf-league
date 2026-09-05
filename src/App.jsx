@@ -25,6 +25,7 @@ import Import         from './pages/admin/Import'
 import Settings       from './pages/admin/Settings'
 import Register       from './pages/Register'
 import Onboarding     from './pages/Onboarding'
+import AuthCallback   from './pages/AuthCallback'
 import Upgrade        from './pages/Upgrade'
 import ResetPassword  from './pages/ResetPassword'
 import FAQ            from './pages/FAQ'
@@ -84,6 +85,7 @@ export default function App() {
         <Route path="/login"       element={<Login />} />
         <Route path="/home"        element={<Home />} />
         <Route path="/onboarding"  element={<Onboarding />} />
+        <Route path="/auth/callback" element={<AuthCallback />} />
         <Route path="/upgrade"     element={<ProtectedRoute><Upgrade /></ProtectedRoute>} />
 
         {/* Admin (requires admin role) */}

@@ -1,6 +1,8 @@
 /**
  * Onboarding — shown to newly signed-up users who have no org/profile yet.
- * Step 1: choose tier + billing. Step 2: name the org.
+ * Step 1: name the org. Step 2: choose tier + billing (the paywall).
+ * Collecting the org name before pricing keeps signups invested before the
+ * price/payment decision.
  * Free → /admin. Paid → Stripe payment link with org ID attached.
  */
 import { useState } from 'react'
@@ -164,24 +166,69 @@ export default function Onboarding() {
 
   return (
     <div className="min-h-screen flex flex-col items-center justify-center p-6" style={{ background: '#fbfaf8' }}>
-      <div className="w-full" style={{ maxWidth: step === 1 ? 860 : 440 }}>
+      <div className="w-full" style={{ maxWidth: step === 1 ? 440 : 860 }}>
 
         {/* Logo */}
         <div className="text-center mb-8">
           <img src="/logo.png" alt="Scorify Golf" className="w-16 h-16 object-contain mx-auto mb-4" />
           <h1 className="font-bold text-2xl mb-1" style={{ letterSpacing: '-0.03em', color: INK }}>
-            {step === 1 ? 'Choose your plan' : 'Name your organization'}
+            {step === 1 ? 'Name your organization' : 'Choose your plan'}
           </h1>
           <p className="text-sm" style={{ color: '#6b7280' }}>
             {step === 1
-              ? 'You can upgrade or change your plan at any time.'
-              : 'This is the name your leagues and events will be listed under.'}
+              ? 'This is the name your leagues and events will be listed under.'
+              : 'You can upgrade or change your plan at any time.'}
           </p>
         </div>
 
-        {/* ── Step 1: Tier picker ── */}
+        {/* ── Step 1: Org name ── */}
         {step === 1 && (
-          <>
+          <div style={{
+            background: '#ffffff',
+            borderRadius: '1.5rem',
+            border: '1px solid #ebe9e4',
+            boxShadow: '0 20px 60px rgba(0,0,0,.08)',
+            padding: '32px 28px',
+          }}>
+            <form
+              onSubmit={e => { e.preventDefault(); if (orgName.trim()) setStep(2) }}
+              className="space-y-5"
+            >
+              <div>
+                <label className="label">Organization / Club Name</label>
+                <input
+                  type="text"
+                  value={orgName}
+                  onChange={e => setOrgName(e.target.value)}
+                  placeholder="e.g. Mulligan's Island Golf Club"
+                  className="input"
+                  autoFocus
+                  required
+                />
+              </div>
+
+              <button
+                type="submit"
+                disabled={!orgName.trim()}
+                className="btn-primary btn-lg w-full"
+              >
+                Continue →
+              </button>
+            </form>
+          </div>
+        )}
+
+        {/* ── Step 2: Tier picker (paywall) ── */}
+        {step === 2 && (
+          <form onSubmit={handleSubmit}>
+            {/* Org name recap */}
+            <div className="flex items-center justify-center gap-2 mb-6 text-sm" style={{ color: '#6b7280' }}>
+              <span>Organization: <strong style={{ color: INK }}>{orgName}</strong></span>
+              <button type="button" onClick={() => setStep(1)} className="text-xs underline" style={{ color: '#9ca3af' }}>
+                Change
+              </button>
+            </div>
+
             {/* Billing toggle */}
             <div className="flex items-center justify-center gap-3 mb-6">
               <button
@@ -279,76 +326,30 @@ export default function Onboarding() {
               })}
             </div>
 
-            <div className="flex justify-center">
-              <button
-                type="button"
-                onClick={() => setStep(2)}
-                className="btn-primary btn-lg"
-                style={{ minWidth: 240 }}
-              >
-                Continue with {selectedTier?.name} →
-              </button>
-            </div>
-          </>
-        )}
-
-        {/* ── Step 2: Org name ── */}
-        {step === 2 && (
-          <div style={{
-            background: '#ffffff',
-            borderRadius: '1.5rem',
-            border: '1px solid #ebe9e4',
-            boxShadow: '0 20px 60px rgba(0,0,0,.08)',
-            padding: '32px 28px',
-          }}>
-            {/* Selected plan badge */}
-            <div className="flex items-center gap-2 mb-6 pb-5" style={{ borderBottom: '1px solid #ebe9e4' }}>
-              <span className="text-xs font-semibold uppercase tracking-widest" style={{ color: '#9ca3af' }}>Plan:</span>
-              <span className="text-sm font-bold px-3 py-1 rounded-full" style={{ background: '#f0fdf4', color: GREEN }}>
-                {selectedTier?.name}
-                {tier !== 'free' && ` · ${billing === 'yearly' ? 'Annual' : 'Monthly'}`}
-              </span>
-              <button type="button" onClick={() => setStep(1)} className="text-xs underline ml-auto" style={{ color: '#9ca3af' }}>
-                Change
-              </button>
-            </div>
-
-            <form onSubmit={handleSubmit} className="space-y-5">
-              <div>
-                <label className="label">Organization / Club Name</label>
+            {tier !== 'free' && (
+              <label className="flex items-start gap-3 cursor-pointer max-w-xl mx-auto mb-6">
                 <input
-                  type="text"
-                  value={orgName}
-                  onChange={e => setOrgName(e.target.value)}
-                  placeholder="e.g. Mulligan's Island Golf Club"
-                  className="input"
-                  autoFocus
-                  required
+                  type="checkbox"
+                  checked={agreed}
+                  onChange={e => setAgreed(e.target.checked)}
+                  className="mt-0.5 shrink-0 rounded"
                 />
-              </div>
+                <span className="text-xs leading-relaxed" style={{ color: '#6b7280' }}>
+                  I have read and agree to the{' '}
+                  <a href="/refund-policy" target="_blank" rel="noopener noreferrer" className="underline font-medium" style={{ color: GREEN }}>Refund Policy</a>
+                  {' '}and{' '}
+                  <a href="/privacy" target="_blank" rel="noopener noreferrer" className="underline font-medium" style={{ color: GREEN }}>Privacy Policy</a>.
+                  I understand that my subscription will begin after a 21-day free trial and I will be charged <strong>{selectedPrice}</strong> after the trial ends.
+                </span>
+              </label>
+            )}
 
-              {tier !== 'free' && (
-                <label className="flex items-start gap-3 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={agreed}
-                    onChange={e => setAgreed(e.target.checked)}
-                    className="mt-0.5 shrink-0 rounded"
-                  />
-                  <span className="text-xs leading-relaxed" style={{ color: '#6b7280' }}>
-                    I have read and agree to the{' '}
-                    <a href="/refund-policy" target="_blank" rel="noopener noreferrer" className="underline font-medium" style={{ color: GREEN }}>Refund Policy</a>
-                    {' '}and{' '}
-                    <a href="/privacy" target="_blank" rel="noopener noreferrer" className="underline font-medium" style={{ color: GREEN }}>Privacy Policy</a>.
-                    I understand that my subscription will begin after a 21-day free trial and I will be charged <strong>{selectedPrice}</strong> after the trial ends.
-                  </span>
-                </label>
-              )}
-
+            <div className="flex flex-col items-center gap-2">
               <button
                 type="submit"
                 disabled={saving || authLoading || !orgName.trim() || (tier !== 'free' && !agreed)}
-                className="btn-primary btn-lg w-full"
+                className="btn-primary btn-lg"
+                style={{ minWidth: 240 }}
               >
                 {saving ? (
                   <span className="flex items-center justify-center gap-2">
@@ -358,7 +359,7 @@ export default function Onboarding() {
                     </svg>
                     Setting up…
                   </span>
-                ) : tier === 'free' ? 'Create my organization →' : 'Continue to payment →'}
+                ) : tier === 'free' ? 'Create my organization →' : `Continue with ${selectedTier?.name} →`}
               </button>
 
               {tier !== 'free' && (
@@ -366,8 +367,8 @@ export default function Onboarding() {
                   You'll be redirected to Stripe to complete payment. Your org is created first so your data is saved.
                 </p>
               )}
-            </form>
-          </div>
+            </div>
+          </form>
         )}
 
         <p className="text-center text-xs mt-6" style={{ color: '#9ca3af' }}>
