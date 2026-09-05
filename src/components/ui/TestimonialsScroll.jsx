@@ -8,32 +8,26 @@ const testimonials = [
   {
     text: "The post-round process is a breeze compared to manually checking scorecards. What used to take an hour is done before everyone leaves the clubhouse.",
     name: "League Organizer",
-    role: "Mulligan's Island Golf Club · San Diego, CA",
   },
   {
     text: "The ability to enter scores during the round and keep track of the competition is a game changer! Everyone is checking the leaderboard on the back nine.",
     name: "League Member",
-    role: "Mulligan's Island Golf Club · San Diego, CA",
   },
   {
     text: "Online registration, payment collection, and player organization has made the pre-tournament setup way more efficient. Our director can actually enjoy the round now.",
     name: "League Administrator",
-    role: "Mulligan's Island Golf Club · San Diego, CA",
   },
   {
     text: "The live leaderboard is a hit with our players. Everyone's on their phone checking standings between holes — it adds a whole new level of excitement to the round.",
     name: "Event Coordinator",
-    role: "Mulligan's Island Golf Club · San Diego, CA",
   },
   {
     text: "Setting up groups and printing tee sheets used to take most of my morning. With Scorify I have it done the night before in under 10 minutes.",
     name: "League Director",
-    role: "Mulligan's Island Golf Club · San Diego, CA",
   },
   {
     text: "No more arguments at the scoring table. Everything is digital, timestamped, and visible to everyone. It's just cleaner.",
     name: "Season Player",
-    role: "Mulligan's Island Golf Club · San Diego, CA",
   },
 ]
 
@@ -53,7 +47,7 @@ function StarRow() {
   )
 }
 
-function TestimonialCard({ text, name, role }) {
+function TestimonialCard({ text, name }) {
   return (
     <motion.div
       whileHover={{ scale: 1.03, y: -6, transition: { type: 'spring', stiffness: 400, damping: 17 } }}
@@ -62,10 +56,7 @@ function TestimonialCard({ text, name, role }) {
     >
       <StarRow />
       <p className="text-sm leading-relaxed mb-5" style={{ color: '#374151' }}>"{text}"</p>
-      <div>
-        <div className="text-sm font-semibold" style={{ color: '#1a1a1f' }}>{name}</div>
-        <div className="text-xs mt-0.5" style={{ color: '#9ca3af' }}>{role}</div>
-      </div>
+      <div className="text-sm font-semibold" style={{ color: '#1a1a1f' }}>{name}</div>
     </motion.div>
   )
 }

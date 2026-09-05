@@ -12,16 +12,43 @@ const GREEN  = '#1B4332'
 const GOLD   = '#D4AF37'
 const INK    = '#1d1d1f'
 
-// ─── Features ────────────────────────────────────────────────────────────────
+// ─── Features (ordered start-of-tournament → finish) ──────────────────────────
 const FEATURES = [
   {
     icon: (
       <svg width="28" height="28" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24">
-        <path d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+        <path d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
       </svg>
     ),
-    title: 'Live Leaderboards',
-    body: 'Real-time standings update as scores come in. Share a link with every player — no login required.',
+    title: 'Online Registration',
+    body: 'Players sign up for events through a shareable registration link. Guest requests, notes, and GHIN numbers collected automatically.',
+  },
+  {
+    icon: (
+      <svg width="28" height="28" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24">
+        <path d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" />
+      </svg>
+    ),
+    title: 'Player Management',
+    body: 'Import your roster, track handicap indexes, assign flights, and manage groups — all in one place.',
+  },
+  {
+    icon: (
+      <svg width="28" height="28" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24">
+        <path d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" />
+      </svg>
+    ),
+    title: 'Auto Group Scheduling',
+    body: 'Automatically assign players to groups by handicap, flight, or randomly — one click builds your whole tee sheet.',
+  },
+  {
+    icon: (
+      <svg width="28" height="28" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24">
+        <path d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+      </svg>
+    ),
+    title: 'Printable Scorecards',
+    body: 'Export pro-quality scorecards for every group with QR codes, tee times, and course details pre-filled.',
   },
   {
     icon: (
@@ -35,11 +62,20 @@ const FEATURES = [
   {
     icon: (
       <svg width="28" height="28" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24">
-        <path d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" />
+        <path d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
       </svg>
     ),
-    title: 'Player Management',
-    body: 'Import your roster, track handicap indexes, assign flights, and manage groups — all in one place.',
+    title: 'Live Leaderboards',
+    body: 'Real-time standings update as scores come in. Share a link with every player — no login required.',
+  },
+  {
+    icon: (
+      <svg width="28" height="28" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24">
+        <path d="M8.111 16.404a5.5 5.5 0 017.778 0M12 20h.01m-7.08-7.071c3.904-3.905 10.236-3.905 14.141 0M1.394 9.393c5.857-5.857 15.355-5.857 21.213 0" />
+      </svg>
+    ),
+    title: 'Offline Scoring',
+    body: 'Lost signal on the back nine? Scores save locally and sync automatically the moment connectivity returns.',
   },
   {
     icon: (
@@ -58,42 +94,6 @@ const FEATURES = [
     ),
     title: 'Season Standings',
     body: 'Cumulative season points across all events with a shareable public standings page for your league.',
-  },
-  {
-    icon: (
-      <svg width="28" height="28" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24">
-        <path d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
-      </svg>
-    ),
-    title: 'Printable Scorecards',
-    body: 'Export pro-quality scorecards for every group with QR codes, tee times, and course details pre-filled.',
-  },
-  {
-    icon: (
-      <svg width="28" height="28" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24">
-        <path d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" />
-      </svg>
-    ),
-    title: 'Auto Group Scheduling',
-    body: 'Automatically assign players to groups by handicap, flight, or randomly — one click builds your whole tee sheet.',
-  },
-  {
-    icon: (
-      <svg width="28" height="28" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24">
-        <path d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
-      </svg>
-    ),
-    title: 'Online Registration',
-    body: 'Players sign up for events through a shareable registration link. Guest requests, notes, and GHIN numbers collected automatically.',
-  },
-  {
-    icon: (
-      <svg width="28" height="28" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24">
-        <path d="M8.111 16.404a5.5 5.5 0 017.778 0M12 20h.01m-7.08-7.071c3.904-3.905 10.236-3.905 14.141 0M1.394 9.393c5.857-5.857 15.355-5.857 21.213 0" />
-      </svg>
-    ),
-    title: 'Offline Scoring',
-    body: 'Lost signal on the back nine? Scores save locally and sync automatically the moment connectivity returns.',
   },
 ]
 
@@ -262,11 +262,11 @@ export default function Home() {
     <>
     <Helmet>
       <title>Scorify Golf — Golf League Management Software</title>
-      <meta name="description" content="The easiest way to run a golf league. Live leaderboards, digital scorecards, handicap tracking, payout management, and online registration — free to start." />
+      <meta name="description" content="Scorify Golf is golf league management software for running weekly, monthly, and season-long leagues — live leaderboards, digital scorecards, handicap tracking, and payouts. Free to start, no credit card required." />
       <meta property="og:title" content="Scorify Golf — Golf League Management Software" />
-      <meta property="og:description" content="Run your golf league with live leaderboards, digital scorecards, handicap tracking, and payout management. Free to start." />
-      <meta property="og:url" content="https://scorifygolf.com" />
-      <link rel="canonical" href="https://scorifygolf.com" />
+      <meta property="og:description" content="Set up in minutes — online registration, digital scorecards, live leaderboards, and payouts. Free to start, no credit card required." />
+      <meta property="og:url" content="https://www.scorifygolf.com/" />
+      <link rel="canonical" href="https://www.scorifygolf.com/" />
       <script type="application/ld+json">{JSON.stringify({
         "@context": "https://schema.org",
         "@type": "SoftwareApplication",
@@ -274,7 +274,7 @@ export default function Home() {
         "applicationCategory": "SportsApplication",
         "operatingSystem": "Web",
         "description": "Golf league management software with live leaderboards, digital scorecards, handicap tracking, and payout management.",
-        "url": "https://scorifygolf.com",
+        "url": "https://www.scorifygolf.com/",
         "offers": {
           "@type": "Offer",
           "price": "0",
@@ -284,7 +284,7 @@ export default function Home() {
         "provider": {
           "@type": "Organization",
           "name": "Scorify Golf",
-          "url": "https://scorifygolf.com"
+          "url": "https://www.scorifygolf.com/"
         }
       })}</script>
     </Helmet>
@@ -427,13 +427,12 @@ export default function Home() {
         <HeroSection
           logo={{ url: '/logo.png', alt: 'Scorify Golf', text: 'Scorify Golf' }}
           slogan="Golf league management software"
-          title={<>Run your golf league<br /><span style={{ color: GOLD }}>the right way.</span></>}
-          subtitle="Digital scoring, live leaderboards, handicap tracking, payout management, and printable scorecards — built for the way your golf league actually plays."
+          title={<>The simplest way to<br />run a <span style={{ color: GOLD }}>golf event.</span></>}
+          subtitle="Set up in minutes — online registration, digital scorecards, live leaderboards, and payouts. Free to start, no credit card required."
           primaryCta={{ text: 'Get started free', href: '/login' }}
           secondaryCta={{ text: 'See features →', href: '#features' }}
           contactInfo={[
             { label: 'scorifygolf.com' },
-            { label: 'Mulligan\'s Island Golf Club, San Diego CA' },
           ]}
         />
 
@@ -677,14 +676,14 @@ export default function Home() {
               Built by a league director, for league directors
             </h2>
             <p className="text-base leading-relaxed mb-4 text-justify" style={{ color: '#6b7280' }}>
-              Scorify was built by Kevin V, a business operations professional who was that guy — stuck at the
-              scoring table entering results while everyone else had a beer after the round. The bottleneck was
-              always the same: one person manually reconciling paper scorecards while the rest of the group waited.
+              Scorify was built by Kevin Vargas, who spent one too many rounds stuck at the scoring table
+              reconciling paper scorecards while everyone else finished up. The bottleneck was always the same
+              person, doing the same manual work, every week.
             </p>
             <p className="text-base leading-relaxed mb-4 text-justify" style={{ color: '#6b7280' }}>
-              Existing tools were either too complicated, too expensive, or built for golf facilities — not the
-              independent organizer running a Wednesday night league out of a group chat. Scorify delivers an
-              affordable, modern platform so any league director can run their league like a pro.
+              Existing tools were either built for golf facilities, too complex for an independent organizer
+              running a weekly league out of a group chat, or too expensive. Scorify is the affordable, modern
+              alternative — built so any league director can run their league like a pro.
             </p>
             <p className="text-base leading-relaxed mb-10 text-justify" style={{ color: '#6b7280' }}>
               Questions or feedback? Reach out directly at{' '}

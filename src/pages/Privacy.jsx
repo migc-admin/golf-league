@@ -31,6 +31,7 @@ export default function Privacy() {
       <Helmet>
         <title>Privacy Policy — Scorify Golf</title>
         <meta name="description" content="Scorify Golf privacy policy — how we collect, use, and protect your personal information under CCPA, CPRA, and applicable US state laws." />
+        <link rel="canonical" href="https://www.scorifygolf.com/privacy" />
       </Helmet>
 
       {/* Nav */}

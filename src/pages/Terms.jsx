@@ -22,6 +22,7 @@ export default function Terms() {
       <Helmet>
         <title>Terms of Service — Scorify Golf</title>
         <meta name="description" content="Scorify Golf terms of service. Read our terms before using the platform." />
+        <link rel="canonical" href="https://www.scorifygolf.com/terms" />
       </Helmet>
 
       <div className="min-h-screen" style={{ background: '#fbfaf8' }}>

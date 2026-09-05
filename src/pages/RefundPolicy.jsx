@@ -30,6 +30,7 @@ export default function RefundPolicy() {
       <Helmet>
         <title>Refund Policy — Scorify Golf</title>
         <meta name="description" content="Scorify Golf refund and cancellation policy for monthly, annual, and one-time subscriptions." />
+        <link rel="canonical" href="https://www.scorifygolf.com/refund-policy" />
       </Helmet>
 
       {/* Nav */}

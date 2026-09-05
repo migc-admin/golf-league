@@ -269,7 +269,19 @@ export default function FAQ() {
         <meta name="description" content="Answers to common questions about Scorify Golf — digital scoring, handicaps, payouts, team play, pricing, and more." />
         <meta property="og:title" content="FAQ — Scorify Golf" />
         <meta property="og:description" content="Answers to common questions about Scorify Golf — digital scoring, handicaps, payouts, team play, pricing, and more." />
-        <link rel="canonical" href="https://scorifygolf.com/faq" />
+        <link rel="canonical" href="https://www.scorifygolf.com/faq" />
+        <script type="application/ld+json">{JSON.stringify({
+          "@context": "https://schema.org",
+          "@type": "FAQPage",
+          "mainEntity": FAQS.flatMap(section => section.items.map(item => ({
+            "@type": "Question",
+            "name": item.q,
+            "acceptedAnswer": {
+              "@type": "Answer",
+              "text": item.a,
+            },
+          }))),
+        })}</script>
       </Helmet>
 
       <div className="min-h-screen flex flex-col" style={{ background: '#fbfaf8', color: INK }}>

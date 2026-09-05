@@ -39,6 +39,7 @@ export default function Roadmap() {
       <Helmet>
         <title>Roadmap — Scorify Golf | What's coming next</title>
         <meta name="description" content="See what's planned for Scorify Golf and submit your own feature ideas. We build with league directors, not just for them." />
+        <link rel="canonical" href="https://www.scorifygolf.com/roadmap" />
       </Helmet>
       <div className="min-h-screen flex flex-col" style={{ background: '#fbfaf8', color: INK }}>
 
