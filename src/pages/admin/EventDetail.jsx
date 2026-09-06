@@ -12,7 +12,7 @@ import { useParams, Link, useSearchParams } from 'react-router-dom'
 import { supabase } from '../../lib/supabase'
 import toast from 'react-hot-toast'
 import { computePayouts, DEFAULT_PAYOUT_CONFIG, getCategoryLabel, ctpLabel, activePayoutKeys, defaultForKey } from '../../lib/engines/payouts'
-import { computeLeaderboards, getStrokeIndexForTee } from '../../lib/engines/scoring'
+import { computeLeaderboards, computeStableford, computeBlindPartners, getStrokeIndexForTee } from '../../lib/engines/scoring'
 import { computeAllSkins } from '../../lib/engines/skins'
 import { computeTGLEventResults, assignTGLPoints } from '../../lib/engines/tgl'
 import Card, { CardHeader } from '../../components/ui/Card'
@@ -424,7 +424,9 @@ async function exportScoresCSV(event, eventPlayers, allScores, course, sideGames
   nonGuestEPs.forEach(ep => { if (ep.flight) flightCounts[ep.flight] = (flightCounts[ep.flight] ?? 0) + 1 })
   const leaderboards  = computeLeaderboards(nonGuestEPs, allScores, course)
   const skinsResults  = computeAllSkins(nonGuestEPs, allScores, course)
-  const { byCategory } = computePayouts(event, nonGuestEPs.length, leaderboards, sideGames, skinsResults, flightCounts)
+  const stablefordData = computeStableford(nonGuestEPs, allScores, course)
+  const blindPartnersData = computeBlindPartners(event, nonGuestEPs, allScores, course)
+  const { byCategory } = computePayouts(event, nonGuestEPs.length, leaderboards, sideGames, skinsResults, flightCounts, stablefordData, blindPartnersData)
 
   const playerMap = Object.fromEntries(eventPlayers.map(ep => [ep.player_id, ep.player]))
 
@@ -3750,8 +3752,10 @@ function TabPayoutSummary({ event, eventPlayers, allScores, sideGames, course })
   nonGuestEPs.forEach(ep => { if (ep.flight) flightCounts[ep.flight] = (flightCounts[ep.flight] ?? 0) + 1 })
   const leaderboards  = computeLeaderboards(nonGuestEPs, allScores, course)
   const skinsResults  = computeAllSkins(nonGuestEPs, allScores, course)
+  const stablefordData = computeStableford(nonGuestEPs, allScores, course)
+  const blindPartnersData = computeBlindPartners(event, nonGuestEPs, allScores, course)
   const { totalPot, byCategory, byPlayer, totalAllocated } = computePayouts(
-    event, nonGuestEPs.length, leaderboards, sideGames, skinsResults, flightCounts
+    event, nonGuestEPs.length, leaderboards, sideGames, skinsResults, flightCounts, stablefordData, blindPartnersData
   )
 
   const playerMap = Object.fromEntries(

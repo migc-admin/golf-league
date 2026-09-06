@@ -8,7 +8,7 @@
 import { useRef, useState } from 'react'
 import { toPng } from 'html-to-image'
 import QRCode from 'qrcode'
-import { getStrokesOnHole, computeLeaderboards, getStrokeIndexForTee } from '../lib/engines/scoring'
+import { getStrokesOnHole, computeLeaderboards, computeStableford, computeBlindPartners, getStrokeIndexForTee } from '../lib/engines/scoring'
 import { computeSkinsForFlight, computeAllSkins } from '../lib/engines/skins'
 import { computePayouts } from '../lib/engines/payouts'
 import { computeTGLEventResults, assignTGLPoints } from '../lib/engines/tgl'
@@ -1228,6 +1228,8 @@ function buildResultsCard({ event, eventPlayers, allScores, course, sideGames, o
 
   // Leaderboards
   const leaderboards = computeLeaderboards(nonGuests, allScores, course)
+  const stablefordData = computeStableford(nonGuests, allScores, course)
+  const blindPartnersData = computeBlindPartners(event, nonGuests, allScores, course)
 
   // Skins
   const skinsResults = computeAllSkins(nonGuests, allScores, course)
@@ -1248,7 +1250,7 @@ function buildResultsCard({ event, eventPlayers, allScores, course, sideGames, o
   // Compute payouts — build per-category per-player amount map
   const flightCounts = {}
   nonGuests.forEach(ep => { if (ep.flight) flightCounts[ep.flight] = (flightCounts[ep.flight] ?? 0) + 1 })
-  const { byCategory } = computePayouts(event, nonGuests.length, leaderboards, sideGames, skinsResults, flightCounts)
+  const { byCategory } = computePayouts(event, nonGuests.length, leaderboards, sideGames, skinsResults, flightCounts, stablefordData, blindPartnersData)
 
   // catAmt[categoryKey][playerId] = amount for that specific result
   const catAmt = {}

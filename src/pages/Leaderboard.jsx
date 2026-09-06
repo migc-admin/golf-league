@@ -9,7 +9,7 @@ import { useParams, Link, useNavigate, useLocation, useSearchParams } from 'reac
 import { Helmet } from 'react-helmet-async'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../hooks/useAuth'
-import { computeLeaderboards, computeStableford, getStrokeIndexForTee } from '../lib/engines/scoring'
+import { computeLeaderboards, computeStableford, computeBlindPartners, getStrokeIndexForTee } from '../lib/engines/scoring'
 import { computeAllSkins, computeSkinsForFlight } from '../lib/engines/skins'
 import { computeMatchPoints, computeTeamMatchPoints } from '../lib/engines/matchPoints'
 import { computePayouts, CATEGORY_LABELS, ctpLabel } from '../lib/engines/payouts'
@@ -190,6 +190,7 @@ export default function Leaderboard() {
   const leaderboards    = course ? computeLeaderboards(eventPlayers, allScores, course)              : null
   const skinsResults    = course ? computeAllSkins(eventPlayers, allScores, course)                  : null
   const stablefordData  = course ? computeStableford(eventPlayers, allScores, course)                : null
+  const blindPartnersData = course ? computeBlindPartners(event, eventPlayers, allScores, course)    : null
   const matchData       = course ? computeMatchPoints(eventPlayers, allScores, course, matchPairings) : null
   const teamMatchData   = course ? computeTeamMatchPoints(eventPlayers, allScores, course, event?.team_match_config ?? null) : null
 
@@ -437,6 +438,8 @@ export default function Leaderboard() {
                 leaderboards={leaderboards}
                 sideGames={sideGames}
                 skinsResults={skinsResults}
+                stablefordData={stablefordData}
+                blindPartnersData={blindPartnersData}
                 playerMap={playerMap}
               />
             )}
@@ -858,55 +861,13 @@ function BlindPartnersLeaderboard({ event, eventPlayers, allScores, course }) {
   const pairs   = event?.side_game_entries?.blind_partner_pairs ?? []
   const parPerHole = course?.par_per_hole ?? []
 
-  function playerNet(playerId) {
-    const scores = allScores.filter(s => s.player_id === playerId)
-    const ep     = eventPlayers.find(e => e.player_id === playerId)
-    const ch     = ep?.course_handicap ?? ep?.handicap_index ?? 0
-    const strokes= parPerHole.map((_, i) => {
-      const s = scores.find(sc => sc.hole_number === i + 1)
-      return s?.gross_score ?? null
-    })
-    const siArr  = course?.stroke_index ?? parPerHole.map((_, i) => i + 1)
-    let net = 0
-    let holesPlayed = 0
-    strokes.forEach((gross, i) => {
-      if (gross == null) return
-      holesPlayed++
-      const si    = siArr[i] ?? i + 1
-      const shots = Math.floor(ch / parPerHole.length) + (si <= (ch % parPerHole.length) ? 1 : 0)
-      net += gross - shots
-    })
-    return { net, holesPlayed }
-  }
-
   function playerName(id) {
     const ep = eventPlayers.find(e => e.player_id === id)
     const p  = ep?.player ?? {}
     return [p.first_name, p.last_name].filter(Boolean).join(' ') || '—'
   }
 
-  const oddConfig = event?.side_game_entries?.blind_partner_odd ?? null
-
-  const ranked = pairs.map((pair, i) => {
-    const r1 = playerNet(pair.p1)
-    let r2
-    if (pair.p2) {
-      r2 = playerNet(pair.p2)
-    } else if (oddConfig?.type === 'ghost' && oddConfig.score !== '' && oddConfig.score != null) {
-      r2 = { net: Number(oddConfig.score), holesPlayed: 18 }
-    } else if (oddConfig?.type === 'blind' && oddConfig.player_id) {
-      r2 = playerNet(oddConfig.player_id)
-    } else {
-      r2 = { net: 0, holesPlayed: 0 }
-    }
-    return {
-      idx: i,
-      p1: pair.p1, p2: pair.p2,
-      oddConfig: !pair.p2 ? oddConfig : null,
-      combinedNet: r1.net + r2.net,
-      holesPlayed: Math.max(r1.holesPlayed, r2.holesPlayed),
-    }
-  }).sort((a, b) => a.combinedNet - b.combinedNet)
+  const ranked = computeBlindPartners(event, eventPlayers, allScores, course)
 
   if (pairs.length === 0) {
     return <p className="text-sm text-gray-400 text-center py-8">No pairs drawn yet.</p>
@@ -1356,7 +1317,7 @@ function TeamMatchBoard({ teamMatchData, teamAName = 'Team A', teamBName = 'Team
 }
 
 // ─── Payouts Board ────────────────────────────────────────────────
-function PayoutsBoard({ event, eventPlayers, leaderboards, sideGames, skinsResults, playerMap }) {
+function PayoutsBoard({ event, eventPlayers, leaderboards, sideGames, skinsResults, stablefordData, blindPartnersData, playerMap }) {
   if (!event?.payout_config || eventPlayers.length === 0) {
     return (
       <div className="text-center py-12 text-gray-400">
@@ -1374,7 +1335,7 @@ function PayoutsBoard({ event, eventPlayers, leaderboards, sideGames, skinsResul
   }
 
   const { totalPot, byCategory, byPlayer, totalAllocated } = computePayouts(
-    event, payingPlayers.length, leaderboards, sideGames ?? [], skinsResults, flightCounts
+    event, payingPlayers.length, leaderboards, sideGames ?? [], skinsResults, flightCounts, stablefordData, blindPartnersData
   )
 
   // Sort categories in the desired display order
@@ -1387,6 +1348,7 @@ function PayoutsBoard({ event, eventPlayers, leaderboards, sideGames, skinsResul
     if (key.startsWith('b9_b_'))    return 50
     // No-flight overall/9s
     if (key.startsWith('18_net_'))  return 0
+    if (key.startsWith('stf_net_')) return 5
     if (key.startsWith('f9_'))      return 10
     if (key.startsWith('b9_'))      return 20
     if (key === 'long_drive_a')     return 60

@@ -163,6 +163,71 @@ export function computeStableford(eventPlayers, allScores, course) {
 }
 
 /**
+ * Compute Blind Partners leaderboard for an event.
+ * Pairs are pre-drawn (event.side_game_entries.blind_partner_pairs) and ranked
+ * by combined net score ascending (lowest wins). An odd player out is handled
+ * via a ghost score or a blind (borrowed) partner score.
+ *
+ * @param {Object} event
+ * @param {Array}  eventPlayers
+ * @param {Array}  allScores
+ * @param {Object} course
+ * @returns {Array} pairs sorted ascending by combinedNet, each with a `rank`
+ */
+export function computeBlindPartners(event, eventPlayers, allScores, course) {
+  const pairs     = event?.side_game_entries?.blind_partner_pairs ?? []
+  const oddConfig = event?.side_game_entries?.blind_partner_odd ?? null
+
+  function playerNet(playerId) {
+    const scores = allScores.filter(s => s.player_id === playerId)
+    const ep     = eventPlayers.find(e => e.player_id === playerId)
+    const ch     = ep?.course_handicap ?? ep?.handicap_index ?? 0
+    const strokeIndexes = getStrokeIndexForTee(course, ep?.tee)
+    let net = 0
+    let holesPlayed = 0
+    scores.forEach(s => {
+      const si = strokeIndexes[s.hole_number - 1] ?? s.hole_number
+      net += s.gross_score - getStrokesOnHole(ch, si)
+      holesPlayed++
+    })
+    return { net, holesPlayed }
+  }
+
+  if (pairs.length === 0) return []
+
+  return pairs.map((pair, i) => {
+    const r1 = playerNet(pair.p1)
+    let r2
+    if (pair.p2) {
+      r2 = playerNet(pair.p2)
+    } else if (oddConfig?.type === 'ghost' && oddConfig.score !== '' && oddConfig.score != null) {
+      r2 = { net: Number(oddConfig.score), holesPlayed: 18 }
+    } else if (oddConfig?.type === 'blind' && oddConfig.player_id) {
+      r2 = playerNet(oddConfig.player_id)
+    } else {
+      r2 = { net: 0, holesPlayed: 0 }
+    }
+    return {
+      idx: i,
+      p1: pair.p1,
+      p2: pair.p2,
+      player_ids: [pair.p1, pair.p2].filter(Boolean),
+      oddConfig: !pair.p2 ? oddConfig : null,
+      combinedNet: r1.net + r2.net,
+      holesPlayed: Math.max(r1.holesPlayed, r2.holesPlayed),
+    }
+  })
+    .sort((a, b) => a.combinedNet - b.combinedNet)
+    .reduce((ranked, p, i) => {
+      // Tied pairs share a rank so they split the payout (same convention as computeLeaderboards)
+      const prev = ranked[i - 1]
+      const tied = prev && prev.combinedNet === p.combinedNet && prev.holesPlayed === p.holesPlayed
+      ranked.push({ ...p, rank: tied ? prev.rank : i + 1 })
+      return ranked
+    }, [])
+}
+
+/**
  * Compute all leaderboard positions for one event.
  *
  * @param {Array} eventPlayers   — from event_players with player attached

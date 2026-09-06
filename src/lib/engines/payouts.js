@@ -54,6 +54,9 @@ export function getCategoryLabel(key) {
   if (key === '18_gross_1st') return 'Low Gross — 1st'
   if (key === '18_gross_2nd') return 'Low Gross — 2nd'
   if (key === '18_gross_3rd') return 'Low Gross — 3rd'
+  if (key === 'stf_net_1st') return 'Stableford Net — 1st'
+  if (key === 'stf_net_2nd') return 'Stableford Net — 2nd'
+  if (key === 'stf_net_3rd') return 'Stableford Net — 3rd'
 
   // Per-flight patterns — any letter
   const fl = flightLetterOf(key)
@@ -107,12 +110,14 @@ export const DEFAULT_PAYOUT_CONFIG = {
   // No-flight
   '18_net_1st': 3, '18_net_2nd': 2, '18_net_3rd': 1,
   '18_gross_1st': 3, '18_gross_2nd': 2, '18_gross_3rd': 1,
+  'stf_net_1st': 3, 'stf_net_2nd': 2, 'stf_net_3rd': 1,
   'f9_1st': 2, 'f9_2nd': 1,
   'b9_1st': 2, 'b9_2nd': 1,
   'skins': 2,
   'long_drive': 0,
   // Full field
   'low_putts': 0,
+  'blind_partners': 0,
 }
 
 function defaultForKey(key) {
@@ -183,7 +188,13 @@ export function activePayoutKeys(event) {
       addRanked(`b9_${fmt.slice(-1)}`, payoutPlaces.net_stroke_back9 ?? 2, 2)
     }
 
-    // Gross Front 9 / Gross Back 9 — scoring only, no dedicated payout keys
+    // Stableford — Net
+    else if (fmt === 'stableford') {
+      addRanked('stf_net', payoutPlaces.stableford ?? 3, 3)
+    }
+
+    // Gross Front 9 / Gross Back 9 / Stableford Gross / Nassau / Team & Match Play formats —
+    // scoring only, no dedicated payout keys yet
   }
 
   // Skins — any flight letter or whole-group (from side_game_options)
@@ -192,6 +203,8 @@ export function activePayoutKeys(event) {
   sides.filter(s => s === 'long_drive' || s.match(/^long_drive_[a-z]$/)).forEach(s => keys.push(s))
   // Low Putts — whole-group or per-flight
   sides.filter(s => s === 'low_putts' || s.match(/^low_putts_[a-z]$/)).forEach(s => keys.push(s))
+  // Blind Partners — single standalone payout for the top pair
+  if (sides.includes('blind_partners')) keys.push('blind_partners')
   // CTP keys are dynamic (added by hole number) — handled separately in TabPayoutConfig
 
   return keys
@@ -207,8 +220,22 @@ function keyMultiplier(key) {
 }
 
 // Returns array of player_ids (multiple when tied)
-function resolveWinners(key, leaderboards, sideGames) {
+function resolveWinners(key, leaderboards, sideGames, stablefordData, blindPartnersData) {
   const rankMap = { '1st': 1, '2nd': 2, '3rd': 3 }
+
+  // Stableford Net (whole-group — same flatten pattern as other whole-group formats)
+  if (key.startsWith('stf_net_')) {
+    const rank = rankMap[key.split('_').pop()]
+    const list = Object.values(stablefordData ?? {}).flat()
+    return list.filter(p => p.rank === rank).map(p => p.player_id)
+  }
+  // Blind Partners — top (lowest combined net) pair; both partners split the payout
+  if (key === 'blind_partners') {
+    const list = blindPartnersData ?? []
+    const top = list[0]
+    if (!top) return []
+    return list.filter(p => p.rank === top.rank).flatMap(p => p.player_ids)
+  }
 
   // 18-hole net (per-flight or full field)
   if (key.startsWith('18_net_')) {
@@ -282,8 +309,10 @@ function resolveWinners(key, leaderboards, sideGames) {
  * @param {Array}  sideGames
  * @param {Object} skinsResults   — { A: skinsResult, B: skinsResult, ... }
  * @param {Object} flightCounts   — { A: number, B: number, C: number, ... }
+ * @param {Object} [stablefordData]    — from scoring.computeStableford, e.g. { A: [...], B: [...] }
+ * @param {Array}  [blindPartnersData] — from scoring.computeBlindPartners, ranked pairs
  */
-export function computePayouts(event, playerCount, leaderboards, sideGames, skinsResults, flightCounts) {
+export function computePayouts(event, playerCount, leaderboards, sideGames, skinsResults, flightCounts, stablefordData = null, blindPartnersData = null) {
   const config   = event.payout_config ?? {}
   const totalPot = (event.payout_basis === 'fixed' && event.payout_fixed_total)
     ? event.payout_fixed_total
@@ -328,7 +357,7 @@ export function computePayouts(event, playerCount, leaderboards, sideGames, skin
       const place = places[i]
       if (absorbed.has(place.rank)) continue
 
-      const winners = resolveWinners(place.key, leaderboards, sideGames)
+      const winners = resolveWinners(place.key, leaderboards, sideGames, stablefordData, blindPartnersData)
       const label = getCategoryLabel(place.key)
 
       if (winners.length > 1) {
@@ -375,8 +404,30 @@ export function computePayouts(event, playerCount, leaderboards, sideGames, skin
       continue
     }
 
+    // Blind Partners — both members of the winning pair are paid; they split the
+    // pot as a team, so this is not a "tie" unless multiple pairs actually tie.
+    if (key === 'blind_partners') {
+      const winners = resolveWinners(key, leaderboards, sideGames, stablefordData, blindPartnersData)
+      const pairs     = blindPartnersData ?? []
+      const tiedPairs = pairs.filter(p => p.rank === pairs[0]?.rank).length
+      const base      = getCategoryLabel(key)
+      const label =
+        tiedPairs > 1        ? `${base} (${tiedPairs} pairs tied — split ${winners.length} ways)`
+        : winners.length > 1 ? `${base} (Winning Pair — split ${winners.length} ways)`
+        : base
+      const split = winners.length > 0 ? Math.round((amount / winners.length) * 100) / 100 : 0
+
+      byCategory.push({ key, label, amount, playerId: winners[0] ?? null, playerIds: winners, isSkin: false, isTied: tiedPairs > 1 })
+      for (const pid of winners) {
+        if (!byPlayer[pid]) byPlayer[pid] = { total: 0, items: [] }
+        byPlayer[pid].total += split
+        byPlayer[pid].items.push({ category: label, amount: split })
+      }
+      continue
+    }
+
     const label   = getCategoryLabel(key)
-    const winners = resolveWinners(key, leaderboards, sideGames)
+    const winners = resolveWinners(key, leaderboards, sideGames, stablefordData, blindPartnersData)
     const isTied  = winners.length > 1
     const split   = winners.length > 0 ? Math.round((amount / winners.length) * 100) / 100 : 0
     const tieLabel = isTied ? `${label} (Tied — split ${winners.length} ways)` : label

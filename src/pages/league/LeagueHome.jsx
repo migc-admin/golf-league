@@ -2,7 +2,7 @@ import { useEffect, useState, Fragment } from 'react'
 import { Link } from 'react-router-dom'
 import { supabase } from '../../lib/supabase'
 import LeagueLayout from '../../components/LeagueLayout'
-import { computeLeaderboards } from '../../lib/engines/scoring'
+import { computeLeaderboards, computeStableford, computeBlindPartners } from '../../lib/engines/scoring'
 import { computeAllSkins } from '../../lib/engines/skins'
 import { computePayouts } from '../../lib/engines/payouts'
 
@@ -173,7 +173,9 @@ export default function LeagueHome({ orgSlug, leagueSlug, initialTab = 'events' 
       try {
         const leaderboards = computeLeaderboards(nonGuest, scores, course)
         const skinsResults = computeAllSkins(nonGuest, scores, course)
-        const { byPlayer } = computePayouts(ev, nonGuest.length, leaderboards, sideGames, skinsResults, flightCounts)
+        const stablefordData = computeStableford(nonGuest, scores, course)
+        const blindPartnersData = computeBlindPartners(ev, nonGuest, scores, course)
+        const { byPlayer } = computePayouts(ev, nonGuest.length, leaderboards, sideGames, skinsResults, flightCounts, stablefordData, blindPartnersData)
 
         for (const { playerId, items } of byPlayer) {
           const ep = eps.find(e => e.player_id === playerId)
