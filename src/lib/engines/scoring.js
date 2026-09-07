@@ -153,7 +153,13 @@ export function computeStableford(eventPlayers, allScores, course) {
   const sorted = (list) =>
     [...list]
       .sort((a, b) => b.totalPoints - a.totalPoints || b.holesPlayed - a.holesPlayed)
-      .map((p, i) => ({ ...p, rank: i + 1 }))
+      // Tie-aware ranking so tied players share a rank and split the payout
+      .reduce((ranked, p, i) => {
+        const prev = ranked[i - 1]
+        const tied = prev && prev.totalPoints === p.totalPoints && prev.holesPlayed === p.holesPlayed
+        ranked.push({ ...p, rank: tied ? prev.rank : i + 1 })
+        return ranked
+      }, [])
 
   const hasFlights = players.some(p => p.flight === 'A' || p.flight === 'B')
   return {

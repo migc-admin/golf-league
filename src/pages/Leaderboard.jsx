@@ -869,6 +869,10 @@ function BlindPartnersLeaderboard({ event, eventPlayers, allScores, course }) {
 
   const ranked = computeBlindPartners(event, eventPlayers, allScores, course)
 
+  // Tied pairs share a rank — label them T2 etc. (same convention as the net board)
+  const rankLabel = (pair) =>
+    ranked.filter(x => x.rank === pair.rank).length > 1 ? `T${pair.rank}` : `${pair.rank}`
+
   if (pairs.length === 0) {
     return <p className="text-sm text-gray-400 text-center py-8">No pairs drawn yet.</p>
   }
@@ -876,15 +880,14 @@ function BlindPartnersLeaderboard({ event, eventPlayers, allScores, course }) {
   return (
     <div className="space-y-2">
       <p className="text-xs text-gray-400 mb-3">Combined net score per pair — lowest wins.</p>
-      {ranked.map((pair, i) => {
-        const vsParTotal = pair.combinedNet - (parPerHole.reduce((a, b) => a + b, 0) * 2)
+      {ranked.map(pair => {
         const color = pair.combinedNet < parPerHole.reduce((a, b) => a + b, 0) * 2
           ? 'text-red-600' : pair.combinedNet === parPerHole.reduce((a, b) => a + b, 0) * 2
           ? 'text-gray-600' : 'text-black'
         return (
           <div key={pair.idx} className="flex items-center justify-between bg-white rounded-xl px-4 py-3 shadow-sm border border-gray-100">
             <div className="flex items-center gap-3">
-              <span className="text-sm font-bold text-gray-400 w-6">{i + 1}</span>
+              <span className="text-sm font-bold text-gray-400 w-6">{rankLabel(pair)}</span>
               <div>
                 <div className="text-sm font-semibold text-gray-800">{playerName(pair.p1)}</div>
                 {pair.p2
@@ -1008,6 +1011,10 @@ function SkinsBoard({ skinsResults, playerMap }) {
 function StablefordLeaderboard({ data, activeFlight }) {
   const list = data[activeFlight] ?? []
 
+  // Tied players share a rank — label them T3 etc. (same convention as the net board)
+  const rankLabel = (p) =>
+    list.filter(x => x.rank === p.rank).length > 1 ? `T${p.rank}` : `${p.rank}`
+
   if (!list.length) return (
     <div className="text-center py-12 text-gray-400">
       <svg className="mx-auto mb-3 w-10 h-10 text-gray-300" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.5"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="5"/><circle cx="12" cy="12" r="1" fill="currentColor"/></svg>
@@ -1029,10 +1036,10 @@ function StablefordLeaderboard({ data, activeFlight }) {
             style={{
               background: i % 2 === 1 ? 'rgba(27,67,50,0.025)' : '#ffffff',
               borderBottom: '1px solid #ebe9e4',
-              borderLeft: i === 0 ? '3px solid #1B4332' : undefined,
+              borderLeft: p.rank === 1 ? '3px solid #1B4332' : undefined,
             }}
           >
-            <span className="text-sm font-semibold text-ink-muted tabular-nums">{i + 1}</span>
+            <span className="text-sm font-semibold text-ink-muted tabular-nums">{rankLabel(p)}</span>
             <div>
               <div className="font-semibold text-sm text-ink leading-tight">
                 {p.player?.last_name}, {p.player?.first_name}

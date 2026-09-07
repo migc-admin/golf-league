@@ -1329,14 +1329,18 @@ function buildResultsCard({ event, eventPlayers, allScores, course, sideGames, o
     const body = sec._body
     const RANK_SUFF = ['1st', '2nd', '3rd']
 
+    // Stableford lives outside `leaderboards` but has the same { A, B } shape,
+    // so expose it under its own key for the format→data lookup in the builders.
+    const scoringData = { ...leaderboards, stableford: stablefordData }
+
     if (hasFlights) {
       // Single unified table — one set of columns for all formats
-      body.appendChild(buildAllFormatsTable(scoringFormats, formatLabels, leaderboards, flights, payoutPlaces, (pid, rank, fl, fmtPrefix) =>
+      body.appendChild(buildAllFormatsTable(scoringFormats, formatLabels, scoringData, flights, payoutPlaces, (pid, rank, fl, fmtPrefix) =>
         display(pid, `${fmtPrefix}_${fl.toLowerCase()}_${RANK_SUFF[rank - 1]}`)
       ))
     } else {
       // Full-field: each format is a sub-section but in a single table
-      body.appendChild(buildAllFormatsTableFullField(scoringFormats, formatLabels, leaderboards, payoutPlaces, (pid, rank, fmtPrefix) =>
+      body.appendChild(buildAllFormatsTableFullField(scoringFormats, formatLabels, scoringData, payoutPlaces, (pid, rank, fmtPrefix) =>
         display(pid, `${fmtPrefix}_${RANK_SUFF[rank - 1]}`)
       ))
     }
@@ -1503,11 +1507,39 @@ function getScoreVals(fmt, entry) {
   }
 }
 
+/**
+ * Formats that report one combined total rather than Out/In splits. These render
+ * a single cell spanning both score columns so the fixed column widths still line up.
+ */
+const TOTAL_ONLY_FORMATS = {
+  stableford: { label: 'Points', value: entry => entry?.totalPoints ?? null },
+}
+
+/** Append the score cells for a format — either Out/In, or one spanning total. */
+function appendScoreCells(tr, fmt, entry, styleFor, emptyText = '—') {
+  const totalOnly = TOTAL_ONLY_FORMATS[fmt]
+  if (totalOnly) {
+    const val = entry ? totalOnly.value(entry) : null
+    const td = document.createElement('td')
+    td.colSpan = 2
+    td.style.cssText = styleFor(val)
+    td.textContent = val != null ? String(val) : emptyText
+    tr.appendChild(td)
+    return
+  }
+  getScoreVals(fmt, entry).slice(0, 2).forEach(val => {
+    const td = document.createElement('td')
+    td.style.cssText = styleFor(val)
+    td.textContent = val != null ? String(val) : emptyText
+    tr.appendChild(td)
+  })
+}
+
 /** Single unified scoring table — all formats share one set of columns so widths stay locked */
 function buildAllFormatsTable(scoringFormats, formatLabels, leaderboards, flights, payoutPlaces, displayFn) {
   const RANK_LABELS = ['1st Place', '2nd Place', '3rd Place']
-  const leaderKeyMap = { net_stroke: 'full', net_stroke_front9: 'front9', net_stroke_back9: 'back9' }
-  const fmtPrefixMap = { net_stroke: '18_net', net_stroke_front9: 'f9', net_stroke_back9: 'b9' }
+  const leaderKeyMap = { net_stroke: 'full', net_stroke_front9: 'front9', net_stroke_back9: 'back9', stableford: 'stableford' }
+  const fmtPrefixMap = { net_stroke: '18_net', net_stroke_front9: 'f9', net_stroke_back9: 'b9', stableford: 'stf_net' }
 
   const SCORE_LABELS = ['Out', 'In']
   const colsPerFlight = 1 + SCORE_LABELS.length  // player + Out + In
@@ -1551,12 +1583,20 @@ function buildAllFormatsTable(scoringFormats, formatLabels, leaderboards, flight
   })
   thead.appendChild(hr1)
 
+  // When every format reports a single total (e.g. Stableford only), collapse
+  // the Out/In pair into one spanning column.
+  const allTotalOnly = scoringFormats.length > 0 && scoringFormats.every(f => TOTAL_ONLY_FORMATS[f])
+  const scoreHeaders = allTotalOnly
+    ? [{ label: TOTAL_ONLY_FORMATS[scoringFormats[0]].label, span: SCORE_LABELS.length }]
+    : SCORE_LABELS.map(label => ({ label, span: 1 }))
+
   const hr2 = document.createElement('tr')
   flights.forEach(() => {
-    ;['Player', ...SCORE_LABELS].forEach((label, i) => {
+    ;[{ label: 'Player', span: 1 }, ...scoreHeaders].forEach((h, i) => {
       const th = document.createElement('th')
+      th.colSpan = h.span
       th.style.cssText = `padding:4px 14px;text-align:${i === 0 ? 'left' : 'center'};background:${HDR_BG};color:#6b7280;font-size:9px;font-weight:700;border-bottom:${R_DIV};letter-spacing:0.04em;text-transform:uppercase;${i === 0 ? 'border-left:2px solid #c8d8c8;' : ''}`
-      th.textContent = label
+      th.textContent = h.label
       hr2.appendChild(th)
     })
   })
@@ -1607,13 +1647,10 @@ function buildAllFormatsTable(scoringFormats, formatLabels, leaderboards, flight
           tdPlayer.textContent = player ? displayFn(player.player_id, rank, fl, fmtPrefix) : (tiedIdx === 0 ? '—' : '')
           tr.appendChild(tdPlayer)
 
-          const scoreVals = getScoreVals(fmt, tiedIdx === 0 ? entry : null).slice(0, 2)
-          scoreVals.forEach(val => {
-            const tdScore = document.createElement('td')
-            tdScore.style.cssText = `padding:${R_PAD};font-size:12px;color:${val !== null ? '#374151' : '#d1d5db'};background:${rowBg};border-bottom:${borderBottom};text-align:center;font-weight:600;`
-            tdScore.textContent = val !== null ? String(val) : (tiedIdx === 0 ? '—' : '')
-            tr.appendChild(tdScore)
-          })
+          appendScoreCells(tr, fmt, tiedIdx === 0 ? entry : null, val =>
+            `padding:${R_PAD};font-size:12px;color:${val != null ? '#374151' : '#d1d5db'};background:${rowBg};border-bottom:${borderBottom};text-align:center;font-weight:600;`,
+            tiedIdx === 0 ? '—' : ''
+          )
         })
         tbody.appendChild(tr)
       }
@@ -1627,8 +1664,8 @@ function buildAllFormatsTable(scoringFormats, formatLabels, leaderboards, flight
 /** Full-field (no flights): Result | Player | Out | In | Putts */
 function buildAllFormatsTableFullField(scoringFormats, formatLabels, leaderboards, payoutPlaces, displayFn) {
   const RANK_LABELS = ['1st Place', '2nd Place', '3rd Place']
-  const leaderKeyMap = { net_stroke: 'full', net_stroke_front9: 'front9', net_stroke_back9: 'back9' }
-  const fmtPrefixMap = { net_stroke: '18_net', net_stroke_front9: 'f9', net_stroke_back9: 'b9' }
+  const leaderKeyMap = { net_stroke: 'full', net_stroke_front9: 'front9', net_stroke_back9: 'back9', stableford: 'stableford' }
+  const fmtPrefixMap = { net_stroke: '18_net', net_stroke_front9: 'f9', net_stroke_back9: 'b9', stableford: 'stf_net' }
 
   const tbl = document.createElement('table')
   tbl.style.cssText = 'width:100%;border-collapse:collapse;font-size:12px;table-layout:fixed;'
@@ -1640,13 +1677,20 @@ function buildAllFormatsTableFullField(scoringFormats, formatLabels, leaderboard
   })
   tbl.appendChild(cg)
 
-  // Header row
+  // Header row — when every format reports a single total (e.g. Stableford only),
+  // collapse the Out/In pair into one spanning column.
+  const allTotalOnly = scoringFormats.length > 0 && scoringFormats.every(f => TOTAL_ONLY_FORMATS[f])
+  const scoreHeaders = allTotalOnly
+    ? [{ label: TOTAL_ONLY_FORMATS[scoringFormats[0]].label, span: 2 }]
+    : [{ label: 'Out', span: 1 }, { label: 'In', span: 1 }]
+
   const thead = document.createElement('thead')
   const hr = document.createElement('tr')
-  ;['Result', 'Player', 'Out', 'In'].forEach((h, i) => {
+  ;[{ label: 'Result', span: 1 }, { label: 'Player', span: 1 }, ...scoreHeaders].forEach((h, i) => {
     const th = document.createElement('th')
+    th.colSpan = h.span
     th.style.cssText = `padding:7px 14px;text-align:${i <= 1 ? 'left' : 'center'};background:#e4ede4;color:${GREEN};font-size:${R_LABEL};font-weight:800;border-bottom:${R_DIV};letter-spacing:0.04em;text-transform:uppercase;`
-    th.textContent = h
+    th.textContent = h.label
     hr.appendChild(th)
   })
   thead.appendChild(hr)
@@ -1692,13 +1736,9 @@ function buildAllFormatsTableFullField(scoringFormats, formatLabels, leaderboard
         tr.appendChild(tdRank)
         tr.appendChild(tdName)
 
-        const scoreVals = getScoreVals(fmt, item).slice(0, 2)
-        scoreVals.forEach(val => {
-          const tdScore = document.createElement('td')
-          tdScore.style.cssText = `padding:${R_PAD};font-size:12px;color:${val !== null ? '#374151' : '#d1d5db'};background:${rowBg};border-bottom:${tiedIdx === tied.length - 1 ? R_DIV : 'none'};text-align:center;font-weight:600;`
-          tdScore.textContent = val !== null ? String(val) : '—'
-          tr.appendChild(tdScore)
-        })
+        appendScoreCells(tr, fmt, item, val =>
+          `padding:${R_PAD};font-size:12px;color:${val != null ? '#374151' : '#d1d5db'};background:${rowBg};border-bottom:${tiedIdx === tied.length - 1 ? R_DIV : 'none'};text-align:center;font-weight:600;`
+        )
 
         tbody.appendChild(tr)
       })
