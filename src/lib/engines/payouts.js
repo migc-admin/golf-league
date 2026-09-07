@@ -21,11 +21,11 @@ function getRankInfo(key) {
 
 /** Extract flight letter (uppercase) from a per-flight key, or null for full-field keys */
 function flightLetterOf(key) {
-  // skins_a, long_drive_b, low_putts_c
-  const sideMatch = key.match(/^(?:skins|long_drive|low_putts)_([a-z])$/)
+  // skins_a, super_skins_b, long_drive_b, low_putts_c
+  const sideMatch = key.match(/^(?:skins|super_skins|long_drive|low_putts)_([a-z])$/)
   if (sideMatch) return sideMatch[1].toUpperCase()
-  // 18_net_a_1st, 18_gross_a_1st, f9_b_2nd, b9_c_3rd
-  const scoringMatch = key.match(/^(?:18_net|18_gross|f9|b9)_([a-z])_(?:1st|2nd|3rd)$/)
+  // 18_net_a_1st, 18_gross_a_1st, f9_b_2nd, b9_c_3rd, stf_net_a_1st
+  const scoringMatch = key.match(/^(?:18_net|18_gross|f9|b9|stf_net)_([a-z])_(?:1st|2nd|3rd)$/)
   if (scoringMatch) return scoringMatch[1].toUpperCase()
   return null
 }
@@ -34,7 +34,13 @@ function flightLetterOf(key) {
 export function getCategoryLabel(key) {
   // CTP handled separately
   if (key.startsWith('ctp_'))       return `Closest to Pin — Hole ${key.replace('ctp_', '')} (Full Field)`
-  if (key.startsWith('super_ctp_')) return `Super CTP — Hole ${key.replace('super_ctp_', '')} (Full Field)`
+  // super_ctp_a_7 (per flight) or super_ctp_7 (whole group)
+  const superCtp = key.match(/^super_ctp_(?:([a-z])_)?(\d+)$/)
+  if (superCtp) {
+    return superCtp[1]
+      ? `Super CTP — Hole ${superCtp[2]}, Flight ${superCtp[1].toUpperCase()}`
+      : `Super CTP — Hole ${superCtp[2]} (Full Field)`
+  }
 
   // Full-field side games
   if (key === 'skins')           return 'Skins (Full Field)'
@@ -65,6 +71,10 @@ export function getCategoryLabel(key) {
     if (key.startsWith('skins_'))       return `Skins — Flight ${fl}`
     if (key.startsWith('long_drive_'))  return `Long Drive — Flight ${fl}`
     if (key.startsWith('low_putts_'))  return `Low Putts — Flight ${fl}`
+    if (key.startsWith('stf_net_')) {
+      const rank = key.split('_').pop()
+      return `Stableford Net — Flight ${fl}, ${rank}`
+    }
     if (key.startsWith('18_net_')) {
       const rank = key.split('_').pop()
       return `18-Hole Net — Flight ${fl}, ${rank}`
@@ -101,6 +111,8 @@ export const DEFAULT_PAYOUT_CONFIG = {
   '18_net_b_1st': 3, '18_net_b_2nd': 2, '18_net_b_3rd': 1,
   '18_gross_a_1st': 3, '18_gross_a_2nd': 2, '18_gross_a_3rd': 1,
   '18_gross_b_1st': 3, '18_gross_b_2nd': 2, '18_gross_b_3rd': 1,
+  'stf_net_a_1st': 3, 'stf_net_a_2nd': 2, 'stf_net_a_3rd': 1,
+  'stf_net_b_1st': 3, 'stf_net_b_2nd': 2, 'stf_net_b_3rd': 1,
   'f9_a_1st': 2, 'f9_a_2nd': 1,
   'f9_b_1st': 2, 'f9_b_2nd': 1,
   'b9_a_1st': 2, 'b9_a_2nd': 1,
@@ -118,6 +130,8 @@ export const DEFAULT_PAYOUT_CONFIG = {
   // Full field
   'low_putts': 0,
   'blind_partners': 0,
+  // Opt-in pots — funded by the buy-in, so they start at 0
+  'super_skins': 0, 'super_skins_a': 0, 'super_skins_b': 0,
 }
 
 function defaultForKey(key) {
@@ -191,6 +205,8 @@ export function activePayoutKeys(event) {
     // Stableford — Net
     else if (fmt === 'stableford') {
       addRanked('stf_net', payoutPlaces.stableford ?? 3, 3)
+    } else if (/^stableford_[a-z]$/.test(fmt)) {
+      addRanked(`stf_net_${fmt.slice(-1)}`, payoutPlaces.stableford ?? 3, 3)
     }
 
     // Gross Front 9 / Gross Back 9 / Stableford Gross / Nassau / Team & Match Play formats —
@@ -203,6 +219,20 @@ export function activePayoutKeys(event) {
   sides.filter(s => s === 'long_drive' || s.match(/^long_drive_[a-z]$/)).forEach(s => keys.push(s))
   // Low Putts — whole-group or per-flight
   sides.filter(s => s === 'low_putts' || s.match(/^low_putts_[a-z]$/)).forEach(s => keys.push(s))
+  // Super Skins — opt-in pot, whole-group or per-flight
+  sides.filter(s => s === 'super_skins' || s.match(/^super_skins_[a-z]$/)).forEach(s => keys.push(s))
+  // Super CTP — the single designated par 3 (opt-in pot). Per-flight when the
+  // side game was selected per flight, otherwise one whole-group prize.
+  if (event.super_ctp_hole) {
+    const superCtpFlights = sides
+      .map(s => s.match(/^super_ctp_([a-z])$/)?.[1])
+      .filter(Boolean)
+    if (superCtpFlights.length > 0) {
+      superCtpFlights.forEach(fl => keys.push(`super_ctp_${fl}_${event.super_ctp_hole}`))
+    } else if (sides.includes('super_ctp')) {
+      keys.push(`super_ctp_${event.super_ctp_hole}`)
+    }
+  }
   // Blind Partners — single standalone payout for the top pair
   if (sides.includes('blind_partners')) keys.push('blind_partners')
   // CTP keys are dynamic (added by hole number) — handled separately in TabPayoutConfig
@@ -223,10 +253,13 @@ function keyMultiplier(key) {
 function resolveWinners(key, leaderboards, sideGames, stablefordData, blindPartnersData) {
   const rankMap = { '1st': 1, '2nd': 2, '3rd': 3 }
 
-  // Stableford Net (whole-group — same flatten pattern as other whole-group formats)
+  // Stableford Net (per-flight or whole-group)
   if (key.startsWith('stf_net_')) {
+    const fl = flightLetterOf(key)
     const rank = rankMap[key.split('_').pop()]
-    const list = Object.values(stablefordData ?? {}).flat()
+    const list = fl
+      ? (stablefordData?.[fl] ?? [])
+      : Object.values(stablefordData ?? {}).flat()
     return list.filter(p => p.rank === rank).map(p => p.player_id)
   }
   // Blind Partners — top (lowest combined net) pair; both partners split the payout
@@ -291,6 +324,17 @@ function resolveWinners(key, leaderboards, sideGames, stablefordData, blindPartn
     )
     return g?.winner_player_id ? [g.winner_player_id] : []
   }
+  // Super CTP — opt-in pot on one designated hole, optionally per flight
+  const superCtp = key.match(/^super_ctp_(?:([a-z])_)?(\d+)$/)
+  if (superCtp) {
+    const fl = superCtp[1]?.toUpperCase() ?? null
+    const holeNum = parseInt(superCtp[2], 10)
+    const g = sideGames.find(g =>
+      g.game_type === 'super_ctp' && g.hole_number === holeNum &&
+      (fl ? g.flight === fl : !g.flight || g.flight === 'overall')
+    )
+    return g?.winner_player_id ? [g.winner_player_id] : []
+  }
   // CTP
   if (key.startsWith('ctp_')) {
     const holeNum = parseInt(key.replace('ctp_', ''), 10)
@@ -311,8 +355,9 @@ function resolveWinners(key, leaderboards, sideGames, stablefordData, blindPartn
  * @param {Object} flightCounts   — { A: number, B: number, C: number, ... }
  * @param {Object} [stablefordData]    — from scoring.computeStableford, e.g. { A: [...], B: [...] }
  * @param {Array}  [blindPartnersData] — from scoring.computeBlindPartners, ranked pairs
+ * @param {Object} [superSkinsResult]  — from skins.computeSuperSkins (single flattened pool)
  */
-export function computePayouts(event, playerCount, leaderboards, sideGames, skinsResults, flightCounts, stablefordData = null, blindPartnersData = null) {
+export function computePayouts(event, playerCount, leaderboards, sideGames, skinsResults, flightCounts, stablefordData = null, blindPartnersData = null, superSkinsResult = null) {
   const config   = event.payout_config ?? {}
   const totalPot = (event.payout_basis === 'fixed' && event.payout_fixed_total)
     ? event.payout_fixed_total
@@ -327,6 +372,16 @@ export function computePayouts(event, playerCount, leaderboards, sideGames, skin
     return Math.round(playerCount / numFlights)
   }
 
+  // Opt-in pots are funded only by the players who bought in, not the whole field.
+  // Returns null when the game isn't opt-in (or no entries are tracked) so the
+  // caller falls back to the flight/field count.
+  function optInCount(key) {
+    const entries = event.side_game_entries ?? {}
+    if (key === 'super_skins' || /^super_skins_[a-z]$/.test(key)) return entries.super_skins?.length ?? null
+    if (key.startsWith('super_ctp_')) return entries.super_ctp?.length ?? null
+    return null
+  }
+
   const byCategory = []
   const byPlayer   = {}
 
@@ -337,7 +392,7 @@ export function computePayouts(event, playerCount, leaderboards, sideGames, skin
     if (!dollarVal || dollarVal <= 0) continue
     const multiplier = keyMultiplier(key)
     const fl = multiplier.startsWith('flight_') ? multiplier.replace('flight_', '').toUpperCase() : null
-    const count = getFlightCount(fl)
+    const count = optInCount(key) ?? getFlightCount(fl)
     const amount = Math.round(dollarVal * count * 100) / 100
     const rankInfo = getRankInfo(key)
     if (rankInfo) {
@@ -387,6 +442,19 @@ export function computePayouts(event, playerCount, leaderboards, sideGames, skin
 
   // Process standalone keys (skins, long drive, low putts, ctp)
   for (const { key, amount } of standaloneEntries) {
+    // Super Skins — one flattened pool of opted-in players, paid per skin
+    if (key === 'super_skins' || /^super_skins_[a-z]$/.test(key)) {
+      if (!superSkinsResult) continue
+      for (const sp of computeSkinsPayout(superSkinsResult, amount)) {
+        const label = `${getCategoryLabel(key)} (${sp.skinsWon} skin${sp.skinsWon !== 1 ? 's' : ''})`
+        byCategory.push({ key: `${key}_${sp.playerId}`, label, amount: sp.total, playerId: sp.playerId, isSkin: true })
+        if (!byPlayer[sp.playerId]) byPlayer[sp.playerId] = { total: 0, items: [] }
+        byPlayer[sp.playerId].total += sp.total
+        byPlayer[sp.playerId].items.push({ category: label, amount: sp.total })
+      }
+      continue
+    }
+
     // Skins — any flight letter
     const skinsFlightMatch = key.match(/^skins_([a-z])$/)
     if (key === 'skins' || skinsFlightMatch) {

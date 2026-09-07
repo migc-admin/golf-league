@@ -9,7 +9,7 @@ import { useRef, useState } from 'react'
 import { toPng } from 'html-to-image'
 import QRCode from 'qrcode'
 import { getStrokesOnHole, computeLeaderboards, computeStableford, computeBlindPartners, getStrokeIndexForTee } from '../lib/engines/scoring'
-import { computeSkinsForFlight, computeAllSkins } from '../lib/engines/skins'
+import { computeSkinsForFlight, computeAllSkins, computeSuperSkins } from '../lib/engines/skins'
 import { computePayouts } from '../lib/engines/payouts'
 import { computeTGLEventResults, assignTGLPoints } from '../lib/engines/tgl'
 
@@ -1233,6 +1233,7 @@ function buildResultsCard({ event, eventPlayers, allScores, course, sideGames, o
 
   // Skins
   const skinsResults = computeAllSkins(nonGuests, allScores, course)
+  const superSkinsResult = computeSuperSkins(event, nonGuests, allScores, course)
 
   const eventDate = event.event_date
     ? new Date(event.event_date + 'T00:00:00').toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' })
@@ -1250,7 +1251,7 @@ function buildResultsCard({ event, eventPlayers, allScores, course, sideGames, o
   // Compute payouts — build per-category per-player amount map
   const flightCounts = {}
   nonGuests.forEach(ep => { if (ep.flight) flightCounts[ep.flight] = (flightCounts[ep.flight] ?? 0) + 1 })
-  const { byCategory } = computePayouts(event, nonGuests.length, leaderboards, sideGames, skinsResults, flightCounts, stablefordData, blindPartnersData)
+  const { byCategory } = computePayouts(event, nonGuests.length, leaderboards, sideGames, skinsResults, flightCounts, stablefordData, blindPartnersData, superSkinsResult)
 
   // catAmt[categoryKey][playerId] = amount for that specific result
   const catAmt = {}
@@ -1260,7 +1261,8 @@ function buildResultsCard({ event, eventPlayers, allScores, course, sideGames, o
       const baseKey = cat.key.replace(/_[^_]+$/, '')
       if (!catAmt[baseKey]) catAmt[baseKey] = {}
       catAmt[baseKey][cat.playerId] = cat.amount
-    } else if (cat.isTied && cat.playerIds?.length > 1) {
+    } else if (cat.playerIds?.length > 1) {
+      // Multiple winners share the pot — tied players, or a team/pair like Blind Partners
       const split = Math.floor((cat.amount / cat.playerIds.length) * 100) / 100
       if (!catAmt[cat.key]) catAmt[cat.key] = {}
       cat.playerIds.forEach(pid => { catAmt[cat.key][pid] = split })
@@ -1315,9 +1317,12 @@ function buildResultsCard({ event, eventPlayers, allScores, course, sideGames, o
     net_stroke:        '18-Hole Net',
     net_stroke_front9: 'Front 9 Net',
     net_stroke_back9:  'Back 9 Net',
+    low_gross:         'Low Gross',
     stableford:        'Stableford',
   }
-  const scoringFormats = formats.filter(f => formatLabels[f])
+  // Per-flight formats are stored with a letter suffix ('stableford_a'); the flight
+  // split is driven by `flights` below, so collapse them back to one base format.
+  const scoringFormats = [...new Set(formats.map(f => f.replace(/_[a-z]$/, '')))].filter(f => formatLabels[f])
   const payoutPlaces = event.payout_places ?? {}
   const RANK_LABELS = ['1st Place', '2nd Place', '3rd Place']
 
@@ -1454,6 +1459,78 @@ function buildResultsCard({ event, eventPlayers, allScores, course, sideGames, o
     wrap.appendChild(sec._card)
   }
 
+  // ── Super Skins ──────────────────────────────────────────────────
+  // Opt-in pot played as one pool, so there is never a flight split here.
+  const superSkinsKey = sides.find(s => s === 'super_skins' || s.match(/^super_skins_[a-z]$/))
+  if (superSkinsKey && superSkinsResult) {
+    const sec = buildSection('Super Skins', GREEN, GOLD)
+    const winners = Object.entries(superSkinsResult.playerSkins)
+      .filter(([, n]) => n > 0)
+      .sort(([, a], [, b]) => b - a)
+
+    if (winners.length === 0) {
+      const none = el('div', { padding: '10px 14px', color: '#999', fontSize: '12px' })
+      none.textContent = superSkinsResult.carryoverToNext
+        ? `No skins won — ${superSkinsResult.carryoverAmount} carry to next event`
+        : 'No skins won'
+      sec._body.appendChild(none)
+    } else {
+      sec._body.appendChild(buildFullFieldGrid(
+        winners.map(([pid, count]) => ({ player_id: pid, _suffix: ` · ${count} skin${count !== 1 ? 's' : ''}` })),
+        winners.length, pid => display(pid, superSkinsKey),
+        GREEN, ROW_BG_ALT, true
+      ))
+    }
+    wrap.appendChild(sec._card)
+  }
+
+  // ── Super CTP ────────────────────────────────────────────────────
+  // A single designated par 3 with its own opt-in pot.
+  const superCtpHole = event.super_ctp_hole ? parseInt(event.super_ctp_hole, 10) : null
+  const superCtpFlights = sides.map(s => s.match(/^super_ctp_([a-z])$/)?.[1]).filter(Boolean)
+  if (superCtpHole && (superCtpFlights.length > 0 || sides.includes('super_ctp'))) {
+    const sec = buildSection('Super Closest to Pin', GREEN, GOLD)
+    const entries = superCtpFlights.length > 0
+      ? superCtpFlights.map(fl => ({ fl: fl.toUpperCase(), key: `super_ctp_${fl}_${superCtpHole}` }))
+      : [{ fl: null, key: `super_ctp_${superCtpHole}` }]
+
+    sec._body.appendChild(buildCtpGrid(entries.map(({ fl, key }) => {
+      const g = sideGames.find(g =>
+        g.game_type === 'super_ctp' && g.hole_number === superCtpHole &&
+        (fl ? g.flight === fl : !g.flight || g.flight === 'overall')
+      )
+      return {
+        label: fl ? `Hole ${superCtpHole} · Flight ${fl}` : `Hole ${superCtpHole}`,
+        name:  g?.winner_player_id ? display(g.winner_player_id, key) : '—',
+      }
+    })))
+    wrap.appendChild(sec._card)
+  }
+
+  // ── Blind Partners ───────────────────────────────────────────────
+  if (sides.includes('blind_partners') && blindPartnersData.length > 0) {
+    const sec = buildSection('Blind Partners', GREEN, GOLD)
+    const isStableford = blindPartnersData[0].mode === 'stableford'
+    const unit    = isStableford ? 'pts' : 'net'
+    const topRank = blindPartnersData[0].rank
+
+    blindPartnersData.filter(p => p.rank === topRank).forEach(pair => {
+      const names = pair.player_ids.map(pid => display(pid, 'blind_partners'))
+      if (!pair.p2) {
+        // Odd player out — their partner score comes from a ghost or a borrowed card
+        names.push(
+          pair.oddConfig?.type === 'ghost' ? `Ghost (${pair.oddConfig.score ?? '—'} ${unit})`
+          : pair.oddConfig?.type === 'blind' && pair.oddConfig.player_id
+            ? `${playerName(pair.oddConfig.player_id)} (blind draw)`
+            : 'No partner'
+        )
+      }
+      sec._body.appendChild(buildSingleWinnerRow(`${names.join(' + ')} — ${pair.combinedScore} ${unit}`))
+    })
+
+    wrap.appendChild(sec._card)
+  }
+
   // ── Footer ───────────────────────────────────────────────────────
   const footer = el('div', { marginTop: '12px', textAlign: 'center' })
   footer.appendChild(txt(`${orgName ?? 'Scorify Golf'} · ${course.name ?? ''} · ${eventDate}`, {
@@ -1503,6 +1580,7 @@ function getScoreVals(fmt, entry) {
     case 'net_stroke':        return [entry.netF9 ?? null, entry.netB9 ?? null, entry.totalPutts ?? null]
     case 'net_stroke_front9': return [entry.netF9 ?? null, null, null]
     case 'net_stroke_back9':  return [null, entry.netB9 ?? null, null]
+    case 'low_gross':         return [entry.grossF9 ?? null, entry.grossB9 ?? null, entry.totalPutts ?? null]
     default:                  return [null, null, null]
   }
 }
@@ -1538,8 +1616,8 @@ function appendScoreCells(tr, fmt, entry, styleFor, emptyText = '—') {
 /** Single unified scoring table — all formats share one set of columns so widths stay locked */
 function buildAllFormatsTable(scoringFormats, formatLabels, leaderboards, flights, payoutPlaces, displayFn) {
   const RANK_LABELS = ['1st Place', '2nd Place', '3rd Place']
-  const leaderKeyMap = { net_stroke: 'full', net_stroke_front9: 'front9', net_stroke_back9: 'back9', stableford: 'stableford' }
-  const fmtPrefixMap = { net_stroke: '18_net', net_stroke_front9: 'f9', net_stroke_back9: 'b9', stableford: 'stf_net' }
+  const leaderKeyMap = { net_stroke: 'full', net_stroke_front9: 'front9', net_stroke_back9: 'back9', low_gross: 'grossFull', stableford: 'stableford' }
+  const fmtPrefixMap = { net_stroke: '18_net', net_stroke_front9: 'f9', net_stroke_back9: 'b9', low_gross: '18_gross', stableford: 'stf_net' }
 
   const SCORE_LABELS = ['Out', 'In']
   const colsPerFlight = 1 + SCORE_LABELS.length  // player + Out + In
@@ -1664,8 +1742,8 @@ function buildAllFormatsTable(scoringFormats, formatLabels, leaderboards, flight
 /** Full-field (no flights): Result | Player | Out | In | Putts */
 function buildAllFormatsTableFullField(scoringFormats, formatLabels, leaderboards, payoutPlaces, displayFn) {
   const RANK_LABELS = ['1st Place', '2nd Place', '3rd Place']
-  const leaderKeyMap = { net_stroke: 'full', net_stroke_front9: 'front9', net_stroke_back9: 'back9', stableford: 'stableford' }
-  const fmtPrefixMap = { net_stroke: '18_net', net_stroke_front9: 'f9', net_stroke_back9: 'b9', stableford: 'stf_net' }
+  const leaderKeyMap = { net_stroke: 'full', net_stroke_front9: 'front9', net_stroke_back9: 'back9', low_gross: 'grossFull', stableford: 'stableford' }
+  const fmtPrefixMap = { net_stroke: '18_net', net_stroke_front9: 'f9', net_stroke_back9: 'b9', low_gross: '18_gross', stableford: 'stf_net' }
 
   const tbl = document.createElement('table')
   tbl.style.cssText = 'width:100%;border-collapse:collapse;font-size:12px;table-layout:fixed;'

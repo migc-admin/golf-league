@@ -9,8 +9,8 @@ import { useParams, Link, useNavigate, useLocation, useSearchParams } from 'reac
 import { Helmet } from 'react-helmet-async'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../hooks/useAuth'
-import { computeLeaderboards, computeStableford, computeBlindPartners, getStrokeIndexForTee } from '../lib/engines/scoring'
-import { computeAllSkins, computeSkinsForFlight } from '../lib/engines/skins'
+import { computeLeaderboards, computeStableford, computeBlindPartners, blindPartnersMode, getStrokeIndexForTee } from '../lib/engines/scoring'
+import { computeAllSkins, computeSuperSkins } from '../lib/engines/skins'
 import { computeMatchPoints, computeTeamMatchPoints } from '../lib/engines/matchPoints'
 import { computePayouts, CATEGORY_LABELS, ctpLabel } from '../lib/engines/payouts'
 import { computeTGLEventResults } from '../lib/engines/tgl'
@@ -191,6 +191,7 @@ export default function Leaderboard() {
   const skinsResults    = course ? computeAllSkins(eventPlayers, allScores, course)                  : null
   const stablefordData  = course ? computeStableford(eventPlayers, allScores, course)                : null
   const blindPartnersData = course ? computeBlindPartners(event, eventPlayers, allScores, course)    : null
+  const superSkinsResult  = course ? computeSuperSkins(event, eventPlayers, allScores, course)       : null
   const matchData       = course ? computeMatchPoints(eventPlayers, allScores, course, matchPairings) : null
   const teamMatchData   = course ? computeTeamMatchPoints(eventPlayers, allScores, course, event?.team_match_config ?? null) : null
 
@@ -411,7 +412,7 @@ export default function Leaderboard() {
               <PuttLeaderboard data={leaderboards.putts} playerMap={playerMap} allScores={allScores} course={course} />
             )}
             {activeTab === 'Stableford' && stablefordData && (
-              <StablefordLeaderboard data={stablefordData} activeFlight={activeFlight} />
+              <StablefordLeaderboard data={stablefordData} activeFlight={activeFlight} allScores={allScores} course={course} />
             )}
             {activeTab === 'Match Points' && matchData && (
               <MatchPointsBoard matchData={matchData} event={event} />
@@ -440,6 +441,7 @@ export default function Leaderboard() {
                 skinsResults={skinsResults}
                 stablefordData={stablefordData}
                 blindPartnersData={blindPartnersData}
+                superSkinsResult={superSkinsResult}
                 playerMap={playerMap}
               />
             )}
@@ -772,19 +774,12 @@ function PuttLeaderboard({ data, playerMap, allScores = [], course = null }) {
 // ─── Skins Board ──────────────────────────────────────────────────
 // ─── Super Skins Leaderboard ──────────────────────────────────────────────────
 function SuperSkinsBoard({ event, eventPlayers, allScores, course, playerMap }) {
-  const optedInIds = event?.side_game_entries?.super_skins ?? []
+  const result = computeSuperSkins(event, eventPlayers, allScores, course)
 
-  // Treat opted-in players as one pool (no flight split) — assign all to 'A' for engine
-  const pool = (optedInIds.length > 0
-    ? eventPlayers.filter(ep => optedInIds.includes(ep.player_id))
-    : eventPlayers
-  ).map(ep => ({ ...ep, flight: 'A' }))
-
-  if (pool.length === 0) {
+  if (!result) {
     return <p className="text-sm text-gray-400 text-center py-8">No players have opted in to Super Skins yet.</p>
   }
 
-  const result = computeSkinsForFlight(pool, allScores, course, 'A')
   const totalSkins = Object.values(result.playerSkins).reduce((a, b) => a + b, 0)
 
   return (
@@ -868,6 +863,7 @@ function BlindPartnersLeaderboard({ event, eventPlayers, allScores, course }) {
   }
 
   const ranked = computeBlindPartners(event, eventPlayers, allScores, course)
+  const isStableford = blindPartnersMode(event) === 'stableford'
 
   // Tied pairs share a rank — label them T2 etc. (same convention as the net board)
   const rankLabel = (pair) =>
@@ -879,11 +875,18 @@ function BlindPartnersLeaderboard({ event, eventPlayers, allScores, course }) {
 
   return (
     <div className="space-y-2">
-      <p className="text-xs text-gray-400 mb-3">Combined net score per pair — lowest wins.</p>
+      <p className="text-xs text-gray-400 mb-3">
+        {isStableford
+          ? 'Combined Stableford points per pair — highest wins.'
+          : 'Combined net score per pair — lowest wins.'}
+      </p>
       {ranked.map(pair => {
-        const color = pair.combinedNet < parPerHole.reduce((a, b) => a + b, 0) * 2
-          ? 'text-red-600' : pair.combinedNet === parPerHole.reduce((a, b) => a + b, 0) * 2
-          ? 'text-gray-600' : 'text-black'
+        const parTotal = parPerHole.reduce((a, b) => a + b, 0) * 2
+        const color = isStableford
+          ? 'text-status-active-text'
+          : pair.combinedScore < parTotal ? 'text-red-600'
+          : pair.combinedScore === parTotal ? 'text-gray-600'
+          : 'text-black'
         return (
           <div key={pair.idx} className="flex items-center justify-between bg-white rounded-xl px-4 py-3 shadow-sm border border-gray-100">
             <div className="flex items-center gap-3">
@@ -893,7 +896,7 @@ function BlindPartnersLeaderboard({ event, eventPlayers, allScores, course }) {
                 {pair.p2
                   ? <div className="text-sm font-semibold text-gray-800">{playerName(pair.p2)}</div>
                   : pair.oddConfig?.type === 'ghost'
-                    ? <div className="text-xs text-amber-600 italic">👻 Ghost ({pair.oddConfig.score ?? '?'} net)</div>
+                    ? <div className="text-xs text-amber-600 italic">👻 Ghost ({pair.oddConfig.score ?? '?'} {isStableford ? 'pts' : 'net'})</div>
                     : pair.oddConfig?.type === 'blind' && pair.oddConfig.player_id
                       ? <div className="text-xs text-amber-600 italic">🔀 {playerName(pair.oddConfig.player_id)}'s score</div>
                       : <div className="text-xs text-gray-400 italic">no partner assigned</div>
@@ -901,7 +904,7 @@ function BlindPartnersLeaderboard({ event, eventPlayers, allScores, course }) {
               </div>
             </div>
             <div className="text-right">
-              <div className={`text-lg font-bold tabular-nums ${color}`}>{pair.combinedNet}</div>
+              <div className={`text-lg font-bold tabular-nums ${color}`}>{pair.combinedScore}</div>
               <div className="text-xs text-gray-400">{pair.holesPlayed} holes</div>
             </div>
           </div>
@@ -1008,7 +1011,8 @@ function SkinsBoard({ skinsResults, playerMap }) {
 }
 
 // ─── Stableford Leaderboard ───────────────────────────────────────
-function StablefordLeaderboard({ data, activeFlight }) {
+function StablefordLeaderboard({ data, activeFlight, allScores = [], course = null }) {
+  const [scorecardPlayer, setScorecardPlayer] = useState(null)
   const list = data[activeFlight] ?? []
 
   // Tied players share a rank — label them T3 etc. (same convention as the net board)
@@ -1032,12 +1036,15 @@ function StablefordLeaderboard({ data, activeFlight }) {
         </div>
         {list.map((p, i) => (
           <div key={p.player_id}
-            className="grid grid-cols-[2.5rem_1fr_3.5rem] items-center px-4 py-3"
+            onClick={() => course && setScorecardPlayer(p)}
+            className="grid grid-cols-[2.5rem_1fr_3.5rem] items-center px-4 py-3 cursor-pointer transition-colors"
             style={{
               background: i % 2 === 1 ? 'rgba(27,67,50,0.025)' : '#ffffff',
               borderBottom: '1px solid #ebe9e4',
               borderLeft: p.rank === 1 ? '3px solid #1B4332' : undefined,
             }}
+            onMouseEnter={e => e.currentTarget.style.background = '#f4f3f0'}
+            onMouseLeave={e => e.currentTarget.style.background = i % 2 === 1 ? 'rgba(27,67,50,0.025)' : '#ffffff'}
           >
             <span className="text-sm font-semibold text-ink-muted tabular-nums">{rankLabel(p)}</span>
             <div>
@@ -1053,6 +1060,14 @@ function StablefordLeaderboard({ data, activeFlight }) {
         ))}
       </div>
       <p className="text-xs text-center text-ink-muted">Eagle=4 · Birdie=3 · Par=2 · Bogey=1 · DBL+=0 (net)</p>
+      {scorecardPlayer && course && (
+        <PlayerScorecardModal
+          player={scorecardPlayer}
+          allScores={allScores}
+          course={course}
+          onClose={() => setScorecardPlayer(null)}
+        />
+      )}
     </div>
   )
 }
@@ -1324,7 +1339,7 @@ function TeamMatchBoard({ teamMatchData, teamAName = 'Team A', teamBName = 'Team
 }
 
 // ─── Payouts Board ────────────────────────────────────────────────
-function PayoutsBoard({ event, eventPlayers, leaderboards, sideGames, skinsResults, stablefordData, blindPartnersData, playerMap }) {
+function PayoutsBoard({ event, eventPlayers, leaderboards, sideGames, skinsResults, stablefordData, blindPartnersData, superSkinsResult, playerMap }) {
   if (!event?.payout_config || eventPlayers.length === 0) {
     return (
       <div className="text-center py-12 text-gray-400">
@@ -1342,7 +1357,7 @@ function PayoutsBoard({ event, eventPlayers, leaderboards, sideGames, skinsResul
   }
 
   const { totalPot, byCategory, byPlayer, totalAllocated } = computePayouts(
-    event, payingPlayers.length, leaderboards, sideGames ?? [], skinsResults, flightCounts, stablefordData, blindPartnersData
+    event, payingPlayers.length, leaderboards, sideGames ?? [], skinsResults, flightCounts, stablefordData, blindPartnersData, superSkinsResult
   )
 
   // Sort categories in the desired display order

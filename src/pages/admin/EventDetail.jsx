@@ -12,8 +12,8 @@ import { useParams, Link, useSearchParams } from 'react-router-dom'
 import { supabase } from '../../lib/supabase'
 import toast from 'react-hot-toast'
 import { computePayouts, DEFAULT_PAYOUT_CONFIG, getCategoryLabel, ctpLabel, activePayoutKeys, defaultForKey } from '../../lib/engines/payouts'
-import { computeLeaderboards, computeStableford, computeBlindPartners, getStrokeIndexForTee } from '../../lib/engines/scoring'
-import { computeAllSkins } from '../../lib/engines/skins'
+import { computeLeaderboards, computeStableford, computeBlindPartners, blindPartnersMode, getStrokeIndexForTee } from '../../lib/engines/scoring'
+import { computeAllSkins, computeSuperSkins } from '../../lib/engines/skins'
 import { computeTGLEventResults, assignTGLPoints } from '../../lib/engines/tgl'
 import Card, { CardHeader } from '../../components/ui/Card'
 import { ExportScorecardsButton, ExportSkinsGridButton, ExportResultsButton, ExportTeamPlayButton } from '../../components/ScorecardExport'
@@ -426,7 +426,8 @@ async function exportScoresCSV(event, eventPlayers, allScores, course, sideGames
   const skinsResults  = computeAllSkins(nonGuestEPs, allScores, course)
   const stablefordData = computeStableford(nonGuestEPs, allScores, course)
   const blindPartnersData = computeBlindPartners(event, nonGuestEPs, allScores, course)
-  const { byCategory } = computePayouts(event, nonGuestEPs.length, leaderboards, sideGames, skinsResults, flightCounts, stablefordData, blindPartnersData)
+  const superSkinsResult  = computeSuperSkins(event, nonGuestEPs, allScores, course)
+  const { byCategory } = computePayouts(event, nonGuestEPs.length, leaderboards, sideGames, skinsResults, flightCounts, stablefordData, blindPartnersData, superSkinsResult)
 
   const playerMap = Object.fromEntries(eventPlayers.map(ep => [ep.player_id, ep.player]))
 
@@ -2839,6 +2840,7 @@ function TabPayoutConfig({ event, eventPlayers, course, onUpdated }) {
 
   const hasCtp       = (event.side_game_options ?? []).includes('ctp')
   const hasLongDrive = (event.side_game_options ?? []).some(s => s.startsWith('long_drive'))
+  const sideGameEntries = event.side_game_entries ?? {}
 
   // Rebuild config whenever event setup changes
   const eventConfigKey = [
@@ -2846,6 +2848,7 @@ function TabPayoutConfig({ event, eventPlayers, course, onUpdated }) {
     (event.formats ?? []).join(','),
     (event.side_game_options ?? []).join(','),
     String(numFlights),
+    String(event.super_ctp_hole ?? ''),
     JSON.stringify(event.payout_places ?? {}),
   ].join('|')
 
@@ -2906,11 +2909,14 @@ function TabPayoutConfig({ event, eventPlayers, course, onUpdated }) {
   }
 
   function getMultiplier(key) {
+    // Opt-in pots are funded only by the players who bought in
+    if (key === 'super_skins' || key.startsWith('super_skins_')) return sideGameEntries.super_skins?.length ?? totalPlayers
+    if (key.startsWith('super_ctp_')) return sideGameEntries.super_ctp?.length ?? totalPlayers
     // Full-field keys
     if (key === 'low_putts' || key.startsWith('ctp_') || key === 'skins' || key === 'long_drive') return totalPlayers
-    if (!hasFlights && (key.startsWith('18_net_') || key.startsWith('18_gross_') || key.startsWith('f9_') || key.startsWith('b9_'))) return totalPlayers
+    if (!hasFlights && (key.startsWith('18_net_') || key.startsWith('18_gross_') || key.startsWith('f9_') || key.startsWith('b9_') || key.startsWith('stf_net_'))) return totalPlayers
     // Per-flight: extract letter
-    const flMatch = key.match(/(?:skins|long_drive|low_putts|18_net|18_gross|f9|b9)_([a-z])/)
+    const flMatch = key.match(/(?:skins|long_drive|low_putts|18_net|18_gross|stf_net|f9|b9)_([a-z])/)
     if (flMatch) {
       const fl = flMatch[1].toUpperCase()
       return flightCounts[fl] ?? Math.round(totalPlayers / (numFlights || 1))
@@ -2931,7 +2937,7 @@ function TabPayoutConfig({ event, eventPlayers, course, onUpdated }) {
     const total = (val || 0) * mult
     const label = getCategoryLabel(key)
     // Determine flight letter
-    const flMatch = hasFlights && key.match(/(?:skins|long_drive|low_putts|18_net|18_gross|f9|b9)_([a-z])(?:_|$)/)
+    const flMatch = hasFlights && key.match(/(?:skins|super_ctp|long_drive|low_putts|18_net|18_gross|stf_net|f9|b9)_([a-z])(?:_|$)/)
     const flLetter = flMatch ? flMatch[1].toUpperCase() : null
     const isField = !flLetter
     return { key, val, label, isField, flLetter, mult, total }
@@ -3140,6 +3146,9 @@ function BlindPartnersCard({ event, eventPlayers, optedInIds = [], onUpdated }) 
   const [oddConfig, setOddConfig] = useState(savedOdd ?? { type: 'ghost', score: '', player_id: '' })
   const [savingOdd, setSavingOdd] = useState(false)
 
+  // Pairs are scored on the event's own metric, so the ghost value is entered in it too
+  const isStableford = blindPartnersMode(event) === 'stableford'
+
   // Keep local state in sync if parent re-fetches
   useEffect(() => {
     setPairs(event.side_game_entries?.blind_partner_pairs ?? [])
@@ -3274,14 +3283,16 @@ function BlindPartnersCard({ event, eventPlayers, optedInIds = [], onUpdated }) 
               ))}
             </div>
 
-            {/* Ghost: preset net score */}
+            {/* Ghost: preset score in the event's scoring metric */}
             {oddConfig.type === 'ghost' && (
               <div className="flex items-center gap-2">
-                <label className="text-xs text-gray-600 font-medium">Preset net score:</label>
+                <label className="text-xs text-gray-600 font-medium">
+                  {isStableford ? 'Preset points:' : 'Preset net score:'}
+                </label>
                 <input
                   type="number"
                   value={oddConfig.score ?? ''}
-                  placeholder="e.g. 72"
+                  placeholder={isStableford ? 'e.g. 36' : 'e.g. 72'}
                   onChange={e => setOddConfig(prev => ({ ...prev, score: e.target.value }))}
                   onBlur={e => {
                     const next = { ...oddConfig, score: e.target.value ? Number(e.target.value) : '' }
@@ -3290,7 +3301,7 @@ function BlindPartnersCard({ event, eventPlayers, optedInIds = [], onUpdated }) 
                   }}
                   className="w-20 border border-gray-200 rounded-lg px-2 py-1 text-sm text-center"
                 />
-                <span className="text-xs text-gray-400">net strokes</span>
+                <span className="text-xs text-gray-400">{isStableford ? 'points' : 'net strokes'}</span>
               </div>
             )}
 
@@ -3754,8 +3765,9 @@ function TabPayoutSummary({ event, eventPlayers, allScores, sideGames, course })
   const skinsResults  = computeAllSkins(nonGuestEPs, allScores, course)
   const stablefordData = computeStableford(nonGuestEPs, allScores, course)
   const blindPartnersData = computeBlindPartners(event, nonGuestEPs, allScores, course)
+  const superSkinsResult  = computeSuperSkins(event, nonGuestEPs, allScores, course)
   const { totalPot, byCategory, byPlayer, totalAllocated } = computePayouts(
-    event, nonGuestEPs.length, leaderboards, sideGames, skinsResults, flightCounts, stablefordData, blindPartnersData
+    event, nonGuestEPs.length, leaderboards, sideGames, skinsResults, flightCounts, stablefordData, blindPartnersData, superSkinsResult
   )
 
   const playerMap = Object.fromEntries(
@@ -3874,7 +3886,7 @@ function EventStatusControl({ event, onUpdated }) {
 // ─── Edit Event Modal ──────────────────────────────────────────────
 
 // Format keys that support per-flight scoring
-const PER_FLIGHT_FORMAT_KEYS = new Set(['net_stroke', 'net_stroke_front9', 'net_stroke_back9', 'low_gross', 'gross_stroke_front9', 'gross_stroke_back9'])
+const PER_FLIGHT_FORMAT_KEYS = new Set(['net_stroke', 'net_stroke_front9', 'net_stroke_back9', 'low_gross', 'gross_stroke_front9', 'gross_stroke_back9', 'stableford'])
 
 /** Expand formats + formatScope into the formats array saved to DB */
 function buildFormatsArray(enabledFormats, formatScope, numFlights) {

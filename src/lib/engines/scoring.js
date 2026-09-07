@@ -144,6 +144,7 @@ export function computeStableford(eventPlayers, allScores, course) {
       player_id:      ep.player_id,
       player:         ep.player,
       flight:         ep.flight,
+      tee:            ep.tee,
       course_handicap: ch,
       totalPoints,
       holesPlayed,
@@ -169,49 +170,75 @@ export function computeStableford(eventPlayers, allScores, course) {
 }
 
 /**
+ * Which metric Blind Partners is scored on. The side game mirrors the event's
+ * primary scoring format so pairs are decided the same way the event is —
+ * Stableford events rank on combined points, everything else on combined net.
+ *
+ * @param {Object} event
+ * @returns {'net'|'stableford'}
+ */
+export function blindPartnersMode(event) {
+  const formats = event?.formats ?? (event?.format ? [event.format] : [])
+  // Strip the per-flight suffix ('stableford_a' → 'stableford')
+  const base = formats.map(f => f.replace(/_[a-z]$/, ''))
+  // Net stroke play wins when an event runs both — it's the primary competition
+  if (base.includes('net_stroke')) return 'net'
+  if (base.includes('stableford')) return 'stableford'
+  return 'net'
+}
+
+/**
  * Compute Blind Partners leaderboard for an event.
  * Pairs are pre-drawn (event.side_game_entries.blind_partner_pairs) and ranked
- * by combined net score ascending (lowest wins). An odd player out is handled
- * via a ghost score or a blind (borrowed) partner score.
+ * on the event's own scoring metric — combined net ascending, or combined
+ * Stableford points descending. An odd player out is handled via a ghost score
+ * or a blind (borrowed) partner score.
  *
  * @param {Object} event
  * @param {Array}  eventPlayers
  * @param {Array}  allScores
  * @param {Object} course
- * @returns {Array} pairs sorted ascending by combinedNet, each with a `rank`
+ * @returns {Array} pairs sorted best-first, each with `combinedScore`, `mode` and `rank`
  */
 export function computeBlindPartners(event, eventPlayers, allScores, course) {
   const pairs     = event?.side_game_entries?.blind_partner_pairs ?? []
   const oddConfig = event?.side_game_entries?.blind_partner_odd ?? null
+  const mode      = blindPartnersMode(event)
+  const parPerHole = course?.par_per_hole ?? []
 
-  function playerNet(playerId) {
+  /** One player's contribution to the pair total, in the event's scoring metric */
+  function playerScore(playerId) {
     const scores = allScores.filter(s => s.player_id === playerId)
     const ep     = eventPlayers.find(e => e.player_id === playerId)
     const ch     = ep?.course_handicap ?? ep?.handicap_index ?? 0
     const strokeIndexes = getStrokeIndexForTee(course, ep?.tee)
-    let net = 0
+    let score = 0
     let holesPlayed = 0
     scores.forEach(s => {
-      const si = strokeIndexes[s.hole_number - 1] ?? s.hole_number
-      net += s.gross_score - getStrokesOnHole(ch, si)
+      const si  = strokeIndexes[s.hole_number - 1] ?? s.hole_number
+      const net = s.gross_score - getStrokesOnHole(ch, si)
+      score += mode === 'stableford'
+        ? stablefordPoints(net, parPerHole[s.hole_number - 1])
+        : net
       holesPlayed++
     })
-    return { net, holesPlayed }
+    return { score, holesPlayed }
   }
 
   if (pairs.length === 0) return []
 
   return pairs.map((pair, i) => {
-    const r1 = playerNet(pair.p1)
+    const r1 = playerScore(pair.p1)
     let r2
     if (pair.p2) {
-      r2 = playerNet(pair.p2)
+      r2 = playerScore(pair.p2)
     } else if (oddConfig?.type === 'ghost' && oddConfig.score !== '' && oddConfig.score != null) {
-      r2 = { net: Number(oddConfig.score), holesPlayed: 18 }
+      // The ghost value is entered in whatever metric the event uses
+      r2 = { score: Number(oddConfig.score), holesPlayed: 18 }
     } else if (oddConfig?.type === 'blind' && oddConfig.player_id) {
-      r2 = playerNet(oddConfig.player_id)
+      r2 = playerScore(oddConfig.player_id)
     } else {
-      r2 = { net: 0, holesPlayed: 0 }
+      r2 = { score: 0, holesPlayed: 0 }
     }
     return {
       idx: i,
@@ -219,15 +246,19 @@ export function computeBlindPartners(event, eventPlayers, allScores, course) {
       p2: pair.p2,
       player_ids: [pair.p1, pair.p2].filter(Boolean),
       oddConfig: !pair.p2 ? oddConfig : null,
-      combinedNet: r1.net + r2.net,
+      mode,
+      combinedScore: r1.score + r2.score,
       holesPlayed: Math.max(r1.holesPlayed, r2.holesPlayed),
     }
   })
-    .sort((a, b) => a.combinedNet - b.combinedNet)
+    // Stableford is a points race (high wins); net stroke play is low-wins
+    .sort((a, b) => mode === 'stableford'
+      ? b.combinedScore - a.combinedScore || b.holesPlayed - a.holesPlayed
+      : a.combinedScore - b.combinedScore)
     .reduce((ranked, p, i) => {
       // Tied pairs share a rank so they split the payout (same convention as computeLeaderboards)
       const prev = ranked[i - 1]
-      const tied = prev && prev.combinedNet === p.combinedNet && prev.holesPlayed === p.holesPlayed
+      const tied = prev && prev.combinedScore === p.combinedScore && prev.holesPlayed === p.holesPlayed
       ranked.push({ ...p, rank: tied ? prev.rank : i + 1 })
       return ranked
     }, [])

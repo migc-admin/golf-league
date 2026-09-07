@@ -148,6 +148,22 @@ export function computeAllSkins(eventPlayers, allScores, course) {
 }
 
 /**
+ * Compute Super Skins — a separate opt-in pot. Everyone who bought in competes
+ * as a single pool regardless of flight, so the pool is flattened onto one flight.
+ *
+ * @returns {Object|null} a skins result, or null when nobody has opted in
+ */
+export function computeSuperSkins(event, eventPlayers, allScores, course) {
+  const optedIn = event?.side_game_entries?.super_skins ?? []
+  const pool = (optedIn.length > 0
+    ? eventPlayers.filter(ep => optedIn.includes(ep.player_id))
+    : eventPlayers
+  ).map(ep => ({ ...ep, flight: 'A' }))
+  if (pool.length === 0) return null
+  return computeSkinsForFlight(pool, allScores, course, 'A')
+}
+
+/**
  * Given a skins result for one flight and the skins pot amount,
  * return per-player payout.
  *

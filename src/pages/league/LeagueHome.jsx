@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom'
 import { supabase } from '../../lib/supabase'
 import LeagueLayout from '../../components/LeagueLayout'
 import { computeLeaderboards, computeStableford, computeBlindPartners } from '../../lib/engines/scoring'
-import { computeAllSkins } from '../../lib/engines/skins'
+import { computeAllSkins, computeSuperSkins } from '../../lib/engines/skins'
 import { computePayouts } from '../../lib/engines/payouts'
 
 const GREEN = '#1B4332'
@@ -175,7 +175,8 @@ export default function LeagueHome({ orgSlug, leagueSlug, initialTab = 'events' 
         const skinsResults = computeAllSkins(nonGuest, scores, course)
         const stablefordData = computeStableford(nonGuest, scores, course)
         const blindPartnersData = computeBlindPartners(ev, nonGuest, scores, course)
-        const { byPlayer } = computePayouts(ev, nonGuest.length, leaderboards, sideGames, skinsResults, flightCounts, stablefordData, blindPartnersData)
+        const superSkinsResult  = computeSuperSkins(ev, nonGuest, scores, course)
+        const { byPlayer } = computePayouts(ev, nonGuest.length, leaderboards, sideGames, skinsResults, flightCounts, stablefordData, blindPartnersData, superSkinsResult)
 
         for (const { playerId, items } of byPlayer) {
           const ep = eps.find(e => e.player_id === playerId)
