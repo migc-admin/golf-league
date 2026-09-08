@@ -12,7 +12,7 @@ import { getStrokesOnHole, computeLeaderboards, computeStableford, computeBlindP
 import { computeSkinsForFlight, computeAllSkins, computeSuperSkins } from '../lib/engines/skins'
 import { computePayouts } from '../lib/engines/payouts'
 import { computeTGLEventResults, assignTGLPoints } from '../lib/engines/tgl'
-import { computeMatchPoints, computeTeamMatchPoints } from '../lib/engines/matchPoints'
+import { computeMatchPoints, computeTeamMatchPoints, buildPairings } from '../lib/engines/matchPoints'
 import { supabase } from '../lib/supabase'
 
 // ─── Mobile-safe PNG download ─────────────────────────────────────
@@ -746,6 +746,389 @@ function buildTable({ course, parPerHole, strokeIndex, teesToShow, players, long
     tr.appendChild(mkTd('', { bg: '#f0f8f0', color: '#111827' }))
 
     tbl.appendChild(tr)
+  })
+
+  return tbl
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// ExportMatchPlayCardsButton — blank match play tracking cards (PNG)
+// One page per GROUP (all matchups sharing a group_number are combined
+// onto a single card), printed twice (top/bottom) — mirrors the Tee
+// Sheet's "2 copies per page" pattern, just at the group level instead
+// of the pairing level, to avoid excess printouts.
+// ═══════════════════════════════════════════════════════════════════
+export function ExportMatchPlayCardsButton({ event, eventPlayers, course }) {
+  const [exporting, setExporting] = useState(false)
+  const [exportError, setExportError] = useState(null)
+  const containerRef = useRef(null)
+
+  async function handleExport() {
+    setExportError(null)
+    if (!course) { setExportError('No course loaded — cannot export.'); return }
+    setExporting(true)
+    try {
+      const { data: storedPairings } = await supabase
+        .from('match_pairings')
+        .select('*')
+        .eq('event_id', event.id)
+        .order('match_number')
+
+      const playerMap = Object.fromEntries(eventPlayers.map(ep => [ep.player_id, ep]))
+      const groupMap = {} // groupNumber -> [{ playerA, playerB, matchNumber }]
+      let n = 1
+      if (storedPairings && storedPairings.length > 0) {
+        for (const p of storedPairings) {
+          const playerA = playerMap[p.player_a_id]
+          const playerB = playerMap[p.player_b_id]
+          if (!playerA || !playerB) continue
+          const g = playerA.group_number ?? playerB.group_number ?? 0
+          if (!groupMap[g]) groupMap[g] = []
+          groupMap[g].push({ playerA, playerB, matchNumber: p.match_number ?? n })
+          n++
+        }
+      } else {
+        const groups = {}
+        for (const ep of eventPlayers) {
+          const g = ep.group_number ?? 0
+          if (!groups[g]) groups[g] = []
+          groups[g].push(ep)
+        }
+        for (const [g, members] of Object.entries(groups)) {
+          for (const { playerA, playerB } of buildPairings(members)) {
+            if (!groupMap[g]) groupMap[g] = []
+            groupMap[g].push({ playerA, playerB, matchNumber: n++ })
+          }
+        }
+      }
+
+      const groupEntries = Object.entries(groupMap)
+      if (groupEntries.length === 0) {
+        setExportError('No match play pairings found — assign groups or set up pairings first.')
+        setExporting(false)
+        return
+      }
+
+      for (const [groupNumber, pairs] of groupEntries) {
+        const node = containerRef.current
+        if (!node) continue
+        node.innerHTML = ''
+
+        const pageEl = buildMatchPage({ event, course, groupNumber, pairs })
+        node.appendChild(pageEl)
+
+        await new Promise(r => setTimeout(r, 80))
+
+        const dataUrl = await toPng(pageEl, {
+          pixelRatio: 3,
+          cacheBust: true,
+          backgroundColor: '#ffffff',
+          width: PAGE_W,
+          height: PAGE_H,
+        })
+
+        const leaguePart = (event.league?.name ?? 'league').replace(/[^a-z0-9]/gi, '_').toLowerCase()
+        const eventPart  = (event.name ?? `event_${event.event_number}`).replace(/[^a-z0-9]/gi, '_').toLowerCase()
+        downloadPng(dataUrl, `matchplay_${leaguePart}_${eventPart}_group${groupNumber}.png`)
+        await new Promise(r => setTimeout(r, 250))
+      }
+    } catch (err) {
+      console.error('Match play card export failed:', err)
+      setExportError(err?.message ?? 'Export failed — check console for details.')
+    } finally {
+      if (containerRef.current) containerRef.current.innerHTML = ''
+      setExporting(false)
+    }
+  }
+
+  return (
+    <>
+      <button
+        onClick={handleExport}
+        disabled={exporting}
+        style={{
+          display: 'inline-flex', alignItems: 'center', gap: 6,
+          padding: '6px 14px', borderRadius: 8,
+          border: '1px solid #d1d5db',
+          background: exporting ? '#f3f4f6' : '#ffffff',
+          color: '#374151', fontSize: 13, fontWeight: 600,
+          cursor: exporting ? 'not-allowed' : 'pointer',
+        }}
+      >
+        {exporting ? (
+          <>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ animation: 'spin 1s linear infinite' }}>
+              <path d="M21 12a9 9 0 1 1-6.219-8.56" />
+            </svg>
+            Exporting…
+          </>
+        ) : (
+          <>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <polyline points="6 9 6 2 18 2 18 9" />
+              <path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2" />
+              <rect x="6" y="14" width="12" height="8" />
+            </svg>
+            Export Match Play Cards
+          </>
+        )}
+      </button>
+      {exportError && (
+        <p style={{ marginTop: 6, fontSize: 12, color: '#dc2626' }}>{exportError}</p>
+      )}
+      <div
+        ref={containerRef}
+        style={{ position: 'fixed', top: -99999, left: -99999, pointerEvents: 'none', zIndex: -1 }}
+      />
+    </>
+  )
+}
+
+// ─── Page: same group card printed twice (top/bottom), like the Tee Sheet ──
+function buildMatchPage({ event, course, groupNumber, pairs }) {
+  const page = el('div', {
+    width: PAGE_W + 'px', height: PAGE_H + 'px',
+    background: '#ffffff',
+    display: 'flex', flexDirection: 'column',
+    padding: PAD + 'px',
+    boxSizing: 'border-box',
+    fontFamily: 'Arial, Helvetica, sans-serif',
+  })
+  const opts = { event, course, groupNumber, pairs }
+  page.appendChild(buildMatchCard(opts))
+  page.appendChild(buildCutLine())
+  page.appendChild(buildMatchCard(opts))
+  return page
+}
+
+// ─── Card: HOLE/PAR/S.I. (shared) + all of the group's matchups stacked ──
+// Kept intentionally sparse — full event/course/org details already live
+// on the primary Tee Sheet card, so this one only carries what's unique
+// to match play tracking.
+function buildMatchCard({ course, groupNumber, pairs }) {
+  const parPerHole  = course.par_per_hole  ?? []
+  const strokeIndex = course.stroke_index  ?? []
+
+  const matches = pairs.map(pair => {
+    const chA = pair.playerA.course_handicap ?? 0
+    const chB = pair.playerB.course_handicap ?? 0
+    const baseline = Math.min(chA, chB)
+    const relA = Math.max(0, chA - baseline)
+    const relB = Math.max(0, chB - baseline)
+    const nameA = `${pair.playerA.player?.first_name ?? ''} ${pair.playerA.player?.last_name ?? ''}`.trim()
+    const nameB = `${pair.playerB.player?.first_name ?? ''} ${pair.playerB.player?.last_name ?? ''}`.trim()
+    return { matchNumber: pair.matchNumber, nameA, nameB, chA, chB, relA, relB }
+  })
+
+  const card = el('div', {
+    width: CARD_W + 'px',
+    height: CARD_H + 'px',
+    border: '2px solid ' + GREEN,
+    borderRadius: '6px',
+    overflow: 'hidden',
+    display: 'flex',
+    flexDirection: 'column',
+    boxSizing: 'border-box',
+    flexShrink: '0',
+  })
+
+  // ── Header — one line, minimal ───────────────────────────────────
+  const header = el('div', {
+    background: GREEN,
+    padding: '5px 10px',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    flexShrink: '0',
+  })
+  header.appendChild(txt(`Group ${groupNumber} \u00b7 Match Play`, {
+    color: GOLD, fontSize: '13px', fontWeight: '700', letterSpacing: '0.02em',
+  }))
+  header.appendChild(txt(
+    matches.length > 1 ? `${matches.length} Matches` : `Match ${matches[0]?.matchNumber ?? 1}`,
+    { color: '#ffffff', fontSize: '10px', fontWeight: '600' }
+  ))
+  card.appendChild(header)
+
+  // ── Score table — shared HOLE/PAR/S.I. + one block per matchup ──
+  card.appendChild(buildMatchTable({ parPerHole, strokeIndex, matches }))
+
+  // ── Footer — short legend only ───────────────────────────────────
+  const footer = el('div', {
+    padding: '3px 10px',
+    background: GRAY_BG,
+    borderTop: '2px solid ' + GREEN,
+    flexShrink: '0',
+  })
+  footer.appendChild(txt(
+    'RESULT: winner\u2019s initial each hole (\u2014 = halve).  STATUS: running score (e.g. 2\u2191, AS, 1\u2193, Dormie 2).',
+    { fontSize: '9px', color: '#6b7280' }
+  ))
+  card.appendChild(footer)
+
+  return card
+}
+
+// ─── Match play score table — HOLE/PAR/S.I. (shared) + per-matchup blocks
+// of 2 player rows + RESULT + STATUS. Each subsequent matchup is set off
+// with a thicker top border so it reads as a distinct block. ──
+function buildMatchTable({ parPerHole, strokeIndex, matches }) {
+  const tbl = document.createElement('table')
+  tbl.style.cssText = `
+    width: 100%;
+    border-collapse: collapse;
+    table-layout: fixed;
+    font-size: 10px;
+    font-family: Arial, Helvetica, sans-serif;
+    flex: 1;
+  `
+
+  // Colgroup — label + 18 holes + OUT/IN/TOT/MP (relative strokes received)
+  const cg = document.createElement('colgroup')
+  const colDefs = [
+    COL_LABEL,
+    ...Array(9).fill(COL_HOLE),   // H1-9
+    COL_HOLE,                      // OUT
+    ...Array(9).fill(COL_HOLE),   // H10-18
+    COL_HOLE, COL_HOLE,            // IN, TOT
+    COL_HOLE,                      // MP
+  ]
+  colDefs.forEach(w => {
+    const c = document.createElement('col')
+    c.style.width = w + 'px'
+    cg.appendChild(c)
+  })
+  tbl.appendChild(cg)
+
+  function mkTd(content, opts = {}) {
+    const {
+      bg = '#ffffff', color = '#111827', bold = false,
+      align = 'center', fontSize = '10px', border = true,
+    } = opts
+    const td = document.createElement('td')
+    td.style.cssText = `
+      height: ${CELL_H}px;
+      text-align: ${align};
+      vertical-align: middle;
+      background: ${bg};
+      color: ${color};
+      font-weight: ${bold ? '700' : '400'};
+      font-size: ${fontSize};
+      border: ${border ? `1px solid ${BORDER}` : 'none'};
+      padding: 0 2px;
+      white-space: nowrap;
+      overflow: hidden;
+      box-sizing: border-box;
+    `
+    td.textContent = String(content ?? '')
+    return td
+  }
+
+  function mkLabel(content, opts = {}) {
+    const td = mkTd(content, { bg: GRAY_BG, color: '#374151', bold: true, align: 'left', fontSize: '9px', ...opts })
+    td.style.paddingLeft = '5px'
+    return td
+  }
+
+  // Blank writable cell (RESULT / STATUS rows) — dashed border hints "write here"
+  function mkWriteCell(opts = {}) {
+    const td = mkTd('', { bg: '#fffdf5', ...opts })
+    td.style.border = `1px dashed ${BORDER}`
+    return td
+  }
+
+  // Score cell with optional match play stroke dots (relative handicap)
+  function mkScoreCell(strokes) {
+    const td = mkTd('', { bg: 'transparent' })
+    td.style.position = 'relative'
+    if (strokes > 0) {
+      const dotWrap = document.createElement('span')
+      dotWrap.style.cssText = 'position: absolute; top: 2px; right: 2px; display: flex; gap: 1px; align-items: center;'
+      for (let i = 0; i < Math.min(strokes, 2); i++) {
+        const dot = document.createElement('span')
+        dot.style.cssText = 'display: inline-block; width: 4px; height: 4px; border-radius: 50%; background: #9a5b13;'
+        dotWrap.appendChild(dot)
+      }
+      td.appendChild(dotWrap)
+    }
+    return td
+  }
+
+  // ── HOLE header row ────────────────────────────────────────────
+  const headerRow = document.createElement('tr')
+  headerRow.appendChild(mkLabel('HOLE', { bg: GREEN, color: '#ffffff' }))
+  for (let h = 1; h <= 9; h++) headerRow.appendChild(mkTd(h, { bg: GREEN, color: '#ffffff', bold: true }))
+  headerRow.appendChild(mkTd('OUT', { bg: GOLD, color: '#1a1a1a', bold: true }))
+  for (let h = 10; h <= 18; h++) headerRow.appendChild(mkTd(h, { bg: GREEN, color: '#ffffff', bold: true }))
+  headerRow.appendChild(mkTd('IN',  { bg: GOLD, color: '#1a1a1a', bold: true }))
+  headerRow.appendChild(mkTd('TOT', { bg: GOLD, color: '#1a1a1a', bold: true }))
+  headerRow.appendChild(mkTd('MP',  { bg: GOLD, color: '#1a1a1a', bold: true }))
+  tbl.appendChild(headerRow)
+
+  // ── PAR row ────────────────────────────────────────────────────
+  const fPar = parPerHole.slice(0, 9).reduce((a, b) => a + b, 0)
+  const bPar = parPerHole.slice(9, 18).reduce((a, b) => a + b, 0)
+  const parRow = document.createElement('tr')
+  parRow.appendChild(mkLabel('PAR'))
+  parPerHole.slice(0, 9).forEach(v => parRow.appendChild(mkTd(v, { bg: GRAY_BG, color: '#374151', bold: true })))
+  parRow.appendChild(mkTd(fPar, { bg: '#e0e0dc', bold: true }))
+  parPerHole.slice(9, 18).forEach(v => parRow.appendChild(mkTd(v, { bg: GRAY_BG, color: '#374151', bold: true })))
+  parRow.appendChild(mkTd(bPar,        { bg: '#e0e0dc', bold: true }))
+  parRow.appendChild(mkTd(fPar + bPar, { bg: '#e0e0dc', bold: true }))
+  parRow.appendChild(mkTd('', { bg: '#e0e0dc' }))
+  tbl.appendChild(parRow)
+
+  // ── S.I. row ───────────────────────────────────────────────────
+  const siRow = document.createElement('tr')
+  siRow.appendChild(mkLabel('S.I.', { bg: '#efefed', color: '#6b7280' }))
+  strokeIndex.slice(0, 9).forEach(v => siRow.appendChild(mkTd(v, { bg: '#efefed', color: '#6b7280' })))
+  siRow.appendChild(mkTd('', { bg: '#efefed' }))
+  strokeIndex.slice(9, 18).forEach(v => siRow.appendChild(mkTd(v, { bg: '#efefed', color: '#6b7280' })))
+  siRow.appendChild(mkTd('', { bg: '#efefed' }))
+  siRow.appendChild(mkTd('', { bg: '#efefed' }))
+  siRow.appendChild(mkTd('', { bg: '#efefed' }))
+  tbl.appendChild(siRow)
+
+  // ── One block per matchup: 2 player rows + RESULT + STATUS ────────
+  matches.forEach((m, idx) => {
+    const divider = idx > 0 ? `2px solid ${GREEN}` : null
+
+    ;[{ name: m.nameA, ch: m.chA, rel: m.relA }, { name: m.nameB, ch: m.chB, rel: m.relB }].forEach((p, pi) => {
+      const tr = document.createElement('tr')
+      const cells = []
+      cells.push(mkLabel(`${p.name || 'Player'} (${p.ch})`, { bg: 'transparent', color: '#111827' }))
+      for (let h = 1; h <= 9; h++) cells.push(mkScoreCell(getStrokesOnHole(p.rel, strokeIndex[h - 1])))
+      cells.push(mkTd('', { bg: 'transparent', bold: true }))
+      for (let h = 10; h <= 18; h++) cells.push(mkScoreCell(getStrokesOnHole(p.rel, strokeIndex[h - 1])))
+      cells.push(mkTd('', { bg: 'transparent', bold: true }))
+      cells.push(mkTd('', { bg: 'transparent', bold: true }))
+      cells.push(mkTd(p.rel, { bg: '#fef3e2', color: '#9a5b13', bold: true }))
+      if (divider && pi === 0) cells.forEach(c => { c.style.borderTop = divider })
+      cells.forEach(c => tr.appendChild(c))
+      tbl.appendChild(tr)
+    })
+
+    // RESULT row — blank cell per hole to mark the winner's initial
+    const resultRow = document.createElement('tr')
+    resultRow.appendChild(mkLabel('RESULT', { bg: '#fef3e2', color: '#9a5b13' }))
+    for (let h = 1; h <= 9; h++) resultRow.appendChild(mkWriteCell())
+    resultRow.appendChild(mkTd('', { bg: '#fef3e2' }))
+    for (let h = 10; h <= 18; h++) resultRow.appendChild(mkWriteCell())
+    resultRow.appendChild(mkTd('', { bg: '#fef3e2' }))
+    resultRow.appendChild(mkTd('', { bg: '#fef3e2' }))
+    resultRow.appendChild(mkTd('', { bg: '#fef3e2' }))
+    tbl.appendChild(resultRow)
+
+    // STATUS row — blank cell per hole to track the running match score
+    const statusRow = document.createElement('tr')
+    statusRow.appendChild(mkLabel('STATUS', { bg: GRAY_BG, color: '#374151' }))
+    for (let h = 1; h <= 9; h++) statusRow.appendChild(mkWriteCell())
+    statusRow.appendChild(mkTd('', { bg: '#e8e8e4' }))
+    for (let h = 10; h <= 18; h++) statusRow.appendChild(mkWriteCell())
+    statusRow.appendChild(mkTd('', { bg: '#e8e8e4' }))
+    statusRow.appendChild(mkTd('', { bg: '#e8e8e4' }))
+    statusRow.appendChild(mkTd('', { bg: '#e8e8e4' }))
+    tbl.appendChild(statusRow)
   })
 
   return tbl
@@ -1594,7 +1977,7 @@ function buildResultsCard({ event, eventPlayers, allScores, course, sideGames, o
     if (matchData.hasTeams && (matchData.teamPoints.A + matchData.teamPoints.B) > 0) {
       const teamRow = el('div', { display: 'flex', borderBottom: R_DIV })
       ;[[teamALabel, matchData.teamPoints.A], [teamBLabel, matchData.teamPoints.B]].forEach(([label, pts], i) => {
-        const cell = el('div', { flex: '1', textAlign: 'center', padding: '10px 14px', background: i === 0 ? '#eef4fb' : '#f6eefb', borderRight: i === 0 ? R_DIV : 'none' })
+        const cell = el('div', { flex: '1', textAlign: 'center', padding: '10px 14px', background: i === 0 ? '#eef4fb' : '#fdecec', borderRight: i === 0 ? R_DIV : 'none' })
         cell.appendChild(txt(label, { display: 'block', fontSize: R_LABEL, fontWeight: '800', color: '#374151', textTransform: 'uppercase', letterSpacing: '0.05em' }))
         cell.appendChild(txt(String(pts), { display: 'block', fontSize: '20px', fontWeight: '900', color: GREEN, marginTop: '2px' }))
         teamRow.appendChild(cell)
@@ -1624,7 +2007,7 @@ function buildResultsCard({ event, eventPlayers, allScores, course, sideGames, o
 
     const teamRow = el('div', { display: 'flex', borderBottom: R_DIV })
     ;[[teamAName, totalA], [teamBName, totalB]].forEach(([label, pts], i) => {
-      const cell = el('div', { flex: '1', textAlign: 'center', padding: '10px 14px', background: i === 0 ? '#eef4fb' : '#f6eefb', borderRight: i === 0 ? R_DIV : 'none' })
+      const cell = el('div', { flex: '1', textAlign: 'center', padding: '10px 14px', background: i === 0 ? '#eef4fb' : '#fdecec', borderRight: i === 0 ? R_DIV : 'none' })
       cell.appendChild(txt(label, { display: 'block', fontSize: R_LABEL, fontWeight: '800', color: '#374151', textTransform: 'uppercase', letterSpacing: '0.05em' }))
       cell.appendChild(txt(String(pts), { display: 'block', fontSize: '20px', fontWeight: '900', color: GREEN, marginTop: '2px' }))
       teamRow.appendChild(cell)

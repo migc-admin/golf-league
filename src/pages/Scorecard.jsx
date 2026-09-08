@@ -34,6 +34,7 @@ import { supabase } from '../lib/supabase'
 import { useAuth } from '../hooks/useAuth'
 import { useOfflineQueue } from '../hooks/useOfflineQueue'
 import { getStrokesOnHole, getStrokeIndexForTee } from '../lib/engines/scoring'
+import { computeMatchStrokeMap } from '../lib/engines/matchPoints'
 import toast from 'react-hot-toast'
 
 export default function Scorecard() {
@@ -53,6 +54,7 @@ export default function Scorecard() {
   const [event,         setEvent]         = useState(null)
   const [course,        setCourse]        = useState(null)
   const [groupPlayers,  setGroupPlayers]  = useState([])
+  const [matchStrokeMap, setMatchStrokeMap] = useState({})
   const [scores,        setScores]        = useState({})
   const [currentHole,   setCurrentHole]   = useState(1)
   const [loading,       setLoading]       = useState(true)
@@ -223,6 +225,22 @@ export default function Scorecard() {
 
       const { data: eps } = await query.order('group_order').order('adjusted_handicap_index')
       setGroupPlayers(eps ?? [])
+
+      const formats = ev.formats ?? (ev.format ? [ev.format] : [])
+      const needsMatchInfo = formats.includes('match_points') || formats.includes('ryder_cup') || formats.includes('team_match_play')
+      if (needsMatchInfo && (eps ?? []).length > 0) {
+        let storedPairings = []
+        if (formats.includes('match_points') || formats.includes('ryder_cup')) {
+          const { data: pairings } = await supabase
+            .from('match_pairings')
+            .select('*')
+            .eq('event_id', evId)
+          storedPairings = pairings ?? []
+        }
+        setMatchStrokeMap(computeMatchStrokeMap(eps ?? [], formats, ev.team_match_config ?? null, storedPairings))
+      } else {
+        setMatchStrokeMap({})
+      }
 
       const playerIds = (eps ?? []).map(ep => ep.player_id)
       if (playerIds.length > 0) {
@@ -609,6 +627,7 @@ export default function Scorecard() {
               score={getScore(ep.player_id, hole)}
               allHoleScores={scores[ep.player_id] ?? {}}
               courseStrokeIndexes={getStrokeIndexForTee(course, ep.tee)}
+              matchStroke={matchStrokeMap[ep.player_id]}
               trackPutts={trackPutts}
               onChange={(field, val) => updateScore(ep.player_id, hole, field, val)}
               onGrossDone={() => {
@@ -773,13 +792,14 @@ function ScrambleGroupCard({ players, hole, par, score, allHoleScores, onChange 
 }
 
 // ─── Player Score Card ─────────────────────────────────────────────
-function PlayerScoreCard({ ep, hole, par, si, score, allHoleScores, courseStrokeIndexes, trackPutts, onChange, onGrossDone }) {
+function PlayerScoreCard({ ep, hole, par, si, score, allHoleScores, courseStrokeIndexes, matchStroke, trackPutts, onChange, onGrossDone }) {
   const grossRef    = useRef(null)
   const puttsRef    = useRef(null)
   const advanceTimer = useRef(null)
 
   const ch      = ep.course_handicap ?? 0
   const strokes = getStrokesOnHole(ch, si)
+  const matchStrokes = matchStroke ? getStrokesOnHole(matchStroke.relCH, si) : 0
 
   // Running total across all saved holes
   let totalGross = 0, totalNetVsPar = 0, holesPlayed = 0
@@ -829,6 +849,19 @@ function PlayerScoreCard({ ep, hole, par, si, score, allHoleScores, courseStroke
             {strokes > 0 && (
               <span className="inline-flex items-center text-xs font-bold px-1.5 py-0.5 rounded-full" style={{ background: '#eaf1ec', color: '#1B4332' }} title={`Receives ${strokes} stroke${strokes > 1 ? 's' : ''}`}>
                 {'●'.repeat(Math.min(strokes, 3))} {strokes} stroke{strokes > 1 ? 's' : ''}
+              </span>
+            )}
+            {matchStrokes > 0 && (
+              <span
+                className="inline-flex items-center text-xs font-bold px-1.5 py-0.5 rounded-full"
+                style={{ background: '#fef3e2', color: '#9a5b13' }}
+                title={
+                  matchStroke.mode === 'individual'
+                    ? `Receives ${matchStrokes} match play stroke${matchStrokes > 1 ? 's' : ''} on this hole vs ${matchStroke.opponentName}`
+                    : `Team receives ${matchStrokes} match play stroke${matchStrokes > 1 ? 's' : ''} on this hole`
+                }
+              >
+                ⚔ {matchStrokes} MP stroke{matchStrokes > 1 ? 's' : ''}
               </span>
             )}
           </div>

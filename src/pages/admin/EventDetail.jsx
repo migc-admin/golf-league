@@ -8,7 +8,7 @@ import {
   arrayMove,
 } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
-import { useParams, Link, useSearchParams } from 'react-router-dom'
+import { useParams, Link, useSearchParams, useNavigate } from 'react-router-dom'
 import { supabase } from '../../lib/supabase'
 import toast from 'react-hot-toast'
 import { computePayouts, DEFAULT_PAYOUT_CONFIG, getCategoryLabel, ctpLabel, activePayoutKeys, defaultForKey } from '../../lib/engines/payouts'
@@ -16,7 +16,7 @@ import { computeLeaderboards, computeStableford, computeBlindPartners, blindPart
 import { computeAllSkins, computeSuperSkins } from '../../lib/engines/skins'
 import { computeTGLEventResults, assignTGLPoints } from '../../lib/engines/tgl'
 import Card, { CardHeader } from '../../components/ui/Card'
-import { ExportScorecardsButton, ExportSkinsGridButton, ExportResultsButton, ExportTeamPlayButton } from '../../components/ScorecardExport'
+import { ExportScorecardsButton, ExportSkinsGridButton, ExportResultsButton, ExportTeamPlayButton, ExportMatchPlayCardsButton } from '../../components/ScorecardExport'
 import { useOrg, useFeatures } from '../../lib/OrgContext'
 import Button from '../../components/ui/Button'
 import Modal from '../../components/ui/Modal'
@@ -101,6 +101,7 @@ function regAlpha(a, b) {
 
 export default function EventDetail() {
   const { orgSlug, leagueSlug, eventSlug } = useParams()
+  const navigate = useNavigate()
   const org = useOrg()
   const hasFeature = useFeatures()
   const [event,        setEvent]        = useState(null)
@@ -185,6 +186,32 @@ export default function EventDetail() {
 
   useEffect(() => { load() }, [load])
 
+  async function handleClone() {
+    const { data: numData } = await supabase
+      .from('events').select('event_number').eq('league_id', event.league_id)
+      .order('event_number', { ascending: false }).limit(1)
+    const nextNum = numData?.[0]?.event_number ? numData[0].event_number + 1 : 1
+
+    const {
+      id, created_at, slug, display_order, event_number, status, name,
+      league: _league, course: _course,
+      ...rest
+    } = event
+
+    const baseName = name ? name : `Event #${event_number}`
+
+    const { data: inserted, error } = await supabase.from('events').insert({
+      ...rest,
+      event_number: nextNum,
+      name: `${baseName} (Copy)`,
+      status: 'upcoming',
+    }).select('slug').single()
+
+    if (error) { toast.error(error.message); return }
+    toast.success('Event cloned')
+    if (inserted?.slug) navigate(`/admin/${orgSlug}/${leagueSlug}/${inserted.slug}`)
+  }
+
   if (loading) return <div className="animate-pulse space-y-4"><div className="h-10 w-64 bg-gray-200 rounded" /><div className="h-48 bg-gray-200 rounded-xl" /></div>
   if (!event)  return <p className="text-gray-500">Event not found.</p>
 
@@ -221,6 +248,9 @@ export default function EventDetail() {
               Wager Board ↗
             </a>
           )}
+          <button type="button" onClick={handleClone} className="btn-secondary btn-sm btn">
+            Clone Event
+          </button>
           <EventStatusControl event={event} onUpdated={load} />
         </div>
       </div>
@@ -1197,6 +1227,8 @@ function EditHandicapModal({ ep, course, onClose, onSaved }) {
 function TabPostRound({ event, eventPlayers, allScores, course, sideGames, orgName, orgLogoUrl, orgSlug, onPrintAsset, onUpdated, tglTeams, tglMembers, tglSelections, hasTgl }) {
   const [scoreEditor, setScoreEditor] = useState(false)
   const hasSkins = (event?.side_game_options ?? []).some(s => s.startsWith('skins'))
+  const eventFormats = event?.formats ?? (event?.format ? [event.format] : [])
+  const hasMatchPlay = eventFormats.includes('match_points') || eventFormats.includes('ryder_cup')
   const leagueName = event.league?.name ?? orgName
   const logoUrl = event.league?.logo_url ?? orgLogoUrl ?? null
 
@@ -1229,6 +1261,19 @@ function TabPostRound({ event, eventPlayers, allScores, course, sideGames, orgNa
             orgLogoUrl={logoUrl}
           />
         </div>
+        {hasMatchPlay && (
+          <div className="flex items-center justify-between border-t border-gray-200 pt-3">
+            <div>
+              <div className="text-sm font-medium text-gray-800">Match Play Cards (PNG)</div>
+              <div className="text-xs text-gray-400 mt-0.5">Blank paper cards to track hole-by-hole match results</div>
+            </div>
+            <ExportMatchPlayCardsButton
+              event={event}
+              eventPlayers={eventPlayers}
+              course={course}
+            />
+          </div>
+        )}
       </div>
 
       {/* ── Scoring ───────────────────────────────────────────── */}

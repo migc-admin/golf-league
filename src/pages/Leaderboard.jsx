@@ -484,7 +484,7 @@ export default function Leaderboard() {
               <MatchPointsBoard matchData={matchData} event={event} />
             )}
             {activeTab === 'Team Match' && teamMatchData && (
-              <TeamMatchBoard teamMatchData={teamMatchData} teamAName={teamMatchData.teamAName} teamBName={teamMatchData.teamBName} />
+              <TeamMatchBoard teamMatchData={teamMatchData} teamAName={teamMatchData.teamAName} teamBName={teamMatchData.teamBName} event={event} />
             )}
             {activeTab === 'Skins' && skinsResults && (
               <SkinsBoard skinsResults={skinsResults} playerMap={playerMap} />
@@ -1200,9 +1200,51 @@ function NassauBoard({ leaderboards, event, activeFlight }) {
   )
 }
 
+// Strip the redundant "(A)"/"(B)" leader tag from in-progress match status strings —
+// color/position in the UI already indicates which side is up.
+function shortStatus(status) {
+  return status.replace(/ \([AB]\)$/, '')
+}
+
+// Edge status text for the compact match row — blank for the trailing side,
+// margin (e.g. "1 UP") for the leading/winning side, "AS" for both sides when tied.
+function edgeStatus(side, entity) {
+  const { upBy, holesPlayed, winner, matchStatus } = entity
+  if (holesPlayed === 0) return ''
+  const leaderSide = upBy > 0 ? 'A' : upBy < 0 ? 'B' : null
+  if (winner != null) {
+    if (winner === 'halve') return 'AS'
+    return winner === side ? shortStatus(matchStatus) : ''
+  }
+  if (leaderSide === null) return 'AS'
+  return leaderSide === side ? shortStatus(matchStatus) : ''
+}
+
+// Strong fill for the leading/winning side's name cell in the compact row, plain text otherwise.
+function compactSideColor(side, entity) {
+  const { upBy, winner } = entity
+  const leaderSide = upBy > 0 ? 'A' : upBy < 0 ? 'B' : null
+  const isWinner = winner === side
+  const isLeading = winner == null && leaderSide === side
+  if (side === 'A') {
+    if (isWinner) return 'bg-blue-700 text-white'
+    if (isLeading) return 'bg-blue-500 text-white'
+    return 'text-gray-900'
+  }
+  if (isWinner) return 'bg-red-700 text-white'
+  if (isLeading) return 'bg-red-500 text-white'
+  return 'text-gray-900'
+}
+
 // ─── Match Points Board ───────────────────────────────────────────
 function MatchPointsBoard({ matchData, event }) {
   const { pairings, teamPoints, hasTeams, ranked } = matchData
+  const [expandedIds, setExpandedIds] = useState(() => new Set())
+  const toggle = (idx) => setExpandedIds(prev => {
+    const next = new Set(prev)
+    if (next.has(idx)) next.delete(idx); else next.add(idx)
+    return next
+  })
   const teamNames = event?.ryder_cup_teams ?? {}
   const teamALabel = teamNames.a?.trim() || 'Flight A'
   const teamBLabel = teamNames.b?.trim() || 'Flight B'
@@ -1216,6 +1258,7 @@ function MatchPointsBoard({ matchData, event }) {
   )
 
   const teamLeader = teamPoints.A > teamPoints.B ? `${teamALabel} leads` : teamPoints.B > teamPoints.A ? `${teamBLabel} leads` : 'All Square'
+  const matchesLabel = event?.status === 'complete' ? 'matches won' : 'matches in progress'
 
   return (
     <div className="space-y-4">
@@ -1229,13 +1272,13 @@ function MatchPointsBoard({ matchData, event }) {
             <div className="flex-1 text-center py-4 bg-blue-50">
               <div className="text-xs font-bold text-blue-600 mb-1">{teamALabel}</div>
               <div className="text-4xl font-black text-blue-700">{teamPoints.A}</div>
-              <div className="text-xs text-blue-400 mt-0.5">matches won</div>
+              <div className="text-xs text-blue-400 mt-0.5">{matchesLabel}</div>
             </div>
             <div className="w-px bg-gray-200" />
-            <div className="flex-1 text-center py-4 bg-purple-50">
-              <div className="text-xs font-bold text-purple-600 mb-1">{teamBLabel}</div>
-              <div className="text-4xl font-black text-purple-700">{teamPoints.B}</div>
-              <div className="text-xs text-purple-400 mt-0.5">matches won</div>
+            <div className="flex-1 text-center py-4 bg-red-50">
+              <div className="text-xs font-bold text-red-600 mb-1">{teamBLabel}</div>
+              <div className="text-4xl font-black text-red-700">{teamPoints.B}</div>
+              <div className="text-xs text-red-400 mt-0.5">{matchesLabel}</div>
             </div>
           </div>
           <div className="text-center py-2 border-t border-gray-100">
@@ -1248,15 +1291,9 @@ function MatchPointsBoard({ matchData, event }) {
       {pairings.map((pair, idx) => {
         const leaderSide = pair.upBy > 0 ? 'A' : pair.upBy < 0 ? 'B' : null
         const isFinished = pair.winner != null
-        // Determine if this specific pairing is cross-flight
-        const pairCrossFlights = pair.playerA.flight && pair.playerB.flight && pair.playerA.flight !== pair.playerB.flight
-        // Use blue/purple for cross-flight, teal/amber for same-flight or no-flight
-        const stylesA = pairCrossFlights
-          ? { label: 'text-blue-600', winner: 'text-blue-700', leading: 'text-blue-600', bg: 'bg-blue-50', status: { win: 'bg-blue-600 text-white', lead: 'bg-blue-100 text-blue-700' } }
-          : { label: 'text-teal-600',  winner: 'text-teal-700',  leading: 'text-teal-600',  bg: 'bg-teal-50',  status: { win: 'bg-teal-600 text-white',  lead: 'bg-teal-100 text-teal-700'  } }
-        const stylesB = pairCrossFlights
-          ? { label: 'text-purple-600', winner: 'text-purple-700', leading: 'text-purple-600', bg: 'bg-purple-50', status: { win: 'bg-purple-600 text-white', lead: 'bg-purple-100 text-purple-700' } }
-          : { label: 'text-amber-600',  winner: 'text-amber-700',  leading: 'text-amber-600',  bg: 'bg-amber-50',  status: { win: 'bg-amber-600 text-white',  lead: 'bg-amber-100 text-amber-700'  } }
+        // First side listed is always blue, second is always red
+        const stylesA = { label: 'text-blue-600', winner: 'text-blue-700', leading: 'text-blue-600', bg: 'bg-blue-50', status: { win: 'bg-blue-600 text-white', lead: 'bg-blue-100 text-blue-700' } }
+        const stylesB = { label: 'text-red-600', winner: 'text-red-700', leading: 'text-red-600', bg: 'bg-red-50', status: { win: 'bg-red-600 text-white', lead: 'bg-red-100 text-red-700' } }
 
         const statusColor = isFinished
           ? (pair.winner === 'A' ? stylesA.status.win : pair.winner === 'B' ? stylesB.status.win : 'bg-gray-200 text-gray-700')
@@ -1265,78 +1302,114 @@ function MatchPointsBoard({ matchData, event }) {
         // playerA is always Team A, playerB always Team B — show team name if set
         const labelA = teamALabel || null
         const labelB = teamBLabel || null
+        const isOpen = expandedIds.has(idx)
+        const middleLabel = pair.holesPlayed === 0 ? 'VS' : `Thru ${pair.holesPlayed}`
+        const leftEdge = edgeStatus('A', pair)
+        const rightEdge = edgeStatus('B', pair)
 
         return (
           <div key={idx} className="bg-white rounded-xl border border-gray-200 overflow-hidden">
-            {/* Match header */}
-            <div className="bg-gray-50 px-4 py-2 border-b border-gray-100 flex items-center justify-between">
-              <span className="text-xs font-semibold text-gray-600">Match {idx + 1}</span>
-              <span className={`text-xs font-bold px-2.5 py-1 rounded-full ${statusColor}`}>
-                {pair.holesPlayed === 0 ? 'Not started' : pair.matchStatus}
-              </span>
-            </div>
-
-            {/* Players vs layout */}
-            <div className="flex items-stretch divide-x divide-gray-100">
-              {/* Player A */}
-              <div className={`flex-1 px-4 py-3 ${leaderSide === 'A' || pair.winner === 'A' ? stylesA.bg : ''}`}>
-                {labelA && <div className={`text-xs font-bold ${stylesA.label} mb-0.5`}>{labelA}</div>}
-                <div className="font-semibold text-sm text-gray-900 leading-tight">
-                  {pair.playerA.player?.last_name}, {pair.playerA.player?.first_name}
+            {/* Compact row — click to expand */}
+            <button type="button" onClick={() => toggle(idx)} className="w-full text-left cursor-pointer">
+              <div className="flex items-stretch">
+                <div className="w-14 flex-shrink-0 flex items-center justify-center bg-blue-50 text-xs font-bold text-blue-700">
+                  {leftEdge}
                 </div>
-                <div className="text-xs text-gray-400">CH {pair.playerA.course_handicap ?? '—'}</div>
+                <div className={`flex-1 min-w-0 px-3 py-3 flex items-center justify-end text-right ${compactSideColor('A', pair)}`}>
+                  <span className="text-sm font-semibold truncate">
+                    {pair.playerA.player?.last_name}, {pair.playerA.player?.first_name}
+                  </span>
+                </div>
+                <div className="flex items-center justify-center px-3 bg-gray-900 text-white text-xs font-bold whitespace-nowrap">
+                  {middleLabel}
+                </div>
+                <div className={`flex-1 min-w-0 px-3 py-3 flex items-center justify-start text-left ${compactSideColor('B', pair)}`}>
+                  <span className="text-sm font-semibold truncate">
+                    {pair.playerB.player?.last_name}, {pair.playerB.player?.first_name}
+                  </span>
+                </div>
+                <div className="w-14 flex-shrink-0 flex items-center justify-center bg-red-50 text-xs font-bold text-red-700">
+                  {rightEdge}
+                </div>
+                <div className="flex items-center px-2 text-gray-400 flex-shrink-0">
+                  <svg className={`w-4 h-4 transition-transform ${isOpen ? 'rotate-180' : ''}`} viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 11.168l3.71-3.938a.75.75 0 111.08 1.04l-4.25 4.5a.75.75 0 01-1.08 0l-4.25-4.5a.75.75 0 01.02-1.06z" clipRule="evenodd" /></svg>
+                </div>
+              </div>
+            </button>
+
+            {isOpen && (
+              <div className="border-t border-gray-100">
+                {/* Match header */}
+                <div className="bg-gray-50 px-4 py-2 border-b border-gray-100 flex items-center justify-between">
+                  <span className="text-xs font-semibold text-gray-600">Match {idx + 1}</span>
+                  <span className={`text-xs font-bold px-2.5 py-1 rounded-full ${statusColor}`}>
+                    {pair.holesPlayed === 0 ? 'Not started' : shortStatus(pair.matchStatus)}
+                  </span>
+                </div>
+
+                {/* Players vs layout */}
+                <div className="flex items-stretch divide-x divide-gray-100">
+                  {/* Player A */}
+                  <div className={`flex-1 px-4 py-3 ${leaderSide === 'A' || pair.winner === 'A' ? stylesA.bg : ''}`}>
+                    {labelA && <div className={`text-xs font-bold ${stylesA.label} mb-0.5`}>{labelA}</div>}
+                    <div className="font-semibold text-sm text-gray-900 leading-tight">
+                      {pair.playerA.player?.last_name}, {pair.playerA.player?.first_name}
+                    </div>
+                    <div className="text-xs text-gray-400">CH {pair.playerA.course_handicap ?? '—'}</div>
+                    {pair.holesPlayed > 0 && (
+                      <div className={`text-lg font-black mt-1 ${pair.winner === 'A' ? stylesA.winner : pair.winner === 'B' ? 'text-gray-300' : leaderSide === 'A' ? stylesA.leading : leaderSide === 'B' ? 'text-gray-500' : 'text-gray-500'}`}>
+                        {pair.winner === 'A' ? `W ${shortStatus(pair.matchStatus)}` : pair.winner === 'B' ? 'Lost' : pair.winner === 'halve' ? '½' : leaderSide === 'A' ? `↑ ${shortStatus(pair.matchStatus)}` : leaderSide === 'B' ? `↓ ${Math.abs(pair.upBy)} DN` : 'AS'}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* VS divider */}
+                  <div className="flex items-center justify-center w-8 bg-gray-50 text-xs text-gray-400 font-bold">vs</div>
+
+                  {/* Player B */}
+                  <div className={`flex-1 px-4 py-3 ${leaderSide === 'B' || pair.winner === 'B' ? stylesB.bg : ''}`}>
+                    {labelB && <div className={`text-xs font-bold ${stylesB.label} mb-0.5`}>{labelB}</div>}
+                    <div className="font-semibold text-sm text-gray-900 leading-tight">
+                      {pair.playerB.player?.last_name}, {pair.playerB.player?.first_name}
+                    </div>
+                    <div className="text-xs text-gray-400">CH {pair.playerB.course_handicap ?? '—'}</div>
+                    {pair.holesPlayed > 0 && (
+                      <div className={`text-lg font-black mt-1 ${pair.winner === 'B' ? stylesB.winner : pair.winner === 'A' ? 'text-gray-300' : leaderSide === 'B' ? stylesB.leading : leaderSide === 'A' ? 'text-gray-500' : 'text-gray-500'}`}>
+                        {pair.winner === 'B' ? `W ${shortStatus(pair.matchStatus)}` : pair.winner === 'A' ? 'Lost' : pair.winner === 'halve' ? '½' : leaderSide === 'B' ? `↑ ${shortStatus(pair.matchStatus)}` : leaderSide === 'A' ? `↓ ${Math.abs(pair.upBy)} DN` : 'AS'}
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* Hole-by-hole dots — colored by who won the hole, tooltip shows running state */}
                 {pair.holesPlayed > 0 && (
-                  <div className={`text-lg font-black mt-1 ${pair.winner === 'A' ? stylesA.winner : pair.winner === 'B' ? 'text-gray-300' : leaderSide === 'A' ? stylesA.leading : 'text-gray-500'}`}>
-                    {pair.winner === 'A' ? `W ${pair.matchStatus}` : pair.winner === 'B' ? 'Lost' : pair.winner === 'halve' ? '½' : leaderSide === 'A' ? `↑ ${pair.matchStatus}` : leaderSide === 'B' ? 'AS' : 'AS'}
+                  <div className="px-4 py-3 border-t border-gray-100 overflow-x-auto">
+                    <div className="flex gap-1 min-w-0">
+                      {pair.holes.map(h => {
+                        if (h.status === 'pending' || h.status === 'conceded') return (
+                          <div key={h.hole} className={`w-7 h-7 rounded-full flex flex-col items-center justify-center text-xs ${h.status === 'conceded' ? 'bg-gray-50 text-gray-200' : 'bg-gray-100 text-gray-400'}`}>
+                            {h.hole}
+                          </div>
+                        )
+                        const bg = h.result === 'A' ? 'bg-blue-500' : h.result === 'B' ? 'bg-red-500' : 'bg-gray-200'
+                        const textCol = h.result === 'halve' ? 'text-gray-500' : 'text-white'
+                        const stateLabel = h.upByAfter === 0 ? 'AS' : `${Math.abs(h.upByAfter)} UP`
+                        return (
+                          <div key={h.hole} title={`Hole ${h.hole} — A net ${h.netA}, B net ${h.netB} — ${stateLabel}`}
+                            className={`w-7 h-7 rounded-full ${bg} ${textCol} flex items-center justify-center text-xs font-bold`}
+                          >
+                            {h.hole}
+                          </div>
+                        )
+                      })}
+                    </div>
+                    <div className="mt-1.5 flex gap-3 text-xs text-gray-400">
+                      <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-full bg-blue-500 inline-block"/> A wins hole</span>
+                      <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-full bg-red-500 inline-block"/> B wins hole</span>
+                      <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-full bg-gray-200 inline-block"/> Halved</span>
+                    </div>
                   </div>
                 )}
-              </div>
-
-              {/* VS divider */}
-              <div className="flex items-center justify-center w-8 bg-gray-50 text-xs text-gray-400 font-bold">vs</div>
-
-              {/* Player B */}
-              <div className={`flex-1 px-4 py-3 ${leaderSide === 'B' || pair.winner === 'B' ? stylesB.bg : ''}`}>
-                {labelB && <div className={`text-xs font-bold ${stylesB.label} mb-0.5`}>{labelB}</div>}
-                <div className="font-semibold text-sm text-gray-900 leading-tight">
-                  {pair.playerB.player?.last_name}, {pair.playerB.player?.first_name}
-                </div>
-                <div className="text-xs text-gray-400">CH {pair.playerB.course_handicap ?? '—'}</div>
-                {pair.holesPlayed > 0 && (
-                  <div className={`text-lg font-black mt-1 ${pair.winner === 'B' ? stylesB.winner : pair.winner === 'A' ? 'text-gray-300' : leaderSide === 'B' ? stylesB.leading : 'text-gray-500'}`}>
-                    {pair.winner === 'B' ? `W ${pair.matchStatus}` : pair.winner === 'A' ? 'Lost' : pair.winner === 'halve' ? '½' : leaderSide === 'B' ? `↑ ${pair.matchStatus}` : leaderSide === 'A' ? 'AS' : 'AS'}
-                  </div>
-                )}
-              </div>
-            </div>
-
-            {/* Hole-by-hole dots — colored by who won the hole, tooltip shows running state */}
-            {pair.holesPlayed > 0 && (
-              <div className="px-4 py-3 border-t border-gray-100 overflow-x-auto">
-                <div className="flex gap-1 min-w-0">
-                  {pair.holes.map(h => {
-                    if (h.status === 'pending' || h.status === 'conceded') return (
-                      <div key={h.hole} className={`w-7 h-7 rounded-full flex flex-col items-center justify-center text-xs ${h.status === 'conceded' ? 'bg-gray-50 text-gray-200' : 'bg-gray-100 text-gray-400'}`}>
-                        {h.hole}
-                      </div>
-                    )
-                    const bg = h.result === 'A' ? 'bg-blue-500' : h.result === 'B' ? 'bg-purple-500' : 'bg-gray-200'
-                    const textCol = h.result === 'halve' ? 'text-gray-500' : 'text-white'
-                    const stateLabel = h.upByAfter === 0 ? 'AS' : `${Math.abs(h.upByAfter)} UP`
-                    return (
-                      <div key={h.hole} title={`Hole ${h.hole} — A net ${h.netA}, B net ${h.netB} — ${stateLabel}`}
-                        className={`w-7 h-7 rounded-full ${bg} ${textCol} flex items-center justify-center text-xs font-bold`}
-                      >
-                        {h.hole}
-                      </div>
-                    )
-                  })}
-                </div>
-                <div className="mt-1.5 flex gap-3 text-xs text-gray-400">
-                  <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-full bg-blue-500 inline-block"/> A wins hole</span>
-                  <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-full bg-purple-500 inline-block"/> B wins hole</span>
-                  <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-full bg-gray-200 inline-block"/> Halved</span>
-                </div>
               </div>
             )}
           </div>
@@ -1347,8 +1420,14 @@ function MatchPointsBoard({ matchData, event }) {
 }
 
 // ─── Team Match Board ─────────────────────────────────────────────
-function TeamMatchBoard({ teamMatchData, teamAName = 'Team A', teamBName = 'Team B' }) {
+function TeamMatchBoard({ teamMatchData, teamAName = 'Team A', teamBName = 'Team B', event }) {
   const { groupMatches, totalA, totalB } = teamMatchData
+  const [expandedIds, setExpandedIds] = useState(() => new Set())
+  const toggle = (idx) => setExpandedIds(prev => {
+    const next = new Set(prev)
+    if (next.has(idx)) next.delete(idx); else next.add(idx)
+    return next
+  })
 
   if (!groupMatches.length) return (
     <div className="text-center py-12 text-gray-400">
@@ -1358,6 +1437,7 @@ function TeamMatchBoard({ teamMatchData, teamAName = 'Team A', teamBName = 'Team
   )
 
   const totalLeader = totalA > totalB ? `${teamAName} leads` : totalB > totalA ? `${teamBName} leads` : 'All Square'
+  const matchesLabel = event?.status === 'complete' ? 'matches won' : 'matches in progress'
 
   return (
     <div className="space-y-4">
@@ -1371,13 +1451,13 @@ function TeamMatchBoard({ teamMatchData, teamAName = 'Team A', teamBName = 'Team
             <div className="flex-1 text-center py-4 bg-blue-50">
               <div className="text-xs font-bold text-blue-600 mb-1">{teamAName}</div>
               <div className="text-4xl font-black text-blue-700">{totalA}</div>
-              <div className="text-xs text-blue-400 mt-0.5">matches won</div>
+              <div className="text-xs text-blue-400 mt-0.5">{matchesLabel}</div>
             </div>
             <div className="w-px bg-gray-200" />
-            <div className="flex-1 text-center py-4 bg-purple-50">
-              <div className="text-xs font-bold text-purple-600 mb-1">{teamBName}</div>
-              <div className="text-4xl font-black text-purple-700">{totalB}</div>
-              <div className="text-xs text-purple-400 mt-0.5">matches won</div>
+            <div className="flex-1 text-center py-4 bg-red-50">
+              <div className="text-xs font-bold text-red-600 mb-1">{teamBName}</div>
+              <div className="text-4xl font-black text-red-700">{totalB}</div>
+              <div className="text-xs text-red-400 mt-0.5">{matchesLabel}</div>
             </div>
           </div>
           <div className="text-center py-2 border-t border-gray-100">
@@ -1391,72 +1471,111 @@ function TeamMatchBoard({ teamMatchData, teamAName = 'Team A', teamBName = 'Team
         const leaderSide = match.upBy > 0 ? 'A' : match.upBy < 0 ? 'B' : null
         const isFinished = match.winner != null
         const statusColor = isFinished
-          ? (match.winner === 'A' ? 'bg-blue-600 text-white' : match.winner === 'B' ? 'bg-purple-600 text-white' : 'bg-gray-200 text-gray-700')
-          : (leaderSide === 'A' ? 'bg-blue-100 text-blue-700' : leaderSide === 'B' ? 'bg-purple-100 text-purple-700' : 'bg-gray-100 text-gray-600')
+          ? (match.winner === 'A' ? 'bg-blue-600 text-white' : match.winner === 'B' ? 'bg-red-600 text-white' : 'bg-gray-200 text-gray-700')
+          : (leaderSide === 'A' ? 'bg-blue-100 text-blue-700' : leaderSide === 'B' ? 'bg-red-100 text-red-700' : 'bg-gray-100 text-gray-600')
+
+        const isOpen = expandedIds.has(idx)
+        const namesA = match.teamA.map(ep => ep.player?.last_name).filter(Boolean).join(' + ')
+        const namesB = match.teamB.map(ep => ep.player?.last_name).filter(Boolean).join(' + ')
+        const middleLabel = match.holesPlayed === 0 ? 'VS' : `Thru ${match.holesPlayed}`
+        const leftEdge = edgeStatus('A', match)
+        const rightEdge = edgeStatus('B', match)
 
         return (
           <div key={idx} className="bg-white rounded-xl border border-gray-200 overflow-hidden">
-            <div className="bg-gray-50 px-4 py-2 border-b border-gray-100 flex items-center justify-between">
-              <span className="text-xs font-semibold text-gray-600">Group {match.groupNumber} — Best Ball</span>
-              <span className={`text-xs font-bold px-2.5 py-1 rounded-full ${statusColor}`}>
-                {match.holesPlayed === 0 ? 'Not started' : match.matchStatus}
-              </span>
-            </div>
-
-            <div className="flex items-stretch divide-x divide-gray-100">
-              {/* Team A */}
-              <div className={`flex-1 px-4 py-3 ${leaderSide === 'A' || match.winner === 'A' ? 'bg-blue-50' : ''}`}>
-                <div className="text-xs font-bold text-blue-600 mb-1">{teamAName}</div>
-                {match.teamA.map(ep => (
-                  <div key={ep.player_id} className="text-sm text-gray-800 leading-snug">
-                    {ep.player?.last_name}, {ep.player?.first_name}
-                    <span className="text-xs text-gray-400 ml-1">({match.relCH[ep.player_id]} rel. strokes)</span>
-                  </div>
-                ))}
-                {match.holesPlayed > 0 && (
-                  <div className={`text-lg font-black mt-2 ${match.winner === 'A' ? 'text-blue-700' : match.winner === 'B' ? 'text-gray-300' : leaderSide === 'A' ? 'text-blue-600' : 'text-gray-500'}`}>
-                    {match.winner === 'A' ? `W ${match.matchStatus}` : match.winner === 'B' ? 'Lost' : match.winner === 'halve' ? '½' : leaderSide === 'A' ? `↑ ${match.matchStatus}` : leaderSide === 'B' ? 'AS' : 'AS'}
-                  </div>
-                )}
-              </div>
-
-              <div className="flex items-center justify-center w-8 bg-gray-50 text-xs text-gray-400 font-bold">vs</div>
-
-              {/* Team B */}
-              <div className={`flex-1 px-4 py-3 ${leaderSide === 'B' || match.winner === 'B' ? 'bg-purple-50' : ''}`}>
-                <div className="text-xs font-bold text-purple-600 mb-1">{teamBName}</div>
-                {match.teamB.map(ep => (
-                  <div key={ep.player_id} className="text-sm text-gray-800 leading-snug">
-                    {ep.player?.last_name}, {ep.player?.first_name}
-                    <span className="text-xs text-gray-400 ml-1">({match.relCH[ep.player_id]} rel. strokes)</span>
-                  </div>
-                ))}
-                {match.holesPlayed > 0 && (
-                  <div className={`text-lg font-black mt-2 ${match.winner === 'B' ? 'text-purple-700' : match.winner === 'A' ? 'text-gray-300' : leaderSide === 'B' ? 'text-purple-600' : 'text-gray-500'}`}>
-                    {match.winner === 'B' ? `W ${match.matchStatus}` : match.winner === 'A' ? 'Lost' : match.winner === 'halve' ? '½' : leaderSide === 'B' ? `↑ ${match.matchStatus}` : leaderSide === 'A' ? 'AS' : 'AS'}
-                  </div>
-                )}
-              </div>
-            </div>
-
-            {/* Hole-by-hole contributor summary */}
-            {match.holesPlayed > 0 && (
-              <div className="px-4 py-3 border-t border-gray-100 bg-gray-50">
-                <p className="text-xs font-semibold text-gray-500 mb-2 uppercase tracking-wide">Best Ball by Hole</p>
-                <div className="flex flex-wrap gap-1.5">
-                  {match.holes.filter(h => h.status === 'played').map(h => {
-                    const bgColor = h.result === 'A' ? 'bg-blue-100 text-blue-700' : h.result === 'B' ? 'bg-purple-100 text-purple-700' : 'bg-gray-100 text-gray-500'
-                    const contributor = h.result === 'A' ? h.contributorA : h.result === 'B' ? h.contributorB : null
-                    const initials = contributor
-                      ? `${contributor.player?.first_name?.[0] ?? ''}${contributor.player?.last_name?.[0] ?? ''}`
-                      : '½'
-                    return (
-                      <div key={h.hole} className={`text-xs font-bold px-2 py-1 rounded-lg ${bgColor}`} title={contributor ? `${contributor.player?.first_name} ${contributor.player?.last_name}` : 'Halved'}>
-                        #{h.hole} {initials}
-                      </div>
-                    )
-                  })}
+            {/* Compact row — click to expand */}
+            <button type="button" onClick={() => toggle(idx)} className="w-full text-left cursor-pointer">
+              <div className="flex items-stretch">
+                <div className="w-14 flex-shrink-0 flex items-center justify-center bg-blue-50 text-xs font-bold text-blue-700">
+                  {leftEdge}
                 </div>
+                <div className={`flex-1 min-w-0 px-3 py-3 flex items-center justify-end text-right ${compactSideColor('A', match)}`}>
+                  <span className="text-sm font-semibold truncate">
+                    {namesA}
+                  </span>
+                </div>
+                <div className="flex items-center justify-center px-3 bg-gray-900 text-white text-xs font-bold whitespace-nowrap">
+                  {middleLabel}
+                </div>
+                <div className={`flex-1 min-w-0 px-3 py-3 flex items-center justify-start text-left ${compactSideColor('B', match)}`}>
+                  <span className="text-sm font-semibold truncate">
+                    {namesB}
+                  </span>
+                </div>
+                <div className="w-14 flex-shrink-0 flex items-center justify-center bg-red-50 text-xs font-bold text-red-700">
+                  {rightEdge}
+                </div>
+                <div className="flex items-center px-2 text-gray-400 flex-shrink-0">
+                  <svg className={`w-4 h-4 transition-transform ${isOpen ? 'rotate-180' : ''}`} viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 11.168l3.71-3.938a.75.75 0 111.08 1.04l-4.25 4.5a.75.75 0 01-1.08 0l-4.25-4.5a.75.75 0 01.02-1.06z" clipRule="evenodd" /></svg>
+                </div>
+              </div>
+            </button>
+
+            {isOpen && (
+              <div className="border-t border-gray-100">
+                <div className="bg-gray-50 px-4 py-2 border-b border-gray-100 flex items-center justify-between">
+                  <span className="text-xs font-semibold text-gray-600">Group {match.groupNumber} — Best Ball</span>
+                  <span className={`text-xs font-bold px-2.5 py-1 rounded-full ${statusColor}`}>
+                    {match.holesPlayed === 0 ? 'Not started' : shortStatus(match.matchStatus)}
+                  </span>
+                </div>
+
+                <div className="flex items-stretch divide-x divide-gray-100">
+                  {/* Team A */}
+                  <div className={`flex-1 px-4 py-3 ${leaderSide === 'A' || match.winner === 'A' ? 'bg-blue-50' : ''}`}>
+                    <div className="text-xs font-bold text-blue-600 mb-1">{teamAName}</div>
+                    {match.teamA.map(ep => (
+                      <div key={ep.player_id} className="text-sm text-gray-800 leading-snug">
+                        {ep.player?.last_name}, {ep.player?.first_name}
+                        <span className="text-xs text-gray-400 ml-1">({match.relCH[ep.player_id]} rel. strokes)</span>
+                      </div>
+                    ))}
+                    {match.holesPlayed > 0 && (
+                      <div className={`text-lg font-black mt-2 ${match.winner === 'A' ? 'text-blue-700' : match.winner === 'B' ? 'text-gray-300' : leaderSide === 'A' ? 'text-blue-600' : leaderSide === 'B' ? 'text-gray-500' : 'text-gray-500'}`}>
+                        {match.winner === 'A' ? `W ${shortStatus(match.matchStatus)}` : match.winner === 'B' ? 'Lost' : match.winner === 'halve' ? '½' : leaderSide === 'A' ? `↑ ${shortStatus(match.matchStatus)}` : leaderSide === 'B' ? `↓ ${Math.abs(match.upBy)} DN` : 'AS'}
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="flex items-center justify-center w-8 bg-gray-50 text-xs text-gray-400 font-bold">vs</div>
+
+                  {/* Team B */}
+                  <div className={`flex-1 px-4 py-3 ${leaderSide === 'B' || match.winner === 'B' ? 'bg-red-50' : ''}`}>
+                    <div className="text-xs font-bold text-red-600 mb-1">{teamBName}</div>
+                    {match.teamB.map(ep => (
+                      <div key={ep.player_id} className="text-sm text-gray-800 leading-snug">
+                        {ep.player?.last_name}, {ep.player?.first_name}
+                        <span className="text-xs text-gray-400 ml-1">({match.relCH[ep.player_id]} rel. strokes)</span>
+                      </div>
+                    ))}
+                    {match.holesPlayed > 0 && (
+                      <div className={`text-lg font-black mt-2 ${match.winner === 'B' ? 'text-red-700' : match.winner === 'A' ? 'text-gray-300' : leaderSide === 'B' ? 'text-red-600' : leaderSide === 'A' ? 'text-gray-500' : 'text-gray-500'}`}>
+                        {match.winner === 'B' ? `W ${shortStatus(match.matchStatus)}` : match.winner === 'A' ? 'Lost' : match.winner === 'halve' ? '½' : leaderSide === 'B' ? `↑ ${shortStatus(match.matchStatus)}` : leaderSide === 'A' ? `↓ ${Math.abs(match.upBy)} DN` : 'AS'}
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* Hole-by-hole contributor summary */}
+                {match.holesPlayed > 0 && (
+                  <div className="px-4 py-3 border-t border-gray-100 bg-gray-50">
+                    <p className="text-xs font-semibold text-gray-500 mb-2 uppercase tracking-wide">Best Ball by Hole</p>
+                    <div className="flex flex-wrap gap-1.5">
+                      {match.holes.filter(h => h.status === 'played').map(h => {
+                        const bgColor = h.result === 'A' ? 'bg-blue-100 text-blue-700' : h.result === 'B' ? 'bg-red-100 text-red-700' : 'bg-gray-100 text-gray-500'
+                        const contributor = h.result === 'A' ? h.contributorA : h.result === 'B' ? h.contributorB : null
+                        const initials = contributor
+                          ? `${contributor.player?.first_name?.[0] ?? ''}${contributor.player?.last_name?.[0] ?? ''}`
+                          : '½'
+                        return (
+                          <div key={h.hole} className={`text-xs font-bold px-2 py-1 rounded-lg ${bgColor}`} title={contributor ? `${contributor.player?.first_name} ${contributor.player?.last_name}` : 'Halved'}>
+                            #{h.hole} {initials}
+                          </div>
+                        )
+                      })}
+                    </div>
+                  </div>
+                )}
               </div>
             )}
           </div>

@@ -47,7 +47,7 @@ function matchStatusLabel(upBy, holesPlayed, closed = false) {
  *   1. If the group has both Flight A and Flight B → pair A vs B by handicap order
  *   2. Otherwise → pair by handicap order top-down (1v2, 3v4, …)
  */
-function buildPairings(groupPlayers) {
+export function buildPairings(groupPlayers) {
   const hasA = groupPlayers.some(ep => ep.flight === 'A')
   const hasB = groupPlayers.some(ep => ep.flight === 'B')
 
@@ -71,6 +71,74 @@ function buildPairings(groupPlayers) {
     pairs.push({ playerA: sorted[i], playerB: sorted[i + 1] })
   }
   return pairs
+}
+
+/**
+ * Compute per-player relative match play handicaps for live scoring.
+ * Used to show a "match play stroke" indicator alongside stroke-play strokes
+ * during hole-by-hole entry — independent of any scores.
+ *
+ * @param {Array}   eventPlayers    — full roster for the event (or group)
+ * @param {Array}   formats         — event.formats (or [event.format])
+ * @param {Object}  [teamMatchConfig] — event.team_match_config, for team_match_play
+ * @param {Array}   [storedPairings]  — match_pairings rows, for match_points/ryder_cup
+ * @returns {Object} map: { [player_id]: { mode: 'individual'|'team', relCH, opponentName? } }
+ */
+export function computeMatchStrokeMap(eventPlayers, formats = [], teamMatchConfig = null, storedPairings = []) {
+  const map = {}
+  const hasIndividual = formats.includes('match_points') || formats.includes('ryder_cup')
+  const hasTeam = formats.includes('team_match_play')
+  if (!hasIndividual && !hasTeam) return map
+
+  const groups = {}
+  for (const ep of eventPlayers) {
+    const g = ep.group_number ?? 0
+    if (!groups[g]) groups[g] = []
+    groups[g].push(ep)
+  }
+
+  if (hasIndividual) {
+    let pairs = []
+    if (storedPairings.length > 0) {
+      const playerMap = Object.fromEntries(eventPlayers.map(ep => [ep.player_id, ep]))
+      pairs = storedPairings
+        .map(p => ({ playerA: playerMap[p.player_a_id], playerB: playerMap[p.player_b_id] }))
+        .filter(p => p.playerA && p.playerB)
+    } else {
+      for (const members of Object.values(groups)) {
+        pairs.push(...buildPairings(members))
+      }
+    }
+    for (const { playerA, playerB } of pairs) {
+      const chA = playerA.course_handicap ?? 0
+      const chB = playerB.course_handicap ?? 0
+      const baseline = Math.min(chA, chB)
+      map[playerA.player_id] = {
+        mode: 'individual',
+        relCH: Math.max(0, chA - baseline),
+        opponentName: `${playerB.player?.first_name ?? ''} ${playerB.player?.last_name ?? ''}`.trim(),
+      }
+      map[playerB.player_id] = {
+        mode: 'individual',
+        relCH: Math.max(0, chB - baseline),
+        opponentName: `${playerA.player?.first_name ?? ''} ${playerA.player?.last_name ?? ''}`.trim(),
+      }
+    }
+  } else if (hasTeam) {
+    const sides = teamMatchConfig?.sides ?? {}
+    const hasSides = Object.keys(sides).length > 0
+    for (const members of Object.values(groups)) {
+      const teamA = hasSides ? members.filter(ep => sides[ep.player_id] === 'A') : members.filter(ep => ep.flight === 'A')
+      const teamB = hasSides ? members.filter(ep => sides[ep.player_id] === 'B') : members.filter(ep => ep.flight === 'B')
+      if (teamA.length === 0 || teamB.length === 0) continue
+      const baseline = Math.min(...members.map(ep => ep.course_handicap ?? 0))
+      for (const ep of [...teamA, ...teamB]) {
+        map[ep.player_id] = { mode: 'team', relCH: Math.max(0, (ep.course_handicap ?? 0) - baseline) }
+      }
+    }
+  }
+
+  return map
 }
 
 /**
