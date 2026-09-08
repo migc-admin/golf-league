@@ -425,9 +425,10 @@ async function exportScoresCSV(event, eventPlayers, allScores, course, sideGames
   const leaderboards  = computeLeaderboards(nonGuestEPs, allScores, course)
   const skinsResults  = computeAllSkins(nonGuestEPs, allScores, course)
   const stablefordData = computeStableford(nonGuestEPs, allScores, course)
+  const stablefordGrossData = computeStableford(nonGuestEPs, allScores, course, true)
   const blindPartnersData = computeBlindPartners(event, nonGuestEPs, allScores, course)
   const superSkinsResult  = computeSuperSkins(event, nonGuestEPs, allScores, course)
-  const { byCategory } = computePayouts(event, nonGuestEPs.length, leaderboards, sideGames, skinsResults, flightCounts, stablefordData, blindPartnersData, superSkinsResult)
+  const { byCategory } = computePayouts(event, nonGuestEPs.length, leaderboards, sideGames, skinsResults, flightCounts, stablefordData, blindPartnersData, superSkinsResult, stablefordGrossData)
 
   const playerMap = Object.fromEntries(eventPlayers.map(ep => [ep.player_id, ep.player]))
 
@@ -2463,6 +2464,20 @@ function TabGroups({ event, eventPlayers, onUpdated, orgSlug, allScores, course 
     }
   }
 
+  // Tap-to-move alternative to drag-and-drop — the drag handle is awkward on touch,
+  // so every card also gets a "Move to" select that jumps straight to a target group.
+  function moveToContainer(ep, fromKey, toKey) {
+    if (!toKey || fromKey === toKey) return
+    setContainers(prev => {
+      const next = {}
+      for (const k of Object.keys(prev)) next[k] = [...prev[k]]
+      next[fromKey] = next[fromKey].filter(m => m.id !== ep.id)
+      next[toKey] = [...(next[toKey] ?? []), ep]
+      persistContainers(next)
+      return next
+    })
+  }
+
   async function persistContainers(snap) {
     const source = snap ?? containers
     setSaving(true)
@@ -2492,6 +2507,10 @@ function TabGroups({ event, eventPlayers, onUpdated, orgSlug, allScores, course 
   const groupKeys = Object.keys(containers).filter(k => k !== 'ungrouped').sort((a, b) => {
     return parseInt(a.replace('group-', ''), 10) - parseInt(b.replace('group-', ''), 10)
   })
+  const moveOptions = [
+    { key: 'ungrouped', label: 'Unassigned' },
+    ...groupKeys.map(key => ({ key, label: `Group ${parseInt(key.replace('group-', ''), 10) + 1}` })),
+  ]
 
   const [showAutoAssign, setShowAutoAssign] = useState(false)
   const [autoMethod,     setAutoMethod]     = useState('random')
@@ -2648,7 +2667,7 @@ function TabGroups({ event, eventPlayers, onUpdated, orgSlug, allScores, course 
           <DroppableGroup
             id="ungrouped"
             title="Unassigned Players"
-            subtitle="Drag into a group below"
+            subtitle="Drag into a group below, or use Move to on mobile"
             members={ungrouped}
             holeAssignments={holeAssignments}
             isShotgun={false}
@@ -2658,6 +2677,8 @@ function TabGroups({ event, eventPlayers, onUpdated, orgSlug, allScores, course 
             noShowLoading={noShowLoading}
             onNoShow={handleNoShow}
             onClearNoShow={handleClearNoShow}
+            moveOptions={moveOptions}
+            onMoveToGroup={moveToContainer}
           />
         )}
 
@@ -2684,6 +2705,8 @@ function TabGroups({ event, eventPlayers, onUpdated, orgSlug, allScores, course 
                 noShowLoading={noShowLoading}
                 onNoShow={handleNoShow}
                 onClearNoShow={handleClearNoShow}
+                moveOptions={moveOptions}
+                onMoveToGroup={moveToContainer}
                 onReturnToPool={ep => {
                   setContainers(prev => {
                     const next = {}
@@ -2707,7 +2730,7 @@ function TabGroups({ event, eventPlayers, onUpdated, orgSlug, allScores, course 
   )
 }
 
-function DroppableGroup({ id, title, subtitle, members, isShotgun, holeAssignments, scorerByGroup, groupNum, onSetGroupHole, allScores, showNoShow, noShowLoading, onNoShow, onClearNoShow, onReturnToPool }) {
+function DroppableGroup({ id, title, subtitle, members, isShotgun, holeAssignments, scorerByGroup, groupNum, onSetGroupHole, allScores, showNoShow, noShowLoading, onNoShow, onClearNoShow, onReturnToPool, moveOptions, onMoveToGroup }) {
   const { setNodeRef, isOver } = useDroppable({ id })
 
   const scored = groupNum && scorerByGroup[groupNum] ? [...scorerByGroup[groupNum]].join(', ') : null
@@ -2752,6 +2775,9 @@ function DroppableGroup({ id, title, subtitle, members, isShotgun, holeAssignmen
               onNoShow={() => onNoShow(ep)}
               onClearNoShow={() => onClearNoShow(ep)}
               onReturnToPool={onReturnToPool ? () => onReturnToPool(ep) : null}
+              moveOptions={moveOptions}
+              currentKey={id}
+              onMoveToGroup={onMoveToGroup}
             />
           ))}
           {members.length === 0 && (
@@ -2763,7 +2789,7 @@ function DroppableGroup({ id, title, subtitle, members, isShotgun, holeAssignmen
   )
 }
 
-function SortablePlayerCard({ ep, isNoShow, showNoShow, noShowLoading, onNoShow, onClearNoShow, onReturnToPool }) {
+function SortablePlayerCard({ ep, isNoShow, showNoShow, noShowLoading, onNoShow, onClearNoShow, onReturnToPool, moveOptions, currentKey, onMoveToGroup }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: ep.id })
   const style = {
     transform: CSS.Transform.toString(transform),
@@ -2773,17 +2799,29 @@ function SortablePlayerCard({ ep, isNoShow, showNoShow, noShowLoading, onNoShow,
 
   return (
     <div ref={setNodeRef} style={style} className={`flex items-center justify-between rounded-lg px-3 py-2 border ${isNoShow ? 'opacity-60 bg-gray-50 border-gray-200' : 'bg-white border-gray-100 hover:border-gray-200'}`}>
-      <div className="flex items-center gap-2">
-        <span {...attributes} {...listeners} className="cursor-grab text-gray-300 hover:text-gray-500 select-none" title="Drag to move">
+      <div className="flex items-center gap-2 min-w-0">
+        <span {...attributes} {...listeners} className="cursor-grab text-gray-300 hover:text-gray-500 select-none hidden sm:inline" title="Drag to move">
           ⠿
         </span>
-        <div>
+        <div className="min-w-0">
           <span className="text-sm font-medium text-gray-900">{ep.player?.first_name} {ep.player?.last_name}</span>
           {isNoShow && <span className="ml-2 text-xs font-semibold px-1.5 py-0.5 rounded-full" style={{ background: '#fef3c7', color: '#92400e' }}>No Show</span>}
           {ep.flight && !isNoShow && <span className="ml-1"><FlightBadge flight={ep.flight} /></span>}
         </div>
       </div>
-      <div className="flex items-center gap-1.5">
+      <div className="flex items-center gap-1.5 shrink-0">
+        {moveOptions && onMoveToGroup && (
+          <select
+            value=""
+            onChange={e => { if (e.target.value) onMoveToGroup(ep, currentKey, e.target.value) }}
+            className="input py-0.5 text-xs w-28 bg-white text-gray-500"
+          >
+            <option value="">Move to…</option>
+            {moveOptions.filter(o => o.key !== currentKey).map(o => (
+              <option key={o.key} value={o.key}>{o.label}</option>
+            ))}
+          </select>
+        )}
         {showNoShow && (
           isNoShow ? (
             <button onClick={onClearNoShow} disabled={noShowLoading} className="text-xs px-2 py-1 rounded border border-gray-200 text-gray-500 hover:bg-gray-50 disabled:opacity-40">
@@ -3764,10 +3802,11 @@ function TabPayoutSummary({ event, eventPlayers, allScores, sideGames, course })
   const leaderboards  = computeLeaderboards(nonGuestEPs, allScores, course)
   const skinsResults  = computeAllSkins(nonGuestEPs, allScores, course)
   const stablefordData = computeStableford(nonGuestEPs, allScores, course)
+  const stablefordGrossData = computeStableford(nonGuestEPs, allScores, course, true)
   const blindPartnersData = computeBlindPartners(event, nonGuestEPs, allScores, course)
   const superSkinsResult  = computeSuperSkins(event, nonGuestEPs, allScores, course)
   const { totalPot, byCategory, byPlayer, totalAllocated } = computePayouts(
-    event, nonGuestEPs.length, leaderboards, sideGames, skinsResults, flightCounts, stablefordData, blindPartnersData, superSkinsResult
+    event, nonGuestEPs.length, leaderboards, sideGames, skinsResults, flightCounts, stablefordData, blindPartnersData, superSkinsResult, stablefordGrossData
   )
 
   const playerMap = Object.fromEntries(
@@ -3886,7 +3925,7 @@ function EventStatusControl({ event, onUpdated }) {
 // ─── Edit Event Modal ──────────────────────────────────────────────
 
 // Format keys that support per-flight scoring
-const PER_FLIGHT_FORMAT_KEYS = new Set(['net_stroke', 'net_stroke_front9', 'net_stroke_back9', 'low_gross', 'gross_stroke_front9', 'gross_stroke_back9', 'stableford'])
+const PER_FLIGHT_FORMAT_KEYS = new Set(['net_stroke', 'net_stroke_front9', 'net_stroke_back9', 'low_gross', 'gross_stroke_front9', 'gross_stroke_back9', 'stableford', 'stableford_gross'])
 
 /** Expand formats + formatScope into the formats array saved to DB */
 function buildFormatsArray(enabledFormats, formatScope, numFlights) {
@@ -3929,7 +3968,8 @@ const EDIT_FORMAT_OPTIONS = [
     { value: 'gross_stroke_back9',  label: 'Gross — Back 9',       tip: 'Holes 10–18 only, no handicap applied.' },
   ]},
   { group: 'Nassau', options: [
-    { value: 'net_stroke_nassau', label: 'Nassau', tip: 'Three separate bets: Front 9, Back 9, and Full 18 net — each scored and paid independently.' },
+    { value: 'net_stroke_nassau',   label: 'Nassau — Net',   tip: 'Three separate bets: Front 9, Back 9, and Full 18 net — each scored and paid independently.' },
+    { value: 'gross_stroke_nassau', label: 'Nassau — Gross', tip: 'Same three bets — Front 9, Back 9, Full 18 — scored on raw gross score, no handicap applied.' },
   ]},
   { group: 'Stableford', options: [
     { value: 'stableford',       label: 'Stableford — Net',   tip: 'Points per hole vs par using net score. Double bogey = 0, Bogey = 1, Par = 2, Birdie = 3, Eagle = 4. Highest points wins.' },

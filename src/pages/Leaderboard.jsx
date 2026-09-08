@@ -13,12 +13,12 @@ import { computeLeaderboards, computeStableford, computeBlindPartners, blindPart
 import { computeAllSkins, computeSuperSkins } from '../lib/engines/skins'
 import { computeMatchPoints, computeTeamMatchPoints } from '../lib/engines/matchPoints'
 import { computePayouts, CATEGORY_LABELS, ctpLabel } from '../lib/engines/payouts'
-import { computeTGLEventResults } from '../lib/engines/tgl'
+import { computeTGLEventResults, assignTGLPoints } from '../lib/engines/tgl'
 import { FlightBadge, StatusBadge } from '../components/ui/Badge'
 import { useFeatures, useOrg } from '../lib/OrgContext'
 import { useSubdomainOrg } from '../lib/SubdomainContext'
 
-const ALL_TABS = ['18-Hole', 'Front 9', 'Back 9', 'Low Gross', 'Stableford', 'Scramble', 'Match Points', 'Team Match', 'Low Putts', 'Skins', 'Super Skins', 'Blind Partners', 'Payouts', 'Team Play']
+const ALL_TABS = ['18-Hole', 'Front 9', 'Back 9', 'Low Gross', 'Gross Front 9', 'Gross Back 9', 'Stableford', 'Stableford Gross', 'Nassau', 'Scramble', 'Match Points', 'Team Match', 'Low Putts', 'Skins', 'Super Skins', 'Blind Partners', 'Payouts', 'Team Play']
 
 function visibleTabs(event, hasTGL = false) {
   if (!event) return ALL_TABS
@@ -32,7 +32,11 @@ function visibleTabs(event, hasTGL = false) {
     if (tab === 'Front 9')       return formats.includes('net_stroke_front9')
     if (tab === 'Back 9')        return formats.includes('net_stroke_back9')
     if (tab === 'Low Gross')     return formats.includes('low_gross')
+    if (tab === 'Gross Front 9') return formats.includes('gross_stroke_front9')
+    if (tab === 'Gross Back 9')  return formats.includes('gross_stroke_back9')
     if (tab === 'Stableford')    return formats.includes('stableford')
+    if (tab === 'Stableford Gross') return formats.includes('stableford_gross')
+    if (tab === 'Nassau')        return formats.includes('net_stroke_nassau') || formats.includes('gross_stroke_nassau')
     if (tab === 'Scramble')      return formats.includes('scramble')
     if (tab === 'Match Points')  return formats.includes('match_points') || formats.includes('ryder_cup')
     if (tab === 'Team Match')    return formats.includes('team_match_play')
@@ -46,12 +50,17 @@ function visibleTabs(event, hasTGL = false) {
 }
 
 const FORMAT_LABELS = {
-  net_stroke:      'Net Stroke Play',
-  low_gross:       'Low Gross',
-  stableford:      'Stableford',
-  match_points:    'Match Play (Head-to-Head)',
-  team_match_play: 'Match Play (Team Best Ball)',
-  ryder_cup:       'Ryder Cup',
+  net_stroke:         'Net Stroke Play',
+  low_gross:          'Low Gross',
+  gross_stroke_front9: 'Gross Front 9',
+  gross_stroke_back9:  'Gross Back 9',
+  stableford:         'Stableford',
+  stableford_gross:   'Stableford (Gross)',
+  net_stroke_nassau:  'Nassau (Net)',
+  gross_stroke_nassau: 'Nassau (Gross)',
+  match_points:       'Match Play (Head-to-Head)',
+  team_match_play:    'Match Play (Team Best Ball)',
+  ryder_cup:          'Ryder Cup',
 }
 
 export default function Leaderboard() {
@@ -190,6 +199,7 @@ export default function Leaderboard() {
   const leaderboards    = course ? computeLeaderboards(eventPlayers, allScores, course)              : null
   const skinsResults    = course ? computeAllSkins(eventPlayers, allScores, course)                  : null
   const stablefordData  = course ? computeStableford(eventPlayers, allScores, course)                : null
+  const stablefordGrossData = course ? computeStableford(eventPlayers, allScores, course, true)      : null
   const blindPartnersData = course ? computeBlindPartners(event, eventPlayers, allScores, course)    : null
   const superSkinsResult  = course ? computeSuperSkins(event, eventPlayers, allScores, course)       : null
   const matchData       = course ? computeMatchPoints(eventPlayers, allScores, course, matchPairings) : null
@@ -198,11 +208,29 @@ export default function Leaderboard() {
   const tglData = (() => {
     if (!leaderboards || !tglTeams.length || !tglSelections.length) return null
     try {
-      const ranked = leaderboards.net?.ranked ?? leaderboards.gross?.ranked ?? []
-      if (!ranked.length) return null
       const epMap = Object.fromEntries(eventPlayers.map(ep => [ep.player_id, ep]))
-      const rankedWithPlayer = ranked.map(r => ({ ...r, player: epMap[r.player_id]?.player ?? null }))
-      return computeTGLEventResults(rankedWithPlayer, tglSelections, tglTeams, tglMembers)
+      const attachPlayer = r => ({ ...r, player: epMap[r.player_id]?.player ?? null })
+      // Combine finished + in-progress rounds so standings update live during the round,
+      // not just once every player has posted all 18 holes.
+      const byNet18 = (a, b) => a.net18 - b.net18 || a.holesCompleted - b.holesCompleted
+      const rerank = arr => {
+        const sorted = [...arr].sort(byNet18)
+        return sorted.map((p, i) => ({
+          ...p,
+          rank: i === 0 || sorted[i - 1].net18 !== p.net18 ? i + 1 : sorted[i - 1].rank,
+        }))
+      }
+      const rankedA = rerank([...(leaderboards.full.A ?? []), ...(leaderboards.full.AInProgress ?? [])]).map(attachPlayer)
+      const rankedB = rerank([...(leaderboards.full.B ?? []), ...(leaderboards.full.BInProgress ?? [])]).map(attachPlayer)
+      if (!rankedA.length && !rankedB.length) return null
+      const hasFlights = eventPlayers.some(ep => ep.flight === 'A' || ep.flight === 'B')
+      const enrolledA = hasFlights ? eventPlayers.filter(ep => ep.flight === 'A').length : eventPlayers.length
+      const enrolledB = eventPlayers.filter(ep => ep.flight === 'B').length
+      const pointsA = rankedA.length ? assignTGLPoints(rankedA, Math.max(rankedA.length, enrolledA)) : {}
+      const pointsB = rankedB.length ? assignTGLPoints(rankedB, Math.max(rankedB.length, enrolledB)) : {}
+      const combinedPoints = { ...pointsA, ...pointsB }
+      const allRanked = [...rankedA, ...rankedB]
+      return computeTGLEventResults(allRanked, tglSelections, tglTeams, tglMembers, combinedPoints)
     } catch { return null }
   })()
 
@@ -333,7 +361,7 @@ export default function Leaderboard() {
       {/* Content */}
       <div className="max-w-2xl mx-auto px-4 py-4">
         {/* Gate: require all non-guest players to have a group before showing scored tabs */}
-        {!allGrouped && ['18-Hole', 'Front 9', 'Back 9', 'Low Gross', 'Stableford', 'Scramble', 'Match Points', 'Team Match', 'Low Putts', 'Skins', 'Super Skins', 'Blind Partners'].includes(activeTab) && (
+        {!allGrouped && ['18-Hole', 'Front 9', 'Back 9', 'Low Gross', 'Gross Front 9', 'Gross Back 9', 'Stableford', 'Stableford Gross', 'Nassau', 'Scramble', 'Match Points', 'Team Match', 'Low Putts', 'Skins', 'Super Skins', 'Blind Partners'].includes(activeTab) && (
           <div className="flex flex-col items-center justify-center py-16 gap-3 text-center">
             <div style={{ fontSize: 40 }}>⛳</div>
             <div className="font-semibold text-ink text-base">Pairings Not Yet Finalized</div>
@@ -408,11 +436,49 @@ export default function Leaderboard() {
                 eventPlayers={eventPlayers}
               />
             )}
+            {activeTab === 'Gross Front 9' && (
+              <NetLeaderboard
+                complete={leaderboards.grossFront9[activeFlight]}
+                inProgress={leaderboards.grossFront9[`${activeFlight}InProgress`]}
+                flight={activeFlight}
+                vsParKey="grossF9VsPar"
+                grossKey="grossF9"
+                netKey="grossF9"
+                handicapKey="f9Handicap"
+                progressHolesKey="f9Holes"
+                maxHoles={9}
+                allScores={allScores}
+                course={course}
+                eventPlayers={eventPlayers}
+              />
+            )}
+            {activeTab === 'Gross Back 9' && (
+              <NetLeaderboard
+                complete={leaderboards.grossBack9[activeFlight]}
+                inProgress={leaderboards.grossBack9[`${activeFlight}InProgress`]}
+                flight={activeFlight}
+                vsParKey="grossB9VsPar"
+                grossKey="grossB9"
+                netKey="grossB9"
+                handicapKey="b9Handicap"
+                progressHolesKey="b9Holes"
+                maxHoles={9}
+                allScores={allScores}
+                course={course}
+                eventPlayers={eventPlayers}
+              />
+            )}
             {activeTab === 'Low Putts' && (
               <PuttLeaderboard data={leaderboards.putts} playerMap={playerMap} allScores={allScores} course={course} />
             )}
             {activeTab === 'Stableford' && stablefordData && (
               <StablefordLeaderboard data={stablefordData} activeFlight={activeFlight} allScores={allScores} course={course} />
+            )}
+            {activeTab === 'Stableford Gross' && stablefordGrossData && (
+              <StablefordLeaderboard data={stablefordGrossData} activeFlight={activeFlight} allScores={allScores} course={course} />
+            )}
+            {activeTab === 'Nassau' && leaderboards && (
+              <NassauBoard leaderboards={leaderboards} event={event} activeFlight={activeFlight} playerMap={playerMap} />
             )}
             {activeTab === 'Match Points' && matchData && (
               <MatchPointsBoard matchData={matchData} event={event} />
@@ -440,6 +506,7 @@ export default function Leaderboard() {
                 sideGames={sideGames}
                 skinsResults={skinsResults}
                 stablefordData={stablefordData}
+                stablefordGrossData={stablefordGrossData}
                 blindPartnersData={blindPartnersData}
                 superSkinsResult={superSkinsResult}
                 playerMap={playerMap}
@@ -1072,6 +1139,67 @@ function StablefordLeaderboard({ data, activeFlight, allScores = [], course = nu
   )
 }
 
+// ─── Nassau Board ─────────────────────────────────────────────────
+// Nassau is three independent bets (Front 9, Back 9, Full 18) reusing the
+// same leaderboards already computed for those tabs — no separate scoring
+// engine needed. Shows the current leader(s) of each bet, net and/or gross
+// depending on which variant(s) were selected for the event.
+function NassauBoard({ leaderboards, event, activeFlight }) {
+  const formats = (event.formats ?? (event.format ? [event.format] : [])).map(k => k.replace(/_[a-z]$/, ''))
+  const variants = []
+  if (formats.includes('net_stroke_nassau'))   variants.push({ key: 'net',   label: 'Net' })
+  if (formats.includes('gross_stroke_nassau')) variants.push({ key: 'gross', label: 'Gross' })
+  if (!variants.length) variants.push({ key: 'net', label: 'Net' })
+
+  const betsFor = (variantKey) => ([
+    { label: 'Front 9', list: (variantKey === 'gross' ? leaderboards.grossFront9 : leaderboards.front9)[activeFlight] ?? [], scoreKey: variantKey === 'gross' ? 'grossF9' : 'netF9' },
+    { label: 'Back 9',  list: (variantKey === 'gross' ? leaderboards.grossBack9  : leaderboards.back9)[activeFlight]  ?? [], scoreKey: variantKey === 'gross' ? 'grossB9' : 'netB9' },
+    { label: 'Full 18', list: (variantKey === 'gross' ? leaderboards.grossFull   : leaderboards.full)[activeFlight]   ?? [], scoreKey: variantKey === 'gross' ? 'gross18' : 'net18' },
+  ])
+
+  const anyScores = variants.some(v => betsFor(v.key).some(b => b.list.length > 0))
+  if (!anyScores) return (
+    <div className="text-center py-12 text-gray-400">
+      <svg className="mx-auto mb-3 w-10 h-10 text-gray-300" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.5"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="5"/><circle cx="12" cy="12" r="1" fill="currentColor"/></svg>
+      <p className="font-medium">No Nassau scores yet for Flight {activeFlight}</p>
+    </div>
+  )
+
+  return (
+    <div className="space-y-5">
+      {variants.map(v => (
+        <div key={v.key}>
+          {variants.length > 1 && (
+            <h3 className="text-xs font-bold uppercase tracking-widest text-ink-muted mb-2">{v.label}</h3>
+          )}
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            {betsFor(v.key).map(bet => (
+              <div key={bet.label} className="card overflow-hidden p-0">
+                <div className="px-3 py-2 text-[10px] font-bold uppercase tracking-widest" style={{ background: '#f4f3f0', color: '#86868b' }}>
+                  {bet.label}
+                </div>
+                {bet.list.length === 0 ? (
+                  <div className="px-3 py-4 text-xs text-ink-muted text-center">No scores yet</div>
+                ) : (
+                  bet.list.filter(p => p.rank === 1).map(p => (
+                    <div key={p.player_id} className="px-3 py-2.5 border-b border-[#ebe9e4] last:border-0">
+                      <div className="font-semibold text-sm text-ink leading-tight">
+                        {p.player?.last_name}, {p.player?.first_name}
+                      </div>
+                      <div className="text-[10px] text-ink-muted mt-0.5">{p[bet.scoreKey]} · leader</div>
+                    </div>
+                  ))
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+      ))}
+      <p className="text-xs text-center text-ink-muted">Three independent bets — Front 9, Back 9, Full 18 — each scored and paid separately.</p>
+    </div>
+  )
+}
+
 // ─── Match Points Board ───────────────────────────────────────────
 function MatchPointsBoard({ matchData, event }) {
   const { pairings, teamPoints, hasTeams, ranked } = matchData
@@ -1339,7 +1467,7 @@ function TeamMatchBoard({ teamMatchData, teamAName = 'Team A', teamBName = 'Team
 }
 
 // ─── Payouts Board ────────────────────────────────────────────────
-function PayoutsBoard({ event, eventPlayers, leaderboards, sideGames, skinsResults, stablefordData, blindPartnersData, superSkinsResult, playerMap }) {
+function PayoutsBoard({ event, eventPlayers, leaderboards, sideGames, skinsResults, stablefordData, stablefordGrossData, blindPartnersData, superSkinsResult, playerMap }) {
   if (!event?.payout_config || eventPlayers.length === 0) {
     return (
       <div className="text-center py-12 text-gray-400">
@@ -1357,7 +1485,7 @@ function PayoutsBoard({ event, eventPlayers, leaderboards, sideGames, skinsResul
   }
 
   const { totalPot, byCategory, byPlayer, totalAllocated } = computePayouts(
-    event, payingPlayers.length, leaderboards, sideGames ?? [], skinsResults, flightCounts, stablefordData, blindPartnersData, superSkinsResult
+    event, payingPlayers.length, leaderboards, sideGames ?? [], skinsResults, flightCounts, stablefordData, blindPartnersData, superSkinsResult, stablefordGrossData
   )
 
   // Sort categories in the desired display order

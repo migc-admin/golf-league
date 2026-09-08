@@ -12,6 +12,8 @@ import { getStrokesOnHole, computeLeaderboards, computeStableford, computeBlindP
 import { computeSkinsForFlight, computeAllSkins, computeSuperSkins } from '../lib/engines/skins'
 import { computePayouts } from '../lib/engines/payouts'
 import { computeTGLEventResults, assignTGLPoints } from '../lib/engines/tgl'
+import { computeMatchPoints, computeTeamMatchPoints } from '../lib/engines/matchPoints'
+import { supabase } from '../lib/supabase'
 
 // ─── Mobile-safe PNG download ─────────────────────────────────────
 // iOS Safari ignores <a download> — open in new tab instead so user can long-press save
@@ -1161,10 +1163,17 @@ export function ExportResultsButton({ event, eventPlayers, allScores, course, si
         } catch { logoDataUrl = null }
       }
 
+      let matchPairings = []
+      const eventFormats = event.formats ?? []
+      if (eventFormats.includes('match_points') || eventFormats.includes('ryder_cup')) {
+        const { data } = await supabase.from('match_pairings').select('*').eq('event_id', event.id).order('match_number')
+        matchPairings = data ?? []
+      }
+
       const node = containerRef.current
       if (!node) return
       node.innerHTML = ''
-      const pageEl = buildResultsCard({ event, eventPlayers, allScores, course, sideGames, orgName, orgLogoUrl: logoDataUrl })
+      const pageEl = buildResultsCard({ event, eventPlayers, allScores, course, sideGames, orgName, orgLogoUrl: logoDataUrl, matchPairings })
       node.appendChild(pageEl)
 
       await Promise.all(
@@ -1219,7 +1228,7 @@ const RES_PAD    = 20
 const BONE_BG    = '#f5f0e8'
 const SEC_RADIUS = '10px'
 
-function buildResultsCard({ event, eventPlayers, allScores, course, sideGames, orgName, orgLogoUrl }) {
+function buildResultsCard({ event, eventPlayers, allScores, course, sideGames, orgName, orgLogoUrl, matchPairings = [] }) {
   const FONT = 'Arial, Helvetica, sans-serif'
   const nonGuests = eventPlayers.filter(ep => !ep.is_guest)
   const sides = event.side_game_options ?? []
@@ -1229,7 +1238,15 @@ function buildResultsCard({ event, eventPlayers, allScores, course, sideGames, o
   // Leaderboards
   const leaderboards = computeLeaderboards(nonGuests, allScores, course)
   const stablefordData = computeStableford(nonGuests, allScores, course)
+  const stablefordGrossData = computeStableford(nonGuests, allScores, course, true)
   const blindPartnersData = computeBlindPartners(event, nonGuests, allScores, course)
+
+  // Match Play — points/progress only, no monetary payout
+  const eventFormats = event.formats ?? []
+  const hasMatchPoints   = eventFormats.includes('match_points') || eventFormats.includes('ryder_cup')
+  const hasTeamMatchPlay = eventFormats.includes('team_match_play')
+  const matchData     = hasMatchPoints   ? computeMatchPoints(nonGuests, allScores, course, matchPairings) : null
+  const teamMatchData = hasTeamMatchPlay ? computeTeamMatchPoints(nonGuests, allScores, course, event.team_match_config ?? null) : null
 
   // Skins
   const skinsResults = computeAllSkins(nonGuests, allScores, course)
@@ -1251,7 +1268,7 @@ function buildResultsCard({ event, eventPlayers, allScores, course, sideGames, o
   // Compute payouts — build per-category per-player amount map
   const flightCounts = {}
   nonGuests.forEach(ep => { if (ep.flight) flightCounts[ep.flight] = (flightCounts[ep.flight] ?? 0) + 1 })
-  const { byCategory } = computePayouts(event, nonGuests.length, leaderboards, sideGames, skinsResults, flightCounts, stablefordData, blindPartnersData, superSkinsResult)
+  const { byCategory } = computePayouts(event, nonGuests.length, leaderboards, sideGames, skinsResults, flightCounts, stablefordData, blindPartnersData, superSkinsResult, stablefordGrossData)
 
   // catAmt[categoryKey][playerId] = amount for that specific result
   const catAmt = {}
@@ -1314,11 +1331,14 @@ function buildResultsCard({ event, eventPlayers, allScores, course, sideGames, o
   // ── Scoring results — table layout ───────────────────────────────
   const formats = event.formats ?? []
   const formatLabels = {
-    net_stroke:        '18-Hole Net',
-    net_stroke_front9: 'Front 9 Net',
-    net_stroke_back9:  'Back 9 Net',
-    low_gross:         'Low Gross',
-    stableford:        'Stableford',
+    net_stroke:          '18-Hole Net',
+    net_stroke_front9:   'Front 9 Net',
+    net_stroke_back9:    'Back 9 Net',
+    low_gross:           'Low Gross',
+    stableford:          'Stableford',
+    gross_stroke_front9: 'Gross Front 9',
+    gross_stroke_back9:  'Gross Back 9',
+    stableford_gross:    'Stableford Gross',
   }
   // Per-flight formats are stored with a letter suffix ('stableford_a'); the flight
   // split is driven by `flights` below, so collapse them back to one base format.
@@ -1336,7 +1356,7 @@ function buildResultsCard({ event, eventPlayers, allScores, course, sideGames, o
 
     // Stableford lives outside `leaderboards` but has the same { A, B } shape,
     // so expose it under its own key for the format→data lookup in the builders.
-    const scoringData = { ...leaderboards, stableford: stablefordData }
+    const scoringData = { ...leaderboards, stableford: stablefordData, stableford_gross: stablefordGrossData }
 
     if (hasFlights) {
       // Single unified table — one set of columns for all formats
@@ -1350,6 +1370,37 @@ function buildResultsCard({ event, eventPlayers, allScores, course, sideGames, o
       ))
     }
 
+    wrap.appendChild(sec._card)
+  }
+
+  // ── Nassau ───────────────────────────────────────────────────────
+  // Three independent bets (Front 9 / Back 9 / Full 18), net and/or gross —
+  // always whole-field, so reuse the front9/back9/full(gross) leaderboards directly.
+  const nassauNet = formats.some(f => f === 'net_stroke_nassau')
+  const nassauGross = formats.some(f => f === 'gross_stroke_nassau')
+  if (nassauNet || nassauGross) {
+    const sec = buildSection('Nassau', GREEN, GOLD)
+    const body = sec._body
+
+    function nassauWinnerName(lbKey, key) {
+      const list = [...(leaderboards[lbKey]?.A ?? []), ...(leaderboards[lbKey]?.B ?? [])]
+      const winners = list.filter(p => p.rank === 1)
+      if (!winners.length) return '—'
+      return winners.map(p => display(p.player_id, key)).join(', ')
+    }
+
+    const nassauEntries = []
+    if (nassauNet) {
+      nassauEntries.push({ label: 'Front 9 (Net)', name: nassauWinnerName('front9', 'nassau_net_f9') })
+      nassauEntries.push({ label: 'Back 9 (Net)',  name: nassauWinnerName('back9',  'nassau_net_b9') })
+      nassauEntries.push({ label: 'Full 18 (Net)', name: nassauWinnerName('full',   'nassau_net_18') })
+    }
+    if (nassauGross) {
+      nassauEntries.push({ label: 'Front 9 (Gross)', name: nassauWinnerName('grossFront9', 'nassau_gross_f9') })
+      nassauEntries.push({ label: 'Back 9 (Gross)',  name: nassauWinnerName('grossBack9',  'nassau_gross_b9') })
+      nassauEntries.push({ label: 'Full 18 (Gross)', name: nassauWinnerName('grossFull',   'nassau_gross_18') })
+    }
+    body.appendChild(buildCtpGrid(nassauEntries))
     wrap.appendChild(sec._card)
   }
 
@@ -1531,6 +1582,68 @@ function buildResultsCard({ event, eventPlayers, allScores, course, sideGames, o
     wrap.appendChild(sec._card)
   }
 
+  // ── Match Play (Head-to-Head / Ryder Cup) ─────────────────────────
+  // Points/status only — this format has no monetary payout.
+  if (matchData && matchData.pairings.length > 0) {
+    const sec = buildSection('Match Play Results', GREEN, GOLD)
+    const body = sec._body
+    const teamNames = event.ryder_cup_teams ?? {}
+    const teamALabel = teamNames.a?.trim() || 'Flight A'
+    const teamBLabel = teamNames.b?.trim() || 'Flight B'
+
+    if (matchData.hasTeams && (matchData.teamPoints.A + matchData.teamPoints.B) > 0) {
+      const teamRow = el('div', { display: 'flex', borderBottom: R_DIV })
+      ;[[teamALabel, matchData.teamPoints.A], [teamBLabel, matchData.teamPoints.B]].forEach(([label, pts], i) => {
+        const cell = el('div', { flex: '1', textAlign: 'center', padding: '10px 14px', background: i === 0 ? '#eef4fb' : '#f6eefb', borderRight: i === 0 ? R_DIV : 'none' })
+        cell.appendChild(txt(label, { display: 'block', fontSize: R_LABEL, fontWeight: '800', color: '#374151', textTransform: 'uppercase', letterSpacing: '0.05em' }))
+        cell.appendChild(txt(String(pts), { display: 'block', fontSize: '20px', fontWeight: '900', color: GREEN, marginTop: '2px' }))
+        teamRow.appendChild(cell)
+      })
+      body.appendChild(teamRow)
+    }
+
+    matchData.pairings.forEach((pair, idx) => {
+      const nameA = playerName(pair.playerA.player_id)
+      const nameB = playerName(pair.playerB.player_id)
+      const status = pair.holesPlayed === 0 ? 'Not started' : pair.matchStatus
+      const row = el('div', { padding: R_PAD, background: idx % 2 === 0 ? R_ODD : R_EVEN, borderBottom: R_DIV, display: 'flex', justifyContent: 'space-between', alignItems: 'center' })
+      row.appendChild(txt(`${nameA} vs ${nameB}`, { fontSize: R_FS, fontWeight: '700', color: '#111' }))
+      row.appendChild(txt(status, { fontSize: '11px', fontWeight: '800', color: GREEN }))
+      body.appendChild(row)
+    })
+
+    wrap.appendChild(sec._card)
+  }
+
+  // ── Team Match Play (Best Ball) ───────────────────────────────────
+  // Points/status only — this format has no monetary payout.
+  if (teamMatchData && teamMatchData.groupMatches.length > 0) {
+    const sec = buildSection('Team Match Play Results', GREEN, GOLD)
+    const body = sec._body
+    const { groupMatches, totalA, totalB, teamAName, teamBName } = teamMatchData
+
+    const teamRow = el('div', { display: 'flex', borderBottom: R_DIV })
+    ;[[teamAName, totalA], [teamBName, totalB]].forEach(([label, pts], i) => {
+      const cell = el('div', { flex: '1', textAlign: 'center', padding: '10px 14px', background: i === 0 ? '#eef4fb' : '#f6eefb', borderRight: i === 0 ? R_DIV : 'none' })
+      cell.appendChild(txt(label, { display: 'block', fontSize: R_LABEL, fontWeight: '800', color: '#374151', textTransform: 'uppercase', letterSpacing: '0.05em' }))
+      cell.appendChild(txt(String(pts), { display: 'block', fontSize: '20px', fontWeight: '900', color: GREEN, marginTop: '2px' }))
+      teamRow.appendChild(cell)
+    })
+    body.appendChild(teamRow)
+
+    groupMatches.forEach((m, idx) => {
+      const namesA = m.teamA.map(ep => playerName(ep.player_id)).join(' + ')
+      const namesB = m.teamB.map(ep => playerName(ep.player_id)).join(' + ')
+      const status = m.holesPlayed === 0 ? 'Not started' : m.matchStatus
+      const row = el('div', { padding: R_PAD, background: idx % 2 === 0 ? R_ODD : R_EVEN, borderBottom: R_DIV })
+      row.appendChild(txt(`Group ${m.groupNumber}: ${namesA} vs ${namesB}`, { display: 'block', fontSize: R_FS, fontWeight: '700', color: '#111' }))
+      row.appendChild(txt(status, { display: 'block', fontSize: '11px', fontWeight: '800', color: GREEN, marginTop: '2px' }))
+      body.appendChild(row)
+    })
+
+    wrap.appendChild(sec._card)
+  }
+
   // ── Footer ───────────────────────────────────────────────────────
   const footer = el('div', { marginTop: '12px', textAlign: 'center' })
   footer.appendChild(txt(`${orgName ?? 'Scorify Golf'} · ${course.name ?? ''} · ${eventDate}`, {
@@ -1581,6 +1694,8 @@ function getScoreVals(fmt, entry) {
     case 'net_stroke_front9': return [entry.netF9 ?? null, null, null]
     case 'net_stroke_back9':  return [null, entry.netB9 ?? null, null]
     case 'low_gross':         return [entry.grossF9 ?? null, entry.grossB9 ?? null, entry.totalPutts ?? null]
+    case 'gross_stroke_front9': return [entry.grossF9 ?? null, null, null]
+    case 'gross_stroke_back9':  return [null, entry.grossB9 ?? null, null]
     default:                  return [null, null, null]
   }
 }
@@ -1590,7 +1705,8 @@ function getScoreVals(fmt, entry) {
  * a single cell spanning both score columns so the fixed column widths still line up.
  */
 const TOTAL_ONLY_FORMATS = {
-  stableford: { label: 'Points', value: entry => entry?.totalPoints ?? null },
+  stableford:       { label: 'Points', value: entry => entry?.totalPoints ?? null },
+  stableford_gross: { label: 'Points', value: entry => entry?.totalPoints ?? null },
 }
 
 /** Append the score cells for a format — either Out/In, or one spanning total. */
@@ -1616,8 +1732,8 @@ function appendScoreCells(tr, fmt, entry, styleFor, emptyText = '—') {
 /** Single unified scoring table — all formats share one set of columns so widths stay locked */
 function buildAllFormatsTable(scoringFormats, formatLabels, leaderboards, flights, payoutPlaces, displayFn) {
   const RANK_LABELS = ['1st Place', '2nd Place', '3rd Place']
-  const leaderKeyMap = { net_stroke: 'full', net_stroke_front9: 'front9', net_stroke_back9: 'back9', low_gross: 'grossFull', stableford: 'stableford' }
-  const fmtPrefixMap = { net_stroke: '18_net', net_stroke_front9: 'f9', net_stroke_back9: 'b9', low_gross: '18_gross', stableford: 'stf_net' }
+  const leaderKeyMap = { net_stroke: 'full', net_stroke_front9: 'front9', net_stroke_back9: 'back9', low_gross: 'grossFull', stableford: 'stableford', gross_stroke_front9: 'grossFront9', gross_stroke_back9: 'grossBack9', stableford_gross: 'stableford_gross' }
+  const fmtPrefixMap = { net_stroke: '18_net', net_stroke_front9: 'f9', net_stroke_back9: 'b9', low_gross: '18_gross', stableford: 'stf_net', gross_stroke_front9: 'gf9', gross_stroke_back9: 'gb9', stableford_gross: 'stf_gross' }
 
   const SCORE_LABELS = ['Out', 'In']
   const colsPerFlight = 1 + SCORE_LABELS.length  // player + Out + In
@@ -1742,8 +1858,8 @@ function buildAllFormatsTable(scoringFormats, formatLabels, leaderboards, flight
 /** Full-field (no flights): Result | Player | Out | In | Putts */
 function buildAllFormatsTableFullField(scoringFormats, formatLabels, leaderboards, payoutPlaces, displayFn) {
   const RANK_LABELS = ['1st Place', '2nd Place', '3rd Place']
-  const leaderKeyMap = { net_stroke: 'full', net_stroke_front9: 'front9', net_stroke_back9: 'back9', low_gross: 'grossFull', stableford: 'stableford' }
-  const fmtPrefixMap = { net_stroke: '18_net', net_stroke_front9: 'f9', net_stroke_back9: 'b9', low_gross: '18_gross', stableford: 'stf_net' }
+  const leaderKeyMap = { net_stroke: 'full', net_stroke_front9: 'front9', net_stroke_back9: 'back9', low_gross: 'grossFull', stableford: 'stableford', gross_stroke_front9: 'grossFront9', gross_stroke_back9: 'grossBack9', stableford_gross: 'stableford_gross' }
+  const fmtPrefixMap = { net_stroke: '18_net', net_stroke_front9: 'f9', net_stroke_back9: 'b9', low_gross: '18_gross', stableford: 'stf_net', gross_stroke_front9: 'gf9', gross_stroke_back9: 'gb9', stableford_gross: 'stf_gross' }
 
   const tbl = document.createElement('table')
   tbl.style.cssText = 'width:100%;border-collapse:collapse;font-size:12px;table-layout:fixed;'

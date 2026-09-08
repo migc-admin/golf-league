@@ -390,7 +390,7 @@ const GROUP_GAMES = [
 const PER_FLIGHT_GAME_KEYS = new Set(PER_FLIGHT_GAMES.map(g => g.key))
 
 // Format keys that support per-flight scoring
-const PER_FLIGHT_FORMAT_KEYS = new Set(['net_stroke', 'net_stroke_front9', 'net_stroke_back9', 'low_gross', 'gross_stroke_front9', 'gross_stroke_back9', 'stableford'])
+const PER_FLIGHT_FORMAT_KEYS = new Set(['net_stroke', 'net_stroke_front9', 'net_stroke_back9', 'low_gross', 'gross_stroke_front9', 'gross_stroke_back9', 'stableford', 'stableford_gross'])
 
 function buildFormatsArray(enabledFormats, formatScope, numFlights) {
   const result = []
@@ -466,7 +466,8 @@ const FORMAT_OPTIONS = [
     { value: 'gross_stroke_back9',  label: 'Gross — Back 9' },
   ]},
   { group: 'Nassau', options: [
-    { value: 'net_stroke_nassau', label: 'Nassau' },
+    { value: 'net_stroke_nassau',   label: 'Nassau — Net' },
+    { value: 'gross_stroke_nassau', label: 'Nassau — Gross' },
   ]},
   { group: 'Stableford', options: [
     { value: 'stableford',       label: 'Stableford — Net' },

@@ -117,9 +117,10 @@ export function stablefordPoints(netScore, par) {
  * @param {Array}  eventPlayers
  * @param {Array}  allScores
  * @param {Object} course
+ * @param {boolean} useGross — when true, score points off gross strokes (no handicap deduction)
  * @returns {{ A: Array, B: Array }}
  */
-export function computeStableford(eventPlayers, allScores, course) {
+export function computeStableford(eventPlayers, allScores, course, useGross = false) {
   const { par_per_hole: parPerHole } = course
 
   const players = eventPlayers.filter(ep => !ep.is_guest).map(ep => {
@@ -134,9 +135,9 @@ export function computeStableford(eventPlayers, allScores, course) {
       const h   = s.hole_number
       const si  = strokeIndexes[h - 1]
       const par = parPerHole[h - 1]
-      const strokes = getStrokesOnHole(ch, si)
-      const net = s.gross_score - strokes
-      totalPoints += stablefordPoints(net, par)
+      const strokes = useGross ? 0 : getStrokesOnHole(ch, si)
+      const scoreForPoints = s.gross_score - strokes
+      totalPoints += stablefordPoints(scoreForPoints, par)
       holesPlayed++
     }
 
@@ -270,7 +271,7 @@ export function computeBlindPartners(event, eventPlayers, allScores, course) {
  * @param {Array} eventPlayers   — from event_players with player attached
  * @param {Array} allScores      — from scores table
  * @param {Object} course        — { par_per_hole, stroke_index }
- * @returns {{ full, front9, back9, grossFull, putts }}  each is an array sorted by score asc
+ * @returns {{ full, front9, back9, grossFull, grossFront9, grossBack9, putts }}  each is an array sorted by score asc
  */
 export function computeLeaderboards(eventPlayers, allScores, course) {
   const { par_per_hole: parPerHole } = course
@@ -333,6 +334,8 @@ export function computeLeaderboards(eventPlayers, allScores, course) {
       f9VsPar:   netF9   - parF9,
       b9VsPar:   netB9   - parB9,
       grossVsPar: gross18 - parPlayed,
+      grossF9VsPar: grossF9 - parF9,
+      grossB9VsPar: grossB9 - parB9,
       totalPutts: playerScores.length > 0 ? totalPutts : null,
     }
   })
@@ -342,6 +345,8 @@ export function computeLeaderboards(eventPlayers, allScores, course) {
   const byNetF9   = (a, b) => a.netF9   - b.netF9   || a.f9Holes - b.f9Holes
   const byNetB9   = (a, b) => a.netB9   - b.netB9   || a.b9Holes - b.b9Holes
   const byGross18 = (a, b) => a.gross18 - b.gross18 || a.holesCompleted - b.holesCompleted
+  const byGrossF9 = (a, b) => a.grossF9 - b.grossF9 || a.f9Holes - b.f9Holes
+  const byGrossB9 = (a, b) => a.grossB9 - b.grossB9 || a.b9Holes - b.b9Holes
   const byPutts  = (a, b) => {
     if (a.totalPutts == null) return 1
     if (b.totalPutts == null) return -1
@@ -393,6 +398,18 @@ export function computeLeaderboards(eventPlayers, allScores, course) {
       B: withRank(flightB.filter(p => p.holesCompleted === 18), byGross18, p => p.gross18),
       AInProgress: withRank(flightA.filter(p => p.holesCompleted > 0 && p.holesCompleted < 18), byGross18, p => p.gross18),
       BInProgress: withRank(flightB.filter(p => p.holesCompleted > 0 && p.holesCompleted < 18), byGross18, p => p.gross18),
+    },
+    grossFront9: {
+      A: withRank(flightA.filter(p => p.f9Holes === 9), byGrossF9, p => p.grossF9),
+      B: withRank(flightB.filter(p => p.f9Holes === 9), byGrossF9, p => p.grossF9),
+      AInProgress: withRank(flightA.filter(p => p.f9Holes > 0 && p.f9Holes < 9), byGrossF9, p => p.grossF9),
+      BInProgress: withRank(flightB.filter(p => p.f9Holes > 0 && p.f9Holes < 9), byGrossF9, p => p.grossF9),
+    },
+    grossBack9: {
+      A: withRank(flightA.filter(p => p.b9Holes === 9), byGrossB9, p => p.grossB9),
+      B: withRank(flightB.filter(p => p.b9Holes === 9), byGrossB9, p => p.grossB9),
+      AInProgress: withRank(flightA.filter(p => p.b9Holes > 0 && p.b9Holes < 9), byGrossB9, p => p.grossB9),
+      BInProgress: withRank(flightB.filter(p => p.b9Holes > 0 && p.b9Holes < 9), byGrossB9, p => p.grossB9),
     },
     putts: withRank(players.filter(p => p.holesCompleted === 18 && p.totalPutts != null), byPutts, p => p.totalPutts),
   }

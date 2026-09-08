@@ -174,9 +174,10 @@ export default function LeagueHome({ orgSlug, leagueSlug, initialTab = 'events' 
         const leaderboards = computeLeaderboards(nonGuest, scores, course)
         const skinsResults = computeAllSkins(nonGuest, scores, course)
         const stablefordData = computeStableford(nonGuest, scores, course)
+        const stablefordGrossData = computeStableford(nonGuest, scores, course, true)
         const blindPartnersData = computeBlindPartners(ev, nonGuest, scores, course)
         const superSkinsResult  = computeSuperSkins(ev, nonGuest, scores, course)
-        const { byPlayer } = computePayouts(ev, nonGuest.length, leaderboards, sideGames, skinsResults, flightCounts, stablefordData, blindPartnersData, superSkinsResult)
+        const { byPlayer } = computePayouts(ev, nonGuest.length, leaderboards, sideGames, skinsResults, flightCounts, stablefordData, blindPartnersData, superSkinsResult, stablefordGrossData)
 
         for (const { playerId, items } of byPlayer) {
           const ep = eps.find(e => e.player_id === playerId)
