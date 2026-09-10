@@ -2859,7 +2859,7 @@ function SortablePlayerCard({ ep, isNoShow, showNoShow, noShowLoading, onNoShow,
           <select
             value=""
             onChange={e => { if (e.target.value) onMoveToGroup(ep, currentKey, e.target.value) }}
-            className="input py-0.5 text-xs w-28 bg-white text-gray-500"
+            className="input py-0.5 text-xs w-28 bg-white text-gray-500 sm:hidden"
           >
             <option value="">Move to…</option>
             {moveOptions.filter(o => o.key !== currentKey).map(o => (
