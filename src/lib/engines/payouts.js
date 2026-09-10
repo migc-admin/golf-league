@@ -39,7 +39,7 @@ export function getCategoryLabel(key) {
   if (superCtp) {
     return superCtp[1]
       ? `Super CTP — Hole ${superCtp[2]}, Flight ${superCtp[1].toUpperCase()}`
-      : `Super CTP — Hole ${superCtp[2]} (Full Field)`
+      : `Super CTP — Hole ${superCtp[2]}`
   }
 
   // Full-field side games
@@ -486,6 +486,7 @@ export function computePayouts(event, playerCount, leaderboards, sideGames, skin
     const entries = event.side_game_entries ?? {}
     if (key === 'super_skins' || /^super_skins_[a-z]$/.test(key)) return entries.super_skins?.length ?? null
     if (key.startsWith('super_ctp_')) return entries.super_ctp?.length ?? null
+    if (key === 'blind_partners') return entries.blind_partners?.length ?? null
     return null
   }
 

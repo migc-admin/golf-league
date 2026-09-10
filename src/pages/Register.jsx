@@ -207,7 +207,7 @@ export default function Register() {
         <div className="text-center mb-8">
           <img src={event?.league?.logo_url ?? event?.league?.org?.logo_url ?? '/logo.png'} alt="Golf League Logo"
             className="w-20 h-20 rounded-full object-cover mx-auto mb-3 shadow-xl" />
-          <h1 className="text-white font-bold text-2xl" style={{ fontFamily: "'Playfair Display', serif" }}>
+          <h1 className="text-white font-bold text-2xl" style={{ fontFamily: "'Manrope', sans-serif" }}>
             Event Registration
           </h1>
           {event && (

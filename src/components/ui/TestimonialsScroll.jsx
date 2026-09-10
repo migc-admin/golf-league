@@ -99,7 +99,7 @@ export default function TestimonialsScroll() {
             Testimonials
           </div>
           <h2 className="text-3xl md:text-4xl font-bold text-center mb-4"
-            style={{ fontFamily: "'Playfair Display', serif", color: '#1a1a1f' }}>
+            style={{ fontFamily: "'Manrope', sans-serif", color: '#1a1a1f' }}>
             What organizers are saying
           </h2>
           <p className="text-center text-base max-w-sm" style={{ color: '#6b7280' }}>
@@ -117,7 +117,7 @@ export default function TestimonialsScroll() {
             <React.Fragment key={s.num}>
               {i > 0 && <div className="hidden sm:block w-px h-8" style={{ background: '#e5e7eb' }} />}
               <div className="text-center">
-                <div className="text-3xl font-bold" style={{ fontFamily: "'Playfair Display', serif", color: GREEN }}>{s.num}</div>
+                <div className="text-3xl font-bold" style={{ fontFamily: "'Manrope', sans-serif", color: GREEN }}>{s.num}</div>
                 <div className="text-sm mt-1" style={{ color: '#6b7280' }}>{s.label}</div>
               </div>
             </React.Fragment>

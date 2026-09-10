@@ -217,13 +217,6 @@ export default function LeagueDetail() {
                     <span className="text-xs text-ink-muted">{formatDate(ev.event_date)}</span>
                   </div>
                   <div className="flex items-center gap-3 flex-shrink-0">
-                    <Link
-                      to={`/${orgSlug}/${league.slug}/${ev.slug}/leaderboard?eid=${ev.id}`}
-                      onClick={e => e.stopPropagation()}
-                      className="text-xs font-semibold text-fairway-700 hover:underline"
-                    >
-                      Leaderboard ↗
-                    </Link>
                     <StatusBadge status={ev.status} />
                   </div>
                 </Link>

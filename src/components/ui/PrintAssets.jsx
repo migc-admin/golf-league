@@ -14,7 +14,7 @@ import html2canvas from 'html2canvas'
 
 const GOLD  = '#C9A84C'
 const GREEN = '#1B4332'
-const FONT  = "'Playfair Display', Georgia, serif"
+const FONT  = "'Manrope', sans-serif"
 
 // ─── Mobile-safe PNG download ─────────────────────────────────────
 // iOS Safari ignores <a download> — open in new tab instead so user can long-press save

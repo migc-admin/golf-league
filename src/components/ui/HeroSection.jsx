@@ -69,7 +69,7 @@ export default function HeroSection({
         <motion.main variants={containerVariants} className="flex-1 flex flex-col justify-center">
           <motion.h1
             className="text-4xl md:text-5xl lg:text-6xl font-bold leading-tight"
-            style={{ fontFamily: "'Playfair Display', serif", color: '#1a1a1f' }}
+            style={{ fontFamily: "'Manrope', sans-serif", color: '#1a1a1f' }}
             variants={itemVariants}
           >
             {title}

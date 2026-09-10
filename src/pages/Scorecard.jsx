@@ -1300,13 +1300,13 @@ function GuestCodeEntry({ eventId, onSuccess }) {
             <img src={eventInfo.league.logo_url} alt="Club Logo" className="w-32 h-32 rounded-full object-cover mx-auto mb-4 shadow-xl" />
           ) : (
             <div className="w-32 h-32 rounded-full flex items-center justify-center mx-auto mb-4 shadow-xl" style={{ background: '#1B4332', border: '2px solid rgba(255,255,255,0.15)' }}>
-              <span className="text-white font-bold text-4xl" style={{ fontFamily: "'Playfair Display', serif" }}>
+              <span className="text-white font-bold text-4xl" style={{ fontFamily: "'Manrope', sans-serif" }}>
                 {(eventInfo?.league?.name ?? '').slice(0, 2).toUpperCase()}
               </span>
             </div>
           )}
           {eventInfo?.league?.name && (
-            <h1 className="text-white font-bold text-2xl" style={{ fontFamily: "'Playfair Display', serif" }}>{eventInfo.league.name}</h1>
+            <h1 className="text-white font-bold text-2xl" style={{ fontFamily: "'Manrope', sans-serif" }}>{eventInfo.league.name}</h1>
           )}
           <p className="text-white/60 text-sm mt-1">{eventLabel}</p>
           <div className="mx-auto mt-2" style={{ width: 40, height: 2, background: '#D4AF37' }} />

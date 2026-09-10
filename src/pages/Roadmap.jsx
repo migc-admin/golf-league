@@ -63,7 +63,7 @@ export default function Roadmap() {
           {/* Hero */}
           <div className="text-center mb-16">
             <p className="text-xs font-bold uppercase tracking-widest mb-3" style={{ color: GREEN }}>Roadmap</p>
-            <h1 className="text-4xl md:text-5xl font-bold mb-4" style={{ fontFamily: "'Playfair Display', serif", color: INK }}>
+            <h1 className="text-4xl md:text-5xl font-bold mb-4" style={{ fontFamily: "'Manrope', sans-serif", color: INK }}>
               What's coming to Scorify
             </h1>
             <p className="text-base max-w-xl mx-auto" style={{ color: '#6b7280' }}>

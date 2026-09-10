@@ -210,7 +210,7 @@ function buildPage({ event, course, groupNum, players, code, qrDataUrl, ctpHoles
     display: 'flex', flexDirection: 'column',
     padding: PAD + 'px',
     boxSizing: 'border-box',
-    fontFamily: 'Arial, Helvetica, sans-serif',
+    fontFamily: 'Manrope, sans-serif',
   })
   const opts = { event, course, groupNum, players, code, qrDataUrl, ctpHoles, longDriveHole, orgName, startingHole, holeAssignStr, orgLogoUrl, globalFlightTeeMap }
   page.appendChild(buildCard(opts))
@@ -369,7 +369,7 @@ function buildCard({ event, course, groupNum, players, code, qrDataUrl, ctpHoles
     codeRow.appendChild(txt('Access Code:', { fontSize: '10px', color: '#374151' }))
     codeRow.appendChild(txt(code, {
       fontSize: '18px', fontWeight: '800', color: GREEN,
-      letterSpacing: '0.14em', fontFamily: 'monospace',
+      letterSpacing: '0.14em', fontFamily: 'Manrope, sans-serif',
     }))
     ftxt.appendChild(codeRow)
   }
@@ -474,7 +474,7 @@ function buildTable({ course, parPerHole, strokeIndex, teesToShow, players, long
     border-collapse: collapse;
     table-layout: fixed;
     font-size: 10px;
-    font-family: Arial, Helvetica, sans-serif;
+    font-family: Manrope, sans-serif;
     flex: 1;
   `
 
@@ -892,7 +892,7 @@ function buildMatchPage({ event, course, groupNumber, pairs }) {
     display: 'flex', flexDirection: 'column',
     padding: PAD + 'px',
     boxSizing: 'border-box',
-    fontFamily: 'Arial, Helvetica, sans-serif',
+    fontFamily: 'Manrope, sans-serif',
   })
   const opts = { event, course, groupNumber, pairs }
   page.appendChild(buildMatchCard(opts))
@@ -979,7 +979,7 @@ function buildMatchTable({ parPerHole, strokeIndex, matches }) {
     border-collapse: collapse;
     table-layout: fixed;
     font-size: 10px;
-    font-family: Arial, Helvetica, sans-serif;
+    font-family: Manrope, sans-serif;
     flex: 1;
   `
 
@@ -1231,7 +1231,7 @@ export function ExportSkinsGridButton({ event, eventPlayers, allScores, course, 
 
 function buildSkinsGrid({ event, course, flightPlayers, allScores, flight, orgName, orgLogoUrl }) {
   const { par_per_hole: pars, stroke_index: sis } = course
-  const FONT = 'Arial, Helvetica, sans-serif'
+  const FONT = 'Manrope, sans-serif'
   const ROW_H = 28
 
   // ── Sequential holes: H1–H9 front, H10–H18 back ─────────────────
@@ -1612,7 +1612,7 @@ const BONE_BG    = '#f5f0e8'
 const SEC_RADIUS = '10px'
 
 function buildResultsCard({ event, eventPlayers, allScores, course, sideGames, orgName, orgLogoUrl, matchPairings = [] }) {
-  const FONT = 'Arial, Helvetica, sans-serif'
+  const FONT = 'Manrope, sans-serif'
   const nonGuests = eventPlayers.filter(ep => !ep.is_guest)
   const sides = event.side_game_options ?? []
   const flights = [...new Set(nonGuests.map(ep => ep.flight).filter(Boolean))].sort()
@@ -2595,7 +2595,7 @@ export function ExportTeamPlayButton({ event, eventPlayers, allScores, course, t
 }
 
 function buildTeamPlayCard({ event, eventPlayers, allScores, course, tglTeams, tglMembers, tglSelections, orgName, orgLogoUrl }) {
-  const FONT = 'Arial, Helvetica, sans-serif'
+  const FONT = 'Manrope, sans-serif'
   const W = 900
   const PAD_CARD = 28
   const BONE = '#f5f0e8'
@@ -2831,7 +2831,7 @@ export function ExportHandicapButton({ event, eventPlayers, allScores, course, o
 }
 
 function buildHandicapCard({ event, eventPlayers, allScores, course, orgName, orgLogoUrl }) {
-  const FONT = 'Arial, Helvetica, sans-serif'
+  const FONT = 'Manrope, sans-serif'
   const BONE = '#f5f0e8'
   const CAP_BG = '#fef9c3'  // yellow
   const CAP_COLOR = '#dc2626' // red

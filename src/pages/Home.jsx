@@ -441,7 +441,7 @@ export default function Home() {
           <div className="max-w-5xl mx-auto px-6">
             <div className="text-center mb-14">
               <p className="text-xs font-bold uppercase tracking-widest mb-3" style={{ color: GREEN }}>How it works</p>
-              <h2 className="text-3xl md:text-4xl font-bold" style={{ fontFamily: "'Playfair Display', serif", color: INK }}>
+              <h2 className="text-3xl md:text-4xl font-bold" style={{ fontFamily: "'Manrope', sans-serif", color: INK }}>
                 Set up in minutes. Score from any phone.
               </h2>
               <p className="mt-4 text-base max-w-xl mx-auto" style={{ color: '#6b7280' }}>
@@ -484,7 +484,7 @@ export default function Home() {
           <div className="max-w-6xl mx-auto px-6">
             <div className="text-center mb-16">
               <p className="text-xs font-bold uppercase tracking-widest mb-3" style={{ color: GREEN }}>Features</p>
-              <h2 className="text-3xl md:text-4xl font-bold" style={{ fontFamily: "'Playfair Display', serif", color: INK }}>
+              <h2 className="text-3xl md:text-4xl font-bold" style={{ fontFamily: "'Manrope', sans-serif", color: INK }}>
                 Everything your golf league needs
               </h2>
               <p className="mt-4 text-base max-w-xl mx-auto" style={{ color: '#6b7280' }}>
@@ -520,7 +520,7 @@ export default function Home() {
             <div style={{ borderTop: '1px solid #ebe9e4', paddingTop: '3rem', marginTop: '4rem' }}>
               <div className="text-center mb-8">
                 <p className="text-xs font-bold uppercase tracking-widest mb-2" style={{ color: '#9ca3af' }}>One-Time Purchases</p>
-                <h3 className="text-2xl font-bold" style={{ fontFamily: "'Playfair Display', serif", color: INK }}>
+                <h3 className="text-2xl font-bold" style={{ fontFamily: "'Manrope', sans-serif", color: INK }}>
                   Just need it for one event?
                 </h3>
                 <p className="text-sm mt-2" style={{ color: '#6b7280' }}>No subscription. Pay once, use it for your event.</p>
@@ -532,7 +532,7 @@ export default function Home() {
                       <div>
                         <p className="text-xs font-bold uppercase tracking-widest mb-1" style={{ color: '#9ca3af' }}>{opt.name}</p>
                         <div className="flex items-end gap-1">
-                          <span className="text-3xl font-bold" style={{ color: INK, fontFamily: "'Playfair Display', serif" }}>{opt.price}</span>
+                          <span className="text-3xl font-bold" style={{ color: INK, fontFamily: "'Manrope', sans-serif" }}>{opt.price}</span>
                           <span className="text-sm mb-1" style={{ color: '#9ca3af' }}>{opt.sub}</span>
                         </div>
                       </div>
@@ -579,7 +579,7 @@ export default function Home() {
           <div className="max-w-4xl mx-auto px-6">
             <div className="text-center mb-12">
               <p className="text-xs font-bold uppercase tracking-widest mb-3" style={{ color: GREEN }}>What's next</p>
-              <h2 className="text-3xl md:text-4xl font-bold mb-4" style={{ fontFamily: "'Playfair Display', serif", color: INK }}>
+              <h2 className="text-3xl md:text-4xl font-bold mb-4" style={{ fontFamily: "'Manrope', sans-serif", color: INK }}>
                 Built with your league in mind
               </h2>
               <p className="text-base max-w-xl mx-auto" style={{ color: '#6b7280' }}>
@@ -622,7 +622,7 @@ export default function Home() {
           <div className="max-w-3xl mx-auto px-6">
             <div className="text-center mb-12">
               <p className="text-xs font-bold uppercase tracking-widest mb-3" style={{ color: GREEN }}>FAQ</p>
-              <h2 className="text-3xl md:text-4xl font-bold" style={{ fontFamily: "'Playfair Display', serif", color: INK }}>
+              <h2 className="text-3xl md:text-4xl font-bold" style={{ fontFamily: "'Manrope', sans-serif", color: INK }}>
                 Common questions
               </h2>
             </div>
@@ -650,7 +650,7 @@ export default function Home() {
         <section id="contact" className="py-24" style={{ background: '#ffffff' }}>
           <div className="max-w-2xl mx-auto px-6 text-center">
             <p className="text-xs font-bold uppercase tracking-widest mb-3" style={{ color: GREEN }}>Contact</p>
-            <h2 className="text-3xl md:text-4xl font-bold mb-4" style={{ fontFamily: "'Playfair Display', serif", color: INK }}>
+            <h2 className="text-3xl md:text-4xl font-bold mb-4" style={{ fontFamily: "'Manrope', sans-serif", color: INK }}>
               Get in touch
             </h2>
             <p className="text-base mb-10" style={{ color: '#6b7280' }}>
@@ -672,7 +672,7 @@ export default function Home() {
         <section id="about" className="py-24" style={{ background: '#fbfaf8' }}>
           <div className="max-w-3xl mx-auto px-6 text-center">
             <p className="text-xs font-bold uppercase tracking-widest mb-3" style={{ color: GREEN }}>About</p>
-            <h2 className="text-3xl md:text-4xl font-bold mb-6" style={{ fontFamily: "'Playfair Display', serif", color: INK }}>
+            <h2 className="text-3xl md:text-4xl font-bold mb-6" style={{ fontFamily: "'Manrope', sans-serif", color: INK }}>
               Built by a league director, for league directors
             </h2>
             <p className="text-base leading-relaxed mb-4 text-justify" style={{ color: '#6b7280' }}>

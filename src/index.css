@@ -13,14 +13,14 @@
   }
 
   body {
-    font-family: 'Schibsted Grotesk', sans-serif;
+    font-family: 'Manrope', sans-serif;
     background: #fbfaf8;
     color: #1d1d1f;
     -webkit-font-smoothing: antialiased;
   }
 
   h1, h2, h3 {
-    font-family: 'Schibsted Grotesk', sans-serif;
+    font-family: 'Manrope', sans-serif;
     font-weight: 700;
     letter-spacing: -0.02em;
   }
@@ -79,7 +79,7 @@
     border-radius: 0.875rem;
     background: #fff;
     color: #1d1d1f;
-    font-family: 'Schibsted Grotesk', sans-serif;
+    font-family: 'Manrope', sans-serif;
   }
   .input:focus {
     outline: none;
@@ -118,7 +118,7 @@
 
   /* ── Section heading ── */
   .section-heading {
-    font-family: 'Schibsted Grotesk', sans-serif;
+    font-family: 'Manrope', sans-serif;
     font-size: 1.1rem;
     font-weight: 700;
     letter-spacing: -0.02em;
@@ -131,7 +131,7 @@
     border-collapse: collapse;
   }
   .lb-table thead th {
-    font-family: 'Schibsted Grotesk', sans-serif;
+    font-family: 'Manrope', sans-serif;
     font-weight: 600;
     font-size: 0.7rem;
     letter-spacing: 0.02em;
@@ -155,7 +155,7 @@
     color: #1d1d1f;
   }
   .lb-table .col-rank {
-    font-family: 'Schibsted Grotesk', sans-serif;
+    font-family: 'Manrope', sans-serif;
     font-weight: 700;
     color: #1d1d1f;
     width: 2.5rem;
@@ -190,7 +190,7 @@
     display: flex;
     align-items: center;
     justify-content: center;
-    font-family: 'Schibsted Grotesk', sans-serif;
+    font-family: 'Manrope', sans-serif;
     font-weight: 700;
     font-size: 0.875rem;
     flex-shrink: 0;

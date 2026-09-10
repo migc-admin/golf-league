@@ -55,9 +55,9 @@ export default {
         },
       },
       fontFamily: {
-        sans:    ['Schibsted Grotesk', '-apple-system', 'BlinkMacSystemFont', 'sans-serif'],
-        serif:   ['Schibsted Grotesk', 'sans-serif'],
-        display: ['Schibsted Grotesk', 'sans-serif'],
+        sans:    ['Manrope', '-apple-system', 'BlinkMacSystemFont', 'sans-serif'],
+        serif:   ['Manrope', 'sans-serif'],
+        display: ['Manrope', 'sans-serif'],
       },
       borderRadius: {
         sm:      '0.5rem',

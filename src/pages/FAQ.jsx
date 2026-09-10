@@ -309,7 +309,7 @@ export default function FAQ() {
           {/* Hero */}
           <section className="py-16 text-center px-6" style={{ background: `linear-gradient(150deg, #0b2318 0%, ${GREEN} 55%, #1f5c3e 100%)` }}>
             <p className="text-xs font-bold uppercase tracking-widest mb-3" style={{ color: GOLD }}>Support</p>
-            <h1 className="text-3xl md:text-5xl font-bold text-white mb-4" style={{ fontFamily: "'Playfair Display', serif" }}>
+            <h1 className="text-3xl md:text-5xl font-bold text-white mb-4" style={{ fontFamily: "'Manrope', sans-serif" }}>
               Frequently Asked Questions
             </h1>
             <p className="text-base max-w-xl mx-auto" style={{ color: 'rgba(255,255,255,0.65)' }}>

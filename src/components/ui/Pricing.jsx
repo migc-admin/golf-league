@@ -35,7 +35,7 @@ function AnimatedPrice({ value }) {
         display: 'inline-block',
         fontSize: '3rem',
         fontWeight: 700,
-        fontFamily: "'Playfair Display', serif",
+        fontFamily: "'Manrope', sans-serif",
         color: INK,
         letterSpacing: '-0.02em',
         animation: 'pricePop 0.35s ease-out',
@@ -111,7 +111,7 @@ export default function Pricing({ plans, title, description }) {
       <div className="text-center mb-10">
         {title && (
           <h2 className="text-3xl md:text-4xl font-bold mb-4"
-            style={{ fontFamily: "'Playfair Display', serif", color: INK }}>
+            style={{ fontFamily: "'Manrope', sans-serif", color: INK }}>
             {title}
           </h2>
         )}

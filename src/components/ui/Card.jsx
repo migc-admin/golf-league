@@ -13,7 +13,7 @@ export function CardHeader({ title, subtitle, action }) {
       <div>
         <h3
           className="font-bold text-augusta-600"
-          style={{ fontFamily: "'Schibsted Grotesk', sans-serif", fontSize: '1rem', letterSpacing: '-0.01em' }}
+          style={{ fontFamily: "'Manrope', sans-serif", fontSize: '1rem', letterSpacing: '-0.01em' }}
         >
           {title}
         </h3>

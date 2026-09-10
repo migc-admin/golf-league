@@ -998,7 +998,7 @@ function AdminScoreEditor({ event, eventPlayers, allScores, course, onClose, onS
           {/* Header */}
           <div className="flex items-center justify-between px-5 py-3 border-b border-gray-200" style={{ background: '#1B4332', borderBottom: '2px solid #D4AF37' }}>
             <div>
-              <p style={{ fontFamily: "'Playfair Display',serif", color: '#D4AF37', fontWeight: 700, fontSize: '1rem' }}>
+              <p style={{ fontFamily: "'Manrope',sans-serif", color: '#D4AF37', fontWeight: 700, fontSize: '1rem' }}>
                 Admin Score Entry
               </p>
               {selectedEp && (
@@ -2995,6 +2995,7 @@ function TabPayoutConfig({ event, eventPlayers, course, onUpdated }) {
     // Opt-in pots are funded only by the players who bought in
     if (key === 'super_skins' || key.startsWith('super_skins_')) return sideGameEntries.super_skins?.length ?? totalPlayers
     if (key.startsWith('super_ctp_')) return sideGameEntries.super_ctp?.length ?? totalPlayers
+    if (key === 'blind_partners') return sideGameEntries.blind_partners?.length ?? totalPlayers
     // Full-field keys
     if (key === 'low_putts' || key.startsWith('ctp_') || key === 'skins' || key === 'long_drive') return totalPlayers
     if (!hasFlights && (key.startsWith('18_net_') || key.startsWith('18_gross_') || key.startsWith('f9_') || key.startsWith('b9_') || key.startsWith('stf_net_'))) return totalPlayers
@@ -3015,16 +3016,20 @@ function TabPayoutConfig({ event, eventPlayers, course, onUpdated }) {
   const overBudget     = totalAllocated > totalPot
 
   // Build rows — each row tagged with its flight letter (null = full field)
+  // and whether it's an opt-in pot (funded only by entrants, not the whole field)
   const rows = Object.entries(config).map(([key, val]) => {
     const mult  = getMultiplier(key)
     const total = (val || 0) * mult
     const label = getCategoryLabel(key)
+    const isOptIn = key === 'super_skins' || key.startsWith('super_skins_')
+      || key.startsWith('super_ctp_') || key === 'blind_partners'
     // Determine flight letter
     const flMatch = hasFlights && key.match(/(?:skins|super_ctp|long_drive|low_putts|18_net|18_gross|stf_net|f9|b9)_([a-z])(?:_|$)/)
     const flLetter = flMatch ? flMatch[1].toUpperCase() : null
-    const isField = !flLetter
-    return { key, val, label, isField, flLetter, mult, total }
+    const isField = !flLetter && !isOptIn
+    return { key, val, label, isField, isOptIn, flLetter, mult, total }
   })
+  const optInRows = rows.filter(r => r.isOptIn)
 
   return (
     <div className="space-y-4">
@@ -3133,7 +3138,7 @@ function TabPayoutConfig({ event, eventPlayers, course, onUpdated }) {
 
       {/* Per-flight scoring & side games — one card per flight */}
       {hasFlights && flightLetters.map(fl => {
-        const flRows = rows.filter(r => r.flLetter === fl)
+        const flRows = rows.filter(r => r.flLetter === fl && !r.isOptIn)
         if (flRows.length === 0) return null
         return (
           <Card key={fl} className="overflow-hidden p-0">
@@ -3145,15 +3150,30 @@ function TabPayoutConfig({ event, eventPlayers, course, onUpdated }) {
         )
       })}
 
-      {/* Full field — no-flight scoring + side games + CTP */}
+      {/* Full field — no-flight scoring + CTP + low putts (everyone participates) */}
       {rows.some(r => r.isField) && (
         <Card className="overflow-hidden p-0">
           <div className="px-4 py-2.5 bg-green-50 border-b border-green-100">
             <h3 className="text-xs font-semibold text-green-700">
-              {hasFlights ? 'Full Field — Side Games & CTP' : 'All Players'} ({totalPlayers} players)
+              {hasFlights ? 'Full Field — Scoring & CTP' : 'All Players'} ({totalPlayers} players)
             </h3>
           </div>
           <PayoutTable rows={rows.filter(r => r.isField)} onChange={setVal} colLabel="$ per player (All)" />
+        </Card>
+      )}
+
+      {/* Opt-in side games — funded only by the players who actually entered */}
+      {optInRows.length > 0 && (
+        <Card className="overflow-hidden p-0">
+          <div className="px-4 py-2.5 bg-amber-50 border-b border-amber-100">
+            <h3 className="text-xs font-semibold text-amber-700">
+              Opt-in Side Games — not everyone participates
+            </h3>
+            <p className="text-xs text-amber-600/80 mt-0.5">
+              Player counts come from the Side Games tab's opt-in rosters, not the full field.
+            </p>
+          </div>
+          <PayoutTable rows={optInRows} onChange={setVal} colLabel="$ per entrant" />
         </Card>
       )}
 
@@ -3440,7 +3460,7 @@ function TabSideGamesMain({ event, eventPlayers, course, sideGames, onUpdated })
   }))]
 
   // Show opt-ins for any of these games when configured — no buy-in toggle required
-  const OPT_IN_GAME_KEYS = new Set(['super_ctp', 'super_skins'])
+  const OPT_IN_GAME_KEYS = new Set(['super_ctp', 'super_skins', 'blind_partners'])
   const optInGames = baseKeys.filter(k => OPT_IN_GAME_KEYS.has(k))
   // Legacy: also include any games where admin explicitly enabled buy-in
   const buyInGames = [...new Set([...optInGames, ...baseKeys.filter(k => buyIns[k]?.enabled)])]
@@ -3456,10 +3476,13 @@ function TabSideGamesMain({ event, eventPlayers, course, sideGames, onUpdated })
     .map((par, i) => ({ hole: i + 1, par }))
     .filter(h => h.par === 3)
   const [superCtpHole, setSuperCtpHole] = useState(event.super_ctp_hole ?? '')
+  // Keep local state in sync when parent re-fetches event
+  useEffect(() => { setSuperCtpHole(event.super_ctp_hole ?? '') }, [event.super_ctp_hole])
   async function saveCtpHole(val) {
     const num = val ? parseInt(val, 10) : null
     setSuperCtpHole(val)
-    await supabase.from('events').update({ super_ctp_hole: num }).eq('id', event.id)
+    const { error } = await supabase.from('events').update({ super_ctp_hole: num }).eq('id', event.id)
+    if (error) { toast.error(error.message); setSuperCtpHole(event.super_ctp_hole ?? ''); return }
     onUpdated?.()
   }
 
@@ -3788,7 +3811,7 @@ function TabSideGames({ event, eventPlayers, course, sideGames, sideGameEntries 
         <BlindPartnersCard
           event={event}
           eventPlayers={eventPlayers}
-          optedInIds={[]}
+          optedInIds={sideGameEntries.blind_partners ?? []}
           onUpdated={onUpdated}
         />
       )}

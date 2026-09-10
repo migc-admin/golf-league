@@ -96,7 +96,7 @@ export default function Upgrade() {
 
         {/* Header */}
         <div className="text-center mb-10">
-          <h1 className="text-3xl font-bold text-gray-900" style={{ fontFamily: "'Playfair Display', serif" }}>
+          <h1 className="text-3xl font-bold text-gray-900" style={{ fontFamily: "'Manrope', sans-serif" }}>
             Upgrade Your Plan
           </h1>
           <p className="text-gray-500 mt-2">Choose the plan that fits your league.</p>

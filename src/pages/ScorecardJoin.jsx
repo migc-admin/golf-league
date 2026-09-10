@@ -157,12 +157,12 @@ export default function ScorecardJoin() {
               className="w-28 h-28 rounded-full flex items-center justify-center mx-auto mb-3 shadow-xl"
               style={{ background: '#1B4332' }}
             >
-              <span className="text-white font-bold text-3xl" style={{ fontFamily: "'Playfair Display', serif" }}>
+              <span className="text-white font-bold text-3xl" style={{ fontFamily: "'Manrope', sans-serif" }}>
                 {(event.league?.name ?? '').slice(0, 2).toUpperCase()}
               </span>
             </div>
           )}
-          <h1 className="text-white font-bold text-2xl" style={{ fontFamily: "'Playfair Display', serif" }}>
+          <h1 className="text-white font-bold text-2xl" style={{ fontFamily: "'Manrope', sans-serif" }}>
             {event.name ?? `Event #${event.event_number}`}
           </h1>
           <p className="text-white/60 text-sm mt-1">{event.course?.name} · {event.league?.name}</p>
