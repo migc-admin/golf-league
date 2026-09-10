@@ -528,17 +528,12 @@ export default function Home() {
               <div className="grid md:grid-cols-2 gap-6">
                 {ONE_TIME.map(opt => (
                   <div key={opt.name} className="rounded-2xl p-7 flex flex-col" style={{ border: '1px solid #ebe9e4', background: '#fbfaf8' }}>
-                    <div className="flex items-start justify-between gap-4 mb-4">
-                      <div>
-                        <p className="text-xs font-bold uppercase tracking-widest mb-1" style={{ color: '#9ca3af' }}>{opt.name}</p>
-                        <div className="flex items-end gap-1">
-                          <span className="text-3xl font-bold" style={{ color: INK, fontFamily: "'Manrope', sans-serif" }}>{opt.price}</span>
-                          <span className="text-sm mb-1" style={{ color: '#9ca3af' }}>{opt.sub}</span>
-                        </div>
+                    <div className="mb-4">
+                      <p className="text-xs font-bold uppercase tracking-widest mb-1" style={{ color: '#9ca3af' }}>{opt.name}</p>
+                      <div className="flex items-end gap-1">
+                        <span className="text-3xl font-bold" style={{ color: INK, fontFamily: "'Manrope', sans-serif" }}>{opt.price}</span>
+                        <span className="text-sm mb-1 font-semibold" style={{ color: '#92611a' }}>{opt.sub}</span>
                       </div>
-                      <span className="text-xs font-bold px-3 py-1 rounded-full mt-1" style={{ background: '#fef9ec', color: '#92611a', border: '1px solid #f5d87a' }}>
-                        One-time
-                      </span>
                     </div>
                     <p className="text-sm mb-4 leading-relaxed" style={{ color: '#6b7280' }}>{opt.description}</p>
                     <ul className="space-y-2 mb-6 flex-1">
@@ -588,12 +583,10 @@ export default function Home() {
             </div>
             <div className="grid sm:grid-cols-2 gap-4 mb-10">
               {[
-                { label: 'Leaderboard embed for your club website', status: 'planned' },
-                { label: 'Sponsor logos on print assets and leaderboard', status: 'planned' },
                 { label: 'Stripe-powered online payment collection', status: 'planned' },
                 { label: 'Text message scoring reminders (Twilio)', status: 'planned' },
                 { label: 'Multi-day trip scoring across multiple courses', status: 'planned' },
-                { label: 'Public event website with live leaderboard', status: 'planned' },
+                { label: 'USGA integration', status: 'planned' },
               ].map(item => (
                 <div key={item.label} className="flex items-start gap-3 rounded-xl p-4" style={{ background: '#fbfaf8', border: '1px solid #ebe9e4' }}>
                   <span className="mt-0.5 shrink-0 w-4 h-4 rounded-full border-2 flex items-center justify-center" style={{ borderColor: GREEN }}>
