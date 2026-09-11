@@ -31,6 +31,7 @@ export default function Leagues() {
     const { data } = await supabase
       .from('leagues')
       .select('id, name, slug, season_year, logo_url, display_order, events(id)')
+      .eq('is_trip_league', false)
       .order('display_order', { ascending: true, nullsFirst: false })
       .order('season_year', { ascending: false })
     setLeagues(data ?? [])

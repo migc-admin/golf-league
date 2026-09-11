@@ -1062,7 +1062,7 @@ function ImportPastResults() {
       const { data: profile } = await supabase.from('profiles').select('org_id').eq('id', user.id).single()
       if (profile?.org_id) {
         setOrgId(profile.org_id)
-        const { data: lgs } = await supabase.from('leagues').select('id, name').eq('org_id', profile.org_id).order('name')
+        const { data: lgs } = await supabase.from('leagues').select('id, name').eq('org_id', profile.org_id).eq('is_trip_league', false).order('name')
         setLeagues(lgs ?? [])
       }
     }

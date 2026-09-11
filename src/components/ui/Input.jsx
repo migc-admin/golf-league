@@ -18,6 +18,24 @@ export default function Input({ label, error, className = '', id, ...props }) {
   )
 }
 
+export function Textarea({ label, error, className = '', id, ...props }) {
+  const generatedId = useId()
+  const textareaId = id ?? generatedId
+
+  return (
+    <div className={className}>
+      {label && <label htmlFor={textareaId} className="label">{label}</label>}
+      <textarea
+        id={textareaId}
+        aria-describedby={error ? `${textareaId}-error` : undefined}
+        className={`input ${error ? 'border-red-400 focus:border-red-500 focus:ring-red-400' : ''}`}
+        {...props}
+      />
+      {error && <p id={`${textareaId}-error`} className="mt-1 text-xs text-red-600">{error}</p>}
+    </div>
+  )
+}
+
 export function Select({ label, error, className = '', id, children, ...props }) {
   const generatedId = useId()
   const selectId = id ?? generatedId

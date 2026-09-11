@@ -43,7 +43,7 @@ export default function Players() {
         : Promise.resolve({ data: [] }),
       currentOrgId
         // Oldest first — the org's original league is the default "home" league for members.
-        ? supabase.from('leagues').select('id, name, season_year, created_at').eq('org_id', currentOrgId).order('created_at', { ascending: true })
+        ? supabase.from('leagues').select('id, name, season_year, created_at').eq('org_id', currentOrgId).eq('is_trip_league', false).order('created_at', { ascending: true })
         : Promise.resolve({ data: [] }),
     ])
 

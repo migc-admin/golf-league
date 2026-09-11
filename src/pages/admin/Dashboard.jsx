@@ -42,6 +42,7 @@ export default function Dashboard() {
           .from('leagues')
           .select('id, name, slug, season_year')
           .eq('org_id', profile.org_id)
+          .eq('is_trip_league', false)
           .order('season_year', { ascending: false }),
       ])
 

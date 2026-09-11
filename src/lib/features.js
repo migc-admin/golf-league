@@ -9,16 +9,19 @@ export const TIER_LIMITS = {
     leagues:     1,
     players:     16,  // per league/event
     admins:      1,
+    trips:       0,
   },
   pro: {
     leagues:     2,
     players:     Infinity,
     admins:      1,
+    trips:       0,
   },
   club: {
     leagues:     Infinity,
     players:     Infinity,
     admins:      3,
+    trips:       1,
   },
 }
 

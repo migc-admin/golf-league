@@ -10,9 +10,13 @@ import OrgHome        from './pages/league/OrgHome'
 import LeagueHome     from './pages/league/LeagueHome'
 import Login          from './pages/Login'
 import Home           from './pages/Home'
+import HeroPreview    from './pages/dev/HeroPreview'
 import Dashboard      from './pages/admin/Dashboard'
 import Leagues        from './pages/admin/Leagues'
 import LeagueDetail   from './pages/admin/LeagueDetail'
+import Trips          from './pages/admin/Trips'
+import TripDetail     from './pages/admin/TripDetail'
+import TripHome       from './pages/trip/TripHome'
 import Courses        from './pages/admin/Courses'
 import Players        from './pages/admin/Players'
 import EventDetail    from './pages/admin/EventDetail'
@@ -57,6 +61,11 @@ function LeagueStandingsRoute() {
   return <OrgProvider orgSlug={orgSlug}><LeagueHome orgSlug={orgSlug} leagueSlug={leagueSlug} initialTab="standings" /></OrgProvider>
 }
 
+function TripHomeRoute({ orgSlug: fixedOrgSlug, initialTab }) {
+  const { orgSlug: paramOrgSlug, tripSlug } = useParams()
+  return <TripHome orgSlug={fixedOrgSlug ?? paramOrgSlug} tripSlug={tripSlug} initialTab={initialTab} />
+}
+
 export default function App() {
   const subdomainSlug = useSubdomain()
 
@@ -68,6 +77,7 @@ export default function App() {
           <Routes>
             <Route path="/" element={<OrgHome orgSlug={subdomainSlug} />} />
             <Route path="/:leagueSlug" element={<LeagueHomeRoute orgSlug={subdomainSlug} />} />
+            <Route path="/trip/:tripSlug" element={<TripHomeRoute orgSlug={subdomainSlug} />} />
             <Route path="/:leagueSlug/:eventSlug" element={<EventPage />} />
             <Route path="/:leagueSlug/:eventSlug/leaderboard" element={<OrgProvider orgSlug={subdomainSlug}><Leaderboard /></OrgProvider>} />
             <Route path="/:leagueSlug/:eventSlug/scorecard"   element={<OrgProvider orgSlug={subdomainSlug}><Scorecard /></OrgProvider>} />
@@ -84,6 +94,7 @@ export default function App() {
       <Routes>
         <Route path="/login"       element={<Login />} />
         <Route path="/home"        element={<Home />} />
+        <Route path="/dev/hero-preview" element={<HeroPreview />} />
         <Route path="/onboarding"  element={<Onboarding />} />
         <Route path="/auth/callback" element={<AuthCallback />} />
         <Route path="/upgrade"     element={<ProtectedRoute><Upgrade /></ProtectedRoute>} />
@@ -93,6 +104,8 @@ export default function App() {
           <Route index                element={<Dashboard />} />
           <Route path="leagues"                    element={<Leagues />} />
           <Route path="leagues/:leagueSlug"        element={<LeagueDetail />} />
+          <Route path="trips"                      element={<Trips />} />
+          <Route path="trips/:tripSlug"            element={<TripDetail />} />
           <Route path="courses"                    element={<Courses />} />
           <Route path="players"                    element={<Players />} />
           <Route path="import"                     element={<Import />} />
@@ -125,6 +138,7 @@ export default function App() {
         <Route path="/" element={<Navigate to="/home" replace />} />
 
         {/* Generic slug-based routes — must be LAST to avoid conflicts */}
+        <Route path="/:orgSlug/trip/:tripSlug"                     element={<TripHomeRoute />} />
         <Route path="/:orgSlug/:leagueSlug/standings"              element={<LeagueStandingsRoute />} />
         <Route path="/:orgSlug/:leagueSlug/:eventSlug/event"       element={<EventPage />} />
         <Route path="/:orgSlug/:leagueSlug/:eventSlug/leaderboard" element={<OrgRouteWrapper><Leaderboard /></OrgRouteWrapper>} />

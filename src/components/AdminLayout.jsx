@@ -12,6 +12,7 @@ const SLATE = '#334155' // exploratory sidebar accent — alternative to fairway
 const NAV_MAIN = [
   { to: '/admin',          label: 'Home',     end: true,  icon: HomeIcon   },
   { to: '/admin/leagues',  label: 'Leagues',  end: false, icon: TrophyIcon },
+  { to: '/admin/trips',    label: 'Trips',    end: false, icon: SuitcaseIcon },
   { to: '/admin/courses',  label: 'Courses',  end: false, icon: FlagIcon   },
   { to: '/admin/players',  label: 'Players',  end: false, icon: UsersIcon  },
   { to: '/admin/import',   label: 'Import',   end: false, icon: UploadIcon, sub: [
@@ -447,6 +448,9 @@ function HomeIcon({ className }) {
 }
 function TrophyIcon({ className }) {
   return <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4M7.835 4.697a3.42 3.42 0 001.946-.806 3.42 3.42 0 014.438 0 3.42 3.42 0 001.946.806 3.42 3.42 0 013.138 3.138 3.42 3.42 0 00.806 1.946 3.42 3.42 0 010 4.438 3.42 3.42 0 00-.806 1.946 3.42 3.42 0 01-3.138 3.138 3.42 3.42 0 00-1.946.806 3.42 3.42 0 01-4.438 0 3.42 3.42 0 00-1.946-.806 3.42 3.42 0 01-3.138-3.138 3.42 3.42 0 00-.806-1.946 3.42 3.42 0 010-4.438 3.42 3.42 0 00.806-1.946 3.42 3.42 0 013.138-3.138z" /></svg>
+}
+function SuitcaseIcon({ className }) {
+  return <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 13a2 2 0 012-2h14a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6zM8 11V7a2 2 0 012-2h4a2 2 0 012 2v4m-9 4h.01M15 15h.01" /></svg>
 }
 function FlagIcon({ className }) {
   return <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 21v-4m0 0V5a2 2 0 012-2h6.5l1 1H21l-3 6 3 6h-8.5l-1-1H5a2 2 0 00-2 2zm9-13.5V9" /></svg>

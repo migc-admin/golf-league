@@ -74,7 +74,7 @@ export default function EventPage() {
         if (directEventId) {
           const { data } = await supabase
             .from('events')
-            .select('*, course:courses(name, address), league:leagues(name, season_year, slug, logo_url, org_id)')
+            .select('*, course:courses(name, address), league:leagues(name, season_year, slug, logo_url, org_id, is_trip_league)')
             .eq('id', directEventId).single()
           ev = data
         } else {
@@ -82,7 +82,7 @@ export default function EventPage() {
           if (!league) { setLoading(false); return }
           const { data } = await supabase
             .from('events')
-            .select('*, course:courses(name, address), league:leagues(name, season_year, slug, logo_url, org_id)')
+            .select('*, course:courses(name, address), league:leagues(name, season_year, slug, logo_url, org_id, is_trip_league)')
             .eq('league_id', league.id).eq('slug', eventSlug).single()
           ev = data
         }
@@ -117,7 +117,9 @@ export default function EventPage() {
   const leaderboardUrl = subdomainOrg
     ? `/${_leagueSlug}/${event.slug}/leaderboard?eid=${eid}`
     : `/${orgSlug}/${_leagueSlug}/${event.slug}/leaderboard?eid=${eid}`
-  const regUrl         = event.league?.slug && event.slug ? `/register/${event.league.slug}/${event.slug}` : null
+  const regUrl         = event.league?.slug && event.slug && !event.league?.is_trip_league
+    ? `/register/${event.league.slug}/${event.slug}`
+    : null
   const formats        = event.formats ?? (event.format ? [event.format] : [])
   const sideGames      = event.side_game_options ?? []
   const eventName      = event.name ?? `Event #${event.event_number}`

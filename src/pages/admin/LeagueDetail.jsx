@@ -15,6 +15,10 @@ const CURRENT_YEAR = new Date().getFullYear()
 
 export default function LeagueDetail() {
   const { leagueSlug } = useParams()
+  return <LeagueDetailView leagueSlug={leagueSlug} />
+}
+
+export function LeagueDetailView({ leagueSlug, containerLabel = 'League', roundLabel = 'Event', hideSeasonYear = false, backTo = '/admin/leagues', backLabel = 'All Leagues', hideHeader = false }) {
   const { user } = useAuth()
   const navigate = useNavigate()
 
@@ -121,12 +125,33 @@ export default function LeagueDetail() {
   return (
     <div className="space-y-6">
       {/* Back nav */}
-      <div>
-        <Link to="/admin/leagues" className="text-sm text-ink-muted hover:text-ink">← All Leagues</Link>
-      </div>
+      {!hideHeader && (
+        <div>
+          <Link to={backTo} className="text-sm text-ink-muted hover:text-ink">← {backLabel}</Link>
+        </div>
+      )}
 
       {/* League header card */}
       <div className="card overflow-hidden p-0">
+        {hideHeader ? (
+          <div className="flex items-center justify-between gap-3 flex-wrap px-5 py-4" style={{ borderBottom: '1px solid #ebe9e4' }}>
+            <div>
+              <h2 className="text-lg font-bold text-ink" style={{ letterSpacing: '-0.02em' }}>{roundLabel}s</h2>
+              <p className="text-sm text-ink-muted mt-0.5">
+                {events.length} {roundLabel.toLowerCase()}{events.length !== 1 ? 's' : ''}
+              </p>
+            </div>
+            <div className="flex items-center gap-2 flex-wrap justify-end shrink-0">
+              <Button size="sm" onClick={() => setEventModal(true)}>+ {roundLabel}</Button>
+              <Link to={`/${orgSlug}/${league.slug}/standings`} className="btn btn-secondary btn-sm">Standings</Link>
+              {checkFeature(orgTier, 'tgl') ? (
+                <Button size="sm" variant="secondary" onClick={() => setTglModal(true)}>{league.team_play_label || 'Team Play'}</Button>
+              ) : (
+                <span className="text-xs text-ink-muted rounded-full px-3 py-1" style={{ background: '#eceae5' }}>Team Play — Club</span>
+              )}
+            </div>
+          </div>
+        ) : (
         <div className="flex items-start gap-5 px-5 py-5" style={{ borderBottom: '1px solid #ebe9e4' }}>
           {/* Logo upload — Club tier only */}
           <div className="shrink-0">
@@ -159,12 +184,15 @@ export default function LeagueDetail() {
           {/* League info */}
           <div className="flex-1 min-w-0">
             <h1 className="text-2xl font-bold text-ink" style={{ letterSpacing: '-0.03em' }}>{league.name}</h1>
-            <p className="text-sm text-ink-muted mt-0.5">Season {league.season_year} · {events.length} event{events.length !== 1 ? 's' : ''}</p>
+            <p className="text-sm text-ink-muted mt-0.5">
+              {!hideSeasonYear && <>Season {league.season_year} · </>}
+              {events.length} {roundLabel.toLowerCase()}{events.length !== 1 ? 's' : ''}
+            </p>
           </div>
 
           {/* Actions */}
           <div className="flex items-center gap-2 flex-wrap justify-end shrink-0">
-            <Button size="sm" onClick={() => setEventModal(true)}>+ Event</Button>
+            <Button size="sm" onClick={() => setEventModal(true)}>+ {roundLabel}</Button>
             <Button size="sm" variant="secondary" onClick={() => setLeagueModal(true)}>Edit League</Button>
             <Link to={`/${orgSlug}/${league.slug}/standings`} className="btn btn-secondary btn-sm">Standings</Link>
             {checkFeature(orgTier, 'tgl') ? (
@@ -175,11 +203,12 @@ export default function LeagueDetail() {
             <Button size="sm" variant="danger" onClick={() => setDeleteModal(true)}>Delete</Button>
           </div>
         </div>
+        )}
 
         {/* Events list */}
         {events.length === 0 ? (
           <div className="px-5 py-6 text-sm text-ink-muted">
-            No events yet. <button onClick={() => setEventModal(true)} className="text-fairway-700 hover:underline font-semibold">Add first event →</button>
+            No {roundLabel.toLowerCase()}s yet. <button onClick={() => setEventModal(true)} className="text-fairway-700 hover:underline font-semibold">Add first {roundLabel.toLowerCase()} →</button>
           </div>
         ) : (
           <div>
@@ -255,13 +284,14 @@ export default function LeagueDetail() {
         open={deleteModal}
         onClose={() => setDeleteModal(false)}
         league={league}
+        containerLabel={containerLabel}
         onConfirm={handleDeleteLeague}
       />
     </div>
   )
 }
 
-function DeleteLeagueModal({ open, onClose, league, onConfirm }) {
+function DeleteLeagueModal({ open, onClose, league, containerLabel = 'League', onConfirm }) {
   const [confirmText, setConfirmText] = useState('')
   const [deleting,    setDeleting]    = useState(false)
 
@@ -276,7 +306,7 @@ function DeleteLeagueModal({ open, onClose, league, onConfirm }) {
   }
 
   return (
-    <Modal open={open} onClose={onClose} title="Delete League">
+    <Modal open={open} onClose={onClose} title={`Delete ${containerLabel}`}>
       <div className="space-y-4">
         <p className="text-sm text-ink-muted">
           This will permanently delete <span className="font-semibold text-ink">{league?.name}</span> and all of its
@@ -298,7 +328,7 @@ function DeleteLeagueModal({ open, onClose, league, onConfirm }) {
             loading={deleting}
             onClick={handleDelete}
           >
-            Delete League
+            Delete {containerLabel}
           </Button>
         </div>
       </div>
