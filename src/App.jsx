@@ -2,6 +2,7 @@ import { Routes, Route, Navigate, useParams } from 'react-router-dom'
 import { AuthProvider } from './hooks/useAuth'
 import ProtectedRoute from './components/ProtectedRoute'
 import AdminRoute     from './components/AdminRoute'
+import SubdomainAdminRoute from './components/SubdomainAdminRoute'
 import { OrgProvider } from './lib/OrgContext'
 import { useSubdomain } from './lib/useSubdomain'
 import { SubdomainContext } from './lib/SubdomainContext'
@@ -76,12 +77,34 @@ export default function App() {
         <SubdomainContext.Provider value={subdomainSlug}>
           <Routes>
             <Route path="/" element={<OrgHome orgSlug={subdomainSlug} />} />
+            <Route path="/login" element={<Login />} />
             <Route path="/:leagueSlug" element={<LeagueHomeRoute orgSlug={subdomainSlug} />} />
             <Route path="/trip/:tripSlug" element={<TripHomeRoute orgSlug={subdomainSlug} />} />
             <Route path="/:leagueSlug/:eventSlug" element={<EventPage />} />
             <Route path="/:leagueSlug/:eventSlug/leaderboard" element={<OrgProvider orgSlug={subdomainSlug}><Leaderboard /></OrgProvider>} />
             <Route path="/:leagueSlug/:eventSlug/scorecard"   element={<OrgProvider orgSlug={subdomainSlug}><Scorecard /></OrgProvider>} />
             <Route path="/:leagueSlug/:eventSlug/schedule"    element={<OrgProvider orgSlug={subdomainSlug}><Schedule /></OrgProvider>} />
+
+            {/* Admin — same subtree as the path-based app, gated by SubdomainAdminRoute
+                so an admin can only manage the org that matches this subdomain. */}
+            <Route path="/admin" element={<SubdomainAdminRoute />}>
+              <Route index                element={<Dashboard />} />
+              <Route path="leagues"                    element={<Leagues />} />
+              <Route path="leagues/:leagueSlug"        element={<LeagueDetail />} />
+              <Route path="trips"                      element={<Trips />} />
+              <Route path="trips/:tripSlug"            element={<TripDetail />} />
+              <Route path="courses"                    element={<Courses />} />
+              <Route path="players"                    element={<Players />} />
+              <Route path="import"                     element={<Import />} />
+              <Route path="settings"                   element={<Settings />} />
+              <Route path="dispute-template"           element={<DisputeTemplate />} />
+              <Route path=":orgSlug/:leagueSlug"            element={<OrgRouteWrapper><Leagues /></OrgRouteWrapper>} />
+              <Route path=":orgSlug/:leagueSlug/:eventSlug" element={<OrgRouteWrapper><EventDetail /></OrgRouteWrapper>} />
+            </Route>
+
+            {/* Unknown paths (e.g. /onboarding, which doesn't apply on a subdomain) fall
+                back to the org's public home rather than rendering nothing. */}
+            <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
         </SubdomainContext.Provider>
         </TenantProvider>

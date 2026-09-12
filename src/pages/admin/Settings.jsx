@@ -3,6 +3,7 @@ import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../hooks/useAuth'
 import { TIER_LABELS } from '../../lib/features'
 import { resolveConfig, BASE_DEFAULTS, TIER_DEFAULTS, FEATURE_TIERS } from '../../lib/tenantConfig'
+import { slugify, checkSlugAvailable } from '../../lib/orgSlug'
 import toast from 'react-hot-toast'
 
 const GREEN = '#1B4332'
@@ -200,7 +201,9 @@ export default function Settings() {
   const { user } = useAuth()
   const [org,           setOrg]           = useState(null)
   const [name,          setName]          = useState('')
+  const [slugInput,     setSlugInput]     = useState('')
   const [saving,        setSaving]        = useState(false)
+  const [savingSlug,    setSavingSlug]    = useState(false)
   const [savingConfig,  setSavingConfig]  = useState(false)
   const [portalLoading, setPortalLoading] = useState(false)
   const [loading,       setLoading]       = useState(true)
@@ -226,6 +229,7 @@ export default function Settings() {
             if (o) {
               setOrg(o)
               setName(o.name)
+              setSlugInput(o.slug)
               // Resolve full merged config for the form initial state
               const merged = resolveConfig(o.tier, o.org_config ?? {})
               setConfigDraft({
@@ -244,17 +248,40 @@ export default function Settings() {
     e.preventDefault()
     if (!name.trim()) return
     setSaving(true)
-    const newSlug = name.trim().toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '')
     const { error } = await supabase
       .from('organizations')
-      .update({ name: name.trim(), slug: newSlug })
+      .update({ name: name.trim() })
       .eq('id', org.id)
     setSaving(false)
     if (error) {
       toast.error('Failed to update: ' + error.message)
     } else {
-      setOrg(o => ({ ...o, name: name.trim(), slug: newSlug }))
+      setOrg(o => ({ ...o, name: name.trim() }))
       toast.success('Organization updated.')
+    }
+  }
+
+  async function handleSaveSlug(e) {
+    e.preventDefault()
+    if (!slugInput.trim()) return
+    setSavingSlug(true)
+    const { slug, available, reason } = await checkSlugAvailable(slugInput, org.id)
+    if (!available) {
+      setSavingSlug(false)
+      toast.error(reason)
+      return
+    }
+    const { error } = await supabase
+      .from('organizations')
+      .update({ slug })
+      .eq('id', org.id)
+    setSavingSlug(false)
+    if (error) {
+      toast.error('Failed to update: ' + error.message)
+    } else {
+      setOrg(o => ({ ...o, slug }))
+      setSlugInput(slug)
+      toast.success('URL updated.')
     }
   }
 
@@ -316,7 +343,6 @@ export default function Settings() {
   const tierLabel = TIER_LABELS[tier] ?? tier
   const badge     = TIER_BADGE[tier] ?? TIER_BADGE.free
   const isPaid    = tier !== 'free'
-  const slug      = name.trim().toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || org.slug
 
   const isPro  = meetsMinTier(tier, 'pro')
   const isClub = meetsMinTier(tier, 'club')
@@ -342,11 +368,6 @@ export default function Settings() {
                 required
               />
             </div>
-            {name.trim() !== org.name && (
-              <p className="text-xs text-amber-600">
-                ⚠ Renaming the org will update your public URL slug and break existing public links (standings, leaderboard, etc.)
-              </p>
-            )}
             <div className="flex justify-end">
               <button
                 type="submit"
@@ -355,6 +376,41 @@ export default function Settings() {
                 style={{ background: GREEN }}
               >
                 {saving ? 'Saving…' : 'Save changes'}
+              </button>
+            </div>
+          </form>
+        </div>
+        <div className="px-6 py-5">
+          <form onSubmit={handleSaveSlug} className="space-y-4">
+            <div>
+              <label className="label">Custom URL</label>
+              <div className="flex items-center gap-1.5 flex-wrap text-sm">
+                <span className="text-gray-400">scorifygolf.com/</span>
+                <input
+                  type="text"
+                  value={slugInput}
+                  onChange={e => setSlugInput(e.target.value)}
+                  className="input flex-1 min-w-[140px]"
+                  required
+                />
+              </div>
+              <p className="text-xs text-gray-500 mt-1.5">
+                Used for your public URL and subdomain (e.g. {slugify(slugInput) || 'your-url'}.scorifygolf.com). Independent of your organization name above.
+              </p>
+            </div>
+            {slugInput.trim() !== org.slug && (
+              <p className="text-xs text-amber-600">
+                ⚠ Changing this will break any existing public links (standings, leaderboard, etc.) that use the old URL.
+              </p>
+            )}
+            <div className="flex justify-end">
+              <button
+                type="submit"
+                disabled={savingSlug || slugInput.trim() === org.slug}
+                className="px-5 py-2 rounded-xl text-sm font-semibold text-white transition-opacity disabled:opacity-40 hover:opacity-90"
+                style={{ background: GREEN }}
+              >
+                {savingSlug ? 'Saving…' : 'Save URL'}
               </button>
             </div>
           </form>
