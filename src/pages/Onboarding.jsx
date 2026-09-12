@@ -91,6 +91,14 @@ function slugify(str) {
     .slice(0, 40)
 }
 
+// Subdomains that must never be assignable to an org — either because they're
+// already claimed by the app itself (app, www) or because they'd be confusing/
+// unsafe as a tenant's public-facing subdomain (api, admin, auth, etc).
+const RESERVED_SLUGS = [
+  'api', 'app', 'auth', 'admin', 'www', 'billing', 'support',
+  'login', 'signup', 'register', 'docs', 'mail', 'status', 'help',
+]
+
 export default function Onboarding() {
   const { user, loading: authLoading } = useAuth()
 
@@ -120,7 +128,7 @@ export default function Onboarding() {
         .eq('slug', baseSlug)
         .maybeSingle()
 
-      const slug = existing
+      const slug = existing || RESERVED_SLUGS.includes(baseSlug)
         ? `${baseSlug}-${Math.random().toString(36).slice(2, 6)}`
         : baseSlug
 
