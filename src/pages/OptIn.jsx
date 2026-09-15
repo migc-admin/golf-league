@@ -3,12 +3,14 @@
  * URL: /:orgSlug/:leagueSlug/:eventSlug/opt-in  (or /:leagueSlug/:eventSlug/opt-in on a subdomain)
  *
  * Flow (single screen, one-time submit):
- *  1. Player picks which opt-in game(s) they're joining (Super Skins / Super CTP / Blind Partners)
- *  2. Player picks their name from the event roster
+ *  1. Player picks their name from the event roster
+ *  2. Player picks which opt-in game(s) they're joining (Super Skins / Super CTP / Blind Partners)
  *  3. Total updates live (already-joined games are excluded from the total)
  *  4. Player taps "Pay Cash" or "Pay with Venmo" — this writes them into
  *     event.side_game_entries via the opt_in_side_games RPC (honor-system, same
  *     trust model as the existing Register.jsx flow — no payment reconciliation)
+ *
+ * Opt-in closes 10 minutes after the last scheduled tee time (see computeOptInCutoff).
  */
 
 import { useEffect, useState } from 'react'
@@ -23,6 +25,26 @@ const GOLD  = '#D4AF37'
 
 function isMobile() {
   return /android|iphone|ipad|ipod/i.test(navigator.userAgent)
+}
+
+// Opt-in closes 10 minutes after the last scheduled tee time (or the single
+// shotgun start time). Returns null if there's no scheduled start time to
+// compute a cutoff from — in that case opt-in stays open indefinitely.
+function computeOptInCutoff(event, eventPlayers) {
+  if (!event?.event_date || !event?.start_time) return null
+  const [h, m] = event.start_time.split(':').map(Number)
+  let lastTeeMins = h * 60 + m
+  if (!event.shotgun_start) {
+    const groupNums = eventPlayers.map(ep => ep.group_number).filter(n => n != null)
+    if (groupNums.length > 0) {
+      const maxGroup = Math.max(...groupNums)
+      const interval = event.tee_time_interval_mins ?? 10
+      lastTeeMins += (maxGroup - 1) * interval
+    }
+  }
+  const cutoff = new Date(`${event.event_date}T00:00:00`)
+  cutoff.setMinutes(cutoff.getMinutes() + lastTeeMins + 10)
+  return cutoff
 }
 
 function VenmoButton({ handle, amount, note }) {
@@ -81,7 +103,7 @@ export default function OptIn() {
       if (!league) { setLoading(false); return }
       const { data: ev } = await supabase
         .from('events')
-        .select('id, name, slug, event_number, event_date, status, venmo_handle, side_game_options, payout_config, side_game_entries, super_ctp_hole, course:courses(name), league:leagues(name, slug, logo_url)')
+        .select('id, name, slug, event_number, event_date, status, venmo_handle, side_game_options, payout_config, side_game_entries, super_ctp_hole, start_time, shotgun_start, tee_time_interval_mins, course:courses(name), league:leagues(name, slug, logo_url)')
         .eq('league_id', league.id)
         .eq('slug', eventSlug)
         .single()
@@ -90,7 +112,7 @@ export default function OptIn() {
 
       const { data: eps } = await supabase
         .from('event_players')
-        .select('player_id, player:players(first_name, last_name)')
+        .select('player_id, group_number, player:players(first_name, last_name)')
         .eq('event_id', ev.id)
       setEventPlayers((eps ?? []).slice().sort((a, b) => {
         const an = `${a.player?.first_name ?? ''} ${a.player?.last_name ?? ''}`
@@ -121,6 +143,9 @@ export default function OptIn() {
   // Enabled opt-in games: derived from side_game_options, filtered to ones with a configured $ amount
   const baseKeys = [...new Set((event.side_game_options ?? []).map(k => k.replace(/_[ab]$/, '')))]
   const availableGames = baseKeys.filter(k => OPT_IN_GAME_KEYS.has(k) && optInAmount(event, k) != null)
+
+  const cutoff   = computeOptInCutoff(event, eventPlayers)
+  const isClosed = cutoff ? new Date() > cutoff : false
 
   const entries = event.side_game_entries ?? {}
   const selectedPlayer = eventPlayers.find(ep => ep.player_id === playerId)
@@ -184,15 +209,38 @@ export default function OptIn() {
           <div className="mx-auto mt-3" style={{ width: 40, height: 2, background: GOLD }} />
         </div>
 
-        {!result && availableGames.length === 0 && (
+        {!result && isClosed && (
+          <div className="bg-white rounded-2xl shadow-2xl p-6 text-center">
+            <p className="text-gray-700 font-semibold mb-1">Opt-in is closed</p>
+            <p className="text-sm text-gray-400">This event's opt-in window has ended. See an event admin if you still need to pay.</p>
+          </div>
+        )}
+
+        {!result && !isClosed && availableGames.length === 0 && (
           <div className="bg-white rounded-2xl shadow-2xl p-6 text-center">
             <p className="text-gray-500">No opt-in side games are set up for this event yet.</p>
           </div>
         )}
 
         {/* Opt-in form */}
-        {!result && availableGames.length > 0 && (
+        {!result && !isClosed && availableGames.length > 0 && (
           <div className="bg-white rounded-2xl shadow-2xl p-6 space-y-5">
+            <div>
+              <label className="block text-xs font-semibold text-gray-600 mb-1">Your Name</label>
+              <select
+                value={playerId}
+                onChange={e => setPlayerId(e.target.value)}
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-600"
+              >
+                <option value="">— Select your name —</option>
+                {eventPlayers.map(ep => (
+                  <option key={ep.player_id} value={ep.player_id}>
+                    {ep.player?.first_name} {ep.player?.last_name}
+                  </option>
+                ))}
+              </select>
+            </div>
+
             <div>
               <p className="text-xs font-semibold text-gray-600 mb-2">Select the games you're joining</p>
               <div className="space-y-2">
@@ -211,22 +259,6 @@ export default function OptIn() {
                   </label>
                 ))}
               </div>
-            </div>
-
-            <div>
-              <label className="block text-xs font-semibold text-gray-600 mb-1">Your Name</label>
-              <select
-                value={playerId}
-                onChange={e => setPlayerId(e.target.value)}
-                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-600"
-              >
-                <option value="">— Select your name —</option>
-                {eventPlayers.map(ep => (
-                  <option key={ep.player_id} value={ep.player_id}>
-                    {ep.player?.first_name} {ep.player?.last_name}
-                  </option>
-                ))}
-              </select>
             </div>
 
             {playerId && alreadyKeys.length > 0 && (
@@ -255,6 +287,9 @@ export default function OptIn() {
                 >
                   {submitting ? 'Submitting…' : `Pay Cash — $${total.toFixed(2)}`}
                 </button>
+                <p className="text-xs text-gray-400 text-center -mt-1">
+                  Cash must be paid to league admin before event begins.
+                </p>
                 {event.venmo_handle && (
                   <button
                     type="button"
@@ -290,7 +325,10 @@ export default function OptIn() {
             </div>
 
             {result.method === 'cash' && (
-              <p className="text-sm text-gray-600">Tell the starter you're paying <strong>${result.total.toFixed(2)}</strong> cash.</p>
+              <div className="space-y-1">
+                <p className="text-sm text-gray-600">Tell the starter you're paying <strong>${result.total.toFixed(2)}</strong> cash.</p>
+                <p className="text-xs text-amber-600 font-medium">Cash must be paid to league admin before event begins.</p>
+              </div>
             )}
 
             {result.method === 'venmo' && event.venmo_handle && (
