@@ -333,6 +333,8 @@ export default function EventDetail() {
           course={course}
           sideGames={sideGames}
           onUpdated={load}
+          orgSlug={orgSlug}
+          leagueSlug={leagueSlug}
         />
       )}
 
@@ -3473,10 +3475,11 @@ function BlindPartnersCard({ event, eventPlayers, optedInIds = [], onUpdated }) 
 }
 
 // ─── Tab: Side Games (opt-ins + draw + winner entry) ─────────────────────────
-function TabSideGamesMain({ event, eventPlayers, course, sideGames, onUpdated }) {
+function TabSideGamesMain({ event, eventPlayers, course, sideGames, onUpdated, orgSlug, leagueSlug }) {
   const sides   = event.side_game_options ?? []
   const buyIns  = event.side_game_buy_ins ?? {}
   const hasSideGames = sides.length > 0 || (event.custom_competitions ?? []).some(c => c?.trim())
+  const optInUrl = `${window.location.origin}/${orgSlug}/${event.league?.slug ?? leagueSlug}/${event.slug}/opt-in`
 
   // Derive unique base keys from side_game_options
   const baseKeys = [...new Set(sides.map(s => {
@@ -3554,6 +3557,19 @@ function TabSideGamesMain({ event, eventPlayers, course, sideGames, onUpdated })
 
   return (
     <div className="space-y-6">
+      {/* ── Opt-in link ──────────────────────────────────────────── */}
+      {optInGames.length > 0 && (
+        <Card>
+          <CardHeader title="Opt-In Link" subtitle="Share this link (or the printable Check-In QR sign) so players can self-serve join & pay for opt-in games" />
+          <div className="flex items-center gap-2 px-4 pb-4">
+            <input readOnly value={optInUrl} className="input text-xs flex-1 bg-gray-50" onFocus={e => e.target.select()} />
+            <Button size="sm" variant="secondary" onClick={() => { navigator.clipboard.writeText(optInUrl); toast.success('Link copied!') }}>
+              Copy
+            </Button>
+          </div>
+        </Card>
+      )}
+
       {/* ── Opt-in rosters ───────────────────────────────────────── */}
       {buyInGames.length > 0 && (
         <div>

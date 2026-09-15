@@ -326,7 +326,7 @@ export default function OptIn() {
 
             {result.method === 'cash' && (
               <div className="space-y-1">
-                <p className="text-sm text-gray-600">Tell the starter you're paying <strong>${result.total.toFixed(2)}</strong> cash.</p>
+                <p className="text-sm text-gray-600">Tell the League Admin you're paying <strong>${result.total.toFixed(2)}</strong> cash.</p>
                 <p className="text-xs text-amber-600 font-medium">Cash must be paid to league admin before event begins.</p>
               </div>
             )}
