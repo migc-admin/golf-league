@@ -26,6 +26,7 @@ import ScorecardJoin  from './pages/ScorecardJoin'
 import Leaderboard    from './pages/Leaderboard'
 import Schedule       from './pages/Schedule'
 import EventPage      from './pages/EventPage'
+import OptIn          from './pages/OptIn'
 import Import         from './pages/admin/Import'
 import Settings       from './pages/admin/Settings'
 import Register       from './pages/Register'
@@ -84,6 +85,7 @@ export default function App() {
             <Route path="/:leagueSlug/:eventSlug/leaderboard" element={<OrgProvider orgSlug={subdomainSlug}><Leaderboard /></OrgProvider>} />
             <Route path="/:leagueSlug/:eventSlug/scorecard"   element={<OrgProvider orgSlug={subdomainSlug}><Scorecard /></OrgProvider>} />
             <Route path="/:leagueSlug/:eventSlug/schedule"    element={<OrgProvider orgSlug={subdomainSlug}><Schedule /></OrgProvider>} />
+            <Route path="/:leagueSlug/:eventSlug/opt-in"      element={<OptIn />} />
 
             {/* Admin — same subtree as the path-based app, gated by SubdomainAdminRoute
                 so an admin can only manage the org that matches this subdomain. */}
@@ -167,6 +169,7 @@ export default function App() {
         <Route path="/:orgSlug/:leagueSlug/:eventSlug/leaderboard" element={<OrgRouteWrapper><Leaderboard /></OrgRouteWrapper>} />
         <Route path="/:orgSlug/:leagueSlug/:eventSlug/schedule"    element={<OrgRouteWrapper><Schedule /></OrgRouteWrapper>} />
         <Route path="/:orgSlug/:leagueSlug/:eventSlug/scorecard"   element={<OrgRouteWrapper><Scorecard /></OrgRouteWrapper>} />
+        <Route path="/:orgSlug/:leagueSlug/:eventSlug/opt-in"      element={<OptIn />} />
 
         <Route path="*" element={<Navigate to="/home" replace />} />
       </Routes>

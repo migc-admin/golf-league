@@ -10,6 +10,7 @@ import { supabase } from '../lib/supabase'
 import { useSubdomainOrg } from '../lib/SubdomainContext'
 import Countdown from '../components/Countdown'
 import Marquee from '../components/ui/Marquee'
+import { OPT_IN_GAME_KEYS } from '../lib/sideGames'
 
 const GREEN    = '#1B4332'
 const GOLD     = '#D4AF37'
@@ -47,10 +48,6 @@ const SIDE_GAME_LABELS = {
   super_ctp:       'Super CTP',
   blind_partners:  'Blind Partners',
 }
-// These games are inherently opt-in (funded by Payout Config's $ per entrant),
-// regardless of the legacy side_game_buy_ins.enabled flag.
-const OPT_IN_GAME_KEYS = new Set(['super_ctp', 'super_skins', 'blind_partners'])
-
 const BASE_TABS = [
   { key: 'overview',  label: 'Overview'  },
   { key: 'pairings',  label: 'Pairings'  },

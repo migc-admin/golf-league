@@ -26,6 +26,7 @@ import ImageUpload from '../../components/ui/ImageUpload'
 import UpgradePrompt from '../../components/ui/UpgradePrompt'
 import PrintAssets from '../../components/ui/PrintAssets'
 import { atLimit, getLimit, nextTier, TIER_LABELS } from '../../lib/features'
+import { OPT_IN_GAME_KEYS, optInAmount } from '../../lib/sideGames'
 
 // Collapsed from 7 → 4 tabs: Players = Registrations + Players & Flights; Payout = Config + Side Games + Summary
 const ALL_ADMIN_TABS = ['Overview', 'Players', 'Groups', 'Side Games', 'Payout', 'Pre/Post Round', 'Team Play']
@@ -43,8 +44,6 @@ const GROUP_GAMES = [
   { key: 'blind_partners', label: 'Blind Partners' },
 ]
 const PER_FLIGHT_GAME_KEYS = new Set(PER_FLIGHT_GAMES.map(g => g.key))
-// Opt-in games fund their pot from Payout Config's "$ per entrant" — no separate buy-in amount needed
-const OPT_IN_GAME_KEYS = new Set(['super_ctp', 'super_skins', 'blind_partners'])
 
 function buildSideGameOptions(enabledGames, gameScope, numFlights) {
   const result = []
@@ -360,6 +359,7 @@ export default function EventDetail() {
           orgName={org?.name}
           orgLogoUrl={org?.logo_url ?? null}
           orgSlug={orgSlug}
+          leagueSlug={leagueSlug}
           onPrintAsset={setPrintAsset}
           onUpdated={load}
           tglTeams={tglTeams}
@@ -383,7 +383,7 @@ export default function EventDetail() {
         />
       )}
 
-      {printAsset && <PrintAssets type={printAsset} event={event} eventPlayers={eventPlayers} tglSelections={tglSelections} onClose={() => setPrintAsset(null)} />}
+      {printAsset && <PrintAssets type={printAsset} event={event} eventPlayers={eventPlayers} tglSelections={tglSelections} orgSlug={orgSlug} leagueSlug={leagueSlug} onClose={() => setPrintAsset(null)} />}
     </div>
   )
 }
@@ -1226,13 +1226,15 @@ function EditHandicapModal({ ep, course, onClose, onSaved }) {
 }
 
 // ─── Tab: Pre/Post Round ──────────────────────────────────────────
-function TabPostRound({ event, eventPlayers, allScores, course, sideGames, orgName, orgLogoUrl, orgSlug, onPrintAsset, onUpdated, tglTeams, tglMembers, tglSelections, hasTgl }) {
+function TabPostRound({ event, eventPlayers, allScores, course, sideGames, orgName, orgLogoUrl, orgSlug, leagueSlug, onPrintAsset, onUpdated, tglTeams, tglMembers, tglSelections, hasTgl }) {
   const [scoreEditor, setScoreEditor] = useState(false)
   const hasSkins = (event?.side_game_options ?? []).some(s => s.startsWith('skins'))
   const eventFormats = event?.formats ?? (event?.format ? [event.format] : [])
   const hasMatchPlay = eventFormats.includes('match_points') || eventFormats.includes('ryder_cup')
   const leagueName = event.league?.name ?? orgName
   const logoUrl = event.league?.logo_url ?? orgLogoUrl ?? null
+  const hasOptInGames = [...new Set((event?.side_game_options ?? []).map(k => k.replace(/_[ab]$/, '')))]
+    .some(k => OPT_IN_GAME_KEYS.has(k) && optInAmount(event, k) != null)
 
   return (
     <div className="space-y-6 max-w-xl">
@@ -1246,6 +1248,9 @@ function TabPostRound({ event, eventPlayers, allScores, course, sideGames, orgNa
             <Button size="sm" variant="secondary" onClick={() => onPrintAsset('tee_sheet')}>Tee Sheet</Button>
             <Button size="sm" variant="secondary" onClick={() => onPrintAsset('cart_signs')}>Cart Signs</Button>
             <Button size="sm" variant="secondary" onClick={() => onPrintAsset('cards')}>Side Game Signs</Button>
+            {hasOptInGames && (
+              <Button size="sm" variant="secondary" onClick={() => onPrintAsset('checkin_qr')}>Check-In QR</Button>
+            )}
           </div>
           <div className="text-xs text-gray-400 mt-1.5">Tee sheet, cart signs, and side game cards for the round</div>
         </div>
@@ -3487,9 +3492,8 @@ function TabSideGamesMain({ event, eventPlayers, course, sideGames, onUpdated })
   // Opt-in games are funded by Payout Config's "$ per entrant" — read it directly so the
   // pot shown here always matches the Payouts tab instead of a separately-entered amount.
   function payoutAmountForKey(key) {
-    const config = event.payout_config ?? {}
-    if (key === 'super_skins') return config.super_skins ?? config.super_skins_a ?? config.super_skins_b ?? null
-    return config[key] ?? buyIns[key]?.amount ?? null
+    if (OPT_IN_GAME_KEYS.has(key)) return optInAmount(event, key)
+    return event.payout_config?.[key] ?? buyIns[key]?.amount ?? null
   }
 
   // Opt-in entries state (synced to DB)

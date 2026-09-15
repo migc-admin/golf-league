@@ -1,16 +1,19 @@
 /**
  * PrintAssets — Printable golf event assets
  *
- * Three asset types:
+ * Four asset types:
  *  'cards'      → CTP and Long Drive cards  (4.72" × 8.27" portrait / A5)
  *  'tee_sheet'  → Tee Sheet                 (8.5" × 11" portrait)
  *  'cart_signs' → Cart Signs                (8.5" × 5.5" landscape)
+ *  'checkin_qr' → Check-In QR sign          (8.5" × 11" portrait)
  */
 
 import { useEffect, useRef, useState, forwardRef } from 'react'
 import { createPortal } from 'react-dom'
 import { toPng } from 'html-to-image'
 import html2canvas from 'html2canvas'
+import QRCode from 'qrcode'
+import { OPT_IN_GAME_KEYS, OPT_IN_GAME_LABELS, optInAmount } from '../../lib/sideGames'
 
 const GOLD  = '#C9A84C'
 const GREEN = '#1B4332'
@@ -414,12 +417,85 @@ function CartSignsPage({ signs }) {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
+// ASSET TYPE 4 — Check-In QR Sign  (8.5" × 11")
+// ═══════════════════════════════════════════════════════════════════════════════
+function CheckinQrPage({ event, games, qrDataUrl }) {
+  const league     = event?.league ?? {}
+  const logoUrl    = league.logo_url ?? null
+  const leagueName = league.name ?? ''
+  const eventName  = event?.name ?? (event?.event_number ? `Event #${event.event_number}` : '')
+  const date       = formatEventDate(event?.event_date)
+  const courseName = event?.course?.name ?? ''
+
+  return (
+    <div style={{
+      width: '8.5in', height: '11in',
+      background: '#fff', color: '#111',
+      padding: '0.6in 0.7in',
+      boxSizing: 'border-box',
+      fontFamily: FONT,
+      display: 'flex', flexDirection: 'column', alignItems: 'center',
+      pageBreakAfter: 'always',
+    }}>
+      {/* Header */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: '0.22in', marginBottom: '0.35in' }}>
+        {logoUrl ? (
+          <img src={logoUrl} alt="" style={{ width: '0.85in', height: '0.85in', borderRadius: '50%', objectFit: 'cover', border: `2px solid ${GOLD}`, flexShrink: 0 }} />
+        ) : (
+          <div style={{ width: '0.85in', height: '0.85in', borderRadius: '50%', background: GREEN, display: 'flex', alignItems: 'center', justifyContent: 'center', color: GOLD, fontWeight: 'bold', fontSize: '0.28in', flexShrink: 0, fontFamily: FONT }}>
+            {leagueName?.slice(0, 2)?.toUpperCase() ?? '⛳'}
+          </div>
+        )}
+        <div>
+          <div style={{ fontSize: '0.22in', fontWeight: 'bold', color: GREEN, fontFamily: FONT }}>{leagueName}</div>
+          <div style={{ fontSize: '0.17in', color: '#333', marginTop: '0.03in', fontFamily: FONT }}>{eventName}</div>
+          <div style={{ fontSize: '0.12in', color: '#666', marginTop: '0.02in', fontFamily: FONT }}>
+            {[date, courseName].filter(Boolean).join('  ·  ')}
+          </div>
+        </div>
+      </div>
+
+      {/* Divider */}
+      <div style={{ width: '100%', height: '2px', background: `linear-gradient(90deg, ${GOLD}, ${GREEN})`, marginBottom: '0.4in' }} />
+
+      <div style={{ fontSize: '0.32in', fontWeight: 900, color: GREEN, fontFamily: FONT, textAlign: 'center' }}>
+        Scan to Opt In &amp; Pay
+      </div>
+      <div style={{ fontSize: '0.16in', color: '#555', fontFamily: FONT, textAlign: 'center', marginTop: '0.08in', marginBottom: '0.4in' }}>
+        Sign up for today's side games and pay your buy-in — cash or Venmo
+      </div>
+
+      {/* QR code */}
+      {qrDataUrl && (
+        <img src={qrDataUrl} alt="Scan to opt in" style={{ width: '4.2in', height: '4.2in', border: `4px solid ${GREEN}`, borderRadius: '0.12in', padding: '0.2in', boxSizing: 'border-box' }} />
+      )}
+
+      {/* Games list */}
+      <div style={{ marginTop: '0.45in', width: '100%', maxWidth: '5in' }}>
+        {games.map(g => (
+          <div key={g.key} style={{
+            display: 'flex', justifyContent: 'space-between',
+            padding: '0.12in 0.18in',
+            fontSize: '0.18in', fontFamily: FONT,
+            borderBottom: '1px solid #e8e8e4',
+          }}>
+            <span style={{ color: '#222', fontWeight: 600 }}>{g.label}</span>
+            <span style={{ color: GREEN, fontWeight: 'bold' }}>${Number(g.amount).toFixed(2)} / entrant</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
 // Main export
 // ═══════════════════════════════════════════════════════════════════════════════
 const PAGE_SIZE = {
   cards:      '8.5in 11in',
   tee_sheet:  '8.5in 11in',
   cart_signs: '8.5in 11in',
+  checkin_qr: '8.5in 11in',
 }
 
 // Physical pixel dimensions at 96dpi (1in = 96px) — all types now render full Letter pages
@@ -427,20 +503,23 @@ const PREVIEW_DIMS = {
   cart_signs: { w: 8.5 * 96, h: 11 * 96 },
   cards:      { w: 8.5 * 96, h: 11 * 96 },
   tee_sheet:  { w: 8.5 * 96, h: 11 * 96 },
+  checkin_qr: { w: 8.5 * 96, h: 11 * 96 },
 }
 const PREVIEW_SCALE = {
   cart_signs: 0.68,
   cards:      0.68,
   tee_sheet:  0.68,
+  checkin_qr: 0.68,
 }
 
 const TITLES = {
   cards:      'CTP & Long Drive Cards',
   tee_sheet:  'Tee Sheet',
   cart_signs: 'Cart Signs',
+  checkin_qr: 'Check-In QR Sign',
 }
 
-export default function PrintAssets({ type, event, eventPlayers = [], tglSelections = [], onClose }) {
+export default function PrintAssets({ type, event, eventPlayers = [], tglSelections = [], orgSlug, leagueSlug, onClose }) {
   const league     = event?.league ?? {}
   const logoUrl    = league.logo_url ?? null
   const leagueName = league.name ?? ''
@@ -454,13 +533,24 @@ export default function PrintAssets({ type, event, eventPlayers = [], tglSelecti
   const [downloadingPng,  setDownloadingPng]  = useState(false)
   const [downloadingReel, setDownloadingReel] = useState(false)
   const [showReel,        setShowReel]        = useState(false)
+  const [checkinQrDataUrl, setCheckinQrDataUrl] = useState(null)
+
+  useEffect(() => {
+    if (type !== 'checkin_qr' || !event?.slug || !leagueSlug || !orgSlug) return
+    let cancelled = false
+    const optInUrl = `${window.location.origin}/${orgSlug}/${leagueSlug}/${event.slug}/opt-in`
+    QRCode.toDataURL(optInUrl, { width: 500, margin: 1, color: { dark: GREEN, light: '#ffffff' } })
+      .then(dataUrl => { if (!cancelled) setCheckinQrDataUrl(dataUrl) })
+    return () => { cancelled = true }
+  }, [type, orgSlug, leagueSlug, event?.slug])
 
   const handleDownloadPng = async () => {
     if (!pngRef.current || downloadingPng) return
     setDownloadingPng(true)
     try {
       const dataUrl = await toPng(pngRef.current, { pixelRatio: 2, cacheBust: true, backgroundColor: '#ffffff' })
-      downloadPng(dataUrl, `tee-sheet-${event?.event_number ?? 'event'}.png`)
+      const filename = type === 'checkin_qr' ? `checkin-qr-${event?.event_number ?? 'event'}.png` : `tee-sheet-${event?.event_number ?? 'event'}.png`
+      downloadPng(dataUrl, filename)
     } finally {
       setDownloadingPng(false)
     }
@@ -574,6 +664,19 @@ export default function PrintAssets({ type, event, eventPlayers = [], tglSelecti
     }
   }
 
+  // ── Check-In QR Sign ──────────────────────────────────────────────────────
+  const checkinGames = type === 'checkin_qr'
+    ? [...new Set((event?.side_game_options ?? []).map(k => k.replace(/_[ab]$/, '')))]
+        .filter(k => OPT_IN_GAME_KEYS.has(k))
+        .map(k => ({ key: k, label: OPT_IN_GAME_LABELS[k], amount: optInAmount(event, k) }))
+        .filter(g => g.amount != null)
+    : []
+
+  if (type === 'checkin_qr' && checkinGames.length > 0 && checkinQrDataUrl) {
+    printNodes = [<CheckinQrPage key="checkin_qr" event={event} games={checkinGames} qrDataUrl={checkinQrDataUrl} />]
+    itemCount  = 1
+  }
+
   // ── Print CSS ─────────────────────────────────────────────────────────────
   useEffect(() => {
     const size  = PAGE_SIZE[type] ?? '8.5in 11in'
@@ -597,6 +700,8 @@ export default function PrintAssets({ type, event, eventPlayers = [], tglSelecti
       ? "Enable CTP, Long Drive, or add custom competitions in the event's Side Games to generate cards."
       : type === 'cart_signs'
       ? 'Assign players to groups in the Groups tab first.'
+      : type === 'checkin_qr'
+      ? (checkinGames.length > 0 ? 'Generating QR code…' : "No opt-in side games (Super Skins, Super CTP, Blind Partners) are configured for this event.")
       : 'No data to print.'
 
     return (
@@ -611,7 +716,7 @@ export default function PrintAssets({ type, event, eventPlayers = [], tglSelecti
   }
 
   const pageCount = printNodes.length
-  const subtitle  = type === 'tee_sheet'
+  const subtitle  = type === 'tee_sheet' || type === 'checkin_qr'
     ? '1 page · 8.5" × 11"'
     : type === 'cart_signs'
     ? `${itemCount} sign${itemCount !== 1 ? 's' : ''} · ${pageCount} page${pageCount !== 1 ? 's' : ''} · 8.5" × 11"`
@@ -652,6 +757,23 @@ export default function PrintAssets({ type, event, eventPlayers = [], tglSelecti
                   style={{ background: GREEN }}
                 >
                   🖨 Download PDF
+                </button>
+              </>
+            ) : type === 'checkin_qr' ? (
+              <>
+                <button
+                  onClick={handleDownloadPng}
+                  disabled={downloadingPng}
+                  className="px-4 py-1.5 rounded-lg text-sm bg-gray-100 text-gray-700 hover:bg-gray-200 font-medium disabled:opacity-50"
+                >
+                  {downloadingPng ? 'Generating…' : '⬇ Download PNG'}
+                </button>
+                <button
+                  onClick={() => window.print()}
+                  className="px-4 py-1.5 rounded-lg text-sm text-white font-medium"
+                  style={{ background: GREEN }}
+                >
+                  🖨 Print
                 </button>
               </>
             ) : (
@@ -713,6 +835,16 @@ export default function PrintAssets({ type, event, eventPlayers = [], tglSelecti
         <div style={{ position: 'fixed', top: '-99999px', left: '-99999px', pointerEvents: 'none', zIndex: -1 }}>
           <div ref={pngRef}>
             <TeeSheetPage forPng event={event} eventPlayers={eventPlayers} tglSelections={tglSelections} />
+          </div>
+        </div>,
+        document.body
+      )}
+
+      {/* Off-screen render for Check-In QR sign PNG capture */}
+      {type === 'checkin_qr' && checkinQrDataUrl && createPortal(
+        <div style={{ position: 'fixed', top: '-99999px', left: '-99999px', pointerEvents: 'none', zIndex: -1 }}>
+          <div ref={pngRef}>
+            <CheckinQrPage event={event} games={checkinGames} qrDataUrl={checkinQrDataUrl} />
           </div>
         </div>,
         document.body
