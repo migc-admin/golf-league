@@ -827,23 +827,25 @@ function ImportRoster() {
         .eq('player_id', playerId)
         .maybeSingle()
 
+      // Course handicap: manual value wins; otherwise auto-calc from slope/rating/par.
+      // Recomputed here (not just on insert) so a re-imported handicap_index always
+      // overrides a previously stored course_handicap instead of leaving it stale.
+      let course_handicap = chManual
+      if (course_handicap === null && hi !== null && eventCourse) {
+        const { slope, rating, par } = eventCourse
+        course_handicap = Math.round((hi * slope / 113) + (rating - par))
+      }
+
       if (alreadyOn) {
-        // Update handicap/flight instead of skipping
+        // Uploaded values always override whatever was previously submitted
         await supabase.from('event_players').update({
           ...(hi !== null ? { handicap_index: hi, adjusted_handicap_index: hi } : {}),
-          ...(chManual !== null ? { course_handicap: chManual } : {}),
+          ...(course_handicap !== null ? { course_handicap } : {}),
           ...(flight ? { flight } : {}),
         }).eq('event_id', eventId).eq('player_id', playerId)
         updated[i] = { ...row, _status: 'matched', _message: null }
         setRows([...updated])
         continue
-      }
-
-      // Course handicap auto-calc
-      let course_handicap = chManual
-      if (course_handicap === null && hi !== null && eventCourse) {
-        const { slope, rating, par } = eventCourse
-        course_handicap = Math.round((hi * slope / 113) + (rating - par))
       }
 
       const { error: epErr } = await supabase.from('event_players').insert({
