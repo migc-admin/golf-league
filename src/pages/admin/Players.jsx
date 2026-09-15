@@ -407,7 +407,7 @@ export default function Players() {
                             )}
                           </td>
                           <td className="px-4 py-3 font-medium text-gray-900 whitespace-nowrap">
-                            {p.last_name}, {p.first_name}
+                            {p.first_name} {p.last_name}
                           </td>
                           <td className="px-4 py-3 text-gray-600">
                             {p.email || <span className="text-gray-300">—</span>}
@@ -737,7 +737,7 @@ function MergePlayerModal({ open, onClose, source, players, onMerge }) {
         <div>
           <label className="label">Duplicate (will be deleted)</label>
           <div className="input bg-gray-50 text-gray-700">
-            {source ? `${source.last_name}, ${source.first_name}${source.email ? ` — ${source.email}` : ''}` : '—'}
+            {source ? `${source.first_name} ${source.last_name}${source.email ? ` — ${source.email}` : ''}` : '—'}
           </div>
         </div>
 
@@ -752,7 +752,7 @@ function MergePlayerModal({ open, onClose, source, players, onMerge }) {
             <option value="">— Select player to keep —</option>
             {options.map(p => (
               <option key={p.id} value={p.id}>
-                {p.last_name}, {p.first_name}{p.email ? ` — ${p.email}` : ''}
+                {p.first_name} {p.last_name}{p.email ? ` — ${p.email}` : ''}
               </option>
             ))}
           </select>

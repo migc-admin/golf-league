@@ -184,28 +184,28 @@ export default function LeagueHome({ orgSlug, leagueSlug, initialTab = 'events' 
                   {moneyLeader && (
                     <StatCard
                       label="Money Leader"
-                      value={`${moneyLeader.player?.last_name}, ${moneyLeader.player?.first_name}`}
+                      value={`${moneyLeader.player?.first_name} ${moneyLeader.player?.last_name}`}
                       sub={`$${moneyLeader.totalEarnings.toFixed(2)}`}
                     />
                   )}
                   {hasSkins && skinsLeader && (
                     <StatCard
                       label="Skins Leader"
-                      value={`${skinsLeader.player?.last_name}, ${skinsLeader.player?.first_name}`}
+                      value={`${skinsLeader.player?.first_name} ${skinsLeader.player?.last_name}`}
                       sub={`${skinsLeader.skinsWon} skin${skinsLeader.skinsWon !== 1 ? 's' : ''} won`}
                     />
                   )}
                   {hasCTP && ctpLeader && (
                     <StatCard
                       label="CTP Leader"
-                      value={`${ctpLeader.player?.last_name}, ${ctpLeader.player?.first_name}`}
+                      value={`${ctpLeader.player?.first_name} ${ctpLeader.player?.last_name}`}
                       sub={`${ctpLeader.ctpWins} win${ctpLeader.ctpWins !== 1 ? 's' : ''}`}
                     />
                   )}
                   {hasLD && ldLeader && (
                     <StatCard
                       label="Long Drive Leader"
-                      value={`${ldLeader.player?.last_name}, ${ldLeader.player?.first_name}`}
+                      value={`${ldLeader.player?.first_name} ${ldLeader.player?.last_name}`}
                       sub={`${ldLeader.ldWins} win${ldLeader.ldWins !== 1 ? 's' : ''}`}
                     />
                   )}

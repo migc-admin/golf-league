@@ -1965,7 +1965,7 @@ function AddPlayerModal({ open, onClose, eventId, available, course, defaultTeeN
                     className="accent-fairway-600 w-4 h-4 shrink-0"
                   />
                   <span className="text-sm font-medium text-gray-800 flex-1 min-w-0 truncate">
-                    {p.last_name}, {p.first_name}
+                    {p.first_name} {p.last_name}
                   </span>
                   {checked && (
                     <>
@@ -2092,6 +2092,22 @@ function MatchPairingsManager({ event, eventId, eventPlayers }) {
 
   const unpairedPlayers = eventPlayers.filter(ep => !pairedIds.has(ep.player_id))
 
+  // Alphabetical (first name, then last name) rather than handicap order — easier to scan in the dropdowns
+  const sortedUnpaired = [...unpairedPlayers].sort((a, b) => {
+    const nameA = `${a.player?.first_name ?? ''} ${a.player?.last_name ?? ''}`.trim().toLowerCase()
+    const nameB = `${b.player?.first_name ?? ''} ${b.player?.last_name ?? ''}`.trim().toLowerCase()
+    return nameA.localeCompare(nameB)
+  })
+
+  // Course handicap lookup by player id, used to show relative match-play strokes
+  const epByPlayerId = Object.fromEntries(eventPlayers.map(ep => [ep.player_id, ep]))
+  function relativeStrokes(playerAId, playerBId) {
+    const chA = epByPlayerId[playerAId]?.course_handicap ?? 0
+    const chB = epByPlayerId[playerBId]?.course_handicap ?? 0
+    const baseline = Math.min(chA, chB)
+    return { relA: Math.max(0, chA - baseline), relB: Math.max(0, chB - baseline) }
+  }
+
   async function addPairing() {
     if (!playerAId || !playerBId || playerAId === playerBId) {
       toast.error('Select two different players')
@@ -2131,7 +2147,7 @@ function MatchPairingsManager({ event, eventId, eventPlayers }) {
   }
 
   function playerName(ep) {
-    return `${ep.player?.last_name ?? ''}, ${ep.player?.first_name ?? ''} (CH: ${ep.course_handicap ?? '—'})`
+    return `${ep.player?.first_name ?? ''} ${ep.player?.last_name ?? ''} (CH: ${ep.course_handicap ?? '—'})`
   }
 
   return (
@@ -2175,23 +2191,26 @@ function MatchPairingsManager({ event, eventId, eventPlayers }) {
           <p className="px-4 py-4 text-sm text-gray-400">No pairings assigned yet.</p>
         ) : (
           <div className="divide-y divide-gray-100">
-            {pairings.map(p => (
-              <div key={p.id} className="flex items-center justify-between px-4 py-3">
-                <div className="text-sm text-gray-800">
-                  <span className="font-semibold text-blue-700">
-                    {p.playerA?.last_name}, {p.playerA?.first_name}
-                  </span>
-                  {' '}
-                  <span className="text-gray-400">vs</span>
-                  {' '}
-                  <span className="font-semibold text-purple-700">
-                    {p.playerB?.last_name}, {p.playerB?.first_name}
-                  </span>
-                  <span className="ml-3 text-xs text-gray-400">Match #{p.match_number}</span>
+            {pairings.map(p => {
+              const { relA, relB } = relativeStrokes(p.player_a_id, p.player_b_id)
+              return (
+                <div key={p.id} className="flex items-center justify-between px-4 py-3">
+                  <div className="text-sm text-gray-800">
+                    <span className="font-semibold text-blue-700">
+                      {p.playerA?.first_name} {p.playerA?.last_name}{relA > 0 ? ` (${relA})` : ''}
+                    </span>
+                    {' '}
+                    <span className="text-gray-400">vs</span>
+                    {' '}
+                    <span className="font-semibold text-purple-700">
+                      {p.playerB?.first_name} {p.playerB?.last_name}{relB > 0 ? ` (${relB})` : ''}
+                    </span>
+                    <span className="ml-3 text-xs text-gray-400">Match #{p.match_number}</span>
+                  </div>
+                  <Button size="sm" variant="danger" onClick={() => deletePairing(p.id)}>Remove</Button>
                 </div>
-                <Button size="sm" variant="danger" onClick={() => deletePairing(p.id)}>Remove</Button>
-              </div>
-            ))}
+              )
+            })}
           </div>
         )}
       </div>
@@ -2212,7 +2231,7 @@ function MatchPairingsManager({ event, eventId, eventPlayers }) {
                   onChange={e => setPlayerAId(e.target.value)}
                 >
                   <option value="">Select player…</option>
-                  {eventPlayers
+                  {sortedUnpaired
                     .filter(ep => ep.player_id !== playerBId)
                     .map(ep => (
                       <option key={ep.player_id} value={ep.player_id}>{playerName(ep)}</option>
@@ -2227,7 +2246,7 @@ function MatchPairingsManager({ event, eventId, eventPlayers }) {
                   onChange={e => setPlayerBId(e.target.value)}
                 >
                   <option value="">Select player…</option>
-                  {eventPlayers
+                  {sortedUnpaired
                     .filter(ep => ep.player_id !== playerAId)
                     .map(ep => (
                       <option key={ep.player_id} value={ep.player_id}>{playerName(ep)}</option>
@@ -2992,10 +3011,11 @@ function TabPayoutConfig({ event, eventPlayers, course, onUpdated }) {
   }
 
   function getMultiplier(key) {
-    // Opt-in pots are funded only by the players who bought in
-    if (key === 'super_skins' || key.startsWith('super_skins_')) return sideGameEntries.super_skins?.length ?? totalPlayers
-    if (key.startsWith('super_ctp_')) return sideGameEntries.super_ctp?.length ?? totalPlayers
-    if (key === 'blind_partners') return sideGameEntries.blind_partners?.length ?? totalPlayers
+    // Opt-in pots are funded only by the players who bought in — never fall back
+    // to the full field, since an empty/unset entrant list means zero entrants.
+    if (key === 'super_skins' || key.startsWith('super_skins_')) return sideGameEntries.super_skins?.length ?? 0
+    if (key === 'super_ctp' || key.startsWith('super_ctp_')) return sideGameEntries.super_ctp?.length ?? 0
+    if (key === 'blind_partners') return sideGameEntries.blind_partners?.length ?? 0
     // Full-field keys
     if (key === 'low_putts' || key.startsWith('ctp_') || key === 'skins' || key === 'long_drive') return totalPlayers
     if (!hasFlights && (key.startsWith('18_net_') || key.startsWith('18_gross_') || key.startsWith('f9_') || key.startsWith('b9_') || key.startsWith('stf_net_'))) return totalPlayers
@@ -3022,7 +3042,7 @@ function TabPayoutConfig({ event, eventPlayers, course, onUpdated }) {
     const total = (val || 0) * mult
     const label = getCategoryLabel(key)
     const isOptIn = key === 'super_skins' || key.startsWith('super_skins_')
-      || key.startsWith('super_ctp_') || key === 'blind_partners'
+      || key === 'super_ctp' || key.startsWith('super_ctp_') || key === 'blind_partners'
     // Determine flight letter
     const flMatch = hasFlights && key.match(/(?:skins|super_ctp|long_drive|low_putts|18_net|18_gross|stf_net|f9|b9)_([a-z])(?:_|$)/)
     const flLetter = flMatch ? flMatch[1].toUpperCase() : null
@@ -3237,9 +3257,7 @@ function PayoutTable({ rows, onChange, colLabel }) {
 
 // ─── Tab: Side Games ──────────────────────────────────────────────
 function BlindPartnersCard({ event, eventPlayers, optedInIds = [], onUpdated }) {
-  const drawPool = optedInIds.length > 0
-    ? eventPlayers.filter(ep => optedInIds.includes(ep.player_id))
-    : eventPlayers
+  const drawPool = eventPlayers.filter(ep => optedInIds.includes(ep.player_id))
 
   // Restore previously drawn pairs and odd-player config from DB
   const savedPairs = event.side_game_entries?.blind_partner_pairs ?? []
@@ -3301,7 +3319,7 @@ function BlindPartnersCard({ event, eventPlayers, optedInIds = [], onUpdated }) 
 
   return (
     <Card>
-      <CardHeader title="Blind Partners" subtitle="All players are included — draw to assign pairs. Results appear on the leaderboard." />
+      <CardHeader title="Blind Partners" subtitle="Only opted-in players are entered — draw to assign pairs. Results appear on the leaderboard." />
       <div className="space-y-4">
         {/* Entrant list */}
         <div>
@@ -3309,7 +3327,7 @@ function BlindPartnersCard({ event, eventPlayers, optedInIds = [], onUpdated }) 
             Entrants ({drawPool.length})
           </div>
           {drawPool.length === 0 ? (
-            <p className="text-sm text-gray-400 italic">No players in this event yet.</p>
+            <p className="text-sm text-gray-400 italic">No players have opted in yet.</p>
           ) : (
             <div className="grid grid-cols-2 gap-1 mb-3">
               {drawPool.map(ep => {
@@ -3764,9 +3782,7 @@ function TabSideGames({ event, eventPlayers, course, sideGames, sideGameEntries 
         const perFlight = hasSuperCtpA || hasSuperCtpB
         const holeLabel = superCtpDesignatedHole ? `Hole ${superCtpDesignatedHole}` : 'No hole designated'
         const optedInIds = sideGameEntries.super_ctp ?? []
-        const ctpPool = optedInIds.length > 0
-          ? eventPlayers.filter(ep => optedInIds.includes(ep.player_id))
-          : eventPlayers
+        const ctpPool = eventPlayers.filter(ep => optedInIds.includes(ep.player_id))
         return (
           <Card>
             <CardHeader title="Super CTP" subtitle={holeLabel} />
@@ -3905,7 +3921,7 @@ function TabPayoutSummary({ event, eventPlayers, allScores, sideGames, course })
                 <div key={playerId} className="px-5 py-3">
                   <div className="flex items-center justify-between">
                     <span className="font-medium text-sm text-gray-900">
-                      {p ? `${p.last_name}, ${p.first_name}` : playerId}
+                      {p ? `${p.first_name} ${p.last_name}` : playerId}
                     </span>
                     <span className="font-bold text-fairway-700">${total.toFixed(2)}</span>
                   </div>
@@ -3937,7 +3953,7 @@ function TabPayoutSummary({ event, eventPlayers, allScores, sideGames, course })
                 <div>
                   <div className="text-sm text-gray-700">{cat.label}</div>
                   <div className="text-xs text-gray-400">
-                    {p ? `${p.last_name}, ${p.first_name}` : '— Unresolved'}
+                    {p ? `${p.first_name} ${p.last_name}` : '— Unresolved'}
                   </div>
                 </div>
                 <span className="font-semibold text-sm text-gray-900">${cat.amount.toFixed(2)}</span>

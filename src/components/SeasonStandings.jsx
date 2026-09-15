@@ -230,7 +230,7 @@ export function MoneyList({ standings, events }) {
                   <td className="px-4 py-3 text-base">{medals[i] ?? i + 1}</td>
                   <td className="px-4 py-3 font-semibold text-ink">
                     <span className="flex items-center gap-1.5">
-                      {s.player?.last_name}, {s.player?.first_name}
+                      {s.player?.first_name} {s.player?.last_name}
                       <svg className="w-3 h-3 text-gray-400 transition-transform" style={{ transform: isExpanded ? 'rotate(180deg)' : '' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
                       </svg>
@@ -297,7 +297,7 @@ export function SideGameTable({ stats, hasSkins, hasCTP, hasLD }) {
             const sideTotal = s.skinsTotal + s.ctpTotal + s.ldTotal + s.lpTotal
             return (
               <tr key={s.player?.id ?? i} style={{ borderBottom: '1px solid #ebe9e4', background: i % 2 === 1 ? 'rgba(27,67,50,0.025)' : '#ffffff' }}>
-                <td className="px-4 py-3 font-semibold text-ink">{s.player?.last_name}, {s.player?.first_name}</td>
+                <td className="px-4 py-3 font-semibold text-ink">{s.player?.first_name} {s.player?.last_name}</td>
                 {hasSkins && <td className="px-4 py-3 text-center text-ink-muted">{s.skinsWon || '—'}</td>}
                 {hasCTP   && <td className="px-4 py-3 text-center text-ink-muted">{s.ctpWins  || '—'}</td>}
                 {hasLD    && <td className="px-4 py-3 text-center text-ink-muted">{s.ldWins   || '—'}</td>}

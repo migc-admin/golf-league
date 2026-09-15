@@ -155,10 +155,9 @@ export function computeAllSkins(eventPlayers, allScores, course) {
  */
 export function computeSuperSkins(event, eventPlayers, allScores, course) {
   const optedIn = event?.side_game_entries?.super_skins ?? []
-  const pool = (optedIn.length > 0
-    ? eventPlayers.filter(ep => optedIn.includes(ep.player_id))
-    : eventPlayers
-  ).map(ep => ({ ...ep, flight: 'A' }))
+  const pool = eventPlayers
+    .filter(ep => optedIn.includes(ep.player_id))
+    .map(ep => ({ ...ep, flight: 'A' }))
   if (pool.length === 0) return null
   return computeSkinsForFlight(pool, allScores, course, 'A')
 }

@@ -707,7 +707,7 @@ function NetLeaderboard({ complete, inProgress, flight, vsParKey = 'netVsPar', g
             <span className="text-sm font-semibold text-ink-muted tabular-nums">{p.mergedRankLabel}</span>
             <div>
               <div className="font-semibold text-sm text-ink leading-tight">
-                {p.player?.last_name}, {p.player?.first_name}
+                {p.player?.first_name} {p.player?.last_name}
               </div>
               <div className="text-[10px] text-ink-muted mt-0.5">
                 CH {p[handicapKey] ?? p.course_handicap} · Gross {p[grossKey] ?? '—'}
@@ -737,7 +737,7 @@ function NetLeaderboard({ complete, inProgress, flight, vsParKey = 'netVsPar', g
               <span className="text-xs text-amber-600 font-semibold">—</span>
               <div>
                 <div className="font-semibold text-sm text-ink leading-tight">
-                  {p.player?.last_name}, {p.player?.first_name}
+                  {p.player?.first_name} {p.player?.last_name}
                 </div>
                 <div className="text-[10px] text-amber-600 mt-0.5">No Show</div>
               </div>
@@ -761,7 +761,7 @@ function NetLeaderboard({ complete, inProgress, flight, vsParKey = 'netVsPar', g
               <span className="text-xs text-ink-muted font-semibold">—</span>
               <div>
                 <div className="font-semibold text-sm text-ink leading-tight">
-                  {ep.player?.last_name}, {ep.player?.first_name}
+                  {ep.player?.first_name} {ep.player?.last_name}
                 </div>
                 <div className="text-[10px] text-ink-muted mt-0.5">CH {ep.course_handicap ?? '—'}</div>
               </div>
@@ -821,7 +821,7 @@ function PuttLeaderboard({ data, playerMap, allScores = [], course = null }) {
         >
           <span className="text-sm font-semibold text-ink-muted tabular-nums">{p.rankLabel}</span>
           <div className="font-medium text-sm text-ink">
-            {p.player?.last_name}, {p.player?.first_name}
+            {p.player?.first_name} {p.player?.last_name}
           </div>
           <span className="text-sm font-black tabular-nums text-status-active-text text-right">{p.totalPutts}</span>
         </div>
@@ -871,7 +871,7 @@ function SuperSkinsBoard({ event, eventPlayers, allScores, course, playerMap }) 
                 return (
                   <div key={pid} className="flex items-center justify-between px-4 py-3" style={{ borderBottom: '1px solid #ebe9e4' }}>
                     <span className="font-medium text-sm text-ink">
-                      {p ? `${p.last_name}, ${p.first_name}` : pid}
+                      {p ? `${p.first_name} ${p.last_name}` : pid}
                     </span>
                     <span className="font-black text-status-active-text text-lg">{count} skin{count !== 1 ? 's' : ''}</span>
                   </div>
@@ -900,7 +900,7 @@ function SuperSkinsBoard({ event, eventPlayers, allScores, course, playerMap }) 
                 {h.winner && (
                   <>
                     <span className="text-xs text-status-active-text font-semibold">
-                      {winner ? `${winner.last_name}, ${winner.first_name}` : h.winner}
+                      {winner ? `${winner.first_name} ${winner.last_name}` : h.winner}
                     </span>
                     <span className="ml-auto text-xs font-bold text-ink-muted">
                       {h.skinsWon} skin{h.skinsWon !== 1 ? 's' : ''}
@@ -1028,7 +1028,7 @@ function SkinsBoard({ skinsResults, playerMap }) {
                 return (
                   <div key={pid} className="flex items-center justify-between px-4 py-3" style={{ borderBottom: '1px solid #ebe9e4' }}>
                     <span className="font-medium text-sm text-ink">
-                      {p ? `${p.last_name}, ${p.first_name}` : pid}
+                      {p ? `${p.first_name} ${p.last_name}` : pid}
                     </span>
                     <span className="font-black text-status-active-text text-lg">{count} skin{count !== 1 ? 's' : ''}</span>
                   </div>
@@ -1059,7 +1059,7 @@ function SkinsBoard({ skinsResults, playerMap }) {
                 {h.winner && (
                   <>
                     <span className="text-xs text-status-active-text font-semibold">
-                      {winner ? `${winner.last_name}, ${winner.first_name}` : h.winner}
+                      {winner ? `${winner.first_name} ${winner.last_name}` : h.winner}
                     </span>
                     <span className="ml-auto text-xs font-bold text-ink-muted">
                       {h.skinsWon} skin{h.skinsWon !== 1 ? 's' : ''}
@@ -1116,7 +1116,7 @@ function StablefordLeaderboard({ data, activeFlight, allScores = [], course = nu
             <span className="text-sm font-semibold text-ink-muted tabular-nums">{rankLabel(p)}</span>
             <div>
               <div className="font-semibold text-sm text-ink leading-tight">
-                {p.player?.last_name}, {p.player?.first_name}
+                {p.player?.first_name} {p.player?.last_name}
               </div>
               <div className="text-[10px] text-ink-muted mt-0.5">
                 CH {p.course_handicap} · {p.holesPlayed} holes
@@ -1184,7 +1184,7 @@ function NassauBoard({ leaderboards, event, activeFlight }) {
                   bet.list.filter(p => p.rank === 1).map(p => (
                     <div key={p.player_id} className="px-3 py-2.5 border-b border-[#ebe9e4] last:border-0">
                       <div className="font-semibold text-sm text-ink leading-tight">
-                        {p.player?.last_name}, {p.player?.first_name}
+                        {p.player?.first_name} {p.player?.last_name}
                       </div>
                       <div className="text-[10px] text-ink-muted mt-0.5">{p[bet.scoreKey]} · leader</div>
                     </div>
@@ -1229,11 +1229,18 @@ function compactSideColor(side, entity) {
   if (side === 'A') {
     if (isWinner) return 'bg-blue-700 text-white'
     if (isLeading) return 'bg-blue-500 text-white'
-    return 'text-gray-900'
+    return 'bg-blue-50 text-gray-900'
   }
   if (isWinner) return 'bg-red-700 text-white'
   if (isLeading) return 'bg-red-500 text-white'
-  return 'text-gray-900'
+  return 'bg-red-50 text-gray-900'
+}
+
+// Player name with match-play strokes (relative to the lower-handicap
+// opponent) shown in parentheses — omitted entirely when no strokes are given.
+function matchPlayerLabel(ep, relHandicap) {
+  const name = `${ep?.player?.first_name ?? ''} ${ep?.player?.last_name ?? ''}`.trim()
+  return relHandicap > 0 ? `${name} (${relHandicap})` : name
 }
 
 // ─── Match Points Board ───────────────────────────────────────────
@@ -1312,23 +1319,23 @@ function MatchPointsBoard({ matchData, event }) {
             {/* Compact row — click to expand */}
             <button type="button" onClick={() => toggle(idx)} className="w-full text-left cursor-pointer">
               <div className="flex items-stretch">
-                <div className="w-14 flex-shrink-0 flex items-center justify-center bg-blue-50 text-xs font-bold text-blue-700">
+                <div className={`w-8 sm:w-14 flex-shrink-0 flex items-center justify-center text-xs font-bold ${compactSideColor('A', pair)}`}>
                   {leftEdge}
                 </div>
-                <div className={`flex-1 min-w-0 px-3 py-3 flex items-center justify-end text-right ${compactSideColor('A', pair)}`}>
-                  <span className="text-sm font-semibold truncate">
-                    {pair.playerA.player?.last_name}, {pair.playerA.player?.first_name}
+                <div className={`flex-1 min-w-0 px-2 sm:px-3 py-3 flex items-center justify-end text-right ${compactSideColor('A', pair)}`}>
+                  <span className="text-sm font-semibold break-words leading-tight">
+                    {matchPlayerLabel(pair.playerA, pair.relHandicapA)}
                   </span>
                 </div>
-                <div className="flex items-center justify-center px-3 bg-gray-900 text-white text-xs font-bold whitespace-nowrap">
+                <div className="flex items-center justify-center px-2 sm:px-3 bg-gray-900 text-white text-xs font-bold whitespace-nowrap">
                   {middleLabel}
                 </div>
-                <div className={`flex-1 min-w-0 px-3 py-3 flex items-center justify-start text-left ${compactSideColor('B', pair)}`}>
-                  <span className="text-sm font-semibold truncate">
-                    {pair.playerB.player?.last_name}, {pair.playerB.player?.first_name}
+                <div className={`flex-1 min-w-0 px-2 sm:px-3 py-3 flex items-center justify-start text-left ${compactSideColor('B', pair)}`}>
+                  <span className="text-sm font-semibold break-words leading-tight">
+                    {matchPlayerLabel(pair.playerB, pair.relHandicapB)}
                   </span>
                 </div>
-                <div className="w-14 flex-shrink-0 flex items-center justify-center bg-red-50 text-xs font-bold text-red-700">
+                <div className={`w-8 sm:w-14 flex-shrink-0 flex items-center justify-center text-xs font-bold ${compactSideColor('B', pair)}`}>
                   {rightEdge}
                 </div>
                 <div className="flex items-center px-2 text-gray-400 flex-shrink-0">
@@ -1353,7 +1360,7 @@ function MatchPointsBoard({ matchData, event }) {
                   <div className={`flex-1 px-4 py-3 ${leaderSide === 'A' || pair.winner === 'A' ? stylesA.bg : ''}`}>
                     {labelA && <div className={`text-xs font-bold ${stylesA.label} mb-0.5`}>{labelA}</div>}
                     <div className="font-semibold text-sm text-gray-900 leading-tight">
-                      {pair.playerA.player?.last_name}, {pair.playerA.player?.first_name}
+                      {matchPlayerLabel(pair.playerA, pair.relHandicapA)}
                     </div>
                     <div className="text-xs text-gray-400">CH {pair.playerA.course_handicap ?? '—'}</div>
                     {pair.holesPlayed > 0 && (
@@ -1370,7 +1377,7 @@ function MatchPointsBoard({ matchData, event }) {
                   <div className={`flex-1 px-4 py-3 ${leaderSide === 'B' || pair.winner === 'B' ? stylesB.bg : ''}`}>
                     {labelB && <div className={`text-xs font-bold ${stylesB.label} mb-0.5`}>{labelB}</div>}
                     <div className="font-semibold text-sm text-gray-900 leading-tight">
-                      {pair.playerB.player?.last_name}, {pair.playerB.player?.first_name}
+                      {matchPlayerLabel(pair.playerB, pair.relHandicapB)}
                     </div>
                     <div className="text-xs text-gray-400">CH {pair.playerB.course_handicap ?? '—'}</div>
                     {pair.holesPlayed > 0 && (
@@ -1486,23 +1493,23 @@ function TeamMatchBoard({ teamMatchData, teamAName = 'Team A', teamBName = 'Team
             {/* Compact row — click to expand */}
             <button type="button" onClick={() => toggle(idx)} className="w-full text-left cursor-pointer">
               <div className="flex items-stretch">
-                <div className="w-14 flex-shrink-0 flex items-center justify-center bg-blue-50 text-xs font-bold text-blue-700">
+                <div className={`w-8 sm:w-14 flex-shrink-0 flex items-center justify-center text-xs font-bold ${compactSideColor('A', match)}`}>
                   {leftEdge}
                 </div>
-                <div className={`flex-1 min-w-0 px-3 py-3 flex items-center justify-end text-right ${compactSideColor('A', match)}`}>
-                  <span className="text-sm font-semibold truncate">
+                <div className={`flex-1 min-w-0 px-2 sm:px-3 py-3 flex items-center justify-end text-right ${compactSideColor('A', match)}`}>
+                  <span className="text-sm font-semibold break-words leading-tight">
                     {namesA}
                   </span>
                 </div>
-                <div className="flex items-center justify-center px-3 bg-gray-900 text-white text-xs font-bold whitespace-nowrap">
+                <div className="flex items-center justify-center px-2 sm:px-3 bg-gray-900 text-white text-xs font-bold whitespace-nowrap">
                   {middleLabel}
                 </div>
-                <div className={`flex-1 min-w-0 px-3 py-3 flex items-center justify-start text-left ${compactSideColor('B', match)}`}>
-                  <span className="text-sm font-semibold truncate">
+                <div className={`flex-1 min-w-0 px-2 sm:px-3 py-3 flex items-center justify-start text-left ${compactSideColor('B', match)}`}>
+                  <span className="text-sm font-semibold break-words leading-tight">
                     {namesB}
                   </span>
                 </div>
-                <div className="w-14 flex-shrink-0 flex items-center justify-center bg-red-50 text-xs font-bold text-red-700">
+                <div className={`w-8 sm:w-14 flex-shrink-0 flex items-center justify-center text-xs font-bold ${compactSideColor('B', match)}`}>
                   {rightEdge}
                 </div>
                 <div className="flex items-center px-2 text-gray-400 flex-shrink-0">
@@ -1526,8 +1533,10 @@ function TeamMatchBoard({ teamMatchData, teamAName = 'Team A', teamBName = 'Team
                     <div className="text-xs font-bold text-blue-600 mb-1">{teamAName}</div>
                     {match.teamA.map(ep => (
                       <div key={ep.player_id} className="text-sm text-gray-800 leading-snug">
-                        {ep.player?.last_name}, {ep.player?.first_name}
-                        <span className="text-xs text-gray-400 ml-1">({match.relCH[ep.player_id]} rel. strokes)</span>
+                        {ep.player?.first_name} {ep.player?.last_name}
+                        {match.relCH[ep.player_id] > 0 && (
+                          <span className="text-xs text-gray-400 ml-1">({match.relCH[ep.player_id]})</span>
+                        )}
                       </div>
                     ))}
                     {match.holesPlayed > 0 && (
@@ -1544,8 +1553,10 @@ function TeamMatchBoard({ teamMatchData, teamAName = 'Team A', teamBName = 'Team
                     <div className="text-xs font-bold text-red-600 mb-1">{teamBName}</div>
                     {match.teamB.map(ep => (
                       <div key={ep.player_id} className="text-sm text-gray-800 leading-snug">
-                        {ep.player?.last_name}, {ep.player?.first_name}
-                        <span className="text-xs text-gray-400 ml-1">({match.relCH[ep.player_id]} rel. strokes)</span>
+                        {ep.player?.first_name} {ep.player?.last_name}
+                        {match.relCH[ep.player_id] > 0 && (
+                          <span className="text-xs text-gray-400 ml-1">({match.relCH[ep.player_id]})</span>
+                        )}
                       </div>
                     ))}
                     {match.holesPlayed > 0 && (
@@ -1663,7 +1674,7 @@ function PayoutsBoard({ event, eventPlayers, leaderboards, sideGames, skinsResul
                   <div className="text-sm text-ink">{cat.label}</div>
                   <div className="text-xs text-ink-muted">
                     {winners.length > 0
-                      ? winners.map(p => `${p.last_name}, ${p.first_name}`).join(' · ')
+                      ? winners.map(p => `${p.first_name} ${p.last_name}`).join(' · ')
                       : '— Unresolved'}
                   </div>
                 </div>
@@ -1690,7 +1701,7 @@ function PayoutsBoard({ event, eventPlayers, leaderboards, sideGames, skinsResul
                 <div key={playerId} className="px-4 py-3" style={{ borderBottom: '1px solid #ebe9e4' }}>
                   <div className="flex items-center justify-between">
                     <span className="font-semibold text-ink">
-                      {p ? `${p.last_name}, ${p.first_name}` : '—'}
+                      {p ? `${p.first_name} ${p.last_name}` : '—'}
                     </span>
                     <span className="font-black text-status-active-text text-lg">${total.toFixed(2)}</span>
                   </div>
