@@ -43,6 +43,8 @@ const GROUP_GAMES = [
   { key: 'blind_partners', label: 'Blind Partners' },
 ]
 const PER_FLIGHT_GAME_KEYS = new Set(PER_FLIGHT_GAMES.map(g => g.key))
+// Opt-in games fund their pot from Payout Config's "$ per entrant" — no separate buy-in amount needed
+const OPT_IN_GAME_KEYS = new Set(['super_ctp', 'super_skins', 'blind_partners'])
 
 function buildSideGameOptions(enabledGames, gameScope, numFlights) {
   const result = []
@@ -3478,10 +3480,17 @@ function TabSideGamesMain({ event, eventPlayers, course, sideGames, onUpdated })
   }))]
 
   // Show opt-ins for any of these games when configured — no buy-in toggle required
-  const OPT_IN_GAME_KEYS = new Set(['super_ctp', 'super_skins', 'blind_partners'])
   const optInGames = baseKeys.filter(k => OPT_IN_GAME_KEYS.has(k))
   // Legacy: also include any games where admin explicitly enabled buy-in
   const buyInGames = [...new Set([...optInGames, ...baseKeys.filter(k => buyIns[k]?.enabled)])]
+
+  // Opt-in games are funded by Payout Config's "$ per entrant" — read it directly so the
+  // pot shown here always matches the Payouts tab instead of a separately-entered amount.
+  function payoutAmountForKey(key) {
+    const config = event.payout_config ?? {}
+    if (key === 'super_skins') return config.super_skins ?? config.super_skins_a ?? config.super_skins_b ?? null
+    return config[key] ?? buyIns[key]?.amount ?? null
+  }
 
   // Opt-in entries state (synced to DB)
   const [entries,  setEntries]  = useState(event.side_game_entries ?? {})
@@ -3548,12 +3557,12 @@ function TabSideGamesMain({ event, eventPlayers, course, sideGames, onUpdated })
           <div className="space-y-4">
             {buyInGames.map(key => {
               const opted  = entries[key] ?? []
-              const amount = buyIns[key]?.amount ?? null
+              const amount = payoutAmountForKey(key)
               const pot    = amount != null ? opted.length * amount : null
               return (
                 <Card key={key}>
                   <div className="flex items-center justify-between mb-3">
-                    <CardHeader title={gameLabel(key)} subtitle={amount != null ? `$${amount} buy-in per player` : 'Separate buy-in'} />
+                    <CardHeader title={gameLabel(key)} subtitle={amount != null ? `$${amount} per entrant · set in Payouts tab` : 'Set the $ per entrant in the Payouts tab'} />
                     {pot != null && (
                       <div className="text-right">
                         <div className="text-xs text-gray-400">Pot</div>
@@ -4499,7 +4508,12 @@ function EditEventModal({ open, onClose, event, onSaved }) {
                       </label>
                     </div>
                   )}
-                  {checked && (
+                  {checked && OPT_IN_GAME_KEYS.has(opt.key) && (
+                    <div className="ml-6 mt-1.5">
+                      <span className="text-xs text-gray-400 italic">Opt-in — $ per entrant is set in the Payouts tab</span>
+                    </div>
+                  )}
+                  {checked && !OPT_IN_GAME_KEYS.has(opt.key) && (
                     <div className="ml-6 mt-1.5 flex items-center gap-3">
                       <label className="flex items-center gap-1.5 cursor-pointer">
                         <input type="checkbox" checked={buyIn.enabled ?? false} onChange={() => toggleBuyIn(opt.key)} className="accent-fairway-600 w-4 h-4" />

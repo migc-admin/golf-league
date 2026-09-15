@@ -1317,7 +1317,7 @@ function MatchPointsBoard({ matchData, event }) {
         return (
           <div key={idx} className="bg-white rounded-xl border border-gray-200 overflow-hidden">
             {/* Compact row — click to expand */}
-            <button type="button" onClick={() => toggle(idx)} className="w-full text-left cursor-pointer">
+            <button type="button" onClick={() => toggle(idx)} className="block w-full text-left cursor-pointer">
               <div className="flex items-stretch">
                 <div className={`w-8 sm:w-14 flex-shrink-0 flex items-center justify-center text-xs font-bold ${compactSideColor('A', pair)}`}>
                   {leftEdge}
@@ -1491,7 +1491,7 @@ function TeamMatchBoard({ teamMatchData, teamAName = 'Team A', teamBName = 'Team
         return (
           <div key={idx} className="bg-white rounded-xl border border-gray-200 overflow-hidden">
             {/* Compact row — click to expand */}
-            <button type="button" onClick={() => toggle(idx)} className="w-full text-left cursor-pointer">
+            <button type="button" onClick={() => toggle(idx)} className="block w-full text-left cursor-pointer">
               <div className="flex items-stretch">
                 <div className={`w-8 sm:w-14 flex-shrink-0 flex items-center justify-center text-xs font-bold ${compactSideColor('A', match)}`}>
                   {leftEdge}

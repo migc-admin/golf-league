@@ -47,6 +47,9 @@ const SIDE_GAME_LABELS = {
   super_ctp:       'Super CTP',
   blind_partners:  'Blind Partners',
 }
+// These games are inherently opt-in (funded by Payout Config's $ per entrant),
+// regardless of the legacy side_game_buy_ins.enabled flag.
+const OPT_IN_GAME_KEYS = new Set(['super_ctp', 'super_skins', 'blind_partners'])
 
 const BASE_TABS = [
   { key: 'overview',  label: 'Overview'  },
@@ -386,7 +389,7 @@ function OverviewTab({ event, leaderboardUrl, description, courseAddress, mapsUr
       const label = SIDE_GAME_LABELS[k]
       if (!label) return null
       const baseKey = k.replace(/_[ab]$/, '')
-      return { name: label, sepEntry: !!(buyIns[baseKey]?.enabled) }
+      return { name: label, sepEntry: OPT_IN_GAME_KEYS.has(baseKey) || !!(buyIns[baseKey]?.enabled) }
     })
     .filter(Boolean)
   const allCompetitions = [
