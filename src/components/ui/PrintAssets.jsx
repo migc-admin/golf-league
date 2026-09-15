@@ -13,6 +13,8 @@ import { createPortal } from 'react-dom'
 import { toPng } from 'html-to-image'
 import html2canvas from 'html2canvas'
 import QRCode from 'qrcode'
+import { supabase } from '../../lib/supabase'
+import { buildPairings } from '../../lib/engines/matchPoints'
 import { OPT_IN_GAME_KEYS, OPT_IN_GAME_LABELS, optInAmount } from '../../lib/sideGames'
 
 const GOLD  = '#C9A84C'
@@ -84,6 +86,59 @@ function epName(ep, { showFlight = false, tglSet = null } = {}) {
   const flight = showFlight && ep?.flight ? ` (${ep.flight})` : ''
   const star   = tglSet?.has(ep?.player_id) ? '*' : ''
   return `${name}${flight}${star}`
+}
+
+// Individual head-to-head match play — 'match_points' and 'ryder_cup' both pair
+// players via the match_pairings table (Best Ball's 'team_match_play' has no
+// 1-on-1 pairing to show here, so it's intentionally excluded).
+function hasMatchPlayFormat(event) {
+  const formats = event?.formats ?? (event?.format ? [event.format] : [])
+  return formats.includes('match_points') || formats.includes('ryder_cup')
+}
+
+function pairInfo(playerA, playerB, matchNumber) {
+  const chA = playerA.course_handicap ?? 0
+  const chB = playerB.course_handicap ?? 0
+  const baseline = Math.min(chA, chB)
+  const nameOf = ep => [ep?.player?.first_name, ep?.player?.last_name].filter(Boolean).join(' ') || '—'
+  return {
+    matchNumber,
+    nameA: nameOf(playerA),
+    nameB: nameOf(playerB),
+    relA: Math.max(0, chA - baseline),
+    relB: Math.max(0, chB - baseline),
+  }
+}
+
+// Build { groupNumber: [{matchNumber, nameA, nameB, relA, relB}] } — uses stored
+// match_pairings when available, otherwise falls back to the same handicap-order
+// pairing the rest of the app uses when pairings haven't been set up yet.
+function buildMatchupsByGroup(eventPlayers, storedPairings) {
+  const playerMap = Object.fromEntries(eventPlayers.map(ep => [ep.player_id, ep]))
+  const groupMap = {}
+  let n = 1
+
+  if (storedPairings && storedPairings.length > 0) {
+    for (const p of storedPairings) {
+      const playerA = playerMap[p.player_a_id]
+      const playerB = playerMap[p.player_b_id]
+      if (!playerA || !playerB) continue
+      const g = Number(playerA.group_number ?? playerB.group_number ?? 0)
+      if (!groupMap[g]) groupMap[g] = []
+      groupMap[g].push(pairInfo(playerA, playerB, p.match_number ?? n))
+      n++
+    }
+  } else {
+    const groups = groupedPlayers(eventPlayers)
+    for (const [g, members] of Object.entries(groups)) {
+      for (const { playerA, playerB } of buildPairings(members)) {
+        const key = Number(g)
+        if (!groupMap[key]) groupMap[key] = []
+        groupMap[key].push(pairInfo(playerA, playerB, n++))
+      }
+    }
+  }
+  return groupMap
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -189,7 +244,7 @@ function CtpCardsPage({ cards }) {
 // ═══════════════════════════════════════════════════════════════════════════════
 // ASSET TYPE 2 — Tee Sheet  (8.5" × 11")
 // ═══════════════════════════════════════════════════════════════════════════════
-function TeeSheetPage({ event, eventPlayers, forPng = false, tglSelections = [] }) {
+function TeeSheetPage({ event, eventPlayers, forPng = false, tglSelections = [], matchupsByGroup = {} }) {
   const league     = event?.league ?? {}
   const logoUrl    = league.logo_url ?? null
   const leagueName = league.name ?? ''
@@ -266,6 +321,7 @@ function TeeSheetPage({ event, eventPlayers, forPng = false, tglSelections = [] 
           : calcTeeTime(event?.start_time, interval, g)
         const names = members.map(ep => epName(ep, { showFlight: hasFlights, tglSet })).join('  /  ')
         const hole  = isShotgun ? (holeMap[g] ? `Hole ${holeMap[g]}` : '—') : 'Hole 1'
+        const matchups = matchupsByGroup[g] ?? []
 
         return (
           <div key={g} style={{
@@ -281,6 +337,13 @@ function TeeSheetPage({ event, eventPlayers, forPng = false, tglSelections = [] 
             <div style={{ fontSize: '0.13in', color: '#555', fontWeight: 'bold', fontFamily: FONT }}>#{g}</div>
             <div style={{ fontSize: '0.13in', color: '#222', lineHeight: 1.3, wordBreak: 'break-word', fontFamily: FONT }}>
               {names || '—'}
+              {matchups.length > 0 && (
+                <div style={{ fontSize: '0.1in', color: GREEN, fontWeight: 600, marginTop: '0.03in', fontFamily: FONT }}>
+                  {matchups.map(m =>
+                    `${m.nameA}${m.relA > 0 ? ` (${m.relA})` : ''} vs ${m.nameB}${m.relB > 0 ? ` (${m.relB})` : ''}`
+                  ).join('  ·  ')}
+                </div>
+              )}
             </div>
             <div style={{ fontSize: '0.12in', color: '#888', whiteSpace: 'nowrap', fontFamily: FONT }}>{hole}</div>
           </div>
@@ -528,12 +591,16 @@ export default function PrintAssets({ type, event, eventPlayers = [], tglSelecti
   const interval   = event?.tee_time_interval_mins ?? 10
 
   const pngRef      = useRef(null)
-  const reelRef     = useRef(null)   // modal preview
-  const captureRef  = useRef(null)   // off-screen capture target
+  const reelRef     = useRef(null)   // modal preview — tee times
+  const captureRef  = useRef(null)   // off-screen capture target — tee times
+  const matchupsReelRef    = useRef(null)   // modal preview — matchups
+  const matchupsCaptureRef = useRef(null)   // off-screen capture target — matchups
   const [downloadingPng,  setDownloadingPng]  = useState(false)
   const [downloadingReel, setDownloadingReel] = useState(false)
+  const [downloadingMatchupsReel, setDownloadingMatchupsReel] = useState(false)
   const [showReel,        setShowReel]        = useState(false)
   const [checkinQrDataUrl, setCheckinQrDataUrl] = useState(null)
+  const [matchPairings, setMatchPairings] = useState([])
 
   useEffect(() => {
     if (type !== 'checkin_qr' || !event?.slug || !leagueSlug || !orgSlug) return
@@ -543,6 +610,19 @@ export default function PrintAssets({ type, event, eventPlayers = [], tglSelecti
       .then(dataUrl => { if (!cancelled) setCheckinQrDataUrl(dataUrl) })
     return () => { cancelled = true }
   }, [type, orgSlug, leagueSlug, event?.slug])
+
+  useEffect(() => {
+    if (type !== 'tee_sheet' || !hasMatchPlayFormat(event) || !event?.id) { setMatchPairings([]); return }
+    let cancelled = false
+    supabase.from('match_pairings').select('*').eq('event_id', event.id).order('match_number')
+      .then(({ data }) => { if (!cancelled) setMatchPairings(data ?? []) })
+    return () => { cancelled = true }
+  }, [type, event?.id])
+
+  const matchupsByGroup = (type === 'tee_sheet' && hasMatchPlayFormat(event))
+    ? buildMatchupsByGroup(eventPlayers, matchPairings)
+    : {}
+  const hasMatchups = Object.keys(matchupsByGroup).length > 0
 
   const handleDownloadPng = async () => {
     if (!pngRef.current || downloadingPng) return
@@ -556,20 +636,25 @@ export default function PrintAssets({ type, event, eventPlayers = [], tglSelecti
     }
   }
 
-  const handleDownloadReel = async () => {
-    const el = captureRef.current
-    if (!el || downloadingReel) return
-    setDownloadingReel(true)
+  // Shared by both IG Reel PNGs — tee times and matchups download as two
+  // separate images rather than one crowded card.
+  async function downloadReelPng(ref, downloading, setDownloading, suffix) {
+    const el = ref.current
+    if (!el || downloading) return
+    setDownloading(true)
     try {
       const dataUrl = await toPng(el, { pixelRatio: 3, cacheBust: true, skipFonts: false })
       const eventName = event?.name ?? `Event_${event?.event_number ?? 'event'}`
-      downloadPng(dataUrl, `${eventName.replace(/\s+/g, '_')}_tee-sheet-reel.png`)
+      downloadPng(dataUrl, `${eventName.replace(/\s+/g, '_')}_${suffix}.png`)
     } catch (err) {
       console.error('IG Reel export failed:', err)
     } finally {
-      setDownloadingReel(false)
+      setDownloading(false)
     }
   }
+
+  const handleDownloadReel = () => downloadReelPng(captureRef, downloadingReel, setDownloadingReel, 'tee-sheet-reel')
+  const handleDownloadMatchupsReel = () => downloadReelPng(matchupsCaptureRef, downloadingMatchupsReel, setDownloadingMatchupsReel, 'matchups-reel')
 
   let printNodes = []
   let itemCount  = 0
@@ -621,7 +706,7 @@ export default function PrintAssets({ type, event, eventPlayers = [], tglSelecti
 
   // ── Tee Sheet ─────────────────────────────────────────────────────────────
   if (type === 'tee_sheet') {
-    printNodes = [<TeeSheetPage key="tee_sheet" event={event} eventPlayers={eventPlayers} tglSelections={tglSelections} />]
+    printNodes = [<TeeSheetPage key="tee_sheet" event={event} eventPlayers={eventPlayers} tglSelections={tglSelections} matchupsByGroup={matchupsByGroup} />]
     itemCount  = 1
   }
 
@@ -834,7 +919,7 @@ export default function PrintAssets({ type, event, eventPlayers = [], tglSelecti
       {type === 'tee_sheet' && createPortal(
         <div style={{ position: 'fixed', top: '-99999px', left: '-99999px', pointerEvents: 'none', zIndex: -1 }}>
           <div ref={pngRef}>
-            <TeeSheetPage forPng event={event} eventPlayers={eventPlayers} tglSelections={tglSelections} />
+            <TeeSheetPage forPng event={event} eventPlayers={eventPlayers} tglSelections={tglSelections} matchupsByGroup={matchupsByGroup} />
           </div>
         </div>,
         document.body
@@ -850,15 +935,21 @@ export default function PrintAssets({ type, event, eventPlayers = [], tglSelecti
         document.body
       )}
 
-      {/* Off-screen capture target — positioned just off right edge so toPng renders fully */}
+      {/* Off-screen capture targets — positioned just off right edge so toPng renders fully */}
       {type === 'tee_sheet' && createPortal(
         <div style={{ position: 'fixed', top: 0, left: '100vw', pointerEvents: 'none', zIndex: -1 }}>
           <TeeSheetReelCard ref={captureRef} event={event} eventPlayers={eventPlayers} tglSelections={tglSelections} />
         </div>,
         document.body
       )}
+      {type === 'tee_sheet' && hasMatchups && createPortal(
+        <div style={{ position: 'fixed', top: 0, left: '100vw', pointerEvents: 'none', zIndex: -1 }}>
+          <MatchupsReelCard ref={matchupsCaptureRef} event={event} matchupsByGroup={matchupsByGroup} />
+        </div>,
+        document.body
+      )}
 
-      {/* IG Reel panel */}
+      {/* IG Reel panel — tee times and matchups download as two separate PNGs */}
       {type === 'tee_sheet' && showReel && (
         <IGReelPanel
           event={event}
@@ -867,6 +958,11 @@ export default function PrintAssets({ type, event, eventPlayers = [], tglSelecti
           reelRef={reelRef}
           downloading={downloadingReel}
           onDownload={handleDownloadReel}
+          hasMatchups={hasMatchups}
+          matchupsByGroup={matchupsByGroup}
+          matchupsReelRef={matchupsReelRef}
+          downloadingMatchups={downloadingMatchupsReel}
+          onDownloadMatchups={handleDownloadMatchupsReel}
           onClose={() => setShowReel(false)}
         />
       )}
@@ -985,34 +1081,129 @@ const TeeSheetReelCard = forwardRef(function TeeSheetReelCard({ event, eventPlay
   )
 })
 
+// ─── IG Reel Card (1080×1920 match play matchups) ────────────────────────────
+const MatchupsReelCard = forwardRef(function MatchupsReelCard({ event, matchupsByGroup }, ref) {
+  const league     = event?.league ?? {}
+  const logoUrl    = league.logo_url ?? null
+  const leagueName = league.name ?? ''
+  const eventName  = event?.name ?? (event?.event_number ? `Event #${event.event_number}` : '')
+  const courseName = event?.course?.name ?? ''
+  const teams      = event?.ryder_cup_teams ?? null
+
+  const groupNums = Object.keys(matchupsByGroup).map(Number).sort((a, b) => a - b)
+  const allMatchups = groupNums.flatMap(g => matchupsByGroup[g])
+
+  // Card is 360×640 at 1× — exported at 3× = 1080×1920
+  return (
+    <div ref={ref} style={{
+      width: 360,
+      background: 'linear-gradient(160deg, #1B4332 0%, #0f2e22 55%, #0a1f17 100%)',
+      display: 'flex',
+      flexDirection: 'column',
+      padding: '28px 22px 20px',
+      fontFamily: 'system-ui, -apple-system, sans-serif',
+      boxSizing: 'border-box',
+      position: 'relative',
+    }}>
+      {/* Gold top bar */}
+      <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 4, background: 'linear-gradient(90deg, #D4AF37, #f0d060, #D4AF37)' }} />
+
+      {/* Header */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 14 }}>
+        {logoUrl ? (
+          <img src={logoUrl} alt="" style={{ width: 40, height: 40, borderRadius: '50%', objectFit: 'cover' }} crossOrigin="anonymous" />
+        ) : (
+          <div style={{ width: 40, height: 40, borderRadius: 8, background: '#D4AF37', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 900, fontSize: 13, color: '#1B4332' }}>
+            {(leagueName ?? 'S').slice(0, 2).toUpperCase()}
+          </div>
+        )}
+        <div>
+          <div style={{ color: '#D4AF37', fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em' }}>{leagueName}</div>
+          <div style={{ color: 'rgba(255,255,255,0.5)', fontSize: 10, marginTop: 1 }}>scorifygolf.com</div>
+        </div>
+      </div>
+
+      {/* Event info */}
+      <div style={{ marginBottom: 14 }}>
+        <div style={{ color: '#fff', fontSize: 18, fontWeight: 900, letterSpacing: '-0.02em', lineHeight: 1.2 }}>{eventName}</div>
+        <div style={{ color: '#D4AF37', fontSize: 11, fontWeight: 600, marginTop: 4 }}>{courseName}</div>
+        <div style={{ color: 'rgba(255,255,255,0.4)', fontSize: 10, marginTop: 2 }}>
+          Match Play Matchups{teams?.a && teams?.b ? ` · ${teams.a} vs ${teams.b}` : ''}
+        </div>
+      </div>
+
+      <div style={{ height: 1, background: 'rgba(255,255,255,0.1)', marginBottom: 10 }} />
+
+      {/* Matchup rows */}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+        {allMatchups.map((m, i) => (
+          <div key={m.matchNumber ?? i} style={{
+            borderRadius: 8,
+            background: i % 2 === 0 ? 'rgba(255,255,255,0.06)' : 'rgba(255,255,255,0.02)',
+            padding: '8px 10px',
+          }}>
+            <div style={{ fontSize: 9, fontWeight: 700, color: '#D4AF37', marginBottom: 3 }}>Match {m.matchNumber}</div>
+            <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.92)', fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+              {m.nameA}{m.relA > 0 ? ` (${m.relA})` : ''}
+              <span style={{ color: 'rgba(255,255,255,0.35)', fontWeight: 500 }}> vs </span>
+              {m.nameB}{m.relB > 0 ? ` (${m.relB})` : ''}
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {/* Footer */}
+      <div style={{ marginTop: 10, paddingTop: 8, borderTop: '1px solid rgba(255,255,255,0.08)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+        <div style={{ fontSize: 8, color: 'rgba(255,255,255,0.3)', textTransform: 'uppercase', letterSpacing: '0.08em' }}>
+          Powered by Scorify Golf
+        </div>
+        <img src="/logo.png" alt="Scorify Golf" style={{ height: 22, objectFit: 'contain', opacity: 0.5 }} />
+      </div>
+    </div>
+  )
+})
+
 // ─── IG Reel preview overlay ──────────────────────────────────────────────────
-function IGReelPanel({ event, eventPlayers, tglSelections, reelRef, downloading, onDownload, onClose }) {
+function IGReelPanel({
+  event, eventPlayers, tglSelections, reelRef, downloading, onDownload,
+  hasMatchups, matchupsByGroup, matchupsReelRef, downloadingMatchups, onDownloadMatchups,
+  onClose,
+}) {
   return (
     <div
       onClick={onClose}
-      style={{ position: 'fixed', inset: 0, zIndex: 9999, background: 'rgba(0,0,0,0.8)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 16 }}
+      style={{ position: 'fixed', inset: 0, zIndex: 9999, background: 'rgba(0,0,0,0.8)', display: 'flex', flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'center', gap: 32, padding: '40px 24px', overflowY: 'auto' }}
     >
-      <div onClick={e => e.stopPropagation()}>
+      <div onClick={e => e.stopPropagation()} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 16 }}>
         <TeeSheetReelCard ref={reelRef} event={event} eventPlayers={eventPlayers} tglSelections={tglSelections} />
-      </div>
-      <div onClick={e => e.stopPropagation()} style={{ display: 'flex', gap: 10 }}>
         <button
           onClick={onDownload}
           disabled={downloading}
           style={{ background: GREEN, color: '#fff', fontWeight: 700, fontSize: 14, padding: '11px 24px', borderRadius: 12, border: 'none', cursor: downloading ? 'not-allowed' : 'pointer', opacity: downloading ? 0.7 : 1 }}
         >
-          {downloading ? 'Exporting…' : '⬇ Download PNG (1080×1920)'}
-        </button>
-        <button
-          onClick={onClose}
-          style={{ background: 'rgba(255,255,255,0.1)', color: '#fff', fontWeight: 600, fontSize: 14, padding: '11px 18px', borderRadius: 12, border: '1px solid rgba(255,255,255,0.15)', cursor: 'pointer' }}
-        >
-          Close
+          {downloading ? 'Exporting…' : '⬇ Tee Times PNG (1080×1920)'}
         </button>
       </div>
-      <p style={{ color: 'rgba(255,255,255,0.4)', fontSize: 11, textAlign: 'center' }}>
-        Preview shows up to 12 groups. Full tee sheet prints all groups.
-      </p>
+
+      {hasMatchups && (
+        <div onClick={e => e.stopPropagation()} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 16 }}>
+          <MatchupsReelCard ref={matchupsReelRef} event={event} matchupsByGroup={matchupsByGroup} />
+          <button
+            onClick={onDownloadMatchups}
+            disabled={downloadingMatchups}
+            style={{ background: GREEN, color: '#fff', fontWeight: 700, fontSize: 14, padding: '11px 24px', borderRadius: 12, border: 'none', cursor: downloadingMatchups ? 'not-allowed' : 'pointer', opacity: downloadingMatchups ? 0.7 : 1 }}
+          >
+            {downloadingMatchups ? 'Exporting…' : '⬇ Matchups PNG (1080×1920)'}
+          </button>
+        </div>
+      )}
+
+      <button
+        onClick={onClose}
+        style={{ position: 'fixed', top: 20, right: 24, background: 'rgba(255,255,255,0.1)', color: '#fff', fontWeight: 600, fontSize: 14, padding: '11px 18px', borderRadius: 12, border: '1px solid rgba(255,255,255,0.15)', cursor: 'pointer' }}
+      >
+        Close
+      </button>
     </div>
   )
 }
