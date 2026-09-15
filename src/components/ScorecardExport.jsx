@@ -983,7 +983,7 @@ function buildMatchTable({ parPerHole, strokeIndex, matches }) {
     flex: 1;
   `
 
-  // Colgroup — label + 18 holes + OUT/IN/TOT/MP (relative strokes received)
+  // Colgroup — label + 18 holes + OUT/IN/TOT/Holes Won
   const cg = document.createElement('colgroup')
   const colDefs = [
     COL_LABEL,
@@ -991,7 +991,7 @@ function buildMatchTable({ parPerHole, strokeIndex, matches }) {
     COL_HOLE,                      // OUT
     ...Array(9).fill(COL_HOLE),   // H10-18
     COL_HOLE, COL_HOLE,            // IN, TOT
-    COL_HOLE,                      // MP
+    COL_HOLE + 20,                  // Holes Won (wider to fit the label)
   ]
   colDefs.forEach(w => {
     const c = document.createElement('col')
@@ -1062,7 +1062,7 @@ function buildMatchTable({ parPerHole, strokeIndex, matches }) {
   for (let h = 10; h <= 18; h++) headerRow.appendChild(mkTd(h, { bg: GREEN, color: '#ffffff', bold: true }))
   headerRow.appendChild(mkTd('IN',  { bg: GOLD, color: '#1a1a1a', bold: true }))
   headerRow.appendChild(mkTd('TOT', { bg: GOLD, color: '#1a1a1a', bold: true }))
-  headerRow.appendChild(mkTd('MP',  { bg: GOLD, color: '#1a1a1a', bold: true }))
+  headerRow.appendChild(mkTd('Holes Won',  { bg: GOLD, color: '#1a1a1a', bold: true, fontSize: '8px' }))
   tbl.appendChild(headerRow)
 
   // ── PAR row ────────────────────────────────────────────────────
@@ -1096,21 +1096,24 @@ function buildMatchTable({ parPerHole, strokeIndex, matches }) {
     ;[{ name: m.nameA, ch: m.chA, rel: m.relA }, { name: m.nameB, ch: m.chB, rel: m.relB }].forEach((p, pi) => {
       const tr = document.createElement('tr')
       const cells = []
-      cells.push(mkLabel(`${p.name || 'Player'} (${p.ch})`, { bg: 'transparent', color: '#111827' }))
+      // Only the player getting strokes (rel > 0) shows the stroke count in parens —
+      // the lower-handicap player in the pairing plays off scratch, so no parens.
+      const nameLabel = p.rel > 0 ? `${p.name || 'Player'} (${p.rel})` : (p.name || 'Player')
+      cells.push(mkLabel(nameLabel, { bg: 'transparent', color: '#111827' }))
       for (let h = 1; h <= 9; h++) cells.push(mkScoreCell(getStrokesOnHole(p.rel, strokeIndex[h - 1])))
       cells.push(mkTd('', { bg: 'transparent', bold: true }))
       for (let h = 10; h <= 18; h++) cells.push(mkScoreCell(getStrokesOnHole(p.rel, strokeIndex[h - 1])))
       cells.push(mkTd('', { bg: 'transparent', bold: true }))
       cells.push(mkTd('', { bg: 'transparent', bold: true }))
-      cells.push(mkTd(p.rel, { bg: '#fef3e2', color: '#9a5b13', bold: true }))
+      cells.push(mkWriteCell({ color: '#9a5b13', bold: true }))
       if (divider && pi === 0) cells.forEach(c => { c.style.borderTop = divider })
       cells.forEach(c => tr.appendChild(c))
       tbl.appendChild(tr)
     })
 
-    // RESULT row — blank cell per hole to mark the winner's initial
+    // HOLE RESULT row — blank cell per hole to mark the winner's initial
     const resultRow = document.createElement('tr')
-    resultRow.appendChild(mkLabel('RESULT', { bg: '#fef3e2', color: '#9a5b13' }))
+    resultRow.appendChild(mkLabel('HOLE RESULT', { bg: '#fef3e2', color: '#9a5b13' }))
     for (let h = 1; h <= 9; h++) resultRow.appendChild(mkWriteCell())
     resultRow.appendChild(mkTd('', { bg: '#fef3e2' }))
     for (let h = 10; h <= 18; h++) resultRow.appendChild(mkWriteCell())
@@ -1119,9 +1122,9 @@ function buildMatchTable({ parPerHole, strokeIndex, matches }) {
     resultRow.appendChild(mkTd('', { bg: '#fef3e2' }))
     tbl.appendChild(resultRow)
 
-    // STATUS row — blank cell per hole to track the running match score
+    // MATCH STATUS row — blank cell per hole to track the running match score
     const statusRow = document.createElement('tr')
-    statusRow.appendChild(mkLabel('STATUS', { bg: GRAY_BG, color: '#374151' }))
+    statusRow.appendChild(mkLabel('MATCH STATUS', { bg: GRAY_BG, color: '#374151' }))
     for (let h = 1; h <= 9; h++) statusRow.appendChild(mkWriteCell())
     statusRow.appendChild(mkTd('', { bg: '#e8e8e4' }))
     for (let h = 10; h <= 18; h++) statusRow.appendChild(mkWriteCell())
