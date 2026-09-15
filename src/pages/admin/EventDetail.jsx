@@ -3505,6 +3505,12 @@ function TabSideGamesMain({ event, eventPlayers, course, sideGames, onUpdated, o
   // Keep local state in sync when parent re-fetches event
   useEffect(() => { setEntries(event.side_game_entries ?? {}) }, [event.side_game_entries])
 
+  // Paid reconciliation state — separate from `entries` (who opted in) so admin
+  // can track who's actually handed over cash/Venmo, same shape as side_game_entries.
+  const [paid,     setPaid]     = useState(event.side_game_paid ?? {})
+  const [savingPd, setSavingPd] = useState(false)
+  useEffect(() => { setPaid(event.side_game_paid ?? {}) }, [event.side_game_paid])
+
   // Super CTP designated hole (editable inline)
   const allPar3sMain = (course?.par_per_hole ?? [])
     .map((par, i) => ({ hole: i + 1, par }))
@@ -3528,11 +3534,38 @@ function TabSideGamesMain({ event, eventPlayers, course, sideGames, onUpdated, o
   }
 
   function toggleEntry(gameKey, playerId) {
-    setEntries(prev => {
+    const cur        = entries[gameKey] ?? []
+    const isRemoving = cur.includes(playerId)
+    const next       = isRemoving ? cur.filter(id => id !== playerId) : [...cur, playerId]
+    const updated    = { ...entries, [gameKey]: next }
+    setEntries(updated)
+    persistEntries(updated)
+
+    // Un-opting a player also clears their paid flag — no stale "paid" for
+    // someone no longer in the roster for this game.
+    if (isRemoving) {
+      const curPaid = paid[gameKey] ?? []
+      if (curPaid.includes(playerId)) {
+        const updatedPaid = { ...paid, [gameKey]: curPaid.filter(id => id !== playerId) }
+        setPaid(updatedPaid)
+        persistPaid(updatedPaid)
+      }
+    }
+  }
+
+  async function persistPaid(next) {
+    setSavingPd(true)
+    await supabase.from('events').update({ side_game_paid: next }).eq('id', event.id)
+    setSavingPd(false)
+    onUpdated?.()
+  }
+
+  function togglePaid(gameKey, playerId) {
+    setPaid(prev => {
       const cur  = prev[gameKey] ?? []
       const next = cur.includes(playerId) ? cur.filter(id => id !== playerId) : [...cur, playerId]
       const updated = { ...prev, [gameKey]: next }
-      persistEntries(updated)
+      persistPaid(updated)
       return updated
     })
   }
@@ -3576,9 +3609,11 @@ function TabSideGamesMain({ event, eventPlayers, course, sideGames, onUpdated, o
           <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-widest mb-3">Opt-in Rosters</h3>
           <div className="space-y-4">
             {buyInGames.map(key => {
-              const opted  = entries[key] ?? []
-              const amount = payoutAmountForKey(key)
-              const pot    = amount != null ? opted.length * amount : null
+              const opted     = entries[key] ?? []
+              const paidIds   = paid[key] ?? []
+              const paidCount = opted.filter(pid => paidIds.includes(pid)).length
+              const amount    = payoutAmountForKey(key)
+              const pot       = amount != null ? opted.length * amount : null
               return (
                 <Card key={key}>
                   <div className="flex items-center justify-between mb-3">
@@ -3588,6 +3623,11 @@ function TabSideGamesMain({ event, eventPlayers, course, sideGames, onUpdated, o
                         <div className="text-xs text-gray-400">Pot</div>
                         <div className="text-lg font-bold text-green-700">${pot.toFixed(2)}</div>
                         <div className="text-xs text-gray-400">{opted.length} entrant{opted.length !== 1 ? 's' : ''}</div>
+                        {opted.length > 0 && (
+                          <div className={`text-xs font-medium ${paidCount === opted.length ? 'text-green-600' : 'text-amber-600'}`}>
+                            {paidCount}/{opted.length} paid
+                          </div>
+                        )}
                       </div>
                     )}
                   </div>
@@ -3608,23 +3648,41 @@ function TabSideGamesMain({ event, eventPlayers, course, sideGames, onUpdated, o
                   )}
                   <div className="grid grid-cols-2 gap-1.5">
                     {eventPlayers.map(ep => {
-                      const pid  = ep.player_id
-                      const p    = ep.player ?? {}
-                      const name = [p.first_name, p.last_name].filter(Boolean).join(' ') || '—'
+                      const pid     = ep.player_id
+                      const p       = ep.player ?? {}
+                      const name    = [p.first_name, p.last_name].filter(Boolean).join(' ') || '—'
+                      const isOpted = opted.includes(pid)
+                      const isPaid  = paidIds.includes(pid)
                       return (
-                        <label key={pid} className="flex items-center gap-2 cursor-pointer text-sm text-gray-700">
-                          <input
-                            type="checkbox"
-                            checked={opted.includes(pid)}
-                            onChange={() => toggleEntry(key, pid)}
-                            className="accent-fairway-600 w-4 h-4"
-                          />
-                          {name}
-                        </label>
+                        <div key={pid} className="flex items-center justify-between gap-1.5 text-sm text-gray-700">
+                          <label className="flex items-center gap-2 cursor-pointer min-w-0">
+                            <input
+                              type="checkbox"
+                              checked={isOpted}
+                              onChange={() => toggleEntry(key, pid)}
+                              className="accent-fairway-600 w-4 h-4 shrink-0"
+                            />
+                            <span className="truncate">{name}</span>
+                          </label>
+                          {isOpted && (
+                            <label
+                              className={`flex items-center gap-1 text-xs font-medium shrink-0 cursor-pointer ${isPaid ? 'text-green-600' : 'text-gray-400'}`}
+                              title="Mark as paid"
+                            >
+                              <input
+                                type="checkbox"
+                                checked={isPaid}
+                                onChange={() => togglePaid(key, pid)}
+                                className="accent-green-600 w-4 h-4"
+                              />
+                              Paid
+                            </label>
+                          )}
+                        </div>
                       )
                     })}
                   </div>
-                  {savingEn && <p className="text-xs text-gray-400 mt-2">Saving…</p>}
+                  {(savingEn || savingPd) && <p className="text-xs text-gray-400 mt-2">Saving…</p>}
                 </Card>
               )
             })}
