@@ -2013,8 +2013,17 @@ function buildResultsCard({ event, eventPlayers, allScores, course, sideGames, o
       const teamA = pair.playerA.flight === 'A' ? teamALabel : teamBLabel
       const teamB = pair.playerB.flight === 'A' ? teamALabel : teamBLabel
       const status = pair.holesPlayed === 0 ? 'Not started' : pair.matchStatus
+
+      // Once a match is decided, lead with the winner ("X def. Y") instead of
+      // the neutral "X vs. Y" — matches how completed match play is reported.
+      let line
+      if (pair.winner === 'A')      line = `${nameA} (${teamA}) def. ${nameB} (${teamB})`
+      else if (pair.winner === 'B') line = `${nameB} (${teamB}) def. ${nameA} (${teamA})`
+      else if (pair.winner === 'halve') line = `${nameA} (${teamA}) halved with ${nameB} (${teamB})`
+      else line = `${nameA} (${teamA}) vs. ${nameB} (${teamB})`
+
       const row = el('div', { padding: R_PAD, background: idx % 2 === 0 ? R_ODD : R_EVEN, borderBottom: R_DIV, display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '10px' })
-      const nameEl = txt(`${nameA} (${teamA}) vs. ${nameB} (${teamB})`, { fontSize: R_FS, fontWeight: '700', color: '#111', whiteSpace: 'nowrap' })
+      const nameEl = txt(line, { fontSize: R_FS, fontWeight: '700', color: '#111', whiteSpace: 'nowrap' })
       nameEl.style.flex = '1'
       row.appendChild(nameEl)
       row.appendChild(txt(status, { fontSize: '11px', fontWeight: '800', color: GREEN, whiteSpace: 'nowrap', flexShrink: '0' }))
