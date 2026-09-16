@@ -10,7 +10,7 @@ import { supabase } from '../lib/supabase'
 import { useSubdomainOrg } from '../lib/SubdomainContext'
 import Countdown from '../components/Countdown'
 import Marquee from '../components/ui/Marquee'
-import { OPT_IN_GAME_KEYS } from '../lib/sideGames'
+import { isBuyInEnabled } from '../lib/sideGames'
 
 const GREEN    = '#1B4332'
 const GOLD     = '#D4AF37'
@@ -380,13 +380,12 @@ function OverviewTab({ event, leaderboardUrl, description, courseAddress, mapsUr
       .map(k => FORMAT_LABELS[k] ?? FORMAT_LABELS[k.replace(/_[a-z]$/, '')])
       .filter(Boolean)
   )]
-  const buyIns = event.side_game_buy_ins ?? {}
   const presetGames = (event.side_game_options ?? [])
     .map(k => {
       const label = SIDE_GAME_LABELS[k]
       if (!label) return null
       const baseKey = k.replace(/_[ab]$/, '')
-      return { name: label, sepEntry: OPT_IN_GAME_KEYS.has(baseKey) || !!(buyIns[baseKey]?.enabled) }
+      return { name: label, sepEntry: isBuyInEnabled(event, baseKey) }
     })
     .filter(Boolean)
   const allCompetitions = [

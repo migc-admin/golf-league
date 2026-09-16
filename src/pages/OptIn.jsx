@@ -4,7 +4,8 @@
  *
  * Flow (single screen, one-time submit):
  *  1. Player picks their name from the event roster
- *  2. Player picks which opt-in game(s) they're joining (Super Skins / Super CTP / Blind Partners)
+ *  2. Player picks which "Separate buy-in" game(s) they're joining (any side game
+ *     flagged that way on the event — not just the legacy Super Skins/Super CTP/Blind Partners)
  *  3. Total updates live (already-joined games are excluded from the total)
  *  4. Player taps "Pay Cash" or "Pay with Venmo" — this writes them into
  *     event.side_game_entries via the opt_in_side_games RPC (honor-system, same
@@ -18,7 +19,7 @@ import { useParams } from 'react-router-dom'
 import { Helmet } from 'react-helmet-async'
 import { supabase } from '../lib/supabase'
 import { useSubdomainOrg } from '../lib/SubdomainContext'
-import { OPT_IN_GAME_KEYS, OPT_IN_GAME_LABELS, optInAmount } from '../lib/sideGames'
+import { OPT_IN_GAME_LABELS, isBuyInEnabled, optInAmount } from '../lib/sideGames'
 
 const GREEN = '#1B4332'
 const GOLD  = '#D4AF37'
@@ -103,7 +104,7 @@ export default function OptIn() {
       if (!league) { setLoading(false); return }
       const { data: ev } = await supabase
         .from('events')
-        .select('id, name, slug, event_number, event_date, status, venmo_handle, side_game_options, payout_config, side_game_entries, super_ctp_hole, start_time, shotgun_start, tee_time_interval_mins, course:courses(name), league:leagues(name, slug, logo_url)')
+        .select('id, name, slug, event_number, event_date, status, venmo_handle, side_game_options, side_game_buy_ins, payout_config, side_game_entries, super_ctp_hole, start_time, shotgun_start, tee_time_interval_mins, course:courses(name), league:leagues(name, slug, logo_url)')
         .eq('league_id', league.id)
         .eq('slug', eventSlug)
         .single()
@@ -112,7 +113,7 @@ export default function OptIn() {
 
       const { data: eps } = await supabase
         .from('event_players')
-        .select('player_id, group_number, player:players(first_name, last_name)')
+        .select('player_id, group_number, flight, player:players(first_name, last_name)')
         .eq('event_id', ev.id)
       setEventPlayers((eps ?? []).slice().sort((a, b) => {
         const an = `${a.player?.first_name ?? ''} ${a.player?.last_name ?? ''}`
@@ -140,21 +141,24 @@ export default function OptIn() {
     )
   }
 
-  // Enabled opt-in games: derived from side_game_options, filtered to ones with a configured $ amount
+  const selectedPlayer  = eventPlayers.find(ep => ep.player_id === playerId)
+  const selectedFlight  = selectedPlayer?.flight ?? null
+  const playerName = selectedPlayer ? `${selectedPlayer.player?.first_name ?? ''} ${selectedPlayer.player?.last_name ?? ''}`.trim() : ''
+
+  // Games flagged "Separate buy-in" on this event, filtered to ones with a configured $ amount.
+  // Uses the selected player's flight (once known) to resolve flight-scoped rates correctly.
   const baseKeys = [...new Set((event.side_game_options ?? []).map(k => k.replace(/_[ab]$/, '')))]
-  const availableGames = baseKeys.filter(k => OPT_IN_GAME_KEYS.has(k) && optInAmount(event, k) != null)
+  const availableGames = baseKeys.filter(k => isBuyInEnabled(event, k) && optInAmount(event, k, selectedFlight) != null)
 
   const cutoff   = computeOptInCutoff(event, eventPlayers)
   const isClosed = cutoff ? new Date() > cutoff : false
 
   const entries = event.side_game_entries ?? {}
-  const selectedPlayer = eventPlayers.find(ep => ep.player_id === playerId)
-  const playerName = selectedPlayer ? `${selectedPlayer.player?.first_name ?? ''} ${selectedPlayer.player?.last_name ?? ''}`.trim() : ''
 
   const selectedList  = [...selectedGames]
   const alreadyKeys   = playerId ? selectedList.filter(k => (entries[k] ?? []).includes(playerId)) : []
   const newKeys       = selectedList.filter(k => !alreadyKeys.includes(k))
-  const total         = newKeys.reduce((sum, k) => sum + (optInAmount(event, k) ?? 0), 0)
+  const total         = newKeys.reduce((sum, k) => sum + (optInAmount(event, k, selectedFlight) ?? 0), 0)
   const canSubmit     = playerId && newKeys.length > 0 && !submitting
 
   function toggleGame(key) {
@@ -255,7 +259,7 @@ export default function OptIn() {
                       />
                       <span className="text-sm font-medium text-gray-800">{OPT_IN_GAME_LABELS[key]}</span>
                     </span>
-                    <span className="text-sm text-gray-500">${Number(optInAmount(event, key)).toFixed(2)}</span>
+                    <span className="text-sm text-gray-500">${Number(optInAmount(event, key, selectedFlight)).toFixed(2)}</span>
                   </label>
                 ))}
               </div>

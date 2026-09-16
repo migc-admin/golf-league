@@ -148,18 +148,46 @@ export function computeAllSkins(eventPlayers, allScores, course) {
 }
 
 /**
- * Compute Super Skins — a separate opt-in pot. Everyone who bought in competes
- * as a single pool regardless of flight, so the pool is flattened onto one flight.
+ * Compute Super Skins.
  *
- * @returns {Object|null} a skins result, or null when nobody has opted in
+ * Who is eligible depends on the "Separate buy-in" flag: when set, only players
+ * on the opt-in roster compete; otherwise the whole field does (funded from the
+ * entry fee). How the pot is pooled depends on the game's scope, encoded as a
+ * flight suffix in side_game_options ('super_skins_a' ⇒ per flight,
+ * 'super_skins' ⇒ whole group):
+ *   - Per flight  — one independent pot per flight. Players compete only
+ *                   against their own flight and can only win that flight's
+ *                   money. Entrant counts stay within the flight, so uneven
+ *                   opt-in (e.g. 5 of 12 in A, 8 of 12 in B) yields
+ *                   proportionally different pots.
+ *   - Whole group — one combined pot across every eligible player.
+ *
+ * @returns {Object|null} { A: {...,entrantCount}, B: {...,entrantCount} }, or
+ *                         null when nobody is eligible
  */
 export function computeSuperSkins(event, eventPlayers, allScores, course) {
-  const optedIn = event?.side_game_entries?.super_skins ?? []
-  const pool = eventPlayers
-    .filter(ep => optedIn.includes(ep.player_id))
-    .map(ep => ({ ...ep, flight: 'A' }))
+  const perFlight = (event?.side_game_options ?? []).some(s => /^super_skins_[a-z]$/.test(s))
+  const buyIn     = !!event?.side_game_buy_ins?.super_skins?.enabled
+
+  const pool = buyIn
+    ? eventPlayers.filter(ep => (event?.side_game_entries?.super_skins ?? []).includes(ep.player_id))
+    : eventPlayers
   if (pool.length === 0) return null
-  return computeSkinsForFlight(pool, allScores, course, 'A')
+
+  if (!perFlight || !event?.use_flights) {
+    const flatPool = pool.map(ep => ({ ...ep, flight: 'A' }))
+    return {
+      A: { ...computeSkinsForFlight(flatPool, allScores, course, 'A'), entrantCount: flatPool.length },
+      B: { holes: [], playerSkins: {}, carryoverToNext: false, carryoverAmount: 0, entrantCount: 0 },
+    }
+  }
+
+  const poolA = pool.filter(ep => ep.flight === 'A')
+  const poolB = pool.filter(ep => ep.flight === 'B')
+  return {
+    A: { ...computeSkinsForFlight(poolA, allScores, course, 'A'), entrantCount: poolA.length },
+    B: { ...computeSkinsForFlight(poolB, allScores, course, 'B'), entrantCount: poolB.length },
+  }
 }
 
 /**

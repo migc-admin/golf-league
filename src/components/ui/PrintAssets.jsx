@@ -15,7 +15,7 @@ import html2canvas from 'html2canvas'
 import QRCode from 'qrcode'
 import { supabase } from '../../lib/supabase'
 import { buildPairings } from '../../lib/engines/matchPoints'
-import { OPT_IN_GAME_KEYS, OPT_IN_GAME_LABELS, optInAmount } from '../../lib/sideGames'
+import { OPT_IN_GAME_LABELS, isBuyInEnabled, optInAmount } from '../../lib/sideGames'
 
 const GOLD  = '#C9A84C'
 const GREEN = '#1B4332'
@@ -752,7 +752,7 @@ export default function PrintAssets({ type, event, eventPlayers = [], tglSelecti
   // ── Check-In QR Sign ──────────────────────────────────────────────────────
   const checkinGames = type === 'checkin_qr'
     ? [...new Set((event?.side_game_options ?? []).map(k => k.replace(/_[ab]$/, '')))]
-        .filter(k => OPT_IN_GAME_KEYS.has(k))
+        .filter(k => isBuyInEnabled(event, k))
         .map(k => ({ key: k, label: OPT_IN_GAME_LABELS[k], amount: optInAmount(event, k) }))
         .filter(g => g.amount != null)
     : []

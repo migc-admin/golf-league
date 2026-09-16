@@ -43,7 +43,7 @@ function visibleTabs(event, hasTGL = false) {
     if (tab === 'Low Putts')     return sideOpts.includes('low_putts')
     if (tab === 'Skins')          return sideOpts.some(s => s.startsWith('skins_'))
     if (tab === 'Super Skins')    return sideOpts.some(s => s === 'super_skins' || s.startsWith('super_skins_'))
-    if (tab === 'Blind Partners') return sideOpts.includes('blind_partners') && (event.side_game_entries?.blind_partner_pairs ?? []).length > 0
+    if (tab === 'Blind Partners') return sideOpts.some(s => s === 'blind_partners' || s.startsWith('blind_partners_')) && (event.side_game_entries?.blind_partner_pairs ?? []).length > 0
     if (tab === 'Team Play')      return hasTGL
     return false
   })
@@ -337,8 +337,13 @@ export default function Leaderboard() {
         </div>
       )}
 
-      {/* Flight toggle — only shown when flights are in use */}
-      {hasFlights && !['Low Putts', 'Skins', 'Match Points', 'Team Match', 'Payouts', 'Scramble'].includes(activeTab) && (
+      {/* Flight toggle — only shown when flights are in use. Super Skins has its
+          own internal flight toggle (it only applies when the game itself is
+          scoped per flight, unlike the rest of the event), so it's excluded here
+          to avoid showing two flight switchers on the same screen. Blind Partners
+          isn't flight-scoped in its results view (pairs can span flights), so it's
+          excluded too, consistent with Low Putts. */}
+      {hasFlights && !['Low Putts', 'Skins', 'Match Points', 'Team Match', 'Payouts', 'Scramble', 'Super Skins', 'Blind Partners'].includes(activeTab) && (
         <div className="max-w-2xl mx-auto px-4 pt-4 flex gap-2">
           {flightLetters.map(f => (
             <button
@@ -841,16 +846,44 @@ function PuttLeaderboard({ data, playerMap, allScores = [], course = null }) {
 // ─── Skins Board ──────────────────────────────────────────────────
 // ─── Super Skins Leaderboard ──────────────────────────────────────────────────
 function SuperSkinsBoard({ event, eventPlayers, allScores, course, playerMap }) {
-  const result = computeSuperSkins(event, eventPlayers, allScores, course)
+  const [flight, setFlight] = useState('A')
+  const allResults = computeSuperSkins(event, eventPlayers, allScores, course)
 
-  if (!result) {
+  if (!allResults) {
     return <p className="text-sm text-gray-400 text-center py-8">No players have opted in to Super Skins yet.</p>
   }
+
+  // Only show the flight toggle when Super Skins is actually scoped per flight
+  // (independent pot per flight) — not merely because the event has flights.
+  const perFlight = (event?.side_game_options ?? []).some(s => /^super_skins_[a-z]$/.test(s))
+  const showFlightToggle = perFlight && (allResults.A.entrantCount > 0) && (allResults.B.entrantCount > 0)
+  const activeFlight = showFlightToggle ? flight : (allResults.A.entrantCount > 0 ? 'A' : 'B')
+  const result = allResults[activeFlight]
 
   const totalSkins = Object.values(result.playerSkins).reduce((a, b) => a + b, 0)
 
   return (
     <div className="space-y-4">
+      {showFlightToggle && (
+        <div className="flex gap-2">
+          {['A', 'B'].map(f => (
+            <button
+              key={f}
+              onClick={() => setFlight(f)}
+              aria-label={`View Flight ${f} Super Skins`}
+              aria-pressed={activeFlight === f}
+              className={`px-4 py-1.5 rounded-full text-sm font-semibold transition-colors cursor-pointer ${
+                activeFlight === f
+                  ? f === 'A' ? 'bg-blue-600 text-white' : 'bg-purple-600 text-white'
+                  : 'bg-white text-gray-500 border border-gray-200'
+              }`}
+            >
+              Flight {f}
+            </button>
+          ))}
+        </div>
+      )}
+
       {result.carryoverToNext && (
         <div className="bg-orange-50 border border-orange-200 rounded-lg px-4 py-3 text-sm text-orange-800">
           {result.carryoverAmount} skin{result.carryoverAmount !== 1 ? 's' : ''} carry to next event (no winner this round)
@@ -860,7 +893,7 @@ function SuperSkinsBoard({ event, eventPlayers, allScores, course, playerMap }) 
       {totalSkins > 0 && (
         <div className="card overflow-hidden p-0">
           <div className="px-4 py-3" style={{ borderBottom: '1px solid #ebe9e4', background: '#f4f3f0' }}>
-            <h3 className="font-semibold text-sm text-ink">Skins Won</h3>
+            <h3 className="font-semibold text-sm text-ink">Skins Won{showFlightToggle ? ` — Flight ${activeFlight}` : ''}</h3>
           </div>
           <div>
             {Object.entries(result.playerSkins)
@@ -1614,8 +1647,8 @@ function PayoutsBoard({ event, eventPlayers, leaderboards, sideGames, skinsResul
     B: payingPlayers.filter(ep => ep.flight === 'B').length,
   }
 
-  const { totalPot, byCategory, byPlayer, totalAllocated } = computePayouts(
-    event, payingPlayers.length, leaderboards, sideGames ?? [], skinsResults, flightCounts, stablefordData, blindPartnersData, superSkinsResult, stablefordGrossData
+  const { totalPot, buyInPotTotal, byCategory, byPlayer, totalAllocated } = computePayouts(
+    event, payingPlayers.length, leaderboards, sideGames ?? [], skinsResults, flightCounts, stablefordData, blindPartnersData, superSkinsResult, stablefordGrossData, payingPlayers
   )
 
   // Sort categories in the desired display order
@@ -1650,7 +1683,10 @@ function PayoutsBoard({ event, eventPlayers, leaderboards, sideGames, skinsResul
         <div>
           <div className="text-xs font-medium" style={{ color: '#86868b' }}>Total Pot</div>
           <div className="text-3xl font-black">${totalPot.toFixed(2)}</div>
-          <div className="text-xs mt-0.5" style={{ color: '#86868b' }}>{eventPlayers.length} players × ${event.entry_fee}</div>
+          <div className="text-xs mt-0.5" style={{ color: '#86868b' }}>
+            {eventPlayers.length} players × ${event.entry_fee}
+            {buyInPotTotal > 0 && <> + ${buyInPotTotal.toFixed(2)} separate buy-ins</>}
+          </div>
         </div>
         <div className="text-right">
           <div className="text-xs font-medium" style={{ color: '#86868b' }}>Allocated</div>

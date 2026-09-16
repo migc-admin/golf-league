@@ -1897,26 +1897,39 @@ function buildResultsCard({ event, eventPlayers, allScores, course, sideGames, o
   }
 
   // ── Super Skins ──────────────────────────────────────────────────
-  // Opt-in pot played as one pool, so there is never a flight split here.
+  // Split into independent per-flight pots when the game is scoped per flight
+  // (each flight competes only against itself); one combined pool otherwise.
   const superSkinsKey = sides.find(s => s === 'super_skins' || s.match(/^super_skins_[a-z]$/))
   if (superSkinsKey && superSkinsResult) {
     const sec = buildSection('Super Skins', GREEN, GOLD)
-    const winners = Object.entries(superSkinsResult.playerSkins)
-      .filter(([, n]) => n > 0)
-      .sort(([, a], [, b]) => b - a)
+    const superSkinsFlights = /^super_skins_[a-z]$/.test(superSkinsKey)
+      && superSkinsResult.A.entrantCount > 0 && superSkinsResult.B.entrantCount > 0
+      ? ['A', 'B']
+      : null
 
-    if (winners.length === 0) {
-      const none = el('div', { padding: '10px 14px', color: '#999', fontSize: '12px' })
-      none.textContent = superSkinsResult.carryoverToNext
-        ? `No skins won — ${superSkinsResult.carryoverAmount} carry to next event`
-        : 'No skins won'
-      sec._body.appendChild(none)
-    } else {
-      sec._body.appendChild(buildFullFieldGrid(
-        winners.map(([pid, count]) => ({ player_id: pid, _suffix: ` · ${count} skin${count !== 1 ? 's' : ''}` })),
-        winners.length, pid => display(pid, superSkinsKey),
-        GREEN, ROW_BG_ALT, true
+    if (superSkinsFlights) {
+      sec._body.appendChild(buildMultiFlightSkins(superSkinsFlights, superSkinsResult, (pid, fl) =>
+        display(pid, `super_skins_${fl.toLowerCase()}`)
       ))
+    } else {
+      const result = superSkinsResult.A.entrantCount > 0 ? superSkinsResult.A : superSkinsResult.B
+      const winners = Object.entries(result.playerSkins)
+        .filter(([, n]) => n > 0)
+        .sort(([, a], [, b]) => b - a)
+
+      if (winners.length === 0) {
+        const none = el('div', { padding: '10px 14px', color: '#999', fontSize: '12px' })
+        none.textContent = result.carryoverToNext
+          ? `No skins won — ${result.carryoverAmount} carry to next event`
+          : 'No skins won'
+        sec._body.appendChild(none)
+      } else {
+        sec._body.appendChild(buildFullFieldGrid(
+          winners.map(([pid, count]) => ({ player_id: pid, _suffix: ` · ${count} skin${count !== 1 ? 's' : ''}` })),
+          winners.length, pid => display(pid, 'super_skins'),
+          GREEN, ROW_BG_ALT, true
+        ))
+      }
     }
     wrap.appendChild(sec._card)
   }
@@ -1945,7 +1958,7 @@ function buildResultsCard({ event, eventPlayers, allScores, course, sideGames, o
   }
 
   // ── Blind Partners ───────────────────────────────────────────────
-  if (sides.includes('blind_partners') && blindPartnersData.length > 0) {
+  if (sides.some(s => s === 'blind_partners' || s.startsWith('blind_partners_')) && blindPartnersData.length > 0) {
     const sec = buildSection('Blind Partners', GREEN, GOLD)
     const isStableford = blindPartnersData[0].mode === 'stableford'
     const unit    = isStableford ? 'pts' : 'net'

@@ -10,6 +10,7 @@
  */
 
 import { computeSkinsPayout } from './skins.js'
+import { baseSideGameKey, isBuyInEnabled, sideKeyFlight } from '../sideGames.js'
 
 // Extract base competition and rank from a ranked key (e.g. '18_net_a_2nd' → { base: '18_net_a', rank: 2 })
 function getRankInfo(key) {
@@ -20,14 +21,24 @@ function getRankInfo(key) {
 }
 
 /** Extract flight letter (uppercase) from a per-flight key, or null for full-field keys */
-function flightLetterOf(key) {
-  // skins_a, super_skins_b, long_drive_b, low_putts_c
-  const sideMatch = key.match(/^(?:skins|super_skins|long_drive|low_putts)_([a-z])$/)
-  if (sideMatch) return sideMatch[1].toUpperCase()
+export function flightLetterOf(key) {
+  // skins_a, super_skins_b, long_drive_b, low_putts_c, super_ctp_a_7
+  const sideFl = sideKeyFlight(key)
+  if (sideFl) return sideFl
   // 18_net_a_1st, 18_gross_a_1st, f9_b_2nd, b9_c_3rd, stf_net_a_1st, gf9_a_1st, gb9_b_2nd, stf_gross_a_1st
   const scoringMatch = key.match(/^(?:18_net|18_gross|f9|b9|stf_net|gf9|gb9|stf_gross)_([a-z])_(?:1st|2nd|3rd)$/)
   if (scoringMatch) return scoringMatch[1].toUpperCase()
   return null
+}
+
+/**
+ * Blind Partners pairs competing for `key`'s pot — the whole ranked list for a
+ * whole-group key, or just that flight's pairs for a `blind_partners_x` key.
+ */
+function blindPartnersPairsFor(key, blindPartnersData) {
+  const list = blindPartnersData ?? []
+  const fl = sideKeyFlight(key)
+  return fl ? list.filter(p => p.flight === fl) : list
 }
 
 /** Human-readable label for any payout key */
@@ -86,6 +97,7 @@ export function getCategoryLabel(key) {
     if (key.startsWith('skins_'))       return `Skins — Flight ${fl}`
     if (key.startsWith('long_drive_'))  return `Long Drive — Flight ${fl}`
     if (key.startsWith('low_putts_'))  return `Low Putts — Flight ${fl}`
+    if (key.startsWith('blind_partners_')) return `Blind Partners — Flight ${fl}`
     if (key.startsWith('stf_net_')) {
       const rank = key.split('_').pop()
       return `Stableford Net — Flight ${fl}, ${rank}`
@@ -168,7 +180,7 @@ export const DEFAULT_PAYOUT_CONFIG = {
   'nassau_gross_f9': 2, 'nassau_gross_b9': 2, 'nassau_gross_18': 3,
   // Full field
   'low_putts': 0,
-  'blind_partners': 0,
+  'blind_partners': 0, 'blind_partners_a': 0, 'blind_partners_b': 0,
   // Opt-in pots — funded by the buy-in, so they start at 0
   'super_skins': 0, 'super_skins_a': 0, 'super_skins_b': 0,
 }
@@ -286,7 +298,7 @@ export function activePayoutKeys(event) {
   sides.filter(s => s === 'long_drive' || s.match(/^long_drive_[a-z]$/)).forEach(s => keys.push(s))
   // Low Putts — whole-group or per-flight
   sides.filter(s => s === 'low_putts' || s.match(/^low_putts_[a-z]$/)).forEach(s => keys.push(s))
-  // Super Skins — opt-in pot, whole-group or per-flight
+  // Super Skins — whole-group or per-flight (one independent pot per flight)
   sides.filter(s => s === 'super_skins' || s.match(/^super_skins_[a-z]$/)).forEach(s => keys.push(s))
   // Super CTP — the single designated par 3 (opt-in pot). Per-flight when the
   // side game was selected per flight, otherwise one whole-group prize.
@@ -300,8 +312,9 @@ export function activePayoutKeys(event) {
       keys.push(`super_ctp_${event.super_ctp_hole}`)
     }
   }
-  // Blind Partners — single standalone payout for the top pair
-  if (sides.includes('blind_partners')) keys.push('blind_partners')
+  // Blind Partners — top pair. Per flight, each flight pays its own top pair.
+  sides.filter(s => s === 'blind_partners' || /^blind_partners_[a-z]$/.test(s))
+    .forEach(s => keys.push(s))
   // CTP keys are dynamic (added by hole number) — handled separately in TabPayoutConfig
 
   return keys
@@ -350,9 +363,10 @@ function resolveWinners(key, leaderboards, sideGames, stablefordData, blindPartn
     if (!top) return []
     return list.filter(p => p.rank === 1).map(p => p.player_id)
   }
-  // Blind Partners — top (lowest combined net) pair; both partners split the payout
-  if (key === 'blind_partners') {
-    const list = blindPartnersData ?? []
+  // Blind Partners — top (lowest combined net) pair; both partners split the
+  // payout. Per flight, only that flight's pairs compete for that flight's pot.
+  if (key === 'blind_partners' || /^blind_partners_[a-z]$/.test(key)) {
+    const list = blindPartnersPairsFor(key, blindPartnersData)
     const top = list[0]
     if (!top) return []
     return list.filter(p => p.rank === top.rank).flatMap(p => p.player_ids)
@@ -461,14 +475,13 @@ function resolveWinners(key, leaderboards, sideGames, stablefordData, blindPartn
  * @param {Object} flightCounts   — { A: number, B: number, C: number, ... }
  * @param {Object} [stablefordData]    — from scoring.computeStableford, e.g. { A: [...], B: [...] }
  * @param {Array}  [blindPartnersData] — from scoring.computeBlindPartners, ranked pairs
- * @param {Object} [superSkinsResult]  — from skins.computeSuperSkins (single flattened pool)
+ * @param {Object} [superSkinsResult]  — from skins.computeSuperSkins, { A: {...,entrantCount}, B: {...,entrantCount} }
  * @param {Object} [stablefordGrossData] — from scoring.computeStableford(..., true), e.g. { A: [...], B: [...] }
+ * @param {Array}  [eventPlayers]     — event_players rows (with .player_id/.flight), used to split
+ *                                      "Separate buy-in" entrant counts by flight for flight-scoped games
  */
-export function computePayouts(event, playerCount, leaderboards, sideGames, skinsResults, flightCounts, stablefordData = null, blindPartnersData = null, superSkinsResult = null, stablefordGrossData = null) {
-  const config   = event.payout_config ?? {}
-  const totalPot = (event.payout_basis === 'fixed' && event.payout_fixed_total)
-    ? event.payout_fixed_total
-    : event.entry_fee * playerCount
+export function computePayouts(event, playerCount, leaderboards, sideGames, skinsResults, flightCounts, stablefordData = null, blindPartnersData = null, superSkinsResult = null, stablefordGrossData = null, eventPlayers = []) {
+  const config = event.payout_config ?? {}
 
   function getFlightCount(fl) {
     if (!fl) return playerCount
@@ -479,16 +492,35 @@ export function computePayouts(event, playerCount, leaderboards, sideGames, skin
     return Math.round(playerCount / numFlights)
   }
 
-  // Opt-in pots are funded only by the players who bought in, not the whole field.
-  // Returns null when the game isn't opt-in (or no entries are tracked) so the
-  // caller falls back to the flight/field count.
+  const flightByPlayer = {}
+  eventPlayers.forEach(ep => { if (ep.flight) flightByPlayer[ep.player_id] = ep.flight })
+
+  // "Separate buy-in" pots are funded only by the players who opted in, not
+  // the whole field/flight. Returns null when the game isn't buy-in-flagged
+  // (or isn't a side-game key at all) so the caller falls back to the
+  // flight/field count.
   function optInCount(key) {
-    const entries = event.side_game_entries ?? {}
-    if (key === 'super_skins' || /^super_skins_[a-z]$/.test(key)) return entries.super_skins?.length ?? null
-    if (key.startsWith('super_ctp_')) return entries.super_ctp?.length ?? null
-    if (key === 'blind_partners') return entries.blind_partners?.length ?? null
-    return null
+    const base = baseSideGameKey(key)
+    if (!base || !isBuyInEnabled(event, base)) return null
+    const opted = event.side_game_entries?.[base] ?? []
+    const fl = flightLetterOf(key)
+    if (!fl) return opted.length
+    return opted.filter(pid => flightByPlayer[pid] === fl).length
   }
+
+  // "Separate buy-in" games are funded by their own opted-in entrants, not the
+  // entry fee — so their pots are new money on top of the entry-fee pot, not
+  // a slice of it. Sum them in so "Total Pot" reflects everything actually in
+  // play, matching the per-category amounts already computed in the loop below.
+  const buyInPotTotal = Object.entries(config).reduce((sum, [key, dollarVal]) => {
+    if (!dollarVal || dollarVal <= 0) return sum
+    const count = optInCount(key)
+    return count === null ? sum : sum + (dollarVal * count)
+  }, 0)
+
+  const totalPot = ((event.payout_basis === 'fixed' && event.payout_fixed_total)
+    ? event.payout_fixed_total
+    : event.entry_fee * playerCount) + buyInPotTotal
 
   const byCategory = []
   const byPlayer   = {}
@@ -548,12 +580,19 @@ export function computePayouts(event, playerCount, leaderboards, sideGames, skin
     }
   }
 
-  // Process standalone keys (skins, long drive, low putts, ctp)
+  // Process standalone keys (skins, super skins, long drive, low putts, ctp)
   for (const { key, amount } of standaloneEntries) {
-    // Super Skins — one flattened pool of opted-in players, paid per skin
-    if (key === 'super_skins' || /^super_skins_[a-z]$/.test(key)) {
+    // Super Skins — same hole-by-hole skins payout as regular Skins, but over
+    // its own pool. When scoped per flight, each flight is an independent pot
+    // whose size comes from that flight's own entrant count (already applied
+    // above via optInCount), so flights never share money.
+    const superSkinsFlightMatch = key.match(/^super_skins_([a-z])$/)
+    if (key === 'super_skins' || superSkinsFlightMatch) {
       if (!superSkinsResult) continue
-      for (const sp of computeSkinsPayout(superSkinsResult, amount)) {
+      const fl = superSkinsFlightMatch ? superSkinsFlightMatch[1].toUpperCase() : 'A'
+      const flResult = superSkinsResult[fl]
+      if (!flResult || flResult.entrantCount === 0) continue
+      for (const sp of computeSkinsPayout(flResult, amount)) {
         const label = `${getCategoryLabel(key)} (${sp.skinsWon} skin${sp.skinsWon !== 1 ? 's' : ''})`
         byCategory.push({ key: `${key}_${sp.playerId}`, label, amount: sp.total, playerId: sp.playerId, isSkin: true })
         if (!byPlayer[sp.playerId]) byPlayer[sp.playerId] = { total: 0, items: [] }
@@ -582,9 +621,9 @@ export function computePayouts(event, playerCount, leaderboards, sideGames, skin
 
     // Blind Partners — both members of the winning pair are paid; they split the
     // pot as a team, so this is not a "tie" unless multiple pairs actually tie.
-    if (key === 'blind_partners') {
+    if (key === 'blind_partners' || /^blind_partners_[a-z]$/.test(key)) {
       const winners = resolveWinners(key, leaderboards, sideGames, stablefordData, blindPartnersData, stablefordGrossData)
-      const pairs     = blindPartnersData ?? []
+      const pairs     = blindPartnersPairsFor(key, blindPartnersData)
       const tiedPairs = pairs.filter(p => p.rank === pairs[0]?.rank).length
       const base      = getCategoryLabel(key)
       const label =
@@ -622,7 +661,7 @@ export function computePayouts(event, playerCount, leaderboards, sideGames, skin
 
   const totalAllocated = byCategory.reduce((s, c) => s + c.amount, 0)
 
-  return { totalPot, byCategory, byPlayer: byPlayerSorted, totalAllocated }
+  return { totalPot, buyInPotTotal, byCategory, byPlayer: byPlayerSorted, totalAllocated }
 }
 
 // Re-export for backwards compat

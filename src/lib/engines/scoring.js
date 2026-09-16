@@ -3,6 +3,8 @@
  * All functions are pure — no side effects, no Supabase calls.
  */
 
+import { isPerFlight } from '../sideGames.js'
+
 /**
  * Compute course handicap per USGA formula.
  * Course Handicap = ROUND((HI × Slope / 113) + (Rating − Par))
@@ -228,7 +230,7 @@ export function computeBlindPartners(event, eventPlayers, allScores, course) {
 
   if (pairs.length === 0) return []
 
-  return pairs.map((pair, i) => {
+  const scored = pairs.map((pair, i) => {
     const r1 = playerScore(pair.p1)
     let r2
     if (pair.p2) {
@@ -248,21 +250,38 @@ export function computeBlindPartners(event, eventPlayers, allScores, course) {
       player_ids: [pair.p1, pair.p2].filter(Boolean),
       oddConfig: !pair.p2 ? oddConfig : null,
       mode,
+      // Pairs are drawn within a flight when scoped per flight, so a pair's
+      // flight is simply its first member's. Stored on the pair at draw time;
+      // fall back to the roster for pairs drawn before scoping existed.
+      flight: pair.flight
+        ?? eventPlayers.find(e => e.player_id === pair.p1)?.flight
+        ?? null,
       combinedScore: r1.score + r2.score,
       holesPlayed: Math.max(r1.holesPlayed, r2.holesPlayed),
     }
   })
-    // Stableford is a points race (high wins); net stroke play is low-wins
-    .sort((a, b) => mode === 'stableford'
-      ? b.combinedScore - a.combinedScore || b.holesPlayed - a.holesPlayed
-      : a.combinedScore - b.combinedScore)
-    .reduce((ranked, p, i) => {
-      // Tied pairs share a rank so they split the payout (same convention as computeLeaderboards)
-      const prev = ranked[i - 1]
-      const tied = prev && prev.combinedScore === p.combinedScore && prev.holesPlayed === p.holesPlayed
-      ranked.push({ ...p, rank: tied ? prev.rank : i + 1 })
-      return ranked
-    }, [])
+
+  // Stableford is a points race (high wins); net stroke play is low-wins
+  const bestFirst = (a, b) => mode === 'stableford'
+    ? b.combinedScore - a.combinedScore || b.holesPlayed - a.holesPlayed
+    : a.combinedScore - b.combinedScore
+
+  // Tied pairs share a rank so they split the payout (same convention as
+  // computeLeaderboards). Per flight, each flight is ranked from 1 independently
+  // so every flight pays its own top pair.
+  const rankGroup = group => group.sort(bestFirst).reduce((ranked, p, i) => {
+    const prev = ranked[i - 1]
+    const tied = prev && prev.combinedScore === p.combinedScore && prev.holesPlayed === p.holesPlayed
+    ranked.push({ ...p, rank: tied ? prev.rank : i + 1 })
+    return ranked
+  }, [])
+
+  if (!isPerFlight(event, 'blind_partners')) return rankGroup(scored)
+
+  const byFlight = {}
+  for (const p of scored) (byFlight[p.flight ?? '—'] ??= []).push(p)
+  return Object.keys(byFlight).sort()
+    .flatMap(fl => rankGroup(byFlight[fl]))
 }
 
 /**

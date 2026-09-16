@@ -11,7 +11,7 @@ import { CSS } from '@dnd-kit/utilities'
 import { useParams, Link, useSearchParams, useNavigate } from 'react-router-dom'
 import { supabase } from '../../lib/supabase'
 import toast from 'react-hot-toast'
-import { computePayouts, DEFAULT_PAYOUT_CONFIG, getCategoryLabel, ctpLabel, activePayoutKeys, defaultForKey } from '../../lib/engines/payouts'
+import { computePayouts, DEFAULT_PAYOUT_CONFIG, getCategoryLabel, ctpLabel, activePayoutKeys, defaultForKey, flightLetterOf } from '../../lib/engines/payouts'
 import { computeLeaderboards, computeStableford, computeBlindPartners, blindPartnersMode, getStrokeIndexForTee } from '../../lib/engines/scoring'
 import { computeAllSkins, computeSuperSkins } from '../../lib/engines/skins'
 import { computeTGLEventResults, assignTGLPoints } from '../../lib/engines/tgl'
@@ -26,21 +26,27 @@ import ImageUpload from '../../components/ui/ImageUpload'
 import UpgradePrompt from '../../components/ui/UpgradePrompt'
 import PrintAssets from '../../components/ui/PrintAssets'
 import { atLimit, getLimit, nextTier, TIER_LABELS } from '../../lib/features'
-import { OPT_IN_GAME_KEYS, optInAmount } from '../../lib/sideGames'
+import { BUY_IN_ELIGIBLE_KEYS, OPT_IN_GAME_LABELS, optInAmount, isBuyInEnabled, baseSideGameKey, isPerFlight } from '../../lib/sideGames'
 
 // Collapsed from 7 → 4 tabs: Players = Registrations + Players & Flights; Payout = Config + Side Games + Summary
 const ALL_ADMIN_TABS = ['Overview', 'Players', 'Groups', 'Side Games', 'Payout', 'Pre/Post Round', 'Team Play']
 
 // ─── Side game helpers (shared between EditEventModal and elsewhere) ──────────
+// Every side game offers a "Per flight / Whole group" scope radio. Scope only
+// decides how the competition is *pooled* (one whole-group pot vs. one
+// independent pot per flight, where players only compete against — and can only
+// win from — their own flight). It is orthogonal to the "Separate buy-in" flag,
+// which decides who *funds* the pot: opted-in entrants only (separate buy-in)
+// vs. the whole field/flight out of the entry fee (no separate buy-in).
+// Per flight, Blind Partners draws pairs *within* each flight (an A player is
+// never paired with a B player) and each flight pays its own pot.
 const PER_FLIGHT_GAMES = [
-  { key: 'skins',       label: 'Skins' },
-  { key: 'super_skins', label: 'Super Skins' },
-  { key: 'long_drive',  label: 'Long Drive' },
-  { key: 'low_putts',   label: 'Low Putts' },
-  { key: 'ctp',         label: 'Closest to Pin (par 3s)' },
-  { key: 'super_ctp',   label: 'Super CTP (par 3s)' },
-]
-const GROUP_GAMES = [
+  { key: 'skins',          label: 'Skins' },
+  { key: 'super_skins',    label: 'Super Skins' },
+  { key: 'long_drive',     label: 'Long Drive' },
+  { key: 'low_putts',      label: 'Low Putts' },
+  { key: 'ctp',            label: 'Closest to Pin (par 3s)' },
+  { key: 'super_ctp',      label: 'Super CTP (par 3s)' },
   { key: 'blind_partners', label: 'Blind Partners' },
 ]
 const PER_FLIGHT_GAME_KEYS = new Set(PER_FLIGHT_GAMES.map(g => g.key))
@@ -55,9 +61,6 @@ function buildSideGameOptions(enabledGames, gameScope, numFlights) {
     } else {
       result.push(g.key)
     }
-  }
-  for (const g of GROUP_GAMES) {
-    if (enabledGames.has(g.key)) result.push(g.key)
   }
   return result
 }
@@ -462,7 +465,7 @@ async function exportScoresCSV(event, eventPlayers, allScores, course, sideGames
   const stablefordGrossData = computeStableford(nonGuestEPs, allScores, course, true)
   const blindPartnersData = computeBlindPartners(event, nonGuestEPs, allScores, course)
   const superSkinsResult  = computeSuperSkins(event, nonGuestEPs, allScores, course)
-  const { byCategory } = computePayouts(event, nonGuestEPs.length, leaderboards, sideGames, skinsResults, flightCounts, stablefordData, blindPartnersData, superSkinsResult, stablefordGrossData)
+  const { byCategory } = computePayouts(event, nonGuestEPs.length, leaderboards, sideGames, skinsResults, flightCounts, stablefordData, blindPartnersData, superSkinsResult, stablefordGrossData, nonGuestEPs)
 
   const playerMap = Object.fromEntries(eventPlayers.map(ep => [ep.player_id, ep.player]))
 
@@ -1236,7 +1239,7 @@ function TabPostRound({ event, eventPlayers, allScores, course, sideGames, orgNa
   const leagueName = event.league?.name ?? orgName
   const logoUrl = event.league?.logo_url ?? orgLogoUrl ?? null
   const hasOptInGames = [...new Set((event?.side_game_options ?? []).map(k => k.replace(/_[ab]$/, '')))]
-    .some(k => OPT_IN_GAME_KEYS.has(k) && optInAmount(event, k) != null)
+    .some(k => isBuyInEnabled(event, k) && optInAmount(event, k) != null)
 
   return (
     <div className="space-y-6 max-w-xl">
@@ -3020,18 +3023,22 @@ function TabPayoutConfig({ event, eventPlayers, course, onUpdated }) {
   }
 
   function getMultiplier(key) {
-    // Opt-in pots are funded only by the players who bought in — never fall back
-    // to the full field, since an empty/unset entrant list means zero entrants.
-    if (key === 'super_skins' || key.startsWith('super_skins_')) return sideGameEntries.super_skins?.length ?? 0
-    if (key === 'super_ctp' || key.startsWith('super_ctp_')) return sideGameEntries.super_ctp?.length ?? 0
-    if (key === 'blind_partners') return sideGameEntries.blind_partners?.length ?? 0
+    // "Separate buy-in" pots are funded only by the players who opted in — never
+    // fall back to the full field, since an empty/unset entrant list means zero entrants.
+    const base = baseSideGameKey(key)
+    if (base && isBuyInEnabled(event, base)) {
+      const opted = sideGameEntries[base] ?? []
+      const fl = flightLetterOf(key)
+      if (!fl) return opted.length
+      const idsInFlight = new Set(nonGuestPlayers.filter(ep => ep.flight === fl).map(ep => ep.player_id))
+      return opted.filter(pid => idsInFlight.has(pid)).length
+    }
     // Full-field keys
     if (key === 'low_putts' || key.startsWith('ctp_') || key === 'skins' || key === 'long_drive') return totalPlayers
     if (!hasFlights && (key.startsWith('18_net_') || key.startsWith('18_gross_') || key.startsWith('f9_') || key.startsWith('b9_') || key.startsWith('stf_net_'))) return totalPlayers
     // Per-flight: extract letter
-    const flMatch = key.match(/(?:skins|long_drive|low_putts|18_net|18_gross|stf_net|f9|b9)_([a-z])/)
-    if (flMatch) {
-      const fl = flMatch[1].toUpperCase()
+    const fl = flightLetterOf(key)
+    if (fl) {
       return flightCounts[fl] ?? Math.round(totalPlayers / (numFlights || 1))
     }
     return totalPlayers
@@ -3050,15 +3057,25 @@ function TabPayoutConfig({ event, eventPlayers, course, onUpdated }) {
     const mult  = getMultiplier(key)
     const total = (val || 0) * mult
     const label = getCategoryLabel(key)
-    const isOptIn = key === 'super_skins' || key.startsWith('super_skins_')
-      || key === 'super_ctp' || key.startsWith('super_ctp_') || key === 'blind_partners'
-    // Determine flight letter
-    const flMatch = hasFlights && key.match(/(?:skins|super_ctp|long_drive|low_putts|18_net|18_gross|stf_net|f9|b9)_([a-z])(?:_|$)/)
-    const flLetter = flMatch ? flMatch[1].toUpperCase() : null
+    const base    = baseSideGameKey(key)
+    const isOptIn = !!(base && isBuyInEnabled(event, base))
+    const flLetter = hasFlights ? flightLetterOf(key) : null
     const isField = !flLetter && !isOptIn
     return { key, val, label, isField, isOptIn, flLetter, mult, total }
   })
-  const optInRows = rows.filter(r => r.isOptIn)
+  // Separate Buy-in games get their own table each — never merged with another
+  // game's rows. A player can only opt into one game and (if per-flight) only
+  // occupies one flight, so a combined "$/player" total spanning rows from
+  // different games or flights would overstate what any single player pays.
+  const optInGameOrder   = []
+  const optInGamesByBase = {}
+  for (const r of rows) {
+    if (!r.isOptIn) continue
+    const base = baseSideGameKey(r.key)
+    if (!base) continue
+    if (!optInGamesByBase[base]) { optInGamesByBase[base] = []; optInGameOrder.push(base) }
+    optInGamesByBase[base].push(r)
+  }
 
   return (
     <div className="space-y-4">
@@ -3191,20 +3208,30 @@ function TabPayoutConfig({ event, eventPlayers, course, onUpdated }) {
         </Card>
       )}
 
-      {/* Opt-in side games — funded only by the players who actually entered */}
-      {optInRows.length > 0 && (
-        <Card className="overflow-hidden p-0">
-          <div className="px-4 py-2.5 bg-amber-50 border-b border-amber-100">
-            <h3 className="text-xs font-semibold text-amber-700">
-              Opt-in Side Games — not everyone participates
-            </h3>
-            <p className="text-xs text-amber-600/80 mt-0.5">
-              Player counts come from the Side Games tab's opt-in rosters, not the full field.
-            </p>
-          </div>
-          <PayoutTable rows={optInRows} onChange={setVal} colLabel="$ per entrant" />
-        </Card>
-      )}
+      {/* Separate Buy-in games — one table per game, since a player never
+          contributes to more than one game (or more than one flight's pot
+          within a game), so each table's own total pot is the only figure
+          that means anything. */}
+      {optInGameOrder.map(base => {
+        const gameRows     = optInGamesByBase[base]
+        const perFlightGame = gameRows.some(r => r.flLetter)
+        const label = OPT_IN_GAME_LABELS[base] ?? base
+        return (
+          <Card key={base} className="overflow-hidden p-0">
+            <div className="px-4 py-2.5 bg-amber-50 border-b border-amber-100">
+              <h3 className="text-xs font-semibold text-amber-700">
+                {label} — Separate Buy-in {perFlightGame ? '(Per Flight)' : '(Whole Group)'}
+              </h3>
+              <p className="text-xs text-amber-600/80 mt-0.5">
+                {perFlightGame
+                  ? "Each flight is its own pot, funded only by that flight's opted-in players — money is never mixed between flights, and only entrants in that flight can win it."
+                  : "One pot open to every player who opts in, regardless of flight. Count comes from the Side Games tab's opt-in roster, not the full field."}
+              </p>
+            </div>
+            <PayoutTable rows={gameRows} onChange={setVal} colLabel="$ per entrant" showPerPlayerTotal={false} />
+          </Card>
+        )
+      })}
 
       {/* Save */}
       <div className="flex items-center justify-between pt-2 border-t border-gray-100">
@@ -3217,7 +3244,7 @@ function TabPayoutConfig({ event, eventPlayers, course, onUpdated }) {
   )
 }
 
-function PayoutTable({ rows, onChange, colLabel }) {
+function PayoutTable({ rows, onChange, colLabel, showPerPlayerTotal = true }) {
   if (rows.length === 0) return <p className="px-4 py-3 text-xs text-gray-400">None</p>
   const totalPerPlayer = rows.reduce((sum, r) => sum + (r.val || 0), 0)
   const totalPot       = rows.reduce((sum, r) => sum + r.total, 0)
@@ -3252,14 +3279,28 @@ function PayoutTable({ rows, onChange, colLabel }) {
           </tr>
         ))}
       </tbody>
-      <tfoot>
-        <tr className="border-t border-gray-200 bg-gray-50 text-xs font-semibold text-gray-700">
-          <td className="px-4 py-2">Total</td>
-          <td className="px-3 py-2 tabular-nums">${totalPerPlayer.toFixed(2)} / player</td>
-          <td className="px-3 py-2" />
-          <td className="px-3 py-2 text-right tabular-nums">${totalPot.toFixed(2)}</td>
-        </tr>
-      </tfoot>
+      {/* A "$/player" total only means something when every row in the table
+          is funded by the same players (full-field / per-flight scoring
+          categories). Separate Buy-in tables never show it — a player is
+          never in more than one flight's row, so summing $ values across
+          rows would overstate what any single entrant actually pays. */}
+      {showPerPlayerTotal ? (
+        <tfoot>
+          <tr className="border-t border-gray-200 bg-gray-50 text-xs font-semibold text-gray-700">
+            <td className="px-4 py-2">Total</td>
+            <td className="px-3 py-2 tabular-nums">${totalPerPlayer.toFixed(2)} / player</td>
+            <td className="px-3 py-2" />
+            <td className="px-3 py-2 text-right tabular-nums">${totalPot.toFixed(2)}</td>
+          </tr>
+        </tfoot>
+      ) : rows.length > 1 ? (
+        <tfoot>
+          <tr className="border-t border-gray-200 bg-gray-50 text-xs font-semibold text-gray-700">
+            <td className="px-4 py-2" colSpan={3}>Combined pot (across flights)</td>
+            <td className="px-3 py-2 text-right tabular-nums">${totalPot.toFixed(2)}</td>
+          </tr>
+        </tfoot>
+      ) : null}
     </table>
   )
 }
@@ -3287,14 +3328,25 @@ function BlindPartnersCard({ event, eventPlayers, optedInIds = [], onUpdated }) 
   }, [event.side_game_entries])
 
   async function drawPartners() {
-    const ids      = drawPool.map(ep => ep.player_id)
-    const shuffled = [...ids].sort(() => Math.random() - 0.5)
+    // Per flight, pairs are drawn *within* each flight — an A player is never
+    // paired with a B player, and each flight leaves at most one odd player.
+    const perFlight = isPerFlight(event, 'blind_partners')
+    const groups = perFlight
+      ? Object.values(drawPool.reduce((acc, ep) => {
+          (acc[ep.flight ?? '—'] ??= []).push(ep); return acc
+        }, {}))
+      : [drawPool]
+
     const newPairs = []
-    for (let i = 0; i < shuffled.length - 1; i += 2) {
-      newPairs.push({ p1: shuffled[i], p2: shuffled[i + 1] })
-    }
-    if (shuffled.length % 2 !== 0) {
-      newPairs.push({ p1: shuffled[shuffled.length - 1], p2: null })
+    for (const group of groups) {
+      const shuffled = [...group].sort(() => Math.random() - 0.5)
+      for (let i = 0; i < shuffled.length - 1; i += 2) {
+        newPairs.push({ p1: shuffled[i].player_id, p2: shuffled[i + 1].player_id, flight: shuffled[i].flight ?? null })
+      }
+      if (shuffled.length % 2 !== 0) {
+        const last = shuffled[shuffled.length - 1]
+        newPairs.push({ p1: last.player_id, p2: null, flight: last.flight ?? null })
+      }
     }
     setPairs(newPairs)
     setSaving(true)
@@ -3477,7 +3529,6 @@ function BlindPartnersCard({ event, eventPlayers, optedInIds = [], onUpdated }) 
 // ─── Tab: Side Games (opt-ins + draw + winner entry) ─────────────────────────
 function TabSideGamesMain({ event, eventPlayers, course, sideGames, onUpdated, orgSlug, leagueSlug }) {
   const sides   = event.side_game_options ?? []
-  const buyIns  = event.side_game_buy_ins ?? {}
   const hasSideGames = sides.length > 0 || (event.custom_competitions ?? []).some(c => c?.trim())
   const optInUrl = `${window.location.origin}/${orgSlug}/${event.league?.slug ?? leagueSlug}/${event.slug}/opt-in`
 
@@ -3487,16 +3538,14 @@ function TabSideGamesMain({ event, eventPlayers, course, sideGames, onUpdated, o
     return (m && PER_FLIGHT_GAME_KEYS.has(m[1])) ? m[1] : s
   }))]
 
-  // Show opt-ins for any of these games when configured — no buy-in toggle required
-  const optInGames = baseKeys.filter(k => OPT_IN_GAME_KEYS.has(k))
-  // Legacy: also include any games where admin explicitly enabled buy-in
-  const buyInGames = [...new Set([...optInGames, ...baseKeys.filter(k => buyIns[k]?.enabled)])]
+  // Any base game flagged "Separate buy-in" gets an opt-in roster here (the 3
+  // legacy opt-in games are always buy-in-enabled — see isBuyInEnabled()).
+  const buyInGames = baseKeys.filter(k => isBuyInEnabled(event, k))
 
-  // Opt-in games are funded by Payout Config's "$ per entrant" — read it directly so the
+  // Buy-in games are funded by Payout Config's "$ per entrant" — read it directly so the
   // pot shown here always matches the Payouts tab instead of a separately-entered amount.
   function payoutAmountForKey(key) {
-    if (OPT_IN_GAME_KEYS.has(key)) return optInAmount(event, key)
-    return event.payout_config?.[key] ?? buyIns[key]?.amount ?? null
+    return optInAmount(event, key)
   }
 
   // Opt-in entries state (synced to DB)
@@ -3591,7 +3640,7 @@ function TabSideGamesMain({ event, eventPlayers, course, sideGames, onUpdated, o
   return (
     <div className="space-y-6">
       {/* ── Opt-in link ──────────────────────────────────────────── */}
-      {optInGames.length > 0 && (
+      {buyInGames.length > 0 && (
         <Card>
           <CardHeader title="Opt-In Link" subtitle="Share this link (or the printable Check-In QR sign) so players can self-serve join & pay for opt-in games" />
           <div className="flex items-center gap-2 px-4 pb-4">
@@ -3770,7 +3819,7 @@ function TabSideGames({ event, eventPlayers, course, sideGames, sideGameEntries 
   const hasLd      = sides.includes('long_drive')
   const hasCtp      = sides.some(s => s === 'ctp' || s.startsWith('ctp_'))
   const hasSuperCtp = sides.some(s => s === 'super_ctp' || s.startsWith('super_ctp_'))
-  const hasBlindPartners = sides.includes('blind_partners')
+  const hasBlindPartners = sides.some(s => s === 'blind_partners' || s.startsWith('blind_partners_'))
   const hasSuperSkins    = sides.some(s => s === 'super_skins' || s.startsWith('super_skins_'))
 
   return (
@@ -3922,8 +3971,12 @@ function TabSideGames({ event, eventPlayers, course, sideGames, sideGameEntries 
       {/* Super Skins */}
       {hasSuperSkins && (
         <Card>
-          <CardHeader title="Super Skins" subtitle="Separate entry — results auto-computed from scoring" />
-          <p className="text-sm text-gray-500 py-2">Super Skins runs on the same scoring data as Skins. Winners are determined automatically once all scores are entered.</p>
+          <CardHeader title="Super Skins" subtitle="Results auto-computed from scoring" />
+          <p className="text-sm text-gray-500 py-2">
+            Super Skins runs on the same scoring data as Skins. Winners are determined automatically once all scores are entered.
+            {sides.some(s => /^super_skins_[a-z]$/.test(s))
+              && ' Each flight competes in its own separate pot, based on each player\u2019s flight assignment — money is never mixed between flights.'}
+          </p>
         </Card>
       )}
 
@@ -3976,8 +4029,8 @@ function TabPayoutSummary({ event, eventPlayers, allScores, sideGames, course })
   const stablefordGrossData = computeStableford(nonGuestEPs, allScores, course, true)
   const blindPartnersData = computeBlindPartners(event, nonGuestEPs, allScores, course)
   const superSkinsResult  = computeSuperSkins(event, nonGuestEPs, allScores, course)
-  const { totalPot, byCategory, byPlayer, totalAllocated } = computePayouts(
-    event, nonGuestEPs.length, leaderboards, sideGames, skinsResults, flightCounts, stablefordData, blindPartnersData, superSkinsResult, stablefordGrossData
+  const { totalPot, buyInPotTotal, byCategory, byPlayer, totalAllocated } = computePayouts(
+    event, nonGuestEPs.length, leaderboards, sideGames, skinsResults, flightCounts, stablefordData, blindPartnersData, superSkinsResult, stablefordGrossData, nonGuestEPs
   )
 
   const playerMap = Object.fromEntries(
@@ -3989,7 +4042,10 @@ function TabPayoutSummary({ event, eventPlayers, allScores, sideGames, course })
       <div className="flex items-center justify-between">
         <div>
           <p className="text-lg font-bold text-gray-900">Total Pot: ${totalPot.toFixed(2)}</p>
-          <p className="text-sm text-gray-500">{nonGuestEPs.length} players × ${event.entry_fee}</p>
+          <p className="text-sm text-gray-500">
+            {nonGuestEPs.length} players × ${event.entry_fee}
+            {buyInPotTotal > 0 && <> + ${buyInPotTotal.toFixed(2)} separate buy-ins</>}
+          </p>
         </div>
       </div>
 
@@ -4237,10 +4293,7 @@ function EditEventModal({ open, onClose, event, onSaved }) {
     setSideGames(prev => { const n = new Set(prev); n.has(key) ? n.delete(key) : n.add(key); return n })
   }
   function toggleBuyIn(key) {
-    setSideGameBuyIns(prev => ({ ...prev, [key]: { ...prev[key], enabled: !(prev[key]?.enabled) } }))
-  }
-  function setBuyInAmount(key, val) {
-    setSideGameBuyIns(prev => ({ ...prev, [key]: { ...prev[key], amount: val } }))
+    setSideGameBuyIns(prev => ({ ...prev, [key]: { enabled: !(prev[key]?.enabled) } }))
   }
 
   async function handleSave(e) {
@@ -4276,9 +4329,10 @@ function EditEventModal({ open, onClose, event, onSaved }) {
         holes_played:           holesPlayed,
         use_handicaps:          useHandicaps,
         side_game_buy_ins:      Object.fromEntries(
-          Object.entries(sideGameBuyIns)
-            .filter(([k, v]) => sideGames.has(k) && v?.enabled)
-            .map(([k, v]) => [k, { enabled: true, amount: v.amount !== '' && v.amount != null ? parseFloat(v.amount) : null }])
+          [...sideGames]
+            .filter(k => BUY_IN_ELIGIBLE_KEYS.has(k))
+            .map(k => [k, { enabled: !!sideGameBuyIns[k]?.enabled }])
+            .filter(([, v]) => v.enabled)
         ),
       })
       .eq('id', event.id)
@@ -4558,7 +4612,7 @@ function EditEventModal({ open, onClose, event, onSaved }) {
         <div>
           <label className="label">Side Games / Competitions</label>
           <div className="space-y-3 bg-gray-50 rounded-xl px-4 py-3">
-            {[...PER_FLIGHT_GAMES, ...GROUP_GAMES].map(opt => {
+            {PER_FLIGHT_GAMES.map(opt => {
               const checked = sideGames.has(opt.key)
               const scope = gameScope[opt.key] ?? 'flight'
               const flightLetters = Array.from({ length: numFlights }, (_, i) => String.fromCharCode(65 + i))
@@ -4586,29 +4640,22 @@ function EditEventModal({ open, onClose, event, onSaved }) {
                       </label>
                     </div>
                   )}
-                  {checked && OPT_IN_GAME_KEYS.has(opt.key) && (
-                    <div className="ml-6 mt-1.5">
-                      <span className="text-xs text-gray-400 italic">Opt-in — $ per entrant is set in the Payouts tab</span>
-                    </div>
-                  )}
-                  {checked && !OPT_IN_GAME_KEYS.has(opt.key) && (
+                  {checked && (
                     <div className="ml-6 mt-1.5 flex items-center gap-3">
                       <label className="flex items-center gap-1.5 cursor-pointer">
-                        <input type="checkbox" checked={buyIn.enabled ?? false} onChange={() => toggleBuyIn(opt.key)} className="accent-fairway-600 w-4 h-4" />
+                        <input
+                          type="checkbox"
+                          checked={buyIn.enabled ?? false}
+                          onChange={() => toggleBuyIn(opt.key)}
+                          className="accent-fairway-600 w-4 h-4"
+                        />
                         <span className="text-xs text-gray-600">Separate buy-in</span>
                       </label>
-                      {buyIn.enabled && (
-                        <div className="flex items-center gap-1">
-                          <span className="text-xs text-gray-400">$</span>
-                          <input
-                            type="number" min="0" step="1"
-                            value={buyIn.amount ?? ''}
-                            onChange={e => setBuyInAmount(opt.key, e.target.value)}
-                            placeholder="0"
-                            className="w-16 border border-gray-300 rounded px-2 py-0.5 text-xs focus:outline-none focus:ring-1 focus:ring-green-600"
-                          />
-                        </div>
-                      )}
+                      <span className="text-xs text-gray-400 italic">
+                        {buyIn.enabled
+                          ? '$ per entrant is set in the Payouts tab'
+                          : 'Included in Entry Fee ($)'}
+                      </span>
                     </div>
                   )}
                 </div>
