@@ -2,6 +2,11 @@
  * digest-registrations
  * Called nightly by Supabase Cron (pg_cron).
  * Sends each org admin a summary of all registrations from the past 24 hours.
+ *
+ * Auth: the Supabase project's anon key alone is not sufficient to prove a
+ * request actually came from the scheduled cron job (it's public by design),
+ * so this function requires a shared secret sent as a custom header by the
+ * cron job's HTTP call — see WEBHOOK_SECRET below.
  */
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
@@ -13,6 +18,7 @@ const supabase = createClient(
 
 const RESEND_API_KEY = Deno.env.get('RESEND_API_KEY') ?? ''
 const FROM_EMAIL     = 'notifications@scorifygolf.com'
+const WEBHOOK_SECRET = Deno.env.get('WEBHOOK_SECRET') ?? ''
 
 /** Escape user-supplied strings before embedding in HTML email templates. */
 function esc(str: unknown): string {
@@ -24,8 +30,12 @@ function esc(str: unknown): string {
     .replace(/'/g, '&#x27;')
 }
 
-serve(async (_req) => {
+serve(async (req) => {
   try {
+    if (!WEBHOOK_SECRET || req.headers.get('x-webhook-secret') !== WEBHOOK_SECRET) {
+      return new Response('Unauthorized', { status: 401 })
+    }
+
     const since = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString()
 
     // Fetch all registrations in the last 24h with event + league + org info

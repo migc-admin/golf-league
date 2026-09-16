@@ -2,6 +2,11 @@
  * notify-registration
  * Triggered by a Supabase Database Webhook on INSERT to registrations table.
  * Sends an instant email to the org admin notifying of a new registration.
+ *
+ * Auth: the Supabase project's anon key alone is not sufficient to prove a
+ * request actually came from the Database Webhook (it's public by design),
+ * so this function requires a shared secret sent as a custom header by the
+ * webhook config — see WEBHOOK_SECRET below.
  */
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
@@ -13,6 +18,7 @@ const supabase = createClient(
 
 const RESEND_API_KEY = Deno.env.get('RESEND_API_KEY') ?? ''
 const FROM_EMAIL     = 'notifications@scorifygolf.com'
+const WEBHOOK_SECRET = Deno.env.get('WEBHOOK_SECRET') ?? ''
 
 /** Escape user-supplied strings before embedding in HTML email templates. */
 function esc(str: unknown): string {
@@ -26,6 +32,10 @@ function esc(str: unknown): string {
 
 serve(async (req) => {
   try {
+    if (!WEBHOOK_SECRET || req.headers.get('x-webhook-secret') !== WEBHOOK_SECRET) {
+      return new Response('Unauthorized', { status: 401 })
+    }
+
     const payload = await req.json()
     const registration = payload.record
 

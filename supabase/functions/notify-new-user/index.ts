@@ -2,6 +2,11 @@
  * notify-new-user
  * Called via a database webhook on INSERT to public.profiles.
  * Sends an email to admin@scorifygolf.com when a new user signs up.
+ *
+ * Auth: the Supabase project's anon key alone is not sufficient to prove a
+ * request actually came from the Database Webhook (it's public by design),
+ * so this function requires a shared secret sent as a custom header by the
+ * webhook config — see WEBHOOK_SECRET below.
  */
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
@@ -14,9 +19,14 @@ const supabase = createClient(
 const RESEND_API_KEY = Deno.env.get('RESEND_API_KEY') ?? ''
 const FROM_EMAIL     = 'notifications@scorifygolf.com'
 const ADMIN_EMAIL    = 'admin@scorifygolf.com'
+const WEBHOOK_SECRET = Deno.env.get('WEBHOOK_SECRET') ?? ''
 
 serve(async (req) => {
   try {
+    if (!WEBHOOK_SECRET || req.headers.get('x-webhook-secret') !== WEBHOOK_SECRET) {
+      return new Response('Unauthorized', { status: 401 })
+    }
+
     const payload = await req.json()
     const profile = payload.record
 
