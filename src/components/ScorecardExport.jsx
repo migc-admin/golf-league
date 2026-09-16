@@ -1654,7 +1654,7 @@ function buildResultsCard({ event, eventPlayers, allScores, course, sideGames, o
   // Compute payouts — build per-category per-player amount map
   const flightCounts = {}
   nonGuests.forEach(ep => { if (ep.flight) flightCounts[ep.flight] = (flightCounts[ep.flight] ?? 0) + 1 })
-  const { byCategory } = computePayouts(event, nonGuests.length, leaderboards, sideGames, skinsResults, flightCounts, stablefordData, blindPartnersData, superSkinsResult, stablefordGrossData)
+  const { byCategory } = computePayouts(event, nonGuests.length, leaderboards, sideGames, skinsResults, flightCounts, stablefordData, blindPartnersData, superSkinsResult, stablefordGrossData, nonGuests)
 
   // catAmt[categoryKey][playerId] = amount for that specific result
   const catAmt = {}
