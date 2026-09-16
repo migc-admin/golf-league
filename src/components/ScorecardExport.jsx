@@ -1793,7 +1793,7 @@ function buildResultsCard({ event, eventPlayers, allScores, course, sideGames, o
   // ── Long Drive ───────────────────────────────────────────────────
   const ldSides = sides.filter(s => s === 'long_drive' || s.match(/^long_drive_[a-z]$/))
   if (ldSides.length > 0) {
-    const sec = buildSection('Longest Drive', GREEN, GOLD)
+    const sec = buildSection('Long Drive', GREEN, GOLD)
     const body = sec._body
 
     const ldFlights = ldSides.map(k => k.match(/^long_drive_([a-z])$/) ? k.match(/^long_drive_([a-z])$/)[1].toUpperCase() : null)
@@ -1816,7 +1816,7 @@ function buildResultsCard({ event, eventPlayers, allScores, course, sideGames, o
   // ── Low Putts ────────────────────────────────────────────────────
   const lpSides = sides.filter(s => s === 'low_putts' || s.match(/^low_putts_[a-z]$/))
   if (lpSides.length > 0) {
-    const sec = buildSection('Fewest Putts', GREEN, GOLD)
+    const sec = buildSection('Low Putts', GREEN, GOLD)
     const body = sec._body
 
     const lpFlights = lpSides.map(k => k.match(/^low_putts_([a-z])$/) ? k.match(/^low_putts_([a-z])$/)[1].toUpperCase() : null)
@@ -1848,7 +1848,7 @@ function buildResultsCard({ event, eventPlayers, allScores, course, sideGames, o
     .map(k => parseInt(k.replace('ctp_', ''), 10))
     .sort((a, b) => a - b)
   if (sides.includes('ctp') && ctpHoles.length > 0) {
-    const sec = buildSection('Closest to Pin (Greenies)', GREEN, GOLD)
+    const sec = buildSection('Closest to Pin', GREEN, GOLD)
     const body = sec._body
     const ctpData = ctpHoles.map(h => {
       const g = sideGames.find(g => g.game_type === 'ctp' && g.hole_number === h)
@@ -1912,7 +1912,13 @@ function buildResultsCard({ event, eventPlayers, allScores, course, sideGames, o
         display(pid, `super_skins_${fl.toLowerCase()}`)
       ))
     } else {
-      const result = superSkinsResult.A.entrantCount > 0 ? superSkinsResult.A : superSkinsResult.B
+      // When the game is per-flight scoped but only one flight has entrants, the
+      // payout category key is still the flight-specific one (e.g. 'super_skins_a'),
+      // never the bare 'super_skins' key — using the wrong key here silently
+      // dropped the $ amount next to each winner's name.
+      const activeFlight = superSkinsResult.A.entrantCount > 0 ? 'A' : 'B'
+      const result = superSkinsResult[activeFlight]
+      const payoutKey = /^super_skins_[a-z]$/.test(superSkinsKey) ? `super_skins_${activeFlight.toLowerCase()}` : 'super_skins'
       const winners = Object.entries(result.playerSkins)
         .filter(([, n]) => n > 0)
         .sort(([, a], [, b]) => b - a)
@@ -1926,7 +1932,7 @@ function buildResultsCard({ event, eventPlayers, allScores, course, sideGames, o
       } else {
         sec._body.appendChild(buildFullFieldGrid(
           winners.map(([pid, count]) => ({ player_id: pid, _suffix: ` · ${count} skin${count !== 1 ? 's' : ''}` })),
-          winners.length, pid => display(pid, 'super_skins'),
+          winners.length, pid => display(pid, payoutKey),
           GREEN, ROW_BG_ALT, true
         ))
       }
@@ -1939,7 +1945,7 @@ function buildResultsCard({ event, eventPlayers, allScores, course, sideGames, o
   const superCtpHole = event.super_ctp_hole ? parseInt(event.super_ctp_hole, 10) : null
   const superCtpFlights = sides.map(s => s.match(/^super_ctp_([a-z])$/)?.[1]).filter(Boolean)
   if (superCtpHole && (superCtpFlights.length > 0 || sides.includes('super_ctp'))) {
-    const sec = buildSection('Super Closest to Pin', GREEN, GOLD)
+    const sec = buildSection('Super CTP', GREEN, GOLD)
     const entries = superCtpFlights.length > 0
       ? superCtpFlights.map(fl => ({ fl: fl.toUpperCase(), key: `super_ctp_${fl}_${superCtpHole}` }))
       : [{ fl: null, key: `super_ctp_${superCtpHole}` }]
@@ -1984,7 +1990,7 @@ function buildResultsCard({ event, eventPlayers, allScores, course, sideGames, o
   // ── Match Play (Head-to-Head / Ryder Cup) ─────────────────────────
   // Points/status only — this format has no monetary payout.
   if (matchData && matchData.pairings.length > 0) {
-    const sec = buildSection('Match Play Results', GREEN, GOLD)
+    const sec = buildSection('Match Points', GREEN, GOLD)
     const body = sec._body
     const teamNames = event.ryder_cup_teams ?? {}
     const teamALabel = teamNames.a?.trim() || 'Flight A'
@@ -2004,10 +2010,14 @@ function buildResultsCard({ event, eventPlayers, allScores, course, sideGames, o
     matchData.pairings.forEach((pair, idx) => {
       const nameA = playerName(pair.playerA.player_id)
       const nameB = playerName(pair.playerB.player_id)
+      const teamA = pair.playerA.flight === 'A' ? teamALabel : teamBLabel
+      const teamB = pair.playerB.flight === 'A' ? teamALabel : teamBLabel
       const status = pair.holesPlayed === 0 ? 'Not started' : pair.matchStatus
-      const row = el('div', { padding: R_PAD, background: idx % 2 === 0 ? R_ODD : R_EVEN, borderBottom: R_DIV, display: 'flex', justifyContent: 'space-between', alignItems: 'center' })
-      row.appendChild(txt(`${nameA} vs ${nameB}`, { fontSize: R_FS, fontWeight: '700', color: '#111' }))
-      row.appendChild(txt(status, { fontSize: '11px', fontWeight: '800', color: GREEN }))
+      const row = el('div', { padding: R_PAD, background: idx % 2 === 0 ? R_ODD : R_EVEN, borderBottom: R_DIV, display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '10px' })
+      const nameEl = txt(`${nameA} (${teamA}) vs. ${nameB} (${teamB})`, { fontSize: R_FS, fontWeight: '700', color: '#111', whiteSpace: 'nowrap' })
+      nameEl.style.flex = '1'
+      row.appendChild(nameEl)
+      row.appendChild(txt(status, { fontSize: '11px', fontWeight: '800', color: GREEN, whiteSpace: 'nowrap', flexShrink: '0' }))
       body.appendChild(row)
     })
 
@@ -2017,7 +2027,7 @@ function buildResultsCard({ event, eventPlayers, allScores, course, sideGames, o
   // ── Team Match Play (Best Ball) ───────────────────────────────────
   // Points/status only — this format has no monetary payout.
   if (teamMatchData && teamMatchData.groupMatches.length > 0) {
-    const sec = buildSection('Team Match Play Results', GREEN, GOLD)
+    const sec = buildSection('Team Match', GREEN, GOLD)
     const body = sec._body
     const { groupMatches, totalA, totalB, teamAName, teamBName } = teamMatchData
 
@@ -2068,7 +2078,7 @@ function buildSection(title, headerBg, headerColor) {
     display: 'flex',
     alignItems: 'center',
   })
-  hdr.appendChild(txt(title, { color: headerColor, fontSize: '13px', fontWeight: '800', letterSpacing: '0.05em', textTransform: 'uppercase' }))
+  hdr.appendChild(txt(title, { color: headerColor, fontSize: '13px', fontWeight: '800', letterSpacing: '0.05em', textTransform: 'uppercase', whiteSpace: 'nowrap' }))
   card.appendChild(hdr)
   const body = el('div', {})
   card.appendChild(body)
