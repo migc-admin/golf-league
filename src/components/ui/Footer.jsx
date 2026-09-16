@@ -4,15 +4,16 @@ const MENU_ITEMS = [
   {
     title: 'Product',
     links: [
-      { text: 'Features',  url: '#features' },
-      { text: 'Pricing',   url: '#pricing'  },
-      { text: 'Demo',      url: '#demo'     },
+      { text: 'Features',  url: '/home#features' },
+      { text: 'Pricing',   url: '/home#pricing'  },
+      { text: 'Demo',      url: '/home#demo'     },
     ],
   },
   {
     title: 'Company',
     links: [
-      { text: 'About',    url: '#about'            },
+      { text: 'About',    url: '/home#about'      },
+      { text: 'Blog',     url: '/blog'             },
       { text: 'Help',     url: '/help'             },
       { text: 'FAQ',      url: '/faq'              },
       { text: 'Contact',  url: 'mailto:admin@scorifygolf.com' },

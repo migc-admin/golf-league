@@ -47,16 +47,16 @@ export default function HeroSection({
         {/* Logo + slogan */}
         <motion.header className="mb-12" variants={itemVariants}>
           {logo && (
-            <div className="flex items-center gap-3">
-              <img src={logo.url} alt={logo.alt} className="h-9 w-9 object-contain" />
+            <div className="flex items-center gap-4">
+              <img src={logo.url} alt={logo.alt} className="h-14 w-14 object-contain" />
               <div>
                 {logo.text && (
-                  <p className="text-base font-bold" style={{ color: '#1a1a1f', letterSpacing: '-0.02em' }}>
+                  <p className="text-2xl font-bold leading-tight" style={{ color: '#1a1a1f', letterSpacing: '-0.02em' }}>
                     {logo.text}
                   </p>
                 )}
                 {slogan && (
-                  <p className="text-xs tracking-widest font-semibold uppercase" style={{ color: GOLD }}>
+                  <p className="text-sm tracking-widest font-bold uppercase" style={{ color: GOLD }}>
                     {slogan}
                   </p>
                 )}
@@ -138,6 +138,7 @@ export default function HeroSection({
 
       {/* ── Right: Video with clip-path reveal ── */}
       <motion.div
+        id="demo"
         className="w-full md:w-1/2 lg:w-2/5 overflow-hidden relative"
         style={{ minHeight: 320 }}
         initial={{ clipPath: 'polygon(100% 0, 100% 0, 100% 100%, 100% 100%)' }}

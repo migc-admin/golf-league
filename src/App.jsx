@@ -1,4 +1,5 @@
-import { Routes, Route, Navigate, useParams } from 'react-router-dom'
+import { useEffect } from 'react'
+import { Routes, Route, Navigate, useParams, useLocation } from 'react-router-dom'
 import { AuthProvider } from './hooks/useAuth'
 import ProtectedRoute from './components/ProtectedRoute'
 import AdminRoute     from './components/AdminRoute'
@@ -35,6 +36,8 @@ import AuthCallback   from './pages/AuthCallback'
 import Upgrade        from './pages/Upgrade'
 import ResetPassword  from './pages/ResetPassword'
 import FAQ            from './pages/FAQ'
+import Blog           from './pages/Blog'
+import BlogPost       from './pages/BlogPost'
 import Help           from './pages/Help'
 import Privacy        from './pages/Privacy'
 import RefundPolicy   from './pages/RefundPolicy'
@@ -43,6 +46,27 @@ import DisputeTemplate from './pages/admin/DisputeTemplate'
 import Roadmap        from './pages/Roadmap'
 import Wager          from './pages/Wager'
 import WagerAdmin     from './pages/WagerAdmin'
+
+// React Router doesn't reset scroll position on navigation (unlike a full page
+// load), so clicking an internal link while scrolled down on the previous page
+// would land you at the same scroll offset. Reset to the top on every route
+// change — unless the link carries a hash (e.g. footer links like "/#features"
+// pointing at a section on the home page), in which case scroll to that section
+// instead once it's mounted.
+function ScrollToTop() {
+  const { pathname, hash } = useLocation()
+  useEffect(() => {
+    if (hash) {
+      const id = hash.slice(1)
+      const raf = requestAnimationFrame(() => {
+        document.getElementById(id)?.scrollIntoView({ block: 'start' })
+      })
+      return () => cancelAnimationFrame(raf)
+    }
+    window.scrollTo(0, 0)
+  }, [pathname, hash])
+  return null
+}
 
 function OrgRouteWrapper({ children }) {
   const { orgSlug } = useParams()
@@ -76,6 +100,7 @@ export default function App() {
       <AuthProvider>
         <TenantProvider orgSlug={subdomainSlug}>
         <SubdomainContext.Provider value={subdomainSlug}>
+          <ScrollToTop />
           <Routes>
             <Route path="/" element={<OrgHome orgSlug={subdomainSlug} />} />
             <Route path="/login" element={<Login />} />
@@ -116,6 +141,7 @@ export default function App() {
 
   return (
     <AuthProvider>
+      <ScrollToTop />
       <Routes>
         <Route path="/login"       element={<Login />} />
         <Route path="/home"        element={<Home />} />
@@ -154,6 +180,8 @@ export default function App() {
         <Route path="/register/:leagueSlug/:eventSlug" element={<Register />} />
         <Route path="/reset-password" element={<ResetPassword />} />
         <Route path="/faq"            element={<FAQ />} />
+        <Route path="/blog"           element={<Blog />} />
+        <Route path="/blog/:slug"     element={<BlogPost />} />
         <Route path="/roadmap"        element={<Roadmap />} />
         <Route path="/help"           element={<Help />} />
         <Route path="/privacy"        element={<Privacy />} />

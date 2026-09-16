@@ -34,20 +34,23 @@ export default function Privacy() {
         <link rel="canonical" href="https://www.scorifygolf.com/privacy" />
       </Helmet>
 
-      {/* Nav */}
-      <header style={{ background: GREEN }} className="px-6 py-4">
-        <div className="max-w-6xl mx-auto flex items-center justify-between">
+      {/* Header */}
+      <header className="sticky top-0 z-50 bg-white" style={{ borderBottom: '1px solid #ebe9e4' }}>
+        <div className="max-w-6xl mx-auto px-6 h-14 flex items-center justify-between">
           <Link to="/home" className="flex items-center gap-2.5">
-            <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: 'rgba(255,255,255,0.15)' }}>
-              <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
-                <path d="M8 1L10.5 5.5H15L11.5 8.5L13 13L8 10L3 13L4.5 8.5L1 5.5H5.5L8 1Z" fill="#ffffff" />
-              </svg>
-            </div>
-            <span className="font-bold text-white text-lg" style={{ letterSpacing: '-0.02em' }}>Scorify Golf</span>
+            <img src="/logo.png" alt="Scorify Golf" className="w-8 h-8 object-contain" />
+            <span className="font-bold text-base" style={{ letterSpacing: '-0.02em', color: INK }}>Scorify Golf</span>
           </Link>
-          <Link to="/home" className="text-sm font-medium text-white opacity-80 hover:opacity-100 transition-opacity">
-            ← Back to Home
-          </Link>
+          <div className="flex items-center gap-3">
+            <Link to="/faq" className="text-sm font-medium" style={{ color: '#6b7280' }}>FAQ</Link>
+            <Link
+              to="/login"
+              className="text-sm font-bold px-4 py-1.5 rounded-full text-white transition-opacity hover:opacity-90"
+              style={{ background: GREEN }}
+            >
+              Get started
+            </Link>
+          </div>
         </div>
       </header>
 
