@@ -1,11 +1,12 @@
 /**
  * PrintAssets — Printable golf event assets
  *
- * Four asset types:
- *  'cards'      → CTP and Long Drive cards  (4.72" × 8.27" portrait / A5)
- *  'tee_sheet'  → Tee Sheet                 (8.5" × 11" portrait)
- *  'cart_signs' → Cart Signs                (8.5" × 5.5" landscape)
- *  'checkin_qr' → Check-In QR sign          (8.5" × 11" portrait)
+ * Five asset types:
+ *  'cards'           → CTP and Long Drive cards  (4.72" × 8.27" portrait / A5)
+ *  'tee_sheet'       → Tee Sheet                 (8.5" × 11" portrait)
+ *  'cart_signs'      → Cart Signs                (8.5" × 5.5" landscape)
+ *  'checkin_qr'      → Check-In QR sign          (8.5" × 11" portrait)
+ *  'opt_in_rosters'  → Opt-In Rosters            (8.5" × 11" portrait, one page per buy-in game)
  */
 
 import { useEffect, useRef, useState, forwardRef } from 'react'
@@ -56,6 +57,17 @@ function shortDate(dateStr) {
   return new Date(dateStr + 'T00:00:00').toLocaleDateString('en-US', {
     month: 'long', day: 'numeric', year: 'numeric',
   })
+}
+
+// Alphabetical by first name, then last name — matches the epAlpha comparator
+// used for the on-screen Opt-in Roster list in EventDetail.jsx.
+function epAlphaSort(a, b) {
+  const fa = (a.player?.first_name ?? '').toLowerCase()
+  const fb = (b.player?.first_name ?? '').toLowerCase()
+  if (fa !== fb) return fa < fb ? -1 : 1
+  const la = (a.player?.last_name ?? '').toLowerCase()
+  const lb = (b.player?.last_name ?? '').toLowerCase()
+  return la < lb ? -1 : 1
 }
 
 function formatEventDate(dateStr) {
@@ -552,34 +564,144 @@ function CheckinQrPage({ event, games, qrDataUrl }) {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
+// ASSET TYPE 5 — Opt-In Rosters  (8.5" × 11", single page — players × games grid)
+// ═══════════════════════════════════════════════════════════════════════════════
+function rosterCellStyle(isHeader) {
+  return {
+    border: '1.5px solid #111',
+    padding: isHeader ? '0.07in 0.12in' : '0.05in 0.12in',
+    fontSize: isHeader ? '0.13in' : '0.14in',
+    fontWeight: isHeader ? 700 : 400,
+    fontFamily: FONT,
+    textAlign: isHeader ? 'center' : 'left',
+    color: '#111',
+    lineHeight: 1.15,
+  }
+}
+
+function OptInRosterSheet({ event, games, players }) {
+  const league     = event?.league ?? {}
+  const logoUrl    = league.logo_url ?? null
+  const leagueName = league.name ?? ''
+  const eventName  = event?.name ?? (event?.event_number ? `Event #${event.event_number}` : '')
+  const date       = formatEventDate(event?.event_date)
+  const courseName = event?.course?.name ?? ''
+
+  return (
+    <div style={{
+      width: '8.5in', height: '11in',
+      background: '#fff', color: '#111',
+      padding: '0.5in 0.6in',
+      boxSizing: 'border-box',
+      fontFamily: FONT,
+      display: 'flex', flexDirection: 'column',
+      pageBreakAfter: 'always',
+    }}>
+      {/* Header */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: '0.15in', marginBottom: '0.15in' }}>
+        {logoUrl ? (
+          <img src={logoUrl} alt="" style={{ width: '0.5in', height: '0.5in', borderRadius: '50%', objectFit: 'cover', border: `2px solid ${GOLD}`, flexShrink: 0 }} />
+        ) : (
+          <div style={{ width: '0.5in', height: '0.5in', borderRadius: '50%', background: GREEN, display: 'flex', alignItems: 'center', justifyContent: 'center', color: GOLD, fontWeight: 'bold', fontSize: '0.18in', flexShrink: 0, fontFamily: FONT }}>
+            {leagueName?.slice(0, 2)?.toUpperCase() ?? '⛳'}
+          </div>
+        )}
+        <div>
+          <div style={{ fontSize: '0.15in', fontWeight: 'bold', color: GREEN, fontFamily: FONT }}>{leagueName}</div>
+          <div style={{ fontSize: '0.12in', color: '#333', marginTop: '0.01in', fontFamily: FONT }}>{eventName}</div>
+          <div style={{ fontSize: '0.09in', color: '#666', marginTop: '0.01in', fontFamily: FONT }}>
+            {[date, courseName].filter(Boolean).join('  ·  ')}
+          </div>
+        </div>
+      </div>
+
+      <div style={{ fontSize: '0.18in', fontWeight: 900, color: GREEN, fontFamily: FONT, marginBottom: '0.12in' }}>
+        Opt-In Rosters
+      </div>
+
+      {/* Grid — one row per player, one column per buy-in game (all columns equal width) */}
+      <table style={{ width: '100%', borderCollapse: 'collapse', tableLayout: 'fixed' }}>
+        <colgroup>
+          {Array.from({ length: games.length + 1 }).map((_, i) => (
+            <col key={i} style={{ width: `${100 / (games.length + 1)}%` }} />
+          ))}
+        </colgroup>
+        <thead>
+          <tr>
+            <th style={{ ...rosterCellStyle(true), textAlign: 'left' }}>Player</th>
+            {games.map(g => (
+              <th key={g.key} style={rosterCellStyle(true)}>
+                {g.label}
+                {g.amount != null && (
+                  <div style={{ fontWeight: 400, fontSize: '0.1in', color: '#666', marginTop: '0.02in' }}>
+                    ${Number(g.amount).toFixed(0)}/entrant
+                  </div>
+                )}
+              </th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {players.map(p => (
+            <tr key={p.id}>
+              <td style={rosterCellStyle(false)}>{p.name}</td>
+              {games.map(g => (
+                <td key={g.key} style={{ ...rosterCellStyle(false), textAlign: 'center', fontWeight: 700, color: GREEN }}>
+                  {p.opted[g.key] ? '✓' : ''}
+                </td>
+              ))}
+            </tr>
+          ))}
+        </tbody>
+      </table>
+
+      {/* Pot summary footer */}
+      <div style={{ marginTop: '0.25in', display: 'flex', gap: '0.4in', flexWrap: 'wrap' }}>
+        {games.map(g => (
+          <div key={g.key} style={{ fontSize: '0.12in', color: '#555', fontFamily: FONT }}>
+            <span style={{ fontWeight: 700, color: GREEN }}>{g.label}:</span>{' '}
+            {g.entrantCount} entrant{g.entrantCount !== 1 ? 's' : ''}
+            {g.pot != null && <> · Pot ${g.pot.toFixed(2)}</>}
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
 // Main export
 // ═══════════════════════════════════════════════════════════════════════════════
 const PAGE_SIZE = {
-  cards:      '8.5in 11in',
-  tee_sheet:  '8.5in 11in',
-  cart_signs: '8.5in 11in',
-  checkin_qr: '8.5in 11in',
+  cards:          '8.5in 11in',
+  tee_sheet:      '8.5in 11in',
+  cart_signs:     '8.5in 11in',
+  checkin_qr:     '8.5in 11in',
+  opt_in_rosters: '8.5in 11in',
 }
 
 // Physical pixel dimensions at 96dpi (1in = 96px) — all types now render full Letter pages
 const PREVIEW_DIMS = {
-  cart_signs: { w: 8.5 * 96, h: 11 * 96 },
-  cards:      { w: 8.5 * 96, h: 11 * 96 },
-  tee_sheet:  { w: 8.5 * 96, h: 11 * 96 },
-  checkin_qr: { w: 8.5 * 96, h: 11 * 96 },
+  cart_signs:     { w: 8.5 * 96, h: 11 * 96 },
+  cards:          { w: 8.5 * 96, h: 11 * 96 },
+  tee_sheet:      { w: 8.5 * 96, h: 11 * 96 },
+  checkin_qr:     { w: 8.5 * 96, h: 11 * 96 },
+  opt_in_rosters: { w: 8.5 * 96, h: 11 * 96 },
 }
 const PREVIEW_SCALE = {
-  cart_signs: 0.68,
-  cards:      0.68,
-  tee_sheet:  0.68,
-  checkin_qr: 0.68,
+  cart_signs:     0.68,
+  cards:          0.68,
+  tee_sheet:      0.68,
+  checkin_qr:     0.68,
+  opt_in_rosters: 0.68,
 }
 
 const TITLES = {
-  cards:      'CTP & Long Drive Cards',
-  tee_sheet:  'Tee Sheet',
-  cart_signs: 'Cart Signs',
-  checkin_qr: 'Check-In QR Sign',
+  cards:          'CTP & Long Drive Cards',
+  tee_sheet:      'Tee Sheet',
+  cart_signs:     'Cart Signs',
+  checkin_qr:     'Check-In QR Sign',
+  opt_in_rosters: 'Opt-In Rosters',
 }
 
 export default function PrintAssets({ type, event, eventPlayers = [], tglSelections = [], orgSlug, leagueSlug, onClose }) {
@@ -762,6 +884,47 @@ export default function PrintAssets({ type, event, eventPlayers = [], tglSelecti
     itemCount  = 1
   }
 
+  // ── Opt-In Rosters ────────────────────────────────────────────────────────
+  // Single-page grid replicating the "Opt-in Rosters" cards from the Side Games
+  // tab — one row per player (alphabetical), one column per buy-in game.
+  let optInRosterPlayerCount = 0
+  if (type === 'opt_in_rosters') {
+    const optInRosterGames = [...new Set((event?.side_game_options ?? []).map(k => k.replace(/_[ab]$/, '')))]
+      .filter(k => isBuyInEnabled(event, k))
+      .map(k => {
+        const opted  = event?.side_game_entries?.[k] ?? []
+        const amount = optInAmount(event, k)
+        return {
+          key: k,
+          label: OPT_IN_GAME_LABELS[k] ?? k,
+          amount,
+          optedIds: opted,
+          entrantCount: opted.length,
+          pot: amount != null ? opted.length * amount : null,
+        }
+      })
+
+    const rosterPlayers = [...eventPlayers]
+      .sort(epAlphaSort)
+      .map(ep => {
+        const p = ep.player ?? {}
+        const opted = {}
+        optInRosterGames.forEach(g => { opted[g.key] = g.optedIds.includes(ep.player_id) })
+        return {
+          id: ep.player_id,
+          name: [p.first_name, p.last_name].filter(Boolean).join(' ') || '—',
+          opted,
+        }
+      })
+
+    optInRosterPlayerCount = rosterPlayers.length
+
+    if (optInRosterGames.length > 0) {
+      printNodes = [<OptInRosterSheet key="opt_in_rosters" event={event} games={optInRosterGames} players={rosterPlayers} />]
+      itemCount  = 1
+    }
+  }
+
   // ── Print CSS ─────────────────────────────────────────────────────────────
   useEffect(() => {
     const size  = PAGE_SIZE[type] ?? '8.5in 11in'
@@ -787,6 +950,8 @@ export default function PrintAssets({ type, event, eventPlayers = [], tglSelecti
       ? 'Assign players to groups in the Groups tab first.'
       : type === 'checkin_qr'
       ? (checkinGames.length > 0 ? 'Generating QR code…' : "No opt-in side games (Super Skins, Super CTP, Blind Partners) are configured for this event.")
+      : type === 'opt_in_rosters'
+      ? "No buy-in side games are configured for this event. Enable a separate buy-in in the event's Side Games tab first."
       : 'No data to print.'
 
     return (
@@ -805,6 +970,8 @@ export default function PrintAssets({ type, event, eventPlayers = [], tglSelecti
     ? '1 page · 8.5" × 11"'
     : type === 'cart_signs'
     ? `${itemCount} sign${itemCount !== 1 ? 's' : ''} · ${pageCount} page${pageCount !== 1 ? 's' : ''} · 8.5" × 11"`
+    : type === 'opt_in_rosters'
+    ? `${optInRosterPlayerCount} player${optInRosterPlayerCount !== 1 ? 's' : ''} · 1 page · 8.5" × 11"`
     : `${itemCount} card${itemCount !== 1 ? 's' : ''} · ${pageCount} page${pageCount !== 1 ? 's' : ''} · 8.5" × 11"`
 
   return (

@@ -1240,6 +1240,8 @@ function TabPostRound({ event, eventPlayers, allScores, course, sideGames, orgNa
   const logoUrl = event.league?.logo_url ?? orgLogoUrl ?? null
   const hasOptInGames = [...new Set((event?.side_game_options ?? []).map(k => k.replace(/_[ab]$/, '')))]
     .some(k => isBuyInEnabled(event, k) && optInAmount(event, k) != null)
+  const hasBuyInGames = [...new Set((event?.side_game_options ?? []).map(k => k.replace(/_[ab]$/, '')))]
+    .some(k => isBuyInEnabled(event, k))
 
   return (
     <div className="space-y-6 max-w-xl">
@@ -1255,6 +1257,9 @@ function TabPostRound({ event, eventPlayers, allScores, course, sideGames, orgNa
             <Button size="sm" variant="secondary" onClick={() => onPrintAsset('cards')}>Side Game Signs</Button>
             {hasOptInGames && (
               <Button size="sm" variant="secondary" onClick={() => onPrintAsset('checkin_qr')}>Check-In QR</Button>
+            )}
+            {hasBuyInGames && (
+              <Button size="sm" variant="secondary" onClick={() => onPrintAsset('opt_in_rosters')}>Opt-In Rosters</Button>
             )}
           </div>
           <div className="text-xs text-gray-400 mt-1.5">Tee sheet, cart signs, and side game cards for the round</div>
@@ -3696,7 +3701,7 @@ function TabSideGamesMain({ event, eventPlayers, course, sideGames, onUpdated, o
                     </div>
                   )}
                   <div className="grid grid-cols-2 gap-1.5">
-                    {eventPlayers.map(ep => {
+                    {[...eventPlayers].sort(epAlpha).map(ep => {
                       const pid     = ep.player_id
                       const p       = ep.player ?? {}
                       const name    = [p.first_name, p.last_name].filter(Boolean).join(' ') || '—'
