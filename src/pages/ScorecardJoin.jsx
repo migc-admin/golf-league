@@ -89,10 +89,11 @@ export default function ScorecardJoin() {
     // Code valid — load groups
     const { data: eps } = await supabase
       .from('event_players')
-      .select('group_number, player:players(first_name, last_name)')
+      .select('group_number, group_order, player:players(first_name, last_name)')
       .eq('event_id', eventId)
       .not('group_number', 'is', null)
       .order('group_number')
+      .order('group_order')
 
     // Group by group_number
     const grpMap = {}
