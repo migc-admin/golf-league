@@ -751,7 +751,9 @@ export default function PrintAssets({ type, event, eventPlayers = [], tglSelecti
     setDownloadingPng(true)
     try {
       const dataUrl = await toPng(pngRef.current, { pixelRatio: 2, cacheBust: true, backgroundColor: '#ffffff' })
-      const filename = type === 'checkin_qr' ? `checkin-qr-${event?.event_number ?? 'event'}.png` : `tee-sheet-${event?.event_number ?? 'event'}.png`
+      const filename = type === 'checkin_qr' ? `checkin-qr-${event?.event_number ?? 'event'}.png`
+        : type === 'opt_in_rosters' ? `opt-in-rosters-${event?.event_number ?? 'event'}.png`
+        : `tee-sheet-${event?.event_number ?? 'event'}.png`
       downloadPng(dataUrl, filename)
     } finally {
       setDownloadingPng(false)
@@ -1011,7 +1013,7 @@ export default function PrintAssets({ type, event, eventPlayers = [], tglSelecti
                   🖨 Download PDF
                 </button>
               </>
-            ) : type === 'checkin_qr' ? (
+            ) : type === 'checkin_qr' || type === 'opt_in_rosters' ? (
               <>
                 <button
                   onClick={handleDownloadPng}
@@ -1097,6 +1099,16 @@ export default function PrintAssets({ type, event, eventPlayers = [], tglSelecti
         <div style={{ position: 'fixed', top: '-99999px', left: '-99999px', pointerEvents: 'none', zIndex: -1 }}>
           <div ref={pngRef}>
             <CheckinQrPage event={event} games={checkinGames} qrDataUrl={checkinQrDataUrl} />
+          </div>
+        </div>,
+        document.body
+      )}
+
+      {/* Off-screen render for Opt-In Rosters PNG capture */}
+      {type === 'opt_in_rosters' && printNodes.length > 0 && createPortal(
+        <div style={{ position: 'fixed', top: '-99999px', left: '-99999px', pointerEvents: 'none', zIndex: -1 }}>
+          <div ref={pngRef}>
+            {printNodes[0]}
           </div>
         </div>,
         document.body
