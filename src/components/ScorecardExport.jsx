@@ -1143,8 +1143,10 @@ export function ExportSkinsGridButton({ event, eventPlayers, allScores, course, 
   const [exportError, setExportError] = useState(null)
   const containerRef = useRef(null)
 
-  const hasSkins = (event?.side_game_options ?? []).some(s => s.startsWith('skins'))
-  if (!hasSkins) return null
+  const sides         = event?.side_game_options ?? []
+  const hasSkins      = sides.some(s => s.startsWith('skins'))
+  const superSkinsKey = sides.find(s => s === 'super_skins' || s.match(/^super_skins_[a-z]$/))
+  if (!hasSkins && !superSkinsKey) return null
 
   async function handleExport() {
     setExportError(null)
@@ -1168,38 +1170,98 @@ export function ExportSkinsGridButton({ event, eventPlayers, allScores, course, 
         } catch { logoDataUrl = null }
       }
 
-      const flights = [...new Set(eventPlayers.map(ep => ep.flight).filter(Boolean))].sort()
-      if (flights.length === 0) flights.push(null)
+      const evPart = (event.name ?? `event_${event.event_number}`).replace(/[^a-z0-9]/gi, '_').toLowerCase()
 
-      for (const flight of flights) {
-        const flightPlayers = flight
-          ? eventPlayers.filter(ep => ep.flight === flight)
-          : eventPlayers
-        flightPlayers.sort((a, b) => (a.course_handicap ?? 99) - (b.course_handicap ?? 99))
+      // ── Skins (regular) — one page per flight ─────────────────────
+      if (hasSkins) {
+        const flights = [...new Set(eventPlayers.map(ep => ep.flight).filter(Boolean))].sort()
+        if (flights.length === 0) flights.push(null)
 
-        const node = containerRef.current
-        if (!node) continue
-        node.innerHTML = ''
-        const pageEl = buildSkinsGrid({ event, course, flightPlayers, allScores, flight, orgName, orgLogoUrl: logoDataUrl })
-        node.appendChild(pageEl)
+        for (const flight of flights) {
+          const flightPlayers = flight
+            ? eventPlayers.filter(ep => ep.flight === flight)
+            : eventPlayers
+          flightPlayers.sort((a, b) => (a.course_handicap ?? 99) - (b.course_handicap ?? 99))
 
-        await Promise.all(
-          [...pageEl.querySelectorAll('img')].map(
-            img => img.complete ? Promise.resolve() : new Promise(r => { img.onload = r; img.onerror = r })
+          const node = containerRef.current
+          if (!node) continue
+          node.innerHTML = ''
+          const pageEl = buildSkinsGrid({ event, course, flightPlayers, allScores, flight, orgName, orgLogoUrl: logoDataUrl })
+          node.appendChild(pageEl)
+
+          await Promise.all(
+            [...pageEl.querySelectorAll('img')].map(
+              img => img.complete ? Promise.resolve() : new Promise(r => { img.onload = r; img.onerror = r })
+            )
           )
-        )
-        await new Promise(r => setTimeout(r, 80))
+          await new Promise(r => setTimeout(r, 80))
 
-        const dataUrl = await toPng(pageEl, {
-          pixelRatio: 2,
-          cacheBust: true,
-          backgroundColor: '#ffffff',
-        })
+          const dataUrl = await toPng(pageEl, {
+            pixelRatio: 2,
+            cacheBust: true,
+            backgroundColor: '#ffffff',
+          })
 
-        const link = document.createElement('a')
-        const evPart = (event.name ?? `event_${event.event_number}`).replace(/[^a-z0-9]/gi, '_').toLowerCase()
-        downloadPng(dataUrl, `skins_grid_${evPart}${flight ? `_flight${flight}` : ''}.png`)
-        await new Promise(r => setTimeout(r, 300))
+          downloadPng(dataUrl, `skins_grid_${evPart}${flight ? `_flight${flight}` : ''}.png`)
+          await new Promise(r => setTimeout(r, 300))
+        }
+      }
+
+      // ── Super Skins — separate page(s), only when the game is actually
+      //    configured on this event (eligibility follows opt-in roster when
+      //    the "Separate buy-in" flag is on, same as computeSuperSkins).
+      if (superSkinsKey) {
+        const superSkinsResult = computeSuperSkins(event, eventPlayers, allScores, course)
+        if (superSkinsResult) {
+          const buyIn = !!event?.side_game_buy_ins?.super_skins?.enabled
+          const pool  = buyIn
+            ? eventPlayers.filter(ep => (event?.side_game_entries?.super_skins ?? []).includes(ep.player_id))
+            : eventPlayers
+
+          const isPerFlightKey    = /^super_skins_[a-z]$/.test(superSkinsKey)
+          const bothFlightsActive = isPerFlightKey && superSkinsResult.A.entrantCount > 0 && superSkinsResult.B.entrantCount > 0
+          const superFlights = bothFlightsActive
+            ? ['A', 'B']
+            : isPerFlightKey
+            ? [superSkinsResult.A.entrantCount > 0 ? 'A' : 'B']
+            : [null]
+
+          for (const flight of superFlights) {
+            const flightPlayers = flight
+              ? pool.filter(ep => ep.flight === flight)
+              : pool.map(ep => ({ ...ep, flight: null }))
+            if (flightPlayers.length === 0) continue
+            flightPlayers.sort((a, b) => (a.course_handicap ?? 99) - (b.course_handicap ?? 99))
+
+            const payoutKey = isPerFlightKey ? `super_skins_${flight.toLowerCase()}` : 'super_skins'
+
+            const node = containerRef.current
+            if (!node) continue
+            node.innerHTML = ''
+            const pageEl = buildSkinsGrid({
+              event, course, flightPlayers, allScores, flight,
+              orgName, orgLogoUrl: logoDataUrl,
+              payoutKey, titleLabel: 'Super Skins Results',
+            })
+            node.appendChild(pageEl)
+
+            await Promise.all(
+              [...pageEl.querySelectorAll('img')].map(
+                img => img.complete ? Promise.resolve() : new Promise(r => { img.onload = r; img.onerror = r })
+              )
+            )
+            await new Promise(r => setTimeout(r, 80))
+
+            const dataUrl = await toPng(pageEl, {
+              pixelRatio: 2,
+              cacheBust: true,
+              backgroundColor: '#ffffff',
+            })
+
+            downloadPng(dataUrl, `super_skins_grid_${evPart}${flight ? `_flight${flight}` : ''}.png`)
+            await new Promise(r => setTimeout(r, 300))
+          }
+        }
       }
     } catch (err) {
       console.error('Skins grid export failed:', err)
@@ -1232,7 +1294,7 @@ export function ExportSkinsGridButton({ event, eventPlayers, allScores, course, 
   )
 }
 
-function buildSkinsGrid({ event, course, flightPlayers, allScores, flight, orgName, orgLogoUrl }) {
+function buildSkinsGrid({ event, course, flightPlayers, allScores, flight, orgName, orgLogoUrl, payoutKey, titleLabel }) {
   const { par_per_hole: pars, stroke_index: sis } = course
   const FONT = 'Manrope, sans-serif'
   const ROW_H = 28
@@ -1249,7 +1311,7 @@ function buildSkinsGrid({ event, course, flightPlayers, allScores, flight, orgNa
 
   // ── Payout ───────────────────────────────────────────────────────
   const payoutConfig   = event.payout_config ?? {}
-  const skinsKey       = flight ? `skins_${flight.toLowerCase()}` : 'skins'
+  const skinsKey       = payoutKey ?? (flight ? `skins_${flight.toLowerCase()}` : 'skins')
   const perPlayerEntry = payoutConfig[skinsKey] ?? 0
   const skinsPot       = perPlayerEntry * flightPlayers.length
   const totalSkins     = Object.values(playerSkins).reduce((a, b) => a + b, 0)
@@ -1327,7 +1389,7 @@ function buildSkinsGrid({ event, course, flightPlayers, allScores, flight, orgNa
   const hLeft = el('div', {})
   hLeft.appendChild(txt(orgName ?? 'Scorify Golf', { color: GOLD, fontSize: '16px', fontWeight: '700', display: 'block' }))
   hLeft.appendChild(txt(
-    `Event #${event.event_number}${flight ? ` · Flight ${flight}` : ''} · Skins Results`,
+    `Event #${event.event_number}${flight ? ` · Flight ${flight}` : ''} · ${titleLabel ?? 'Skins Results'}`,
     { color: 'rgba(255,255,255,0.85)', fontSize: '12px', display: 'block', marginTop: '3px' }
   ))
   const eventDate = event.event_date
