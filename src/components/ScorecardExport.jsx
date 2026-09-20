@@ -1386,11 +1386,11 @@ function buildSkinsGrid({ event, course, flightPlayers, allScores, flight, orgNa
     background: GREEN, borderRadius: '8px', padding: '10px 16px',
     display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '12px',
   })
-  const hLeft = el('div', {})
-  hLeft.appendChild(txt(orgName ?? 'Scorify Golf', { color: GOLD, fontSize: '16px', fontWeight: '700', display: 'block' }))
+  const hLeft = el('div', { flexShrink: '0', minWidth: '0' })
+  hLeft.appendChild(txt(orgName ?? 'Scorify Golf', { color: GOLD, fontSize: '16px', fontWeight: '700', display: 'block', whiteSpace: 'nowrap' }))
   hLeft.appendChild(txt(
     `Event #${event.event_number}${flight ? ` · Flight ${flight}` : ''} · ${titleLabel ?? 'Skins Results'}`,
-    { color: 'rgba(255,255,255,0.85)', fontSize: '12px', display: 'block', marginTop: '3px' }
+    { color: 'rgba(255,255,255,0.85)', fontSize: '12px', display: 'block', marginTop: '3px', whiteSpace: 'nowrap' }
   ))
   const eventDate = event.event_date
     ? new Date(event.event_date + 'T00:00:00').toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' })
