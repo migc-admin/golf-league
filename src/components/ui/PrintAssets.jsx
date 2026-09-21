@@ -670,41 +670,139 @@ function OptInRosterSheet({ event, games, players }) {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
+// ASSET TYPE 6 — Payouts per Player  (8.5" × 11", single page — name, total, breakdown)
+// ═══════════════════════════════════════════════════════════════════════════════
+function PayoutsPerPlayerSheet({ event, players }) {
+  const league     = event?.league ?? {}
+  const logoUrl    = league.logo_url ?? null
+  const leagueName = league.name ?? ''
+  const eventName  = event?.name ?? (event?.event_number ? `Event #${event.event_number}` : '')
+  const date       = formatEventDate(event?.event_date)
+  const courseName = event?.course?.name ?? ''
+  const totalPot   = players.reduce((sum, p) => sum + p.total, 0)
+
+  return (
+    <div style={{
+      // No fixed height here — unlike the other single-page sheets, this list
+      // can run longer than one page. minHeight keeps short lists looking like
+      // a full page; a long list simply grows taller and flows across
+      // additional print pages (see PAGE_MARGIN + pageBreakInside below), and
+      // still captures as one continuous image for the PNG export.
+      width: '8.5in', minHeight: '11in',
+      background: '#fff', color: '#111',
+      padding: '0.5in 0.6in',
+      boxSizing: 'border-box',
+      fontFamily: FONT,
+      display: 'flex', flexDirection: 'column',
+    }}>
+      {/* Header */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: '0.15in', marginBottom: '0.15in' }}>
+        {logoUrl ? (
+          <img src={logoUrl} alt="" style={{ width: '0.5in', height: '0.5in', borderRadius: '50%', objectFit: 'cover', border: `2px solid ${GOLD}`, flexShrink: 0 }} />
+        ) : (
+          <div style={{ width: '0.5in', height: '0.5in', borderRadius: '50%', background: GREEN, display: 'flex', alignItems: 'center', justifyContent: 'center', color: GOLD, fontWeight: 'bold', fontSize: '0.18in', flexShrink: 0, fontFamily: FONT }}>
+            {leagueName?.slice(0, 2)?.toUpperCase() ?? '⛳'}
+          </div>
+        )}
+        <div>
+          <div style={{ fontSize: '0.15in', fontWeight: 'bold', color: GREEN, fontFamily: FONT }}>{leagueName}</div>
+          <div style={{ fontSize: '0.12in', color: '#333', marginTop: '0.01in', fontFamily: FONT }}>{eventName}</div>
+          <div style={{ fontSize: '0.09in', color: '#666', marginTop: '0.01in', fontFamily: FONT }}>
+            {[date, courseName].filter(Boolean).join('  ·  ')}
+          </div>
+        </div>
+      </div>
+
+      <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', marginBottom: '0.12in' }}>
+        <div style={{ fontSize: '0.18in', fontWeight: 900, color: GREEN, fontFamily: FONT }}>
+          Payouts per Player
+        </div>
+        <div style={{ fontSize: '0.13in', fontWeight: 700, color: '#333', fontFamily: FONT }}>
+          Total Pot: ${totalPot.toFixed(2)}
+        </div>
+      </div>
+
+      {/* Player list — name + total, with category breakdown underneath */}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.09in' }}>
+        {players.map(p => (
+          <div
+            key={p.playerId}
+            style={{
+              border: '1.5px solid #111', borderRadius: 4, padding: '0.08in 0.14in',
+              // Keep a player's card from being split across a print page break.
+              breakInside: 'avoid', pageBreakInside: 'avoid',
+            }}
+          >
+            <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between' }}>
+              <span style={{ fontSize: '0.14in', fontWeight: 700, color: '#111', fontFamily: FONT }}>{p.name}</span>
+              <span style={{ fontSize: '0.14in', fontWeight: 900, color: GREEN, fontFamily: FONT }}>${p.total.toFixed(2)}</span>
+            </div>
+            {p.items.length > 0 && (
+              <div style={{ marginTop: '0.03in', display: 'flex', flexDirection: 'column', gap: '0.01in' }}>
+                {p.items.map((item, i) => (
+                  <div key={i} style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.1in', color: '#555', fontFamily: FONT }}>
+                    <span>{item.category}</span>
+                    <span>${item.amount.toFixed(2)}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
 // Main export
 // ═══════════════════════════════════════════════════════════════════════════════
 const PAGE_SIZE = {
-  cards:          '8.5in 11in',
-  tee_sheet:      '8.5in 11in',
-  cart_signs:     '8.5in 11in',
-  checkin_qr:     '8.5in 11in',
-  opt_in_rosters: '8.5in 11in',
+  cards:               '8.5in 11in',
+  tee_sheet:           '8.5in 11in',
+  cart_signs:          '8.5in 11in',
+  checkin_qr:          '8.5in 11in',
+  opt_in_rosters:      '8.5in 11in',
+  payouts_per_player:  '8.5in 11in',
+}
+
+// Per-page print margin. Every other type is a single hand-laid-out page that
+// already includes its own edge-to-edge padding, so it stays at 0. Payouts per
+// Player is the only type whose content can spill onto additional pages, so it
+// needs a real @page margin — otherwise page 2+ would have no top/bottom
+// breathing room and content could sit flush against the physical page edge.
+const PAGE_MARGIN = {
+  payouts_per_player: '0.4in 0in',
 }
 
 // Physical pixel dimensions at 96dpi (1in = 96px) — all types now render full Letter pages
 const PREVIEW_DIMS = {
-  cart_signs:     { w: 8.5 * 96, h: 11 * 96 },
-  cards:          { w: 8.5 * 96, h: 11 * 96 },
-  tee_sheet:      { w: 8.5 * 96, h: 11 * 96 },
-  checkin_qr:     { w: 8.5 * 96, h: 11 * 96 },
-  opt_in_rosters: { w: 8.5 * 96, h: 11 * 96 },
+  cart_signs:          { w: 8.5 * 96, h: 11 * 96 },
+  cards:               { w: 8.5 * 96, h: 11 * 96 },
+  tee_sheet:           { w: 8.5 * 96, h: 11 * 96 },
+  checkin_qr:          { w: 8.5 * 96, h: 11 * 96 },
+  opt_in_rosters:      { w: 8.5 * 96, h: 11 * 96 },
+  payouts_per_player:  { w: 8.5 * 96, h: 11 * 96 },
 }
 const PREVIEW_SCALE = {
-  cart_signs:     0.68,
-  cards:          0.68,
-  tee_sheet:      0.68,
-  checkin_qr:     0.68,
-  opt_in_rosters: 0.68,
+  cart_signs:          0.68,
+  cards:               0.68,
+  tee_sheet:           0.68,
+  checkin_qr:          0.68,
+  opt_in_rosters:      0.68,
+  payouts_per_player:  0.68,
 }
 
 const TITLES = {
-  cards:          'CTP & Long Drive Cards',
-  tee_sheet:      'Tee Sheet',
-  cart_signs:     'Cart Signs',
-  checkin_qr:     'Check-In QR Sign',
-  opt_in_rosters: 'Opt-In Rosters',
+  cards:               'CTP & Long Drive Cards',
+  tee_sheet:           'Tee Sheet',
+  cart_signs:          'Cart Signs',
+  checkin_qr:          'Check-In QR Sign',
+  opt_in_rosters:      'Opt-In Rosters',
+  payouts_per_player:  'Payouts per Player',
 }
 
-export default function PrintAssets({ type, event, eventPlayers = [], tglSelections = [], orgSlug, leagueSlug, onClose }) {
+export default function PrintAssets({ type, event, eventPlayers = [], tglSelections = [], orgSlug, leagueSlug, payoutsByPlayer = [], onClose }) {
   const league     = event?.league ?? {}
   const logoUrl    = league.logo_url ?? null
   const leagueName = league.name ?? ''
@@ -753,6 +851,7 @@ export default function PrintAssets({ type, event, eventPlayers = [], tglSelecti
       const dataUrl = await toPng(pngRef.current, { pixelRatio: 2, cacheBust: true, backgroundColor: '#ffffff' })
       const filename = type === 'checkin_qr' ? `checkin-qr-${event?.event_number ?? 'event'}.png`
         : type === 'opt_in_rosters' ? `opt-in-rosters-${event?.event_number ?? 'event'}.png`
+        : type === 'payouts_per_player' ? `payouts-per-player-${event?.event_number ?? 'event'}.png`
         : `tee-sheet-${event?.event_number ?? 'event'}.png`
       downloadPng(dataUrl, filename)
     } finally {
@@ -927,14 +1026,21 @@ export default function PrintAssets({ type, event, eventPlayers = [], tglSelecti
     }
   }
 
+  // ── Payouts per Player ───────────────────────────────────────────────────
+  if (type === 'payouts_per_player' && payoutsByPlayer.length > 0) {
+    printNodes = [<PayoutsPerPlayerSheet key="payouts_per_player" event={event} players={payoutsByPlayer} />]
+    itemCount  = 1
+  }
+
   // ── Print CSS ─────────────────────────────────────────────────────────────
   useEffect(() => {
-    const size  = PAGE_SIZE[type] ?? '8.5in 11in'
+    const size   = PAGE_SIZE[type] ?? '8.5in 11in'
+    const margin = PAGE_MARGIN[type] ?? '0'
     const style = document.createElement('style')
     style.id    = 'print-assets-style'
     style.textContent = `
       @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;700;900&display=swap');
-      @page { size: ${size}; margin: 0; }
+      @page { size: ${size}; margin: ${margin}; }
       @media print {
         body > * { display: none !important; }
         #print-assets-root { display: block !important; }
@@ -954,6 +1060,8 @@ export default function PrintAssets({ type, event, eventPlayers = [], tglSelecti
       ? (checkinGames.length > 0 ? 'Generating QR code…' : "No opt-in side games (Super Skins, Super CTP, Blind Partners) are configured for this event.")
       : type === 'opt_in_rosters'
       ? "No buy-in side games are configured for this event. Enable a separate buy-in in the event's Side Games tab first."
+      : type === 'payouts_per_player'
+      ? 'No payouts resolved yet. Set up Payout Config and enter scores first.'
       : 'No data to print.'
 
     return (
@@ -974,6 +1082,8 @@ export default function PrintAssets({ type, event, eventPlayers = [], tglSelecti
     ? `${itemCount} sign${itemCount !== 1 ? 's' : ''} · ${pageCount} page${pageCount !== 1 ? 's' : ''} · 8.5" × 11"`
     : type === 'opt_in_rosters'
     ? `${optInRosterPlayerCount} player${optInRosterPlayerCount !== 1 ? 's' : ''} · 1 page · 8.5" × 11"`
+    : type === 'payouts_per_player'
+    ? `${payoutsByPlayer.length} player${payoutsByPlayer.length !== 1 ? 's' : ''} · 1 page · 8.5" × 11"`
     : `${itemCount} card${itemCount !== 1 ? 's' : ''} · ${pageCount} page${pageCount !== 1 ? 's' : ''} · 8.5" × 11"`
 
   return (
@@ -1013,7 +1123,7 @@ export default function PrintAssets({ type, event, eventPlayers = [], tglSelecti
                   🖨 Download PDF
                 </button>
               </>
-            ) : type === 'checkin_qr' || type === 'opt_in_rosters' ? (
+            ) : type === 'checkin_qr' || type === 'opt_in_rosters' || type === 'payouts_per_player' ? (
               <>
                 <button
                   onClick={handleDownloadPng}
@@ -1106,6 +1216,16 @@ export default function PrintAssets({ type, event, eventPlayers = [], tglSelecti
 
       {/* Off-screen render for Opt-In Rosters PNG capture */}
       {type === 'opt_in_rosters' && printNodes.length > 0 && createPortal(
+        <div style={{ position: 'fixed', top: '-99999px', left: '-99999px', pointerEvents: 'none', zIndex: -1 }}>
+          <div ref={pngRef}>
+            {printNodes[0]}
+          </div>
+        </div>,
+        document.body
+      )}
+
+      {/* Off-screen render for Payouts per Player PNG capture */}
+      {type === 'payouts_per_player' && printNodes.length > 0 && createPortal(
         <div style={{ position: 'fixed', top: '-99999px', left: '-99999px', pointerEvents: 'none', zIndex: -1 }}>
           <div ref={pngRef}>
             {printNodes[0]}

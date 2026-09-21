@@ -219,6 +219,30 @@ export default function EventDetail() {
   if (loading) return <div className="animate-pulse space-y-4"><div className="h-10 w-64 bg-gray-200 rounded" /><div className="h-48 bg-gray-200 rounded-xl" /></div>
   if (!event)  return <p className="text-gray-500">Event not found.</p>
 
+  // Only computed when the "Payouts per Player" print asset is open — mirrors
+  // TabPayoutSummary's exact computation so the printed sheet always matches
+  // the on-screen Payout Summary tab.
+  let payoutsByPlayer = []
+  if (printAsset === 'payouts_per_player' && course) {
+    const nonGuestEPs   = eventPlayers.filter(ep => !ep.is_guest)
+    const flightCounts  = {}
+    nonGuestEPs.forEach(ep => { if (ep.flight) flightCounts[ep.flight] = (flightCounts[ep.flight] ?? 0) + 1 })
+    const leaderboards  = computeLeaderboards(nonGuestEPs, allScores, course)
+    const skinsResults  = computeAllSkins(nonGuestEPs, allScores, course)
+    const stablefordData = computeStableford(nonGuestEPs, allScores, course)
+    const stablefordGrossData = computeStableford(nonGuestEPs, allScores, course, true)
+    const blindPartnersData = computeBlindPartners(event, nonGuestEPs, allScores, course)
+    const superSkinsResult  = computeSuperSkins(event, nonGuestEPs, allScores, course)
+    const { byPlayer } = computePayouts(
+      event, nonGuestEPs.length, leaderboards, sideGames, skinsResults, flightCounts, stablefordData, blindPartnersData, superSkinsResult, stablefordGrossData, nonGuestEPs
+    )
+    const playerMap = Object.fromEntries(eventPlayers.map(ep => [ep.player_id, ep.player]))
+    payoutsByPlayer = byPlayer.map(({ playerId, total, items }) => {
+      const p = playerMap[playerId]
+      return { playerId, name: p ? `${p.first_name} ${p.last_name}` : playerId, total, items }
+    })
+  }
+
   return (
     <div className="space-y-5">
       {/* Breadcrumb */}
@@ -388,7 +412,7 @@ export default function EventDetail() {
         />
       )}
 
-      {printAsset && <PrintAssets type={printAsset} event={event} eventPlayers={eventPlayers} tglSelections={tglSelections} orgSlug={orgSlug} leagueSlug={leagueSlug} onClose={() => setPrintAsset(null)} />}
+      {printAsset && <PrintAssets type={printAsset} event={event} eventPlayers={eventPlayers} tglSelections={tglSelections} orgSlug={orgSlug} leagueSlug={leagueSlug} payoutsByPlayer={payoutsByPlayer} onClose={() => setPrintAsset(null)} />}
     </div>
   )
 }
@@ -1376,6 +1400,15 @@ function TabPostRound({ event, eventPlayers, allScores, course, sideGames, orgNa
             />
           </div>
         )}
+        <div className="flex items-center justify-between border-t border-gray-200 pt-3">
+          <div>
+            <div className="text-sm font-medium text-gray-800">Payouts per Player (PNG)</div>
+            <div className="text-xs text-gray-400 mt-0.5">Per-player payout totals with category breakdown</div>
+          </div>
+          <Button size="sm" variant="secondary" onClick={() => onPrintAsset('payouts_per_player')}>
+            Payouts per Player
+          </Button>
+        </div>
       </div>
 
       {scoreEditor && (
