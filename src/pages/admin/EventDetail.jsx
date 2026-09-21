@@ -3598,9 +3598,13 @@ function TabSideGamesMain({ event, eventPlayers, course, sideGames, onUpdated, o
     // Un-opting a player also clears their paid flag — no stale "paid" for
     // someone no longer in the roster for this game.
     if (isRemoving) {
-      const curPaid = paid[gameKey] ?? []
-      if (curPaid.includes(playerId)) {
-        const updatedPaid = { ...paid, [gameKey]: curPaid.filter(id => id !== playerId) }
+      const curPaid = paid[gameKey]
+      const hasPaid = Array.isArray(curPaid) ? curPaid.includes(playerId) : curPaid?.[playerId] != null
+      if (hasPaid) {
+        const updatedGamePaid = Array.isArray(curPaid)
+          ? curPaid.filter(id => id !== playerId)
+          : Object.fromEntries(Object.entries(curPaid).filter(([id]) => id !== playerId))
+        const updatedPaid = { ...paid, [gameKey]: updatedGamePaid }
         setPaid(updatedPaid)
         persistPaid(updatedPaid)
       }
@@ -3614,11 +3618,25 @@ function TabSideGamesMain({ event, eventPlayers, course, sideGames, onUpdated, o
     onUpdated?.()
   }
 
-  function togglePaid(gameKey, playerId) {
+  // Payment method per player per game — 'cash' | 'venmo' | null. Older events
+  // stored side_game_paid[key] as a plain array of paid player IDs (no method);
+  // those show as 'unspecified' until the admin picks a method, which upgrades
+  // that game's entry to the new { playerId: 'cash'|'venmo' } shape.
+  function paidMethodFor(gameKey, playerId) {
+    const v = paid[gameKey]
+    if (Array.isArray(v)) return v.includes(playerId) ? 'unspecified' : null
+    return v?.[playerId] ?? null
+  }
+
+  function setPaidMethod(gameKey, playerId, method) {
     setPaid(prev => {
-      const cur  = prev[gameKey] ?? []
-      const next = cur.includes(playerId) ? cur.filter(id => id !== playerId) : [...cur, playerId]
-      const updated = { ...prev, [gameKey]: next }
+      const cur    = prev[gameKey]
+      const curObj = Array.isArray(cur)
+        ? Object.fromEntries(cur.map(id => [id, 'unspecified']))
+        : { ...(cur ?? {}) }
+      if (method) curObj[playerId] = method
+      else delete curObj[playerId]
+      const updated = { ...prev, [gameKey]: curObj }
       persistPaid(updated)
       return updated
     })
@@ -3663,11 +3681,12 @@ function TabSideGamesMain({ event, eventPlayers, course, sideGames, onUpdated, o
           <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-widest mb-3">Opt-in Rosters</h3>
           <div className="space-y-4">
             {buyInGames.map(key => {
-              const opted     = entries[key] ?? []
-              const paidIds   = paid[key] ?? []
-              const paidCount = opted.filter(pid => paidIds.includes(pid)).length
-              const amount    = payoutAmountForKey(key)
-              const pot       = amount != null ? opted.length * amount : null
+              const opted      = entries[key] ?? []
+              const paidCount  = opted.filter(pid => paidMethodFor(key, pid) != null).length
+              const cashCount  = opted.filter(pid => paidMethodFor(key, pid) === 'cash').length
+              const venmoCount = opted.filter(pid => paidMethodFor(key, pid) === 'venmo').length
+              const amount     = payoutAmountForKey(key)
+              const pot        = amount != null ? opted.length * amount : null
               return (
                 <Card key={key}>
                   <div className="flex items-center justify-between mb-3">
@@ -3680,6 +3699,9 @@ function TabSideGamesMain({ event, eventPlayers, course, sideGames, onUpdated, o
                         {opted.length > 0 && (
                           <div className={`text-xs font-medium ${paidCount === opted.length ? 'text-green-600' : 'text-amber-600'}`}>
                             {paidCount}/{opted.length} paid
+                            {(cashCount > 0 || venmoCount > 0) && (
+                              <span className="text-gray-400 font-normal"> ({cashCount} cash · {venmoCount} venmo)</span>
+                            )}
                           </div>
                         )}
                       </div>
@@ -3706,7 +3728,7 @@ function TabSideGamesMain({ event, eventPlayers, course, sideGames, onUpdated, o
                       const p       = ep.player ?? {}
                       const name    = [p.first_name, p.last_name].filter(Boolean).join(' ') || '—'
                       const isOpted = opted.includes(pid)
-                      const isPaid  = paidIds.includes(pid)
+                      const method  = paidMethodFor(key, pid)
                       return (
                         <div key={pid} className="flex items-center justify-between gap-1.5 text-sm text-gray-700">
                           <label className="flex items-center gap-2 cursor-pointer min-w-0">
@@ -3719,18 +3741,29 @@ function TabSideGamesMain({ event, eventPlayers, course, sideGames, onUpdated, o
                             <span className="truncate">{name}</span>
                           </label>
                           {isOpted && (
-                            <label
-                              className={`flex items-center gap-1 text-xs font-medium shrink-0 cursor-pointer ${isPaid ? 'text-green-600' : 'text-gray-400'}`}
-                              title="Mark as paid"
-                            >
-                              <input
-                                type="checkbox"
-                                checked={isPaid}
-                                onChange={() => togglePaid(key, pid)}
-                                className="accent-green-600 w-4 h-4"
-                              />
-                              Paid
-                            </label>
+                            <div className="flex items-center gap-1 shrink-0">
+                              {method === 'unspecified' && (
+                                <span className="text-xs text-green-600" title="Marked paid before cash/Venmo tracking existed">✓</span>
+                              )}
+                              <button
+                                type="button"
+                                onClick={() => setPaidMethod(key, pid, method === 'cash' ? null : 'cash')}
+                                className={`px-1.5 py-0.5 rounded text-xs font-medium border transition-colors ${
+                                  method === 'cash' ? 'bg-green-600 text-white border-green-600' : 'text-gray-400 border-gray-200 hover:border-gray-300'
+                                }`}
+                              >
+                                Cash
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => setPaidMethod(key, pid, method === 'venmo' ? null : 'venmo')}
+                                className={`px-1.5 py-0.5 rounded text-xs font-medium border transition-colors ${
+                                  method === 'venmo' ? 'bg-blue-600 text-white border-blue-600' : 'text-gray-400 border-gray-200 hover:border-gray-300'
+                                }`}
+                              >
+                                Venmo
+                              </button>
+                            </div>
                           )}
                         </div>
                       )

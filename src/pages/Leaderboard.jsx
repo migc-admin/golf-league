@@ -204,6 +204,9 @@ export default function Leaderboard() {
   const superSkinsResult  = course ? computeSuperSkins(event, eventPlayers, allScores, course)       : null
   const matchData       = course ? computeMatchPoints(eventPlayers, allScores, course, matchPairings) : null
   const teamMatchData   = course ? computeTeamMatchPoints(eventPlayers, allScores, course, event?.team_match_config ?? null) : null
+  // While any pairing is still being played, the tab reads "Matches Ahead" (in-progress
+  // language); once every match has closed, it switches to the final "Match Points" label.
+  const matchesFinished = matchData ? matchData.pairings.every(p => p.winner != null) : true
 
   const tglData = (() => {
     if (!leaderboards || !tglTeams.length || !tglSelections.length) return null
@@ -324,7 +327,7 @@ export default function Leaderboard() {
                     : 'text-ink-muted hover:text-ink hover:bg-surface-high'
                 }`}
               >
-                {tab}
+                {tab === 'Match Points' && !matchesFinished ? 'Matches Ahead' : tab}
               </button>
             ))}
           </div>
@@ -1298,7 +1301,9 @@ function MatchPointsBoard({ matchData, event }) {
   )
 
   const teamLeader = teamPoints.A > teamPoints.B ? `${teamALabel} leads` : teamPoints.B > teamPoints.A ? `${teamBLabel} leads` : 'All Square'
-  const matchesLabel = event?.status === 'complete' ? 'matches won' : 'matches in progress'
+  // Keyed off every individual pairing being decided (winner set), not event.status —
+  // the round can still be "Live" while every match has already closed out.
+  const isComplete = pairings.every(p => p.winner != null)
 
   return (
     <div className="space-y-4">
@@ -1312,15 +1317,20 @@ function MatchPointsBoard({ matchData, event }) {
             <div className="flex-1 text-center py-4 bg-blue-50">
               <div className="text-xs font-bold text-blue-600 mb-1">{teamALabel}</div>
               <div className="text-4xl font-black text-blue-700">{teamPoints.A}</div>
-              <div className="text-xs text-blue-400 mt-0.5">{matchesLabel}</div>
+              {isComplete && <div className="text-xs text-blue-400 mt-0.5">matches won</div>}
             </div>
             <div className="w-px bg-gray-200" />
             <div className="flex-1 text-center py-4 bg-red-50">
               <div className="text-xs font-bold text-red-600 mb-1">{teamBLabel}</div>
               <div className="text-4xl font-black text-red-700">{teamPoints.B}</div>
-              <div className="text-xs text-red-400 mt-0.5">{matchesLabel}</div>
+              {isComplete && <div className="text-xs text-red-400 mt-0.5">matches won</div>}
             </div>
           </div>
+          {!isComplete && (
+            <div className="text-center py-2 border-t border-gray-100 bg-amber-50">
+              <span className="text-xs font-semibold text-amber-700">Matches are in Progress</span>
+            </div>
+          )}
           <div className="text-center py-2 border-t border-gray-100">
             <span className="text-xs font-semibold text-gray-600">{teamLeader}</span>
           </div>
@@ -1343,7 +1353,7 @@ function MatchPointsBoard({ matchData, event }) {
         const labelA = teamALabel || null
         const labelB = teamBLabel || null
         const isOpen = expandedIds.has(idx)
-        const middleLabel = pair.holesPlayed === 0 ? 'VS' : `Thru ${pair.holesPlayed}`
+        const middleLabel = pair.holesPlayed === 0 ? 'VS' : isFinished ? 'F' : `Thru ${pair.holesPlayed}`
         const leftEdge = edgeStatus('A', pair)
         const rightEdge = edgeStatus('B', pair)
 
