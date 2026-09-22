@@ -419,7 +419,7 @@ export default function EventDetail() {
 
 // ─── Export Scores ────────────────────────────────────────────────
 async function exportScoresCSV(event, eventPlayers, allScores, course, sideGames = []) {
-  const XLSX = await import('xlsx')
+  const { default: ExcelJS } = await import('exceljs')
 
   const scoreMap = {}
   for (const s of allScores) {
@@ -509,16 +509,25 @@ async function exportScoresCSV(event, eventPlayers, allScores, course, sideGames
   }
 
   // ── Build workbook ────────────────────────────────────────────────
-  const wb = XLSX.utils.book_new()
+  const wb = new ExcelJS.Workbook()
 
-  const ws1 = XLSX.utils.aoa_to_sheet([sheetHeaders, parRow, siRow, ...grossRows])
-  const ws2 = XLSX.utils.aoa_to_sheet([sheetHeaders, parRow, siRow, ...netRows])
-  const ws3 = XLSX.utils.aoa_to_sheet([payoutHeaders, ...payoutRows])
-  XLSX.utils.book_append_sheet(wb, ws1, 'Gross')
-  XLSX.utils.book_append_sheet(wb, ws2, 'Net')
-  XLSX.utils.book_append_sheet(wb, ws3, 'Payouts')
+  const ws1 = wb.addWorksheet('Gross')
+  ws1.addRows([sheetHeaders, parRow, siRow, ...grossRows])
 
-  XLSX.writeFile(wb, `event_${event.event_number}_scores.xlsx`)
+  const ws2 = wb.addWorksheet('Net')
+  ws2.addRows([sheetHeaders, parRow, siRow, ...netRows])
+
+  const ws3 = wb.addWorksheet('Payouts')
+  ws3.addRows([payoutHeaders, ...payoutRows])
+
+  const buf = await wb.xlsx.writeBuffer()
+  const blob = new Blob([buf], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' })
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = `event_${event.event_number}_scores.xlsx`
+  a.click()
+  URL.revokeObjectURL(url)
 }
 
 function exportHandicapCSV(event, eventPlayers, allScores, course) {
