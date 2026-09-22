@@ -1862,7 +1862,7 @@ function AddPlayerModal({ open, onClose, eventId, available, course, defaultTeeN
       if (next[playerId]) {
         delete next[playerId]
       } else {
-        next[playerId] = { hi: '', flight: '', autoHC: false, ch: '' }
+        next[playerId] = { hi: '', flight: '', autoHC: true, ch: '' }
       }
       return next
     })
@@ -1894,7 +1894,7 @@ function AddPlayerModal({ open, onClose, eventId, available, course, defaultTeeN
 
   function selectAll() {
     const next = {}
-    available.forEach(p => { next[p.id] = bulk[p.id] ?? { hi: '', flight: '', autoHC: false, ch: '' } })
+    available.forEach(p => { next[p.id] = bulk[p.id] ?? { hi: '', flight: '', autoHC: true, ch: '' } })
     setBulk(next)
   }
 
@@ -1908,11 +1908,15 @@ function AddPlayerModal({ open, onClose, eventId, available, course, defaultTeeN
     : available
 
   const selected = Object.entries(bulk)
+  // HI/CH are optional — a blank value is always valid (filled in later via the
+  // upload feature); if a value IS entered, it must be a well-formed number.
   const allValid = selected.length > 0 && selected.every(([, v]) =>
     !useHandicaps ||
     v.flight === 'guest' ||
-    (v.hi !== '' && !isNaN(parseFloat(v.hi)) &&
-    (v.autoHC || (v.ch !== '' && !isNaN(parseInt(v.ch, 10)))))
+    (
+      (v.hi === '' || !isNaN(parseFloat(v.hi))) &&
+      (v.autoHC || v.ch === '' || !isNaN(parseInt(v.ch, 10)))
+    )
   )
 
   async function handleSave(e) {
@@ -1942,9 +1946,14 @@ function AddPlayerModal({ open, onClose, eventId, available, course, defaultTeeN
           flight:                  flight || null,
         })
       } else {
-        const hiVal = parseFloat(hi)
+        // HI/CH are optional — blank fields are filled in later (e.g. via the
+        // upload feature) rather than blocking the add. handicap_index is a
+        // NOT NULL column, so a blank HI is stored as 0 (same placeholder the
+        // guest/no-handicap insert paths above already use); course_handicap
+        // is nullable and left null when blank.
+        const hiVal = hi !== '' ? parseFloat(hi) : 0
         let course_handicap = null
-        if (autoHC && chSlope && chRating && chPar) {
+        if (hi !== '' && autoHC && chSlope && chRating && chPar) {
           course_handicap = Math.round((hiVal * chSlope / 113) + (chRating - chPar))
         } else if (!autoHC && ch !== '') {
           course_handicap = parseInt(ch, 10)
@@ -2053,7 +2062,6 @@ function AddPlayerModal({ open, onClose, eventId, available, course, defaultTeeN
                             onChange={e => setField(p.id, 'hi', e.target.value)}
                             placeholder="HI"
                             className="input py-1 text-xs w-16 shrink-0"
-                            required
                           />
                           {vals.autoHC ? (
                             <span
@@ -2071,7 +2079,6 @@ function AddPlayerModal({ open, onClose, eventId, available, course, defaultTeeN
                               placeholder="CH"
                               className="input py-1 text-xs w-16 shrink-0"
                               title="Course handicap (manual)"
-                              required
                             />
                           )}
                           <button
