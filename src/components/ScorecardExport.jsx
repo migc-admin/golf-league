@@ -1761,17 +1761,25 @@ function buildResultsCard({ event, eventPlayers, allScores, course, sideGames, o
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'space-between',
+    gap: '12px',
     marginBottom: '16px',
   })
-  const hLeft = el('div', {})
-  hLeft.appendChild(txt(orgName ?? 'Scorify Golf', { color: GOLD, fontSize: '16px', fontWeight: '700', display: 'block' }))
-  hLeft.appendChild(txt(`Event #${event.event_number} · Tournament Results`, { color: 'rgba(255,255,255,0.85)', fontSize: '12px', display: 'block', marginTop: '3px' }))
-  hLeft.appendChild(txt(`${course.name ?? ''} · ${eventDate}`, { color: 'rgba(255,255,255,0.6)', fontSize: '10px', display: 'block', marginTop: '3px' }))
+  // Flex column + explicit line-height (rather than block spans stacked with
+  // marginTop) so a long org name that wraps to two lines still reserves the
+  // right amount of vertical space — the event/date lines below it never
+  // overlap the wrapped text.
+  const hLeft = el('div', {
+    display: 'flex', flexDirection: 'column', gap: '3px',
+    minWidth: '0', flex: '1 1 auto',
+  })
+  hLeft.appendChild(txt(orgName ?? 'Scorify Golf', { color: GOLD, fontSize: '16px', fontWeight: '700', lineHeight: '1.25' }))
+  hLeft.appendChild(txt(`Event #${event.event_number} · Tournament Results`, { color: 'rgba(255,255,255,0.85)', fontSize: '12px', lineHeight: '1.3' }))
+  hLeft.appendChild(txt(`${course.name ?? ''} · ${eventDate}`, { color: 'rgba(255,255,255,0.6)', fontSize: '10px', lineHeight: '1.3' }))
   header.appendChild(hLeft)
   if (orgLogoUrl) {
     const logoImg = document.createElement('img')
     logoImg.src = orgLogoUrl
-    logoImg.style.cssText = `width:52px;height:52px;border-radius:50%;object-fit:cover;border:2px solid ${GOLD}`
+    logoImg.style.cssText = `width:52px;height:52px;border-radius:50%;object-fit:cover;border:2px solid ${GOLD};flex-shrink:0`
     header.appendChild(logoImg)
   }
   wrap.appendChild(header)
@@ -2072,8 +2080,12 @@ function buildResultsCard({ event, eventPlayers, allScores, course, sideGames, o
     matchData.pairings.forEach((pair, idx) => {
       const nameA = playerName(pair.playerA.player_id)
       const nameB = playerName(pair.playerB.player_id)
-      const teamA = pair.playerA.flight === 'A' ? teamALabel : teamBLabel
-      const teamB = pair.playerB.flight === 'A' ? teamALabel : teamBLabel
+      // Team membership is determined by pairing position (playerA → Team A,
+      // playerB → Team B — set explicitly per-pairing in Match Pairings), NOT
+      // by each player's stroke-play scoring flight. A player's net-scoring
+      // flight and their Ryder Cup team side are independent and can differ.
+      const teamA = teamALabel
+      const teamB = teamBLabel
       const status = pair.holesPlayed === 0 ? 'Not started' : pair.matchStatus
 
       // Once a match is decided, lead with the winner ("X def. Y") instead of
