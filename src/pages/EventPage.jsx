@@ -64,6 +64,7 @@ export default function EventPage() {
   const [event,        setEvent]        = useState(null)
   const [playerCount,  setPlayerCount]  = useState(null)
   const [eventPlayers, setEventPlayers] = useState([])
+  const [pairings,     setPairings]     = useState([])
   const [loading,      setLoading]      = useState(true)
   const [activeTab,    setActiveTab]    = useState('overview')
 
@@ -96,6 +97,19 @@ export default function EventPage() {
           .order('group_number').order('group_order', { nullsFirst: false }).order('flight')
         setEventPlayers(eps ?? [])
         setPlayerCount(count ?? 0)
+
+        // Match Play / Ryder Cup matchups — only fetched when the event actually
+        // uses one of those formats, to avoid an extra query on every event.
+        const evFormats = ev.formats ?? (ev.format ? [ev.format] : [])
+        if (evFormats.includes('match_points') || evFormats.includes('ryder_cup')) {
+          const { data: mp } = await supabase
+            .from('match_pairings')
+            .select('*, playerA:players!player_a_id(first_name,last_name), playerB:players!player_b_id(first_name,last_name)')
+            .eq('event_id', ev.id)
+            .order('match_number')
+          setPairings(mp ?? [])
+        }
+
         setLoading(false)
       } catch (err) {
         console.error('EventPage load error:', err)
@@ -143,6 +157,12 @@ export default function EventPage() {
   const eventDateTime = event.event_date
     ? new Date(`${event.event_date}T${(event.start_time ?? '00:00:00').slice(0, 8)}`)
     : null
+
+  // "Matchups" tab (Match Play / Ryder Cup pairings) only shows once pairings
+  // have actually been posted — inserted right after Overview.
+  const tabs = pairings.length > 0
+    ? [BASE_TABS[0], { key: 'matchups', label: 'Matchups' }, ...BASE_TABS.slice(1)]
+    : BASE_TABS
 
   return (
     <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column', background: '#f9f8f5', fontFamily: 'system-ui, -apple-system, sans-serif' }}>
@@ -235,7 +255,7 @@ export default function EventPage() {
 
             {/* Tab bar */}
             <div className="event-tab-bar" style={{ borderTop: '1px solid #e5e7eb', marginLeft: 'clamp(-16px,-4vw,-44px)', marginRight: 'clamp(-16px,-4vw,-44px)' }}>
-              {BASE_TABS.map(tab => (
+              {tabs.map(tab => (
                 <button key={tab.key} onClick={() => setActiveTab(tab.key)}
                   style={{
                     padding: '13px 24px',
@@ -282,6 +302,10 @@ export default function EventPage() {
 
         {activeTab === 'overview' && (
           <OverviewTab event={event} leaderboardUrl={leaderboardUrl} description={description} courseAddress={courseAddress} mapsUrl={mapsUrl} eventId={eid} />
+        )}
+
+        {activeTab === 'matchups' && (
+          <MatchupsTab pairings={pairings} event={event} eventPlayers={eventPlayers} />
         )}
 
         {activeTab === 'pairings' && (
@@ -674,6 +698,68 @@ function PhotosTab({ photos, eventId, onUploaded }) {
           </div>
         </div>
       )}
+    </div>
+  )
+}
+
+// ─── Matchups Tab (Match Play / Ryder Cup pairings) ────────────────────────────
+function MatchupsTab({ pairings, event, eventPlayers }) {
+  const epByPlayerId = Object.fromEntries(eventPlayers.map(ep => [ep.player_id, ep]))
+  function relativeStrokes(aId, bId) {
+    const chA = epByPlayerId[aId]?.course_handicap ?? 0
+    const chB = epByPlayerId[bId]?.course_handicap ?? 0
+    const baseline = Math.min(chA, chB)
+    return { relA: Math.max(0, chA - baseline), relB: Math.max(0, chB - baseline) }
+  }
+
+  const isRyderCup = (event.formats ?? (event.format ? [event.format] : [])).includes('ryder_cup')
+  const teamAName = event.ryder_cup_teams?.a || 'Team A'
+  const teamBName = event.ryder_cup_teams?.b || 'Team B'
+
+  if (pairings.length === 0) {
+    return (
+      <div style={{ textAlign: 'center', paddingTop: 80, paddingBottom: 80 }}>
+        <div style={{ fontSize: 17, fontWeight: 700, color: '#111827', marginBottom: 6 }}>Matchups not posted yet</div>
+        <div style={{ fontSize: 14, color: '#86868b' }}>Check back closer to the event.</div>
+      </div>
+    )
+  }
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+      {isRyderCup && (
+        <div style={{ fontSize: 13, color: '#9ca3af', fontWeight: 500 }}>
+          {teamAName} vs {teamBName} · {pairings.length} match{pairings.length !== 1 ? 'es' : ''}
+        </div>
+      )}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: 12 }}>
+        {pairings.map(p => {
+          const { relA, relB } = relativeStrokes(p.player_a_id, p.player_b_id)
+          return (
+            <div key={p.id} style={{ background: '#fff', borderRadius: 14, overflow: 'hidden', border: '1px solid #e5e7eb' }}>
+              <div style={{ background: GREEN, color: '#fff', padding: '10px 16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                <span style={{ fontWeight: 700, fontSize: 12, letterSpacing: '0.04em' }}>MATCH #{p.match_number}</span>
+                {isRyderCup && <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.6)' }}>{teamAName} vs {teamBName}</span>}
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column' }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px 16px', borderBottom: '1px solid #f3f4f6' }}>
+                  <span style={{ fontSize: 14, fontWeight: 700, color: '#1d4ed8' }}>
+                    {p.playerA?.first_name} {p.playerA?.last_name}
+                  </span>
+                  {relA > 0 && <span style={{ fontSize: 12, color: '#9ca3af', fontWeight: 600 }}>+{relA}</span>}
+                </div>
+                <div style={{ textAlign: 'center', fontSize: 11, color: '#9ca3af', fontWeight: 700, padding: '4px 0' }}>VS</div>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px 16px', borderTop: '1px solid #f3f4f6' }}>
+                  <span style={{ fontSize: 14, fontWeight: 700, color: '#6d28d9' }}>
+                    {p.playerB?.first_name} {p.playerB?.last_name}
+                  </span>
+                  {relB > 0 && <span style={{ fontSize: 12, color: '#9ca3af', fontWeight: 600 }}>+{relB}</span>}
+                </div>
+              </div>
+            </div>
+          )
+        })}
+      </div>
     </div>
   )
 }

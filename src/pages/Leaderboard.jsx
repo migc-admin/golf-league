@@ -204,9 +204,6 @@ export default function Leaderboard() {
   const superSkinsResult  = course ? computeSuperSkins(event, eventPlayers, allScores, course)       : null
   const matchData       = course ? computeMatchPoints(eventPlayers, allScores, course, matchPairings) : null
   const teamMatchData   = course ? computeTeamMatchPoints(eventPlayers, allScores, course, event?.team_match_config ?? null) : null
-  // While any pairing is still being played, the tab reads "Matches Ahead" (in-progress
-  // language); once every match has closed, it switches to the final "Match Points" label.
-  const matchesFinished = matchData ? matchData.pairings.every(p => p.winner != null) : true
 
   const tglData = (() => {
     if (!leaderboards || !tglTeams.length || !tglSelections.length) return null
@@ -327,7 +324,7 @@ export default function Leaderboard() {
                     : 'text-ink-muted hover:text-ink hover:bg-surface-high'
                 }`}
               >
-                {tab === 'Match Points' && !matchesFinished ? 'Matches Ahead' : tab}
+                {tab === 'Match Points' ? 'Match Play' : tab}
               </button>
             ))}
           </div>
