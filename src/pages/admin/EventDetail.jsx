@@ -2124,6 +2124,27 @@ function MatchPairingsManager({ event, eventId, eventPlayers }) {
   const [savingTeams, setSavingTeams] = useState(false)
   const isRyderCup = (event?.formats ?? []).includes('ryder_cup')
 
+  // Drag-and-drop reordering of the Current Match Pairings list — dragging a
+  // row updates match_number (order) for all pairings, not player selection.
+  const dndSensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 5 } }))
+  const [activeDragPairingId, setActiveDragPairingId] = useState(null)
+
+  function handlePairingDragStart({ active }) { setActiveDragPairingId(active.id) }
+
+  async function handlePairingDragEnd({ active, over }) {
+    setActiveDragPairingId(null)
+    if (!over || active.id === over.id) return
+    const oldIndex = pairings.findIndex(p => p.id === active.id)
+    const newIndex = pairings.findIndex(p => p.id === over.id)
+    if (oldIndex === -1 || newIndex === -1) return
+    const reordered = arrayMove(pairings, oldIndex, newIndex)
+    setPairings(reordered)
+    await Promise.all(reordered.map((p, i) =>
+      supabase.from('match_pairings').update({ match_number: i + 1 }).eq('id', p.id)
+    ))
+    await loadPairings()
+  }
+
   async function loadPairings() {
     const { data } = await supabase
       .from('match_pairings')
@@ -2234,10 +2255,13 @@ function MatchPairingsManager({ event, eventId, eventPlayers }) {
         </div>
       )}
 
-      {/* Current pairings */}
+      {/* Current pairings — drag to reorder match number */}
       <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
         <div className="px-4 py-3 bg-gray-50 border-b border-gray-100 flex items-center justify-between">
-          <h3 className="text-sm font-semibold text-gray-800">Current Match Pairings</h3>
+          <div>
+            <h3 className="text-sm font-semibold text-gray-800">Current Match Pairings</h3>
+            {pairings.length > 1 && <p className="text-xs text-gray-400 mt-0.5">Drag to reorder</p>}
+          </div>
           {pairings.length > 0 && (
             <button type="button" onClick={renumberAll} className="text-xs text-fairway-700 font-semibold hover:underline">
               Renumber
@@ -2247,28 +2271,30 @@ function MatchPairingsManager({ event, eventId, eventPlayers }) {
         {pairings.length === 0 ? (
           <p className="px-4 py-4 text-sm text-gray-400">No pairings assigned yet.</p>
         ) : (
-          <div className="divide-y divide-gray-100">
-            {pairings.map(p => {
-              const { relA, relB } = relativeStrokes(p.player_a_id, p.player_b_id)
-              return (
-                <div key={p.id} className="flex items-center justify-between px-4 py-3">
-                  <div className="text-sm text-gray-800">
-                    <span className="font-semibold text-blue-700">
-                      {p.playerA?.first_name} {p.playerA?.last_name}{relA > 0 ? ` (${relA})` : ''}
-                    </span>
-                    {' '}
-                    <span className="text-gray-400">vs</span>
-                    {' '}
-                    <span className="font-semibold text-purple-700">
-                      {p.playerB?.first_name} {p.playerB?.last_name}{relB > 0 ? ` (${relB})` : ''}
-                    </span>
-                    <span className="ml-3 text-xs text-gray-400">Match #{p.match_number}</span>
+          <DndContext sensors={dndSensors} collisionDetection={closestCenter} onDragStart={handlePairingDragStart} onDragEnd={handlePairingDragEnd}>
+            <SortableContext items={pairings.map(p => p.id)} strategy={verticalListSortingStrategy}>
+              <div className="divide-y divide-gray-100">
+                {pairings.map(p => {
+                  const { relA, relB } = relativeStrokes(p.player_a_id, p.player_b_id)
+                  return (
+                    <SortablePairingRow key={p.id} pairing={p} relA={relA} relB={relB} onRemove={() => deletePairing(p.id)} />
+                  )
+                })}
+              </div>
+            </SortableContext>
+            <DragOverlay>
+              {activeDragPairingId ? (() => {
+                const p = pairings.find(pp => pp.id === activeDragPairingId)
+                if (!p) return null
+                const { relA, relB } = relativeStrokes(p.player_a_id, p.player_b_id)
+                return (
+                  <div className="bg-white border-2 border-fairway-600 rounded-lg px-4 py-3 shadow-xl">
+                    <PairingRowLabel pairing={p} relA={relA} relB={relB} />
                   </div>
-                  <Button size="sm" variant="danger" onClick={() => deletePairing(p.id)}>Remove</Button>
-                </div>
-              )
-            })}
-          </div>
+                )
+              })() : null}
+            </DragOverlay>
+          </DndContext>
         )}
       </div>
 
@@ -2322,6 +2348,41 @@ function MatchPairingsManager({ event, eventId, eventPlayers }) {
       {unpairedPlayers.length < 2 && pairings.length > 0 && (
         <p className="text-sm text-gray-400 text-center">All players have been paired.</p>
       )}
+    </div>
+  )
+}
+
+function PairingRowLabel({ pairing: p, relA, relB }) {
+  return (
+    <div className="text-sm text-gray-800">
+      <span className="font-semibold text-blue-700">
+        {p.playerA?.first_name} {p.playerA?.last_name}{relA > 0 ? ` (${relA})` : ''}
+      </span>
+      {' '}
+      <span className="text-gray-400">vs</span>
+      {' '}
+      <span className="font-semibold text-purple-700">
+        {p.playerB?.first_name} {p.playerB?.last_name}{relB > 0 ? ` (${relB})` : ''}
+      </span>
+      <span className="ml-3 text-xs text-gray-400">Match #{p.match_number}</span>
+    </div>
+  )
+}
+
+function SortablePairingRow({ pairing, relA, relB, onRemove }) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: pairing.id })
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.4 : 1,
+  }
+  return (
+    <div ref={setNodeRef} style={style} className="flex items-center justify-between px-4 py-3 bg-white">
+      <div className="flex items-center gap-3 min-w-0">
+        <span {...attributes} {...listeners} className="cursor-grab text-gray-300 hover:text-gray-500 select-none shrink-0" title="Drag to reorder">⠿</span>
+        <PairingRowLabel pairing={pairing} relA={relA} relB={relB} />
+      </div>
+      <Button size="sm" variant="danger" onClick={onRemove}>Remove</Button>
     </div>
   )
 }
