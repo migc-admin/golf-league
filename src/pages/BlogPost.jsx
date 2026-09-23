@@ -2,6 +2,10 @@ import { Link, useParams, Navigate } from 'react-router-dom'
 import { Helmet } from 'react-helmet-async'
 import Footer from '../components/ui/Footer'
 import { getBlogPost, BLOG_POSTS } from '../lib/blogPosts'
+import ComparisonTable from '../components/blog/ComparisonTable'
+import LeaderboardPreview from '../components/blog/LeaderboardPreview'
+import PrintAssetGallery from '../components/blog/PrintAssetGallery'
+import LiveScoringGallery from '../components/blog/LiveScoringGallery'
 
 const GREEN = '#1B4332'
 const INK   = '#1d1d1f'
@@ -20,6 +24,18 @@ function Block({ block }) {
         {block.items.map((item, i) => <li key={i}>{item}</li>)}
       </ul>
     )
+  }
+  if (block.type === 'table') {
+    return <ComparisonTable headers={block.headers} rows={block.rows} />
+  }
+  if (block.type === 'leaderboard') {
+    return <LeaderboardPreview title={block.title} rows={block.rows} />
+  }
+  if (block.type === 'printAssets') {
+    return <PrintAssetGallery />
+  }
+  if (block.type === 'liveScoring') {
+    return <LiveScoringGallery />
   }
   return <p className="text-sm leading-relaxed mb-4" style={{ color: '#374151' }}>{block.text}</p>
 }
@@ -46,7 +62,13 @@ export default function BlogPost() {
           "headline": post.title,
           "description": post.excerpt,
           "datePublished": post.date,
-          "author": { "@type": "Organization", "name": "Scorify Golf" },
+          "author": {
+            "@type": "Person",
+            "name": "Kevin Vargas",
+            "jobTitle": "Founder, Scorify Golf",
+            "description": "Built Scorify Golf to run his own golf league's live scoring and season standings, then opened it up to other independent league directors.",
+          },
+          "publisher": { "@type": "Organization", "name": "Scorify Golf" },
         })}</script>
       </Helmet>
 
@@ -73,15 +95,18 @@ export default function BlogPost() {
         </header>
 
         <main className="flex-1">
-          <article className="max-w-2xl mx-auto px-6 py-14">
+          <article className="max-w-3xl mx-auto px-6 py-14">
             <Link to="/blog" className="text-sm font-semibold" style={{ color: GREEN }}>← Back to Blog</Link>
 
             <p className="text-xs font-bold uppercase tracking-widest mt-6 mb-3" style={{ color: GREEN }}>
               {post.category} · {formatDate(post.date)}
             </p>
-            <h1 className="text-3xl md:text-4xl font-bold mb-8" style={{ letterSpacing: '-0.02em', color: INK }}>
+            <h1 className="text-3xl md:text-4xl font-bold mb-6" style={{ letterSpacing: '-0.02em', color: INK }}>
               {post.title}
             </h1>
+            <p className="text-sm mb-8" style={{ color: '#6b7280' }}>
+              By <span className="font-semibold" style={{ color: INK }}>Kevin Vargas</span>, Founder of Scorify Golf
+            </p>
 
             {post.content.map((block, i) => <Block key={i} block={block} />)}
 
