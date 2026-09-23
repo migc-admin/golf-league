@@ -1655,7 +1655,9 @@ function PayoutsBoard({ event, eventPlayers, leaderboards, sideGames, skinsResul
   }
 
   const { totalPot, buyInPotTotal, byCategory, byPlayer, totalAllocated } = computePayouts(
-    event, payingPlayers.length, leaderboards, sideGames ?? [], skinsResults, flightCounts, stablefordData, blindPartnersData, superSkinsResult, stablefordGrossData, payingPlayers
+    event, payingPlayers.length, leaderboards, sideGames ?? [], skinsResults, flightCounts, {
+      stablefordData, blindPartnersData, superSkinsResult, stablefordGrossData, eventPlayers: payingPlayers,
+    }
   )
 
   // Sort categories in the desired display order

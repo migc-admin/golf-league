@@ -234,7 +234,9 @@ export default function EventDetail() {
     const blindPartnersData = computeBlindPartners(event, nonGuestEPs, allScores, course)
     const superSkinsResult  = computeSuperSkins(event, nonGuestEPs, allScores, course)
     const { byPlayer } = computePayouts(
-      event, nonGuestEPs.length, leaderboards, sideGames, skinsResults, flightCounts, stablefordData, blindPartnersData, superSkinsResult, stablefordGrossData, nonGuestEPs
+      event, nonGuestEPs.length, leaderboards, sideGames, skinsResults, flightCounts, {
+        stablefordData, blindPartnersData, superSkinsResult, stablefordGrossData, eventPlayers: nonGuestEPs,
+      }
     )
     const playerMap = Object.fromEntries(eventPlayers.map(ep => [ep.player_id, ep.player]))
     payoutsByPlayer = byPlayer.map(({ playerId, total, items }) => {
@@ -489,7 +491,9 @@ async function exportScoresCSV(event, eventPlayers, allScores, course, sideGames
   const stablefordGrossData = computeStableford(nonGuestEPs, allScores, course, true)
   const blindPartnersData = computeBlindPartners(event, nonGuestEPs, allScores, course)
   const superSkinsResult  = computeSuperSkins(event, nonGuestEPs, allScores, course)
-  const { byCategory } = computePayouts(event, nonGuestEPs.length, leaderboards, sideGames, skinsResults, flightCounts, stablefordData, blindPartnersData, superSkinsResult, stablefordGrossData, nonGuestEPs)
+  const { byCategory } = computePayouts(event, nonGuestEPs.length, leaderboards, sideGames, skinsResults, flightCounts, {
+    stablefordData, blindPartnersData, superSkinsResult, stablefordGrossData, eventPlayers: nonGuestEPs,
+  })
 
   const playerMap = Object.fromEntries(eventPlayers.map(ep => [ep.player_id, ep.player]))
 
@@ -4178,7 +4182,9 @@ function TabPayoutSummary({ event, eventPlayers, allScores, sideGames, course })
   const blindPartnersData = computeBlindPartners(event, nonGuestEPs, allScores, course)
   const superSkinsResult  = computeSuperSkins(event, nonGuestEPs, allScores, course)
   const { totalPot, buyInPotTotal, byCategory, byPlayer, totalAllocated } = computePayouts(
-    event, nonGuestEPs.length, leaderboards, sideGames, skinsResults, flightCounts, stablefordData, blindPartnersData, superSkinsResult, stablefordGrossData, nonGuestEPs
+    event, nonGuestEPs.length, leaderboards, sideGames, skinsResults, flightCounts, {
+      stablefordData, blindPartnersData, superSkinsResult, stablefordGrossData, eventPlayers: nonGuestEPs,
+    }
   )
 
   const playerMap = Object.fromEntries(

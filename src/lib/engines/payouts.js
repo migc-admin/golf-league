@@ -473,14 +473,22 @@ function resolveWinners(key, leaderboards, sideGames, stablefordData, blindPartn
  * @param {Array}  sideGames
  * @param {Object} skinsResults   — { A: skinsResult, B: skinsResult, ... }
  * @param {Object} flightCounts   — { A: number, B: number, C: number, ... }
- * @param {Object} [stablefordData]    — from scoring.computeStableford, e.g. { A: [...], B: [...] }
- * @param {Array}  [blindPartnersData] — from scoring.computeBlindPartners, ranked pairs
- * @param {Object} [superSkinsResult]  — from skins.computeSuperSkins, { A: {...,entrantCount}, B: {...,entrantCount} }
- * @param {Object} [stablefordGrossData] — from scoring.computeStableford(..., true), e.g. { A: [...], B: [...] }
- * @param {Array}  [eventPlayers]     — event_players rows (with .player_id/.flight), used to split
+ * @param {Object} [options.stablefordData]    — from scoring.computeStableford, e.g. { A: [...], B: [...] }
+ * @param {Array}  [options.blindPartnersData] — from scoring.computeBlindPartners, ranked pairs
+ * @param {Object} [options.superSkinsResult]  — from skins.computeSuperSkins, { A: {...,entrantCount}, B: {...,entrantCount} }
+ * @param {Object} [options.stablefordGrossData] — from scoring.computeStableford(..., true), e.g. { A: [...], B: [...] }
+ * @param {Array}  [options.eventPlayers]     — event_players rows (with .player_id/.flight), used to split
  *                                      "Separate buy-in" entrant counts by flight for flight-scoped games
  */
-export function computePayouts(event, playerCount, leaderboards, sideGames, skinsResults, flightCounts, stablefordData = null, blindPartnersData = null, superSkinsResult = null, stablefordGrossData = null, eventPlayers = []) {
+export function computePayouts(event, playerCount, leaderboards, sideGames, skinsResults, flightCounts, options = {}) {
+  const {
+    stablefordData = null,
+    blindPartnersData = null,
+    superSkinsResult = null,
+    stablefordGrossData = null,
+    eventPlayers = [],
+  } = options
+
   const config = event.payout_config ?? {}
 
   function getFlightCount(fl) {
