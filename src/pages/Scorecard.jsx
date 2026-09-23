@@ -49,7 +49,7 @@ export default function Scorecard() {
     await signOut()
     navigate('/login', { replace: true })
   }
-  const { saveScore, pendingCount, syncing } = useOfflineQueue()
+  const { saveScore, pendingCount, syncing, deadLetterCount } = useOfflineQueue()
 
   const [event,         setEvent]         = useState(null)
   const [course,        setCourse]        = useState(null)
@@ -511,6 +511,12 @@ export default function Scorecard() {
               <div className="flex items-center gap-1 rounded-full px-2.5 py-1" style={{ background: '#fef9c3' }}>
                 <div className={`w-1.5 h-1.5 rounded-full ${syncing ? 'bg-yellow-400 animate-pulse' : 'bg-yellow-500'}`} />
                 <span className="text-xs text-yellow-700">{pendingCount} pending</span>
+              </div>
+            )}
+            {deadLetterCount > 0 && (
+              <div className="flex items-center gap-1 rounded-full px-2.5 py-1" style={{ background: '#fee2e2' }} title="These scores repeatedly failed to save and were not synced. Re-enter them manually.">
+                <div className="w-1.5 h-1.5 rounded-full bg-red-500" />
+                <span className="text-xs text-red-700">{deadLetterCount} failed to sync</span>
               </div>
             )}
             {holesEntered > 0 && (

@@ -30,12 +30,19 @@ export function computeSkinsForFlight(eventPlayers, allScores, course, flight) {
     return { holes: [], playerSkins: {}, carryoverToNext: false, carryoverAmount: 0 }
   }
 
+  // Pre-index scores by player+hole so the lookup below is O(1) instead of
+  // an O(n) scan of allScores repeated for every hole × player combination.
+  const scoreMap = new Map()
+  for (const s of allScores) {
+    scoreMap.set(`${s.player_id}:${s.hole_number}`, s)
+  }
+
   // Build net score per player per hole
   const netByHole = {}    // { holeNum: { playerId: netScore } }
   for (let h = 1; h <= 18; h++) {
     netByHole[h] = {}
     for (const ep of flightPlayers) {
-      const s = allScores.find(x => x.player_id === ep.player_id && x.hole_number === h)
+      const s = scoreMap.get(`${ep.player_id}:${h}`)
       if (s) {
         const strokeIndexes = getStrokeIndexForTee(course, ep.tee)
         const strokes = getStrokesOnHole(ep.course_handicap ?? 0, strokeIndexes[h - 1])
@@ -138,13 +145,15 @@ export function computeSkinsForFlight(eventPlayers, allScores, course, flight) {
 }
 
 /**
- * Compute skins for both flights.
+ * Compute skins for every flight present among eventPlayers (not just A/B —
+ * leagues can configure 3+ flights). A and B keys are always present (even
+ * if empty) since some UI consumers assume they exist.
  */
 export function computeAllSkins(eventPlayers, allScores, course) {
-  return {
-    A: computeSkinsForFlight(eventPlayers, allScores, course, 'A'),
-    B: computeSkinsForFlight(eventPlayers, allScores, course, 'B'),
-  }
+  const flights = new Set(['A', 'B', ...eventPlayers.map(ep => ep.flight).filter(Boolean)])
+  return Object.fromEntries(
+    [...flights].sort().map(fl => [fl, computeSkinsForFlight(eventPlayers, allScores, course, fl)])
+  )
 }
 
 /**

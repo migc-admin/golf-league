@@ -450,19 +450,3 @@ export function computeTeamMatchPoints(eventPlayers, allScores, course, teamMatc
 
   return { groupMatches, totalA, totalB, teamAName, teamBName }
 }
-
-/**
- * Convenience: just get the team Ryder Cup score.
- */
-export function computeRyderCupScore(eventPlayers, allScores, course) {
-  const { teamPoints, pairings } = computeMatchPoints(eventPlayers, allScores, course)
-  const holesPlayed = pairings.reduce((acc, p) => acc + p.holesPlayed, 0)
-
-  let leader
-  const diff = teamPoints.A - teamPoints.B
-  if (diff > 0)      leader = 'Flight A'
-  else if (diff < 0) leader = 'Flight B'
-  else               leader = 'All square'
-
-  return { teamA: teamPoints.A, teamB: teamPoints.B, leader, margin: Math.abs(diff), holesPlayed }
-}
