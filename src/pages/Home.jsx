@@ -254,6 +254,7 @@ export default function Home() {
     { label: 'Pricing',  href: '#pricing'  },
     { label: 'Roadmap',  href: '#roadmap'  },
     { label: 'FAQ',      href: '#faq'      },
+    { label: 'Blog',     href: '/blog'     },
     { label: 'Contact',  href: '#contact'  },
     { label: 'About',    href: '#about'    },
   ]

@@ -11,6 +11,8 @@ function formatDate(dateStr) {
   return new Date(dateStr + 'T00:00:00').toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })
 }
 
+const SORTED_POSTS = [...BLOG_POSTS].sort((a, b) => new Date(b.date) - new Date(a.date))
+
 export default function Blog() {
   return (
     <>
@@ -61,7 +63,7 @@ export default function Blog() {
           {/* Post list */}
           <section className="py-16 px-6">
             <div className="max-w-3xl mx-auto space-y-6">
-              {BLOG_POSTS.map(post => (
+              {SORTED_POSTS.map(post => (
                 <Link
                   key={post.slug}
                   to={`/blog/${post.slug}`}
