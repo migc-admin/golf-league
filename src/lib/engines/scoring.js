@@ -372,7 +372,7 @@ export function computeLeaderboards(eventPlayers, allScores, course) {
     return a.totalPutts - b.totalPutts
   }
 
-  const withRank = (arr, sortFn, tieKey) => {
+  const withRank = (arr, sortFn, tieKey, holesKey = p => p.holesCompleted) => {
     const sorted = [...arr].sort(sortFn)
     const ranked = []
     for (let i = 0; i < sorted.length; i++) {
@@ -381,7 +381,7 @@ export function computeLeaderboards(eventPlayers, allScores, course) {
         ranked.push({ ...p, rank: 1 })
       } else {
         const prev = ranked[i - 1]
-        const tied = tieKey(prev) === tieKey(p) && prev.holesCompleted === p.holesCompleted
+        const tied = tieKey(prev) === tieKey(p) && holesKey(prev) === holesKey(p)
         ranked.push({ ...p, rank: tied ? prev.rank : i + 1 })
       }
     }
@@ -401,16 +401,16 @@ export function computeLeaderboards(eventPlayers, allScores, course) {
       BInProgress: withRank(flightB.filter(p => p.holesCompleted > 0 && p.holesCompleted < 18), byNet18, p => p.net18),
     },
     front9: {
-      A: withRank(flightA.filter(p => p.f9Holes === 9), byNetF9, p => p.netF9),
-      B: withRank(flightB.filter(p => p.f9Holes === 9), byNetF9, p => p.netF9),
-      AInProgress: withRank(flightA.filter(p => p.f9Holes > 0 && p.f9Holes < 9), byNetF9, p => p.netF9),
-      BInProgress: withRank(flightB.filter(p => p.f9Holes > 0 && p.f9Holes < 9), byNetF9, p => p.netF9),
+      A: withRank(flightA.filter(p => p.f9Holes === 9), byNetF9, p => p.netF9, p => p.f9Holes),
+      B: withRank(flightB.filter(p => p.f9Holes === 9), byNetF9, p => p.netF9, p => p.f9Holes),
+      AInProgress: withRank(flightA.filter(p => p.f9Holes > 0 && p.f9Holes < 9), byNetF9, p => p.netF9, p => p.f9Holes),
+      BInProgress: withRank(flightB.filter(p => p.f9Holes > 0 && p.f9Holes < 9), byNetF9, p => p.netF9, p => p.f9Holes),
     },
     back9: {
-      A: withRank(flightA.filter(p => p.b9Holes === 9), byNetB9, p => p.netB9),
-      B: withRank(flightB.filter(p => p.b9Holes === 9), byNetB9, p => p.netB9),
-      AInProgress: withRank(flightA.filter(p => p.b9Holes > 0 && p.b9Holes < 9), byNetB9, p => p.netB9),
-      BInProgress: withRank(flightB.filter(p => p.b9Holes > 0 && p.b9Holes < 9), byNetB9, p => p.netB9),
+      A: withRank(flightA.filter(p => p.b9Holes === 9), byNetB9, p => p.netB9, p => p.b9Holes),
+      B: withRank(flightB.filter(p => p.b9Holes === 9), byNetB9, p => p.netB9, p => p.b9Holes),
+      AInProgress: withRank(flightA.filter(p => p.b9Holes > 0 && p.b9Holes < 9), byNetB9, p => p.netB9, p => p.b9Holes),
+      BInProgress: withRank(flightB.filter(p => p.b9Holes > 0 && p.b9Holes < 9), byNetB9, p => p.netB9, p => p.b9Holes),
     },
     grossFull: {
       A: withRank(flightA.filter(p => p.holesCompleted === 18), byGross18, p => p.gross18),
@@ -419,16 +419,16 @@ export function computeLeaderboards(eventPlayers, allScores, course) {
       BInProgress: withRank(flightB.filter(p => p.holesCompleted > 0 && p.holesCompleted < 18), byGross18, p => p.gross18),
     },
     grossFront9: {
-      A: withRank(flightA.filter(p => p.f9Holes === 9), byGrossF9, p => p.grossF9),
-      B: withRank(flightB.filter(p => p.f9Holes === 9), byGrossF9, p => p.grossF9),
-      AInProgress: withRank(flightA.filter(p => p.f9Holes > 0 && p.f9Holes < 9), byGrossF9, p => p.grossF9),
-      BInProgress: withRank(flightB.filter(p => p.f9Holes > 0 && p.f9Holes < 9), byGrossF9, p => p.grossF9),
+      A: withRank(flightA.filter(p => p.f9Holes === 9), byGrossF9, p => p.grossF9, p => p.f9Holes),
+      B: withRank(flightB.filter(p => p.f9Holes === 9), byGrossF9, p => p.grossF9, p => p.f9Holes),
+      AInProgress: withRank(flightA.filter(p => p.f9Holes > 0 && p.f9Holes < 9), byGrossF9, p => p.grossF9, p => p.f9Holes),
+      BInProgress: withRank(flightB.filter(p => p.f9Holes > 0 && p.f9Holes < 9), byGrossF9, p => p.grossF9, p => p.f9Holes),
     },
     grossBack9: {
-      A: withRank(flightA.filter(p => p.b9Holes === 9), byGrossB9, p => p.grossB9),
-      B: withRank(flightB.filter(p => p.b9Holes === 9), byGrossB9, p => p.grossB9),
-      AInProgress: withRank(flightA.filter(p => p.b9Holes > 0 && p.b9Holes < 9), byGrossB9, p => p.grossB9),
-      BInProgress: withRank(flightB.filter(p => p.b9Holes > 0 && p.b9Holes < 9), byGrossB9, p => p.grossB9),
+      A: withRank(flightA.filter(p => p.b9Holes === 9), byGrossB9, p => p.grossB9, p => p.b9Holes),
+      B: withRank(flightB.filter(p => p.b9Holes === 9), byGrossB9, p => p.grossB9, p => p.b9Holes),
+      AInProgress: withRank(flightA.filter(p => p.b9Holes > 0 && p.b9Holes < 9), byGrossB9, p => p.grossB9, p => p.b9Holes),
+      BInProgress: withRank(flightB.filter(p => p.b9Holes > 0 && p.b9Holes < 9), byGrossB9, p => p.grossB9, p => p.b9Holes),
     },
     putts: withRank(players.filter(p => p.holesCompleted === 18 && p.totalPutts != null), byPutts, p => p.totalPutts),
   }

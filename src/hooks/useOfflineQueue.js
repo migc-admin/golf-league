@@ -102,7 +102,7 @@ export function useOfflineQueue() {
         const { error } = await persistScore(item)
         if (!error) succeeded.push(item._qid)
       } catch {
-        break
+        continue
       }
     }
 
