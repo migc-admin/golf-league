@@ -11,6 +11,29 @@
     <priority>0.8</priority>
   </url>
   <url>
+    <loc>https://www.scorifygolf.com/blog</loc>
+    <changefreq>weekly</changefreq>
+    <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>https://www.scorifygolf.com/blog/how-to-run-a-fair-skins-game</loc>
+    <lastmod>2026-08-11</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.6</priority>
+  </url>
+  <url>
+    <loc>https://www.scorifygolf.com/blog/flights-vs-full-field</loc>
+    <lastmod>2026-08-28</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.6</priority>
+  </url>
+  <url>
+    <loc>https://www.scorifygolf.com/blog/golf-handicaps-for-league-play</loc>
+    <lastmod>2026-09-15</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.6</priority>
+  </url>
+  <url>
     <loc>https://www.scorifygolf.com/roadmap</loc>
     <changefreq>weekly</changefreq>
     <priority>0.7</priority>

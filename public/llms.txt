@@ -44,4 +44,5 @@ Built by Kevin V, a business operations professional who ran golf leagues and go
 - Features: https://scorifygolf.com/features
 - About: https://scorifygolf.com/about
 - FAQ: https://scorifygolf.com/faq
+- Blog: https://scorifygolf.com/blog
 - Login: https://scorifygolf.com/login

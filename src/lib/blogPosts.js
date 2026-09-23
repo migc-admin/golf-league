@@ -10,7 +10,7 @@ export const BLOG_POSTS = [
     slug: 'how-to-run-a-fair-skins-game',
     title: 'How to Run a Fair Skins Game',
     excerpt: 'Skins games are one of the easiest ways to add stakes to a casual round — but only if the rules are set before the first tee shot. Here\'s how to avoid the most common disputes.',
-    date: '2026-09-15',
+    date: '2026-08-11',
     category: 'Side Games',
     content: [
       { type: 'p', text: 'A skins game is simple in theory: whoever has the lowest score on a hole wins that hole\'s "skin." If two or more players tie for low score, the skin carries over to the next hole, growing the pot. In practice, most disputes come from ambiguity that was never resolved before the round started — not from the format itself.' },
@@ -28,7 +28,7 @@ export const BLOG_POSTS = [
     slug: 'flights-vs-full-field',
     title: 'Flights vs. Full Field: Choosing the Right Format for Your League',
     excerpt: 'Splitting your league into flights can make competition fairer — or it can just add complexity for no benefit. Here\'s how to know which format actually fits your group.',
-    date: '2026-09-15',
+    date: '2026-08-28',
     category: 'League Setup',
     content: [
       { type: 'p', text: 'One of the first decisions a new league admin faces is whether to run the whole field as one competition or split players into flights by handicap. Both are valid — the right choice depends on the size and skill spread of your group.' },
