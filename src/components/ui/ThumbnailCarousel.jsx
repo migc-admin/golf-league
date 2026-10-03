@@ -53,62 +53,72 @@ export default function ThumbnailCarousel({ slides = [] }) {
 
   if (slides.length === 0) return null
 
+  const active = slides[imgIndex]
+
   return (
-    <div className="flex flex-col items-center justify-center overflow-hidden select-none py-2">
-      <div className={`relative ${SLIDE_WIDTH_CLASSES} py-4`}>
-        <div className="relative overflow-hidden rounded-2xl">
-          <motion.div
-            drag="x"
-            dragConstraints={{ left: 0, right: 0 }}
-            style={{ x: dragX }}
-            animate={{ translateX: `-${imgIndex * 100}%` }}
-            transition={SPRING_OPTIONS}
-            onDragEnd={onDragEnd}
-            className="flex cursor-grab active:cursor-grabbing"
-          >
+    <div className="w-full overflow-hidden select-none py-2">
+      <div className="flex flex-col lg:flex-row items-center lg:items-center gap-10 lg:gap-16">
+        {/* ── Left: image carousel + thumbnails ── */}
+        <div className={`relative ${SLIDE_WIDTH_CLASSES} shrink-0 mx-auto lg:mx-0 py-4`}>
+          <div className="relative overflow-hidden rounded-2xl">
+            <motion.div
+              drag="x"
+              dragConstraints={{ left: 0, right: 0 }}
+              style={{ x: dragX }}
+              animate={{ translateX: `-${imgIndex * 100}%` }}
+              transition={SPRING_OPTIONS}
+              onDragEnd={onDragEnd}
+              className="flex cursor-grab active:cursor-grabbing"
+            >
+              {slides.map((s, idx) => (
+                <motion.div
+                  key={s.key}
+                  animate={{ scale: imgIndex === idx ? ACTIVE_SCALE : INACTIVE_SCALE }}
+                  transition={SPRING_OPTIONS}
+                  className={`relative ${SLIDE_SIZE_CLASSES} shrink-0 rounded-2xl overflow-hidden shadow-xl bg-white`}
+                  style={{ border: '1px solid #ebe9e4' }}
+                >
+                  <img
+                    src={s.src}
+                    alt={s.label}
+                    draggable={false}
+                    className="w-full h-full object-contain pointer-events-none"
+                  />
+                </motion.div>
+              ))}
+            </motion.div>
+          </div>
+
+          <div className="mt-4 flex gap-2 justify-center lg:justify-start items-center overflow-x-auto overflow-y-visible p-1 pb-2">
             {slides.map((s, idx) => (
-              <motion.div
+              <button
                 key={s.key}
-                animate={{ scale: imgIndex === idx ? ACTIVE_SCALE : INACTIVE_SCALE }}
-                transition={SPRING_OPTIONS}
-                className={`relative ${SLIDE_SIZE_CLASSES} shrink-0 rounded-2xl overflow-hidden shadow-xl bg-white`}
-                style={{ border: '1px solid #ebe9e4' }}
+                type="button"
+                onClick={() => setImgIndex(idx)}
+                aria-label={`Go to ${s.label}`}
+                className={`relative ${THUMB_SIZE_CLASSES} rounded-lg overflow-hidden transition-all duration-300 shrink-0 cursor-pointer ${
+                  idx === imgIndex
+                    ? `scale-110 ${ACTIVE_THUMB_RING_CLASSES} shadow-md opacity-100`
+                    : 'opacity-50 hover:opacity-90'
+                }`}
+                style={idx === imgIndex ? { '--tw-ring-color': '#1B4332' } : undefined}
               >
-                <img
-                  src={s.src}
-                  alt={s.label}
-                  draggable={false}
-                  className="w-full h-full object-contain pointer-events-none"
-                />
-              </motion.div>
+                <img src={s.src} alt="" className="w-full h-full object-cover object-top" />
+              </button>
             ))}
-          </motion.div>
+          </div>
         </div>
 
-        <div className="mt-4 flex gap-2 justify-center items-center overflow-x-auto overflow-y-visible p-1 pb-2">
-          {slides.map((s, idx) => (
-            <button
-              key={s.key}
-              type="button"
-              onClick={() => setImgIndex(idx)}
-              aria-label={`Go to ${s.label}`}
-              className={`relative ${THUMB_SIZE_CLASSES} rounded-lg overflow-hidden transition-all duration-300 shrink-0 cursor-pointer ${
-                idx === imgIndex
-                  ? `scale-110 ${ACTIVE_THUMB_RING_CLASSES} shadow-md opacity-100`
-                  : 'opacity-50 hover:opacity-90'
-              }`}
-              style={idx === imgIndex ? { '--tw-ring-color': '#1B4332' } : undefined}
-            >
-              <img src={s.src} alt="" className="w-full h-full object-cover object-top" />
-            </button>
-          ))}
+        {/* ── Right: description of the active slide ── */}
+        <div className="flex-1 text-center lg:text-left max-w-md mx-auto lg:mx-0">
+          <p className="text-xl sm:text-2xl font-bold" style={{ fontFamily: "'Manrope', sans-serif", color: '#1B4332' }}>
+            {active?.label}
+          </p>
+          {active?.caption && (
+            <p className="text-base mt-3 leading-relaxed" style={{ color: '#6b7280' }}>{active.caption}</p>
+          )}
         </div>
       </div>
-
-      <p className="text-sm font-semibold mt-1" style={{ color: '#1B4332' }}>{slides[imgIndex]?.label}</p>
-      {slides[imgIndex]?.caption && (
-        <p className="text-xs mt-1 text-center max-w-xs" style={{ color: '#6b7280' }}>{slides[imgIndex].caption}</p>
-      )}
     </div>
   )
 }

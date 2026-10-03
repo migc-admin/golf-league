@@ -559,9 +559,9 @@ export default function Home() {
                   <div key={opt.name} className="rounded-2xl p-7 flex flex-col" style={{ border: '1px solid #ebe9e4', background: '#fbfaf8' }}>
                     <div className="mb-4">
                       <p className="text-xs font-bold uppercase tracking-widest mb-1" style={{ color: '#9ca3af' }}>{opt.name}</p>
-                      <div className="flex items-end gap-1">
+                      <div className="flex flex-col">
                         <span className="text-3xl font-bold" style={{ color: INK, fontFamily: "'Manrope', sans-serif" }}>{opt.price}</span>
-                        <span className="text-sm mb-1 font-semibold" style={{ color: '#92611a' }}>{opt.sub}</span>
+                        <span className="text-sm font-semibold mt-1" style={{ color: '#92611a' }}>{opt.sub}</span>
                       </div>
                     </div>
                     <p className="text-sm mb-4 leading-relaxed" style={{ color: '#6b7280' }}>{opt.description}</p>
