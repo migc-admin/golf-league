@@ -7,6 +7,7 @@ import Footer from '../components/ui/Footer'
 import Pricing from '../components/ui/Pricing'
 import HeroSection from '../components/ui/HeroSection'
 import TestimonialsScroll from '../components/ui/TestimonialsScroll'
+import ThumbnailCarousel from '../components/ui/ThumbnailCarousel'
 
 const GREEN  = '#1B4332'
 const GOLD   = '#D4AF37'
@@ -98,6 +99,16 @@ const FEATURES = [
 ]
 
 // ─── Pricing ─────────────────────────────────────────────────────────────────
+// ─── "See it in action" screens (real product UI, sample data) ───────────────
+const PRODUCT_SCREENS = [
+  { key: 'entry', label: 'Score Entry', src: '/blog/live-scoring/score-entry.png', caption: 'Players tap their score hole-by-hole — no app download, no login.' },
+  { key: 'scorecard', label: 'Full Scorecard', src: '/blog/live-scoring/scorecard.PNG', caption: 'Every hole, every player, gross and net — visible to the whole group in real time.' },
+  { key: 'leaderboard', label: 'Live Leaderboard', src: '/blog/live-scoring/leaderboard.PNG', caption: 'Standings update automatically as scores come in, split by flight.' },
+  { key: 'tee_sheet', label: 'Tee Sheet', src: '/blog/print-assets/tee-sheet.png', caption: 'Groups, tee times, and starting holes — printed for the pro shop or starter.' },
+  { key: 'cart_sign', label: 'Cart Sign', src: '/blog/print-assets/cart-sign.png', caption: 'One per cart — group number and player names, ready to slide into the holder.' },
+  { key: 'ctp_sign', label: 'Closest to the Pin Sign', src: '/blog/print-assets/ctp-sign.png', caption: 'Posted at the tee box — hole number and a sign-in sheet for the side game.' },
+]
+
 const PLANS = [
   {
     name: 'Starter',
@@ -477,6 +488,23 @@ export default function Home() {
                 </div>
               ))}
             </div>
+          </div>
+        </section>
+
+        {/* ── See it in action ──────────────────────────────────────── */}
+        <section id="screenshots" className="py-24" style={{ background: '#ffffff' }}>
+          <div className="max-w-5xl mx-auto px-6">
+            <div className="text-center mb-10">
+              <p className="text-xs font-bold uppercase tracking-widest mb-3" style={{ color: GREEN }}>See it in action</p>
+              <h2 className="text-3xl md:text-4xl font-bold" style={{ fontFamily: "'Manrope', sans-serif", color: INK }}>
+                The real app, not a mockup
+              </h2>
+              <p className="mt-4 text-base max-w-xl mx-auto" style={{ color: '#6b7280' }}>
+                From score entry on the course to live leaderboards and printable signage — here's what players and admins actually see.
+              </p>
+            </div>
+            <ThumbnailCarousel slides={PRODUCT_SCREENS} />
+            <p className="text-xs text-center mt-2" style={{ color: '#9ca3af' }}>Sample data for illustration — not a real event.</p>
           </div>
         </section>
 
