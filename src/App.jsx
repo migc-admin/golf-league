@@ -16,6 +16,7 @@ import HeroPreview    from './pages/dev/HeroPreview'
 import Dashboard      from './pages/admin/Dashboard'
 import Leagues        from './pages/admin/Leagues'
 import LeagueDetail   from './pages/admin/LeagueDetail'
+import CreateEvent    from './pages/admin/CreateEvent'
 import Trips          from './pages/admin/Trips'
 import TripDetail     from './pages/admin/TripDetail'
 import TripHome       from './pages/trip/TripHome'
@@ -118,6 +119,7 @@ export default function App() {
               <Route index                element={<Dashboard />} />
               <Route path="leagues"                    element={<Leagues />} />
               <Route path="leagues/:leagueSlug"        element={<LeagueDetail />} />
+              <Route path="leagues/:leagueSlug/new-event" element={<CreateEvent />} />
               <Route path="trips"                      element={<Trips />} />
               <Route path="trips/:tripSlug"            element={<TripDetail />} />
               <Route path="courses"                    element={<Courses />} />
@@ -155,6 +157,7 @@ export default function App() {
           <Route index                element={<Dashboard />} />
           <Route path="leagues"                    element={<Leagues />} />
           <Route path="leagues/:leagueSlug"        element={<LeagueDetail />} />
+          <Route path="leagues/:leagueSlug/new-event" element={<CreateEvent />} />
           <Route path="trips"                      element={<Trips />} />
           <Route path="trips/:tripSlug"            element={<TripDetail />} />
           <Route path="courses"                    element={<Courses />} />
