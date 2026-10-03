@@ -18,6 +18,18 @@ function Block({ block }) {
   if (block.type === 'h2') {
     return <h2 className="text-xl font-bold mt-8 mb-3" style={{ color: INK }}>{block.text}</h2>
   }
+  if (block.type === 'h3') {
+    return <h3 className="text-base font-bold mt-6 mb-2" style={{ color: INK }}>{block.text}</h3>
+  }
+  if (block.type === 'pLink') {
+    return (
+      <p className="text-sm leading-relaxed mb-4" style={{ color: '#374151' }}>
+        {block.text}{' '}
+        <Link to={block.href} className="font-semibold" style={{ color: GREEN }}>{block.linkText}</Link>
+        {block.after ?? ''}
+      </p>
+    )
+  }
   if (block.type === 'ul') {
     return (
       <ul className="list-disc pl-5 space-y-1 text-sm leading-relaxed" style={{ color: '#374151' }}>
