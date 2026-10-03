@@ -46,6 +46,12 @@
     <priority>0.6</priority>
   </url>
   <url>
+    <loc>https://www.scorifygolf.com/blog/golf-league-side-games-skins-ctp-payouts</loc>
+    <lastmod>2026-09-28</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.6</priority>
+  </url>
+  <url>
     <loc>https://www.scorifygolf.com/roadmap</loc>
     <changefreq>weekly</changefreq>
     <priority>0.7</priority>
