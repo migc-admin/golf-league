@@ -5,7 +5,7 @@ import { useAuth } from '../hooks/useAuth'
 import { supabase } from '../lib/supabase'
 import Footer from '../components/ui/Footer'
 import Pricing from '../components/ui/Pricing'
-import HeroSection from '../components/ui/HeroSection'
+import HeroCentered from '../components/ui/HeroCentered'
 import TestimonialsScroll from '../components/ui/TestimonialsScroll'
 import ThumbnailCarousel from '../components/ui/ThumbnailCarousel'
 
@@ -436,7 +436,7 @@ export default function Home() {
       <main className="flex-1">
 
         {/* ── Hero ───────────────────────────────────────────────────── */}
-        <HeroSection
+        <HeroCentered
           logo={{ url: '/logo.png', alt: 'Scorify Golf', text: 'Scorify Golf' }}
           slogan="Golf league management software"
           title={<>The simplest way to<br />run a <span style={{ color: GOLD }}>golf event.</span></>}
