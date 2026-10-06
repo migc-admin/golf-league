@@ -49,6 +49,19 @@ function Block({ block }) {
   if (block.type === 'liveScoring') {
     return <LiveScoringGallery />
   }
+  if (block.type === 'image') {
+    return (
+      <figure className="my-6">
+        <img
+          src={block.src}
+          alt={block.alt}
+          className="w-full rounded-xl shadow-sm"
+          style={{ border: '1px solid #ebe9e4' }}
+          loading="lazy"
+        />
+      </figure>
+    )
+  }
   return <p className="text-sm leading-relaxed mb-4" style={{ color: '#374151' }}>{block.text}</p>
 }
 
