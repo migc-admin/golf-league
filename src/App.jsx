@@ -25,6 +25,7 @@ import Players        from './pages/admin/Players'
 import EventDetail    from './pages/admin/EventDetail'
 import Scorecard      from './pages/Scorecard'
 import ScorecardJoin  from './pages/ScorecardJoin'
+import PlayerLink     from './pages/PlayerLink'
 import Leaderboard    from './pages/Leaderboard'
 import Schedule       from './pages/Schedule'
 import EventPage      from './pages/EventPage'
@@ -175,6 +176,9 @@ export default function App() {
 
         {/* Join via access code — no auth required */}
         <Route path="/join/:eventId" element={<ScorecardJoin />} />
+
+        {/* Permanent per-player link (QR + NFC tag) — bypasses the access code */}
+        <Route path="/p/:token" element={<PlayerLink />} />
 
         {/* Scorecard — public for specific eventId (shareable link), auth required for /me */}
         <Route path="/scorecard/me" element={<ProtectedRoute><Scorecard /></ProtectedRoute>} />

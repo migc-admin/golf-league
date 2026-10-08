@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../hooks/useAuth'
 import toast from 'react-hot-toast'
+import QRCode from 'qrcode'
 import Card, { CardHeader } from '../../components/ui/Card'
 import Button from '../../components/ui/Button'
 import Modal from '../../components/ui/Modal'
@@ -773,6 +774,61 @@ function RoleBadge({ role }) {
   return <Badge variant="gray">No Role</Badge>
 }
 
+function PlayerTagSection({ player }) {
+  const [token,      setToken]      = useState(player.player_link_token ?? null)
+  const [qr,         setQr]         = useState(null)
+  const [regenerating, setRegenerating] = useState(false)
+
+  useEffect(() => { setToken(player.player_link_token ?? null) }, [player.id, player.player_link_token])
+
+  const url = token ? `${window.location.origin}/p/${token}` : null
+
+  useEffect(() => {
+    if (!url) { setQr(null); return }
+    QRCode.toDataURL(url, { width: 120, margin: 1, color: { dark: '#1B4332', light: '#ffffff' } })
+      .then(setQr)
+      .catch(() => setQr(null))
+  }, [url])
+
+  async function copyLink() {
+    if (!url) return
+    await navigator.clipboard.writeText(url)
+    toast.success('Link copied')
+  }
+
+  async function regenerate() {
+    setRegenerating(true)
+    const newToken = crypto.randomUUID().replace(/-/g, '')
+    const { error } = await supabase.from('players').update({ player_link_token: newToken }).eq('id', player.id)
+    setRegenerating(false)
+    if (error) { toast.error(error.message); return }
+    setToken(newToken)
+    toast.success('Player tag link regenerated — old tag/QR will stop working')
+  }
+
+  return (
+    <div className="rounded-xl border border-gray-200 p-4 flex items-center gap-4">
+      {qr && <img src={qr} alt="Player tag QR code" className="w-20 h-20 rounded-lg shrink-0" />}
+      <div className="flex-1 min-w-0">
+        <p className="text-sm font-semibold text-ink">Player Tag Link</p>
+        <p className="text-xs text-ink-muted mt-0.5">
+          Permanent link for this player — print the QR or write it to an NFC tag on their bag.
+          Jumps straight to whatever event they're playing today, no access code needed.
+        </p>
+        {url && <p className="text-xs text-gray-400 mt-1 truncate">{url}</p>}
+        <div className="flex gap-3 mt-2">
+          <button type="button" onClick={copyLink} disabled={!url} className="text-xs font-semibold text-fairway-700 hover:underline disabled:opacity-50">
+            Copy link
+          </button>
+          <button type="button" onClick={regenerate} disabled={regenerating} className="text-xs font-semibold text-gray-500 hover:underline disabled:opacity-50">
+            {regenerating ? 'Regenerating…' : 'Regenerate (old tag stops working)'}
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 function PlayerModal({ open, onClose, editing, orgId, onSaved, onOpenMerge }) {
   const [form,   setForm]   = useState({ first_name: '', last_name: '', email: '', phone: '', ghin_number: '', intended_role: 'player' })
   const [saving, setSaving] = useState(false)
@@ -853,6 +909,7 @@ function PlayerModal({ open, onClose, editing, orgId, onSaved, onOpenMerge }) {
             Admin role is applied immediately if a matching email account exists.
           </p>
         </div>
+        {editing && <PlayerTagSection player={editing} />}
         <div className="flex items-center justify-between pt-2">
           {editing && onOpenMerge ? (
             <button
