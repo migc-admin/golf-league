@@ -1167,15 +1167,26 @@ function EditHandicapModal({ ep, course, onClose, onSaved }) {
   const chPar    = course?.par ?? null
   const teeName  = ep.tee ?? null
 
-  const hiInit   = ep.handicap_index ?? ''
-  const chInit   = (chSlope && chRating && chPar && hiInit !== '')
+  // handicap_index is a NOT NULL column — 0 is the placeholder used for
+  // "not entered yet" (see AddPlayerModal), so treat it the same as blank
+  // here rather than showing a misleading 0.0 scratch handicap.
+  const hasHi    = ep.handicap_index != null && ep.handicap_index !== 0
+  const hiInit   = hasHi ? ep.handicap_index : ''
+  const hasCh    = ep.course_handicap != null && ep.course_handicap !== 0
+  const chInit   = (chSlope && chRating && chPar && hasHi)
     ? Math.round((parseFloat(hiInit) * chSlope / 113) + (chRating - chPar))
-    : (ep.course_handicap ?? '')
+    : (hasCh ? ep.course_handicap : '')
 
   const [hi, setHi] = useState(String(hiInit))
   const [ch, setCh] = useState(String(chInit))
   const [autoCalc, setAutoCalc] = useState(true)
   const [saving, setSaving] = useState(false)
+
+  // Match play course handicap — optional override, independent of any fixed
+  // percentage. NULL means "same as stroke play". Left open so each tournament
+  // can apply whatever allowance/adjustment it wants, entered directly.
+  const [sameForMatchPlay, setSameForMatchPlay] = useState(ep.match_play_course_handicap == null)
+  const [matchCh, setMatchCh] = useState(ep.match_play_course_handicap != null ? String(ep.match_play_course_handicap) : '')
 
   // Auto-calculate CH from HI whenever HI changes and autoCalc is on
   const calcCh = useCallback((hiVal) => {
@@ -1199,12 +1210,18 @@ function EditHandicapModal({ ep, course, onClose, onSaved }) {
 
   async function handleSave() {
     setSaving(true)
-    const hiVal = parseFloat(hi)
-    if (isNaN(hiVal)) { toast.error('Invalid handicap index'); setSaving(false); return }
+    const hiVal = hi !== '' ? parseFloat(hi) : 0
+    if (hi !== '' && isNaN(hiVal)) { toast.error('Invalid handicap index'); setSaving(false); return }
     const chVal = ch !== '' ? parseInt(ch, 10) : null
+    const matchChVal = sameForMatchPlay ? null : (matchCh !== '' ? parseInt(matchCh, 10) : null)
     const { error } = await supabase
       .from('event_players')
-      .update({ handicap_index: hiVal, adjusted_handicap_index: hiVal, course_handicap: chVal })
+      .update({
+        handicap_index: hiVal,
+        adjusted_handicap_index: hiVal,
+        course_handicap: chVal,
+        match_play_course_handicap: matchChVal,
+      })
       .eq('id', ep.id)
     setSaving(false)
     if (error) { toast.error(error.message); return }
@@ -1253,6 +1270,32 @@ function EditHandicapModal({ ep, course, onClose, onSaved }) {
               {teeName && <span className="font-medium">{teeName} tee — </span>}
               ({hi} × {chSlope} / 113) + ({chRating} − {chPar})
             </p>
+          )}
+        </div>
+
+        <div className="border-t border-gray-100 pt-3">
+          <label className="flex items-center gap-1.5 text-xs text-gray-500 cursor-pointer mb-2">
+            <input
+              type="checkbox"
+              checked={sameForMatchPlay}
+              onChange={e => setSameForMatchPlay(e.target.checked)}
+            />
+            Same handicap for match play
+          </label>
+          {!sameForMatchPlay && (
+            <div>
+              <label className="label">Match Play Course Handicap</label>
+              <input
+                type="number"
+                value={matchCh}
+                onChange={e => setMatchCh(e.target.value)}
+                className="input"
+                placeholder="e.g. 12"
+              />
+              <p className="text-xs text-gray-400 mt-1">
+                Used only for match play scoring in this event — stroke play keeps the Course Handicap above.
+              </p>
+            </div>
           )}
         </div>
 
@@ -1618,6 +1661,7 @@ function TabFlights({ event, eventPlayers, course, allPlayers, onUpdated }) {
                     <span className="text-orange-600">Adj: {ep.adjusted_handicap_index}</span>
                   )}
                   {ep.course_handicap != null && <span>CH: {ep.course_handicap}</span>}
+                  {ep.match_play_course_handicap != null && <span className="text-blue-600">MP: {ep.match_play_course_handicap}</span>}
                 </>
             }
             {ep.tournament_wins_prior > 0 && (
@@ -1760,6 +1804,7 @@ function TabFlights({ event, eventPlayers, course, allPlayers, onUpdated }) {
                   <div className="text-xs text-gray-500 flex items-center gap-3 mt-0.5">
                     <span>HI: {ep.handicap_index}</span>
                     {ep.course_handicap != null && <span>CH: {ep.course_handicap}</span>}
+                  {ep.match_play_course_handicap != null && <span className="text-blue-600">MP: {ep.match_play_course_handicap}</span>}
                   </div>
                 </div>
                 <div className="flex items-center gap-2">

@@ -23,6 +23,16 @@
 import { getStrokesOnHole, getStrokeIndexForTee } from './scoring'
 
 /**
+ * Course handicap to use for match play math. Falls back to the stroke-play
+ * course_handicap when no match-play-specific override is set on the
+ * event_players row (match_play_course_handicap is null by default, meaning
+ * "same as stroke play").
+ */
+function matchCH(ep) {
+  return ep?.match_play_course_handicap ?? ep?.course_handicap ?? null
+}
+
+/**
  * Format a USGA match play status string.
  * upBy > 0 means A leads, upBy < 0 means B leads.
  */
@@ -53,9 +63,9 @@ export function buildPairings(groupPlayers) {
 
   if (hasA && hasB) {
     const flightA = [...groupPlayers.filter(ep => ep.flight === 'A')]
-      .sort((a, b) => (a.course_handicap ?? 99) - (b.course_handicap ?? 99))
+      .sort((a, b) => (matchCH(a) ?? 99) - (matchCH(b) ?? 99))
     const flightB = [...groupPlayers.filter(ep => ep.flight === 'B')]
-      .sort((a, b) => (a.course_handicap ?? 99) - (b.course_handicap ?? 99))
+      .sort((a, b) => (matchCH(a) ?? 99) - (matchCH(b) ?? 99))
 
     const pairs = []
     const count = Math.max(flightA.length, flightB.length)
@@ -65,7 +75,7 @@ export function buildPairings(groupPlayers) {
     return pairs
   }
 
-  const sorted = [...groupPlayers].sort((a, b) => (a.course_handicap ?? 99) - (b.course_handicap ?? 99))
+  const sorted = [...groupPlayers].sort((a, b) => (matchCH(a) ?? 99) - (matchCH(b) ?? 99))
   const pairs = []
   for (let i = 0; i + 1 < sorted.length; i += 2) {
     pairs.push({ playerA: sorted[i], playerB: sorted[i + 1] })
@@ -110,8 +120,8 @@ export function computeMatchStrokeMap(eventPlayers, formats = [], teamMatchConfi
       }
     }
     for (const { playerA, playerB } of pairs) {
-      const chA = playerA.course_handicap ?? 0
-      const chB = playerB.course_handicap ?? 0
+      const chA = matchCH(playerA) ?? 0
+      const chB = matchCH(playerB) ?? 0
       const baseline = Math.min(chA, chB)
       map[playerA.player_id] = {
         mode: 'individual',
@@ -131,9 +141,9 @@ export function computeMatchStrokeMap(eventPlayers, formats = [], teamMatchConfi
       const teamA = hasSides ? members.filter(ep => sides[ep.player_id] === 'A') : members.filter(ep => ep.flight === 'A')
       const teamB = hasSides ? members.filter(ep => sides[ep.player_id] === 'B') : members.filter(ep => ep.flight === 'B')
       if (teamA.length === 0 || teamB.length === 0) continue
-      const baseline = Math.min(...members.map(ep => ep.course_handicap ?? 0))
+      const baseline = Math.min(...members.map(ep => matchCH(ep) ?? 0))
       for (const ep of [...teamA, ...teamB]) {
-        map[ep.player_id] = { mode: 'team', relCH: Math.max(0, (ep.course_handicap ?? 0) - baseline) }
+        map[ep.player_id] = { mode: 'team', relCH: Math.max(0, (matchCH(ep) ?? 0) - baseline) }
       }
     }
   }
@@ -164,8 +174,8 @@ function computePairingResult(playerA, playerB, allScores, course, baselineCH = 
   )
 
   // Relative handicaps — Option B
-  const chA = playerA.course_handicap ?? 0
-  const chB = playerB.course_handicap ?? 0
+  const chA = matchCH(playerA) ?? 0
+  const chB = matchCH(playerB) ?? 0
   const baseline = baselineCH ?? Math.min(chA, chB)
   const relA = Math.max(0, chA - baseline)
   const relB = Math.max(0, chB - baseline)
@@ -354,12 +364,12 @@ export function computeTeamMatchPoints(eventPlayers, allScores, course, teamMatc
     if (teamA.length === 0 || teamB.length === 0) continue
 
     // Baseline = lowest CH across all players in the group
-    const allCHs = members.map(ep => ep.course_handicap ?? 0)
+    const allCHs = members.map(ep => matchCH(ep) ?? 0)
     const baseline = Math.min(...allCHs)
 
     // Assign relative handicaps
     const relCH = Object.fromEntries(
-      members.map(ep => [ep.player_id, Math.max(0, (ep.course_handicap ?? 0) - baseline)])
+      members.map(ep => [ep.player_id, Math.max(0, (matchCH(ep) ?? 0) - baseline)])
     )
 
     let upBy = 0
