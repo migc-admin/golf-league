@@ -25,6 +25,7 @@ import Badge, { FlightBadge, StatusBadge } from '../../components/ui/Badge'
 import ImageUpload from '../../components/ui/ImageUpload'
 import UpgradePrompt from '../../components/ui/UpgradePrompt'
 import PrintAssets from '../../components/ui/PrintAssets'
+import { matchCH } from '../../lib/engines/matchPoints'
 import { atLimit, getLimit, nextTier, TIER_LABELS } from '../../lib/features'
 import { BUY_IN_ELIGIBLE_KEYS, OPT_IN_GAME_LABELS, optInAmount, isBuyInEnabled, baseSideGameKey, isPerFlight } from '../../lib/sideGames'
 
@@ -2238,8 +2239,8 @@ function MatchPairingsManager({ event, eventId, eventPlayers }) {
   // Course handicap lookup by player id, used to show relative match-play strokes
   const epByPlayerId = Object.fromEntries(eventPlayers.map(ep => [ep.player_id, ep]))
   function relativeStrokes(playerAId, playerBId) {
-    const chA = epByPlayerId[playerAId]?.course_handicap ?? 0
-    const chB = epByPlayerId[playerBId]?.course_handicap ?? 0
+    const chA = matchCH(epByPlayerId[playerAId]) ?? 0
+    const chB = matchCH(epByPlayerId[playerBId]) ?? 0
     const baseline = Math.min(chA, chB)
     return { relA: Math.max(0, chA - baseline), relB: Math.max(0, chB - baseline) }
   }
@@ -2283,7 +2284,7 @@ function MatchPairingsManager({ event, eventId, eventPlayers }) {
   }
 
   function playerName(ep) {
-    return `${ep.player?.first_name ?? ''} ${ep.player?.last_name ?? ''} (CH: ${ep.course_handicap ?? '—'})`
+    return `${ep.player?.first_name ?? ''} ${ep.player?.last_name ?? ''} (CH: ${matchCH(ep) ?? '—'})`
   }
 
   return (
@@ -2511,7 +2512,7 @@ function TeamMatchSetup({ event, eventPlayers, onUpdated }) {
               <div key={ep.player_id} className="flex items-center justify-between px-4 py-3">
                 <div className="text-sm font-medium text-gray-800">
                   {playerName(ep)}
-                  <span className="text-xs text-gray-400 ml-2">CH {ep.course_handicap ?? '—'}</span>
+                  <span className="text-xs text-gray-400 ml-2">CH {matchCH(ep) ?? '—'}</span>
                 </div>
                 <div className="flex gap-2">
                   <button

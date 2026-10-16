@@ -12,7 +12,7 @@ import { getStrokesOnHole, computeLeaderboards, computeStableford, computeBlindP
 import { computeSkinsForFlight, computeAllSkins, computeSuperSkins } from '../lib/engines/skins'
 import { computePayouts } from '../lib/engines/payouts'
 import { computeTGLEventResults, assignTGLPoints } from '../lib/engines/tgl'
-import { computeMatchPoints, computeTeamMatchPoints, buildPairings } from '../lib/engines/matchPoints'
+import { computeMatchPoints, computeTeamMatchPoints, buildPairings, matchCH } from '../lib/engines/matchPoints'
 import { supabase } from '../lib/supabase'
 
 // ─── Mobile-safe PNG download ─────────────────────────────────────
@@ -910,8 +910,8 @@ function buildMatchCard({ course, groupNumber, pairs }) {
   const strokeIndex = course.stroke_index  ?? []
 
   const matches = pairs.map(pair => {
-    const chA = pair.playerA.course_handicap ?? 0
-    const chB = pair.playerB.course_handicap ?? 0
+    const chA = matchCH(pair.playerA) ?? 0
+    const chB = matchCH(pair.playerB) ?? 0
     const baseline = Math.min(chA, chB)
     const relA = Math.max(0, chA - baseline)
     const relB = Math.max(0, chB - baseline)

@@ -28,7 +28,7 @@ import { getStrokesOnHole, getStrokeIndexForTee } from './scoring'
  * event_players row (match_play_course_handicap is null by default, meaning
  * "same as stroke play").
  */
-function matchCH(ep) {
+export function matchCH(ep) {
   return ep?.match_play_course_handicap ?? ep?.course_handicap ?? null
 }
 
