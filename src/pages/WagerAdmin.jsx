@@ -7,6 +7,7 @@ import { useEffect, useState } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../hooks/useAuth'
+import { computeMatchPoints } from '../lib/engines/matchPoints'
 
 const MIGC_ORG = import.meta.env.VITE_MIGC_ORG_ID
 const GREEN    = '#1B4332'
@@ -38,6 +39,7 @@ export default function WagerAdmin() {
   const [players,     setPlayers]     = useState([])
   const [wagers,      setWagers]      = useState([])
   const [scores,      setScores]      = useState([])
+  const [pairings,    setPairings]    = useState([])
   const [loading,     setLoading]     = useState(true)
   const [error,       setError]       = useState(null)
   const [acting,      setActing]      = useState(null)
@@ -47,7 +49,7 @@ export default function WagerAdmin() {
   async function loadData() {
     const { data: ev } = await supabase
       .from('events')
-      .select('*, league:leagues(name, org_id)')
+      .select('*, course:courses(*), league:leagues(name, org_id)')
       .eq('id', eventId).single()
 
     if (!ev || ev.league?.org_id !== MIGC_ORG) {
@@ -59,7 +61,7 @@ export default function WagerAdmin() {
 
     const { data: eps } = await supabase
       .from('event_players')
-      .select('player_id, course_handicap, adjusted_handicap_index, player:players(first_name, last_name)')
+      .select('*, player:players(first_name, last_name)')
       .eq('event_id', eventId)
     setPlayers(eps ?? [])
 
@@ -68,9 +70,17 @@ export default function WagerAdmin() {
     // Scores always loaded — used for live leaderboard during active event too
     const { data: sc } = await supabase
       .from('scores')
-      .select('player_id, gross_score')
+      .select('player_id, hole_number, gross_score')
       .eq('event_id', eventId)
     setScores(sc ?? [])
+
+    // Match play pairings — drives match wager pools and settlement
+    const { data: mp } = await supabase
+      .from('match_pairings')
+      .select('*')
+      .eq('event_id', eventId)
+      .order('match_number')
+    setPairings(mp ?? [])
 
     setLoading(false)
   }
@@ -265,6 +275,44 @@ export default function WagerAdmin() {
     }
   }
 
+  // ── Match play wagers ───────────────────────────────────────────────
+  // Each match is its own two-way pool. Winning side splits the whole pool
+  // pro rata to stake. A halved match refunds every stake. If nobody backed
+  // the winner, the pool rolls to the club (same rule as WIN).
+  const matchResultByKey = {}
+  if (pairings.length > 0 && event.course) {
+    const mr = computeMatchPoints(players, scores, event.course, pairings)
+    for (const r of mr.pairings) matchResultByKey[`${r.playerA.player_id}|${r.playerB.player_id}`] = r
+  }
+  const matchCards = pairings.map(m => {
+    const bets = active.filter(w => w.match_pairing_id === m.id)
+    const sideAmt = { [m.player_a_id]: 0, [m.player_b_id]: 0 }
+    for (const w of bets) sideAmt[w.pick_match] = (sideAmt[w.pick_match] ?? 0) + parseFloat(w.amount)
+    const pool = (sideAmt[m.player_a_id] ?? 0) + (sideAmt[m.player_b_id] ?? 0)
+    const result = matchResultByKey[`${m.player_a_id}|${m.player_b_id}`] ?? null
+    const winnerPid = result?.winner === 'A' ? m.player_a_id : result?.winner === 'B' ? m.player_b_id : null
+
+    let settlement = null
+    if (result?.winner === 'halve') {
+      settlement = { type: 'refund', bettors: bets.map(w => ({ name: w.bettor_name, pid: w.pick_match, bet: parseFloat(w.amount), payout: parseFloat(w.amount) })) }
+    } else if (winnerPid) {
+      const winners = bets.filter(w => w.pick_match === winnerPid)
+      const stake = winners.reduce((sum, w) => sum + parseFloat(w.amount), 0)
+      settlement = winners.length === 0
+        ? { type: 'club', winnerPid }
+        : {
+            type: 'paid',
+            winnerPid,
+            bettors: winners.map(w => ({
+              name: w.bettor_name, pid: w.pick_match, bet: parseFloat(w.amount),
+              payout: Math.floor((parseFloat(w.amount) / stake) * pool * 100) / 100,
+            })),
+          }
+    }
+    return { match: m, bets, sideAmt, pool, result, settlement }
+  })
+  const matchPoolTotal = matchCards.reduce((sum, c) => sum + c.pool, 0)
+
   const showResults = event.status === 'complete' || event.status === 'active'
   const autoClosed  = isTeeTimePast(event)
   const bettingOpen = !event.wagers_closed && !autoClosed && event.status !== 'complete'
@@ -299,9 +347,11 @@ export default function WagerAdmin() {
   const BetRow = ({ w, isDeleted }) => (
     <tr style={{ borderTop: '1px solid #f3f4f6', background: isDeleted ? '#fef2f2' : 'transparent', opacity: isDeleted ? 0.75 : 1 }}>
       <td style={{ padding: '9px 12px', fontWeight: 700, color: '#111' }}>{w.bettor_name}</td>
-      <td style={{ padding: '9px 12px', color: '#374151' }}>{playerName(w.pick_1st ?? w.pick_2nd)}</td>
+      <td style={{ padding: '9px 12px', color: '#374151' }}>{playerName(w.pick_1st ?? w.pick_2nd ?? w.pick_match)}</td>
       <td style={{ padding: '9px 12px', textAlign: 'center' }}>
-        {w.pick_1st
+        {w.match_pairing_id
+          ? <span style={{ fontSize: 11, fontWeight: 700, color: '#7c3aed', background: '#f5f3ff', border: '1px solid #ddd6fe', borderRadius: 6, padding: '2px 7px' }}>MATCH</span>
+          : w.pick_1st
           ? <span style={{ fontSize: 11, fontWeight: 700, color: '#16a34a', background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: 6, padding: '2px 7px' }}>WIN</span>
           : <span style={{ fontSize: 11, fontWeight: 700, color: '#1d4ed8', background: '#eff6ff', border: '1px solid #bfdbfe', borderRadius: 6, padding: '2px 7px' }}>PLACE</span>
         }
@@ -391,11 +441,12 @@ export default function WagerAdmin() {
             <span style={{ color: GOLD, fontWeight: 700, fontSize: 13 }}>Pool Summary</span>
             <span style={{ color: 'rgba(255,255,255,0.6)', fontSize: 12 }}>{active.length} active bet{active.length !== 1 ? 's' : ''}</span>
           </div>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', padding: '14px 16px', gap: 8 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: `repeat(${matchPoolTotal > 0 ? 4 : 3}, 1fr)`, padding: '14px 16px', gap: 8 }}>
             {[
               ['WIN Pool', fmt(winPool), '#16a34a'],
               ['PLACE Pool', fmt(placePool), '#1d4ed8'],
-              ['Total Pot', fmt(totalPot), GREEN],
+              ...(matchPoolTotal > 0 ? [['Match Pool', fmt(matchPoolTotal), '#7c3aed']] : []),
+              ['Total Pot', fmt(totalPot + matchPoolTotal), GREEN],
             ].map(([label, val, color]) => (
               <div key={label} style={{ textAlign: 'center' }}>
                 <div style={{ fontSize: 11, color: '#9ca3af', fontWeight: 700, marginBottom: 2 }}>{label}</div>
@@ -525,6 +576,61 @@ export default function WagerAdmin() {
           </div>
         )}
 
+        {/* Match Play Wagers */}
+        {matchCards.length > 0 && (
+          <div style={{ background: '#fff', borderRadius: 14, border: '1px solid #e5e7eb', overflow: 'hidden' }}>
+            <div style={{ background: GREEN, padding: '10px 16px' }}>
+              <span style={{ color: GOLD, fontWeight: 700, fontSize: 13 }}>Match Play Wagers</span>
+              <span style={{ color: 'rgba(255,255,255,0.55)', fontSize: 11, marginLeft: 8 }}>
+                Pool per match · halved = stakes refunded
+              </span>
+            </div>
+            {matchCards.map(({ match, sideAmt, pool, result, settlement }, i) => (
+              <div key={match.id} style={{ padding: '12px 16px', borderTop: i === 0 ? 'none' : '1px solid #f3f4f6' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 6 }}>
+                  <span style={{ fontSize: 12, fontWeight: 800, color: '#111' }}>
+                    Match {match.match_number}: {playerName(match.player_a_id)} vs {playerName(match.player_b_id)}
+                  </span>
+                  <span style={{ fontSize: 11, color: '#6b7280', fontWeight: 700 }}>Pool {fmt(pool)}</span>
+                </div>
+                <div style={{ fontSize: 11, color: '#9ca3af', marginBottom: 6 }}>
+                  {result ? `${result.matchStatus}${result.winner ? ' · Final' : ''}` : 'Match not scored yet'}
+                </div>
+                {[match.player_a_id, match.player_b_id].map(pid => {
+                  const amt = sideAmt[pid] ?? 0
+                  return (
+                    <div key={pid} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, padding: '2px 0' }}>
+                      <span style={{ fontWeight: 600, color: '#374151' }}>{playerName(pid)}</span>
+                      <span>
+                        {amt > 0
+                          ? <><span style={{ fontWeight: 700, color: '#7c3aed' }}>{fmt(amt)}</span> <span style={{ color: '#9ca3af', fontSize: 11 }}>{(pool / amt).toFixed(2)}x</span></>
+                          : <span style={{ color: '#d1d5db' }}>—</span>}
+                      </span>
+                    </div>
+                  )
+                })}
+                {settlement?.type === 'paid' && (
+                  <div style={{ background: '#f5f3ff', border: '1px solid #ddd6fe', borderRadius: 10, padding: '10px 12px', marginTop: 8 }}>
+                    <div style={{ fontSize: 11, fontWeight: 700, color: '#7c3aed', marginBottom: 6 }}>Winner: {playerName(settlement.winnerPid)}</div>
+                    <BettorTable bettors={settlement.bettors} color="#7c3aed" border="#ddd6fe" playerName={playerName} />
+                  </div>
+                )}
+                {settlement?.type === 'refund' && (
+                  <div style={{ background: '#f9fafb', border: '1px solid #e5e7eb', borderRadius: 10, padding: '10px 12px', marginTop: 8 }}>
+                    <div style={{ fontSize: 11, fontWeight: 700, color: '#6b7280', marginBottom: settlement.bettors.length ? 6 : 0 }}>Match halved — all stakes refunded</div>
+                    {settlement.bettors.length > 0 && <BettorTable bettors={settlement.bettors} color="#6b7280" border="#e5e7eb" playerName={playerName} />}
+                  </div>
+                )}
+                {settlement?.type === 'club' && (
+                  <div style={{ background: '#f9fafb', border: '1px solid #e5e7eb', borderRadius: 10, padding: '10px 12px', marginTop: 8, fontSize: 12, color: '#6b7280' }}>
+                    Winner: <strong>{playerName(settlement.winnerPid)}</strong> — no bets on the winner. {fmt(pool)} rolls to the club.
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
+
         {/* Active Bets */}
         <div style={{ background: '#fff', borderRadius: 14, border: '1px solid #e5e7eb', overflow: 'hidden' }}>
           <div style={{ background: GREEN, padding: '10px 16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -564,7 +670,7 @@ export default function WagerAdmin() {
         )}
 
         <p style={{ fontSize: 10, color: '#9ca3af', textAlign: 'center' }}>
-          Full pool paid to winner(s). If no one picks the winner, funds roll to the club.
+          Full pool paid to winner(s). If no one picks the winner, funds roll to the club. Halved matches refund stakes.
         </p>
       </div>
     </div>

@@ -36,6 +36,7 @@ export default function Wager() {
   const [event,        setEvent]        = useState(null)
   const [players,      setPlayers]      = useState([])   // event_players with player obj
   const [wagers,       setWagers]       = useState([])   // live board data
+  const [pairings,     setPairings]     = useState([])   // match play pairings (empty = no match betting)
   const [loading,      setLoading]      = useState(true)
   const [error,        setError]        = useState(null)
 
@@ -48,7 +49,8 @@ export default function Wager() {
   const [payMethod,    setPayMethod]    = useState('venmo') // 'venmo' | 'cash'
 
   function emptyPick() {
-    return { id: Math.random(), playerId: '', position: 'win', amount: '' }
+    // kind: 'field' = WIN/PLACE on a player · 'match' = pick a winner in a match play pairing
+    return { id: Math.random(), kind: 'field', playerId: '', position: 'win', matchId: '', matchPick: '', amount: '' }
   }
 
   useEffect(() => {
@@ -73,6 +75,14 @@ export default function Wager() {
         .eq('event_id', eventId)
         .order('flight').order('adjusted_handicap_index')
       setPlayers((eps ?? []).filter(ep => ep.player && typeof ep.player === 'object'))
+
+      // Match play pairings — when present, bettors can also wager on each match
+      const { data: mp } = await supabase
+        .from('match_pairings')
+        .select('*')
+        .eq('event_id', eventId)
+        .order('match_number')
+      setPairings(mp ?? [])
 
       // Load live wagers for board (exclude soft-deleted)
       const { data: ws } = await supabase
@@ -122,6 +132,17 @@ export default function Wager() {
     return `${ep.player.first_name} ${ep.player.last_name}`
   }
 
+  // Match pools — each match is its own two-way pool (Player A vs Player B)
+  const matchStats = pairings.map(m => {
+    const bets = wagers.filter(w => w.match_pairing_id === m.id)
+    const sideAmt = { [m.player_a_id]: 0, [m.player_b_id]: 0 }
+    for (const w of bets) sideAmt[w.pick_match] = (sideAmt[w.pick_match] ?? 0) + parseFloat(w.amount)
+    const pool = (sideAmt[m.player_a_id] ?? 0) + (sideAmt[m.player_b_id] ?? 0)
+    return { match: m, pool, sideAmt }
+  })
+  const matchPoolTotal = matchStats.reduce((s, m) => s + m.pool, 0)
+  const matchLabel = m => `Match ${m.match_number}: ${playerName(m.player_a_id)} vs ${playerName(m.player_b_id)}`
+
   // ── Pick helpers ─────────────────────────────────────────────────
   function updatePick(id, field, value) {
     setPicks(prev => prev.map(p => p.id === id ? { ...p, [field]: value } : p))
@@ -134,22 +155,34 @@ export default function Wager() {
     e.preventDefault()
     if (!bettorName.trim()) { alert('Please enter your name.'); return }
     for (const p of picks) {
-      if (!p.playerId) { alert('Please select a player for each pick.'); return }
+      if (p.kind === 'match') {
+        if (!p.matchId || !p.matchPick) { alert('Please select a match and a winner for each match pick.'); return }
+      } else if (!p.playerId) { alert('Please select a player for each pick.'); return }
       if (!p.amount || parseFloat(p.amount) < MIN_BET) { alert(`Minimum bet is ${fmt(MIN_BET)}.`); return }
     }
     setSubmitting(true)
 
     const totalAmt = picks.reduce((s, p) => s + parseFloat(p.amount), 0)
     const memo = `${event.name} – ${bettorName.trim()} | ` +
-      picks.map(p => `${playerName(p.playerId)} ${p.position.toUpperCase()} ${fmt(p.amount)}`).join(', ')
+      picks.map(p => p.kind === 'match'
+        ? `${playerName(p.matchPick)} MATCH ${fmt(p.amount)}`
+        : `${playerName(p.playerId)} ${p.position.toUpperCase()} ${fmt(p.amount)}`).join(', ')
 
-    const rows = picks.map(p => ({
-      event_id:    eventId,
-      bettor_name: bettorName.trim(),
-      pick_1st:    p.position === 'win'   ? p.playerId : null,
-      pick_2nd:    p.position === 'place' ? p.playerId : null,
-      amount:      parseFloat(p.amount),
-    }))
+    const rows = picks.map(p => p.kind === 'match'
+      ? {
+          event_id:          eventId,
+          bettor_name:       bettorName.trim(),
+          match_pairing_id:  p.matchId,
+          pick_match:        p.matchPick,
+          amount:            parseFloat(p.amount),
+        }
+      : {
+          event_id:    eventId,
+          bettor_name: bettorName.trim(),
+          pick_1st:    p.position === 'win'   ? p.playerId : null,
+          pick_2nd:    p.position === 'place' ? p.playerId : null,
+          amount:      parseFloat(p.amount),
+        })
 
     const { error: insErr } = await supabase.from('wagers').insert(rows)
     if (insErr) { alert('Error saving bet: ' + insErr.message); setSubmitting(false); return }
@@ -231,6 +264,39 @@ export default function Wager() {
           </div>
         )}
 
+        {/* Match odds */}
+        {matchStats.length > 0 && (
+          <div style={{ background: '#fff', borderRadius: 14, border: '1px solid #e5e7eb', overflow: 'hidden' }}>
+            <div style={{ background: GREEN, padding: '10px 16px' }}>
+              <span style={{ color: GOLD, fontWeight: 700, fontSize: 13 }}>Match Play Odds</span>
+              <span style={{ color: 'rgba(255,255,255,0.6)', fontSize: 11, marginLeft: 10 }}>
+                Each match is its own pool · Total {fmt(matchPoolTotal)}
+              </span>
+            </div>
+            {matchStats.map(({ match, pool, sideAmt }, i) => (
+              <div key={match.id} style={{ padding: '10px 16px', borderTop: i === 0 ? 'none' : '1px solid #f3f4f6', background: i % 2 === 0 ? '#fff' : '#fafafa' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, color: '#6b7280', fontWeight: 700, marginBottom: 4 }}>
+                  <span>Match {match.match_number}</span>
+                  <span>Pool {fmt(pool)}</span>
+                </div>
+                {[match.player_a_id, match.player_b_id].map(pid => {
+                  const amt = sideAmt[pid] ?? 0
+                  return (
+                    <div key={pid} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, padding: '2px 0' }}>
+                      <span style={{ fontWeight: 700, color: '#111' }}>{playerName(pid)}</span>
+                      <span>
+                        {amt > 0
+                          ? <><span style={{ fontWeight: 700, color: '#16a34a' }}>{fmt(amt)}</span> <span style={{ color: '#9ca3af', fontSize: 10 }}>{(pool / amt).toFixed(2)}x</span></>
+                          : <span style={{ color: '#d1d5db' }}>—</span>}
+                      </span>
+                    </div>
+                  )
+                })}
+              </div>
+            ))}
+          </div>
+        )}
+
         {/* Betting closed */}
         {getBettingClosedReason(event) && (
           <div style={{ background: '#fff', borderRadius: 14, border: '1px solid #e5e7eb', padding: '28px 20px', textAlign: 'center' }}>
@@ -270,6 +336,67 @@ export default function Wager() {
                     )}
                   </div>
 
+                  {/* Field vs Match toggle — only when match play pairings exist */}
+                  {pairings.length > 0 && (
+                    <div style={{ display: 'flex', gap: 8 }}>
+                      {[['field', 'Field (WIN/PLACE)'], ['match', 'Match Play']].map(([kind, label]) => (
+                        <button
+                          key={kind}
+                          type="button"
+                          onClick={() => updatePick(pick.id, 'kind', kind)}
+                          style={{
+                            flex: 1, padding: '6px 0', borderRadius: 8, border: '2px solid',
+                            borderColor: pick.kind === kind ? GREEN : '#e5e7eb',
+                            background: pick.kind === kind ? '#f0fdf4' : '#fff',
+                            color: pick.kind === kind ? GREEN : '#9ca3af',
+                            fontWeight: 700, fontSize: 12, cursor: 'pointer',
+                          }}
+                        >
+                          {label}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+
+                  {pick.kind === 'match' ? (
+                    <>
+                      <select
+                        value={pick.matchId}
+                        onChange={e => setPicks(prev => prev.map(p => p.id === pick.id ? { ...p, matchId: e.target.value, matchPick: '' } : p))}
+                        style={{ width: '100%', padding: '8px 10px', borderRadius: 8, border: '1px solid #d1d5db', fontSize: 14, background: '#fff', boxSizing: 'border-box' }}
+                      >
+                        <option value="">— Select match —</option>
+                        {pairings.map(m => (
+                          <option key={m.id} value={m.id}>{matchLabel(m)}</option>
+                        ))}
+                      </select>
+                      {pick.matchId && (() => {
+                        const m = pairings.find(x => x.id === pick.matchId)
+                        if (!m) return null
+                        return (
+                          <div style={{ display: 'flex', gap: 8 }}>
+                            {[m.player_a_id, m.player_b_id].map(pid => (
+                              <button
+                                key={pid}
+                                type="button"
+                                onClick={() => updatePick(pick.id, 'matchPick', pid)}
+                                style={{
+                                  flex: 1, padding: '7px 4px', borderRadius: 8, border: '2px solid',
+                                  borderColor: pick.matchPick === pid ? '#16a34a' : '#e5e7eb',
+                                  background: pick.matchPick === pid ? '#f0fdf4' : '#fff',
+                                  color: pick.matchPick === pid ? '#16a34a' : '#6b7280',
+                                  fontWeight: 700, fontSize: 13, cursor: 'pointer',
+                                }}
+                              >
+                                {playerName(pid)} to win
+                              </button>
+                            ))}
+                          </div>
+                        )
+                      })()}
+                    </>
+                  ) : (
+                  <>
                   {/* Player select */}
                   <select
                     value={pick.playerId}
@@ -304,6 +431,8 @@ export default function Wager() {
                       </button>
                     ))}
                   </div>
+                  </>
+                  )}
 
                   {/* Amount */}
                   <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
@@ -401,7 +530,7 @@ export default function Wager() {
         )}
 
         <p style={{ fontSize: 10, color: '#9ca3af', textAlign: 'center' }}>
-          Full pool paid to winner(s). If no one picks the winner, funds roll to the club. Bets are final once submitted.
+          Full pool paid to winner(s). If no one picks the winner, funds roll to the club. Match bets are refunded if the match is halved. Bets are final once submitted.
         </p>
       </div>
     </div>
