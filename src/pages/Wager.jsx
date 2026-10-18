@@ -6,7 +6,7 @@
  */
 
 import { useEffect, useState } from 'react'
-import { useParams, Link } from 'react-router-dom'
+import { useParams } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 
 const MIGC_ORG  = import.meta.env.VITE_MIGC_ORG_ID
@@ -217,9 +217,6 @@ export default function Wager() {
           <div style={{ color: 'rgba(255,255,255,0.85)', fontSize: 13, marginTop: 2 }}>{event.name} · Wager Board</div>
           <div style={{ color: 'rgba(255,255,255,0.55)', fontSize: 11, marginTop: 2 }}>{eventDate}</div>
         </div>
-        <Link to={`/wager/${eventId}/board`} style={{ fontSize: 12, fontWeight: 600, color: GOLD, textDecoration: 'none', border: `1px solid ${GOLD}`, borderRadius: 8, padding: '5px 10px' }}>
-          View Board
-        </Link>
       </div>
 
       <div style={{ maxWidth: 560, margin: '0 auto', padding: '20px 16px', display: 'flex', flexDirection: 'column', gap: 16 }}>
@@ -519,12 +516,6 @@ export default function Wager() {
               >
                 Place Another Bet
               </button>
-              <Link
-                to={`/wager/${eventId}/board`}
-                style={{ fontSize: 13, fontWeight: 600, color: '#fff', background: GREEN, border: 'none', borderRadius: 8, padding: '8px 16px', textDecoration: 'none' }}
-              >
-                View Board
-              </Link>
             </div>
           </div>
         )}
