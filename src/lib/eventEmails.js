@@ -189,6 +189,10 @@ export function buildPreRoundEmail({ event, eventPlayers = [], matchPairings = [
   const html = wrap(`
     ${header({ leagueName, logoUrl, title, subtitle: longDate(event?.event_date) })}
     ${note?.trim() ? paragraph(note.trim()) : ''}
+    ${eventUrl || wagerUrl ? `<div style="margin:4px 0 8px;">
+      ${eventUrl ? button('View Event Page', eventUrl) : ''}
+      ${wagerUrl ? button('Place a Bet', wagerUrl) : ''}
+    </div>` : ''}
     ${sectionTitle('Event Details')}
     ${detailRows([
       ['Date', esc(longDate(event?.event_date))],
@@ -207,10 +211,7 @@ export function buildPreRoundEmail({ event, eventPlayers = [], matchPairings = [
     ${matchPairings.length ? `
       ${sectionTitle('Match Play Matchups')}
       <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border:1px solid #e5e7eb;">${matchRows}</table>` : ''}
-    <div style="margin-top:20px;">
-      ${eventUrl ? button('View Event Page', eventUrl) : ''}
-      ${wagerUrl ? button('Place a Bet', wagerUrl) : ''}
-    </div>`)
+    `)
 
   return { subject: `${leagueName ? leagueName + ': ' : ''}${title} — ${shortDate(event?.event_date)}`.trim(), html }
 }
