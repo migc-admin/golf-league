@@ -4,6 +4,7 @@
  */
 
 import { useEffect, useState } from 'react'
+import { FORMAT_LABELS, SIDE_GAME_LABELS } from '../lib/eventLabels'
 import { useParams, useSearchParams, Link } from 'react-router-dom'
 import DOMPurify from 'dompurify'
 import { supabase } from '../lib/supabase'
@@ -16,38 +17,6 @@ const GREEN    = '#1B4332'
 const GOLD     = '#D4AF37'
 const MIGC_ORG = import.meta.env.VITE_MIGC_ORG_ID
 
-const FORMAT_LABELS = {
-  net_stroke:          'Net Stroke Play — Overall',
-  net_stroke_front9:   'Net Stroke Play — Front 9',
-  net_stroke_back9:    'Net Stroke Play — Back 9',
-  low_gross:           'Low Gross — Overall',
-  gross_stroke_front9: 'Low Gross — Front 9',
-  gross_stroke_back9:  'Low Gross — Back 9',
-  net_stroke_nassau:   'Nassau',
-  stableford:          'Stableford — Net',
-  stableford_gross:    'Stableford — Gross',
-  best_ball_2:         'Best Ball — 2 Person',
-  best_ball_4:         'Best Ball — 4 Person',
-  scramble:            'Scramble',
-  shamble:             'Shamble',
-  match_points:        'Match Points',
-  ryder_cup:           'Ryder Cup',
-}
-const SIDE_GAME_LABELS = {
-  skins:           'Skins',
-  skins_a:         'Skins — Flight A',
-  skins_b:         'Skins — Flight B',
-  super_skins:     'Super Skins',
-  super_skins_a:   'Super Skins — Flight A',
-  super_skins_b:   'Super Skins — Flight B',
-  long_drive:      'Long Drive',
-  long_drive_a:    'Long Drive — Flight A',
-  long_drive_b:    'Long Drive — Flight B',
-  low_putts:       'Low Putts',
-  ctp:             'Closest to Pin',
-  super_ctp:       'Super CTP',
-  blind_partners:  'Blind Partners',
-}
 const BASE_TABS = [
   { key: 'overview',  label: 'Overview'  },
   { key: 'pairings',  label: 'Pairings'  },
@@ -163,6 +132,13 @@ export default function EventPage() {
   const tabs = pairings.length > 0
     ? [BASE_TABS[0], { key: 'matchups', label: 'Matchups' }, ...BASE_TABS.slice(1)]
     : BASE_TABS
+
+  // Wager link: always for live events. For upcoming events, only once groups
+  // are set and — when the event has match play — the matchups are posted too.
+  const hasMatchFormat = formats.includes('match_points') || formats.includes('ryder_cup')
+  const groupsSet      = eventPlayers.some(ep => ep.group_number != null)
+  const matchupsSet    = !hasMatchFormat || pairings.length > 0
+  const showBetLink    = event.status === 'active' || (event.status === 'upcoming' && groupsSet && matchupsSet)
 
   return (
     <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column', background: '#f9f8f5', fontFamily: 'system-ui, -apple-system, sans-serif' }}>
@@ -301,7 +277,7 @@ export default function EventPage() {
       <div style={{ maxWidth: 1100, margin: '0 auto', width: '100%', padding: 'clamp(20px,4vw,32px) clamp(16px,4vw,40px)', flex: 1, boxSizing: 'border-box' }}>
 
         {activeTab === 'overview' && (
-          <OverviewTab event={event} leaderboardUrl={leaderboardUrl} description={description} courseAddress={courseAddress} mapsUrl={mapsUrl} eventId={eid} />
+          <OverviewTab event={event} leaderboardUrl={leaderboardUrl} description={description} courseAddress={courseAddress} mapsUrl={mapsUrl} eventId={eid} showBetLink={showBetLink} />
         )}
 
         {activeTab === 'matchups' && (
@@ -394,7 +370,7 @@ function SponsorBar({ sponsors }) {
 }
 
 // ─── Overview Tab ─────────────────────────────────────────────────────────────
-function OverviewTab({ event, leaderboardUrl, description, courseAddress, mapsUrl, eventId }) {
+function OverviewTab({ event, leaderboardUrl, description, courseAddress, mapsUrl, eventId, showBetLink }) {
   const scheduleItems = (event.schedule_items ?? []).filter(s => s.label?.trim())
   const customCompetitions = (event.custom_competitions ?? []).filter(c => c?.trim())
   // Strip per-flight suffix (e.g. net_stroke_a → net_stroke) before label lookup,
@@ -423,7 +399,7 @@ function OverviewTab({ event, leaderboardUrl, description, courseAddress, mapsUr
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
 
-      {isMIGC && eventId && event.status === 'active' && (
+      {isMIGC && eventId && showBetLink && (
         <a
           href={`/wager/${eventId}`}
           style={{

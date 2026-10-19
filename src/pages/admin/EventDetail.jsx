@@ -26,6 +26,8 @@ import ImageUpload from '../../components/ui/ImageUpload'
 import UpgradePrompt from '../../components/ui/UpgradePrompt'
 import PrintAssets from '../../components/ui/PrintAssets'
 import { matchCH } from '../../lib/engines/matchPoints'
+import { computePlayerPayouts } from '../../lib/engines/payoutSummary'
+import EventEmailModal from '../../components/ui/EventEmailModal'
 import { atLimit, getLimit, nextTier, TIER_LABELS } from '../../lib/features'
 import { BUY_IN_ELIGIBLE_KEYS, OPT_IN_GAME_LABELS, optInAmount, isBuyInEnabled, baseSideGameKey, isPerFlight } from '../../lib/sideGames'
 
@@ -223,28 +225,9 @@ export default function EventDetail() {
   // Only computed when the "Payouts per Player" print asset is open — mirrors
   // TabPayoutSummary's exact computation so the printed sheet always matches
   // the on-screen Payout Summary tab.
-  let payoutsByPlayer = []
-  if (printAsset === 'payouts_per_player' && course) {
-    const nonGuestEPs   = eventPlayers.filter(ep => !ep.is_guest)
-    const flightCounts  = {}
-    nonGuestEPs.forEach(ep => { if (ep.flight) flightCounts[ep.flight] = (flightCounts[ep.flight] ?? 0) + 1 })
-    const leaderboards  = computeLeaderboards(nonGuestEPs, allScores, course)
-    const skinsResults  = computeAllSkins(nonGuestEPs, allScores, course)
-    const stablefordData = computeStableford(nonGuestEPs, allScores, course)
-    const stablefordGrossData = computeStableford(nonGuestEPs, allScores, course, true)
-    const blindPartnersData = computeBlindPartners(event, nonGuestEPs, allScores, course)
-    const superSkinsResult  = computeSuperSkins(event, nonGuestEPs, allScores, course)
-    const { byPlayer } = computePayouts(
-      event, nonGuestEPs.length, leaderboards, sideGames, skinsResults, flightCounts, {
-        stablefordData, blindPartnersData, superSkinsResult, stablefordGrossData, eventPlayers: nonGuestEPs,
-      }
-    )
-    const playerMap = Object.fromEntries(eventPlayers.map(ep => [ep.player_id, ep.player]))
-    payoutsByPlayer = byPlayer.map(({ playerId, total, items }) => {
-      const p = playerMap[playerId]
-      return { playerId, name: p ? `${p.first_name} ${p.last_name}` : playerId, total, items }
-    })
-  }
+  const payoutsByPlayer = printAsset === 'payouts_per_player'
+    ? computePlayerPayouts(event, eventPlayers, allScores, course, sideGames)
+    : []
 
   return (
     <div className="space-y-5">
@@ -1314,6 +1297,7 @@ function EditHandicapModal({ ep, course, onClose, onSaved }) {
 // ─── Tab: Pre/Post Round ──────────────────────────────────────────
 function TabPostRound({ event, eventPlayers, allScores, course, sideGames, orgName, orgLogoUrl, orgSlug, leagueSlug, onPrintAsset, onUpdated, tglTeams, tglMembers, tglSelections, hasTgl }) {
   const [scoreEditor, setScoreEditor] = useState(false)
+  const [emailKind, setEmailKind] = useState(null) // 'pre' | 'post'
   const hasSkins = (event?.side_game_options ?? []).some(s => s.startsWith('skins'))
   const eventFormats = event?.formats ?? (event?.format ? [event.format] : [])
   const hasMatchPlay = eventFormats.includes('match_points') || eventFormats.includes('ryder_cup')
@@ -1358,6 +1342,13 @@ function TabPostRound({ event, eventPlayers, allScores, course, sideGames, orgNa
             orgSlug={orgSlug}
             orgLogoUrl={logoUrl}
           />
+        </div>
+        <div className="flex items-center justify-between border-t border-gray-200 pt-3">
+          <div>
+            <div className="text-sm font-medium text-gray-800">Tournament Details Email</div>
+            <div className="text-xs text-gray-400 mt-0.5">Event info, groups, tee times and matchups — copy and paste into Gmail</div>
+          </div>
+          <Button size="sm" variant="secondary" onClick={() => setEmailKind('pre')}>Preview &amp; Copy</Button>
         </div>
         {hasMatchPlay && (
           <div className="flex items-center justify-between border-t border-gray-200 pt-3">
@@ -1459,6 +1450,13 @@ function TabPostRound({ event, eventPlayers, allScores, course, sideGames, orgNa
         )}
         <div className="flex items-center justify-between border-t border-gray-200 pt-3">
           <div>
+            <div className="text-sm font-medium text-gray-800">Results Email</div>
+            <div className="text-xs text-gray-400 mt-0.5">Winners, payouts and match results — copy and paste into Gmail</div>
+          </div>
+          <Button size="sm" variant="secondary" onClick={() => setEmailKind('post')}>Preview &amp; Copy</Button>
+        </div>
+        <div className="flex items-center justify-between border-t border-gray-200 pt-3">
+          <div>
             <div className="text-sm font-medium text-gray-800">Payouts per Player (PNG)</div>
             <div className="text-xs text-gray-400 mt-0.5">Per-player payout totals with category breakdown</div>
           </div>
@@ -1467,6 +1465,22 @@ function TabPostRound({ event, eventPlayers, allScores, course, sideGames, orgNa
           </Button>
         </div>
       </div>
+
+      {emailKind && (
+        <EventEmailModal
+          kind={emailKind}
+          event={event}
+          eventPlayers={eventPlayers}
+          allScores={allScores}
+          course={course}
+          sideGames={sideGames}
+          leagueName={leagueName}
+          logoUrl={logoUrl}
+          orgSlug={orgSlug}
+          leagueSlug={leagueSlug}
+          onClose={() => setEmailKind(null)}
+        />
+      )}
 
       {scoreEditor && (
         <AdminScoreEditor
