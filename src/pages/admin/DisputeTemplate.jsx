@@ -62,7 +62,7 @@ Prepared: ${today}
 
 MERCHANT INFORMATION
 Business Name:    Scorify Golf
-Website:          https://scorifygolf.com
+Website:          https://www.scorifygolf.com
 Contact Email:    admin@scorifygolf.com
 Business Type:    SaaS — Golf League Management Platform
 
@@ -115,7 +115,7 @@ REFUND POLICY
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 Our published Refund Policy is available at:
-https://scorifygolf.com/refund-policy
+https://www.scorifygolf.com/refund-policy
 
 Key terms applicable to this charge:
 • All plans include a 21-day free trial before billing begins.

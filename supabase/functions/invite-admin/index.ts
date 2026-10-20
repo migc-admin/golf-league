@@ -106,7 +106,7 @@ serve(async (req) => {
         role:      'admin',
         full_name: fullName ?? '',
       },
-      redirectTo: `${req.headers.get('origin') ?? 'https://scorifygolf.com'}/admin`,
+      redirectTo: `${req.headers.get('origin') ?? 'https://www.scorifygolf.com'}/admin`,
     })
 
     if (inviteError) {

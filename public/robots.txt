@@ -5,5 +5,13 @@ Disallow: /admin
 Disallow: /onboarding
 Disallow: /scorecard/
 Disallow: /join/
+Disallow: /home
+Disallow: /login
+Disallow: /auth/
+Disallow: /reset-password
+Disallow: /upgrade
+Disallow: /dev/
+Disallow: /p/
+Disallow: /wager/
 
-Sitemap: https://scorifygolf.com/sitemap.xml
+Sitemap: https://www.scorifygolf.com/sitemap.xml

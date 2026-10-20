@@ -55,7 +55,7 @@ export default function LeagueLayout({ org, leagues = [], children }) {
       <footer className="border-t border-gray-200 bg-white text-center py-4 text-sm text-gray-500">
         Powered by{' '}
         <a
-          href="https://scorifygolf.com"
+          href="https://www.scorifygolf.com"
           target="_blank"
           rel="noreferrer"
           className="font-semibold hover:underline"

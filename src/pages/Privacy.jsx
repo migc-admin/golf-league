@@ -65,7 +65,7 @@ export default function Privacy() {
 
         <p className="text-sm leading-relaxed mb-10" style={{ color: '#374151' }}>
           Scorify Golf ("we," "us," or "our") operates the Scorify Golf web application at{' '}
-          <a href="https://scorifygolf.com" className="underline" style={{ color: GREEN }}>scorifygolf.com</a>{' '}
+          <a href="https://www.scorifygolf.com" className="underline" style={{ color: GREEN }}>scorifygolf.com</a>{' '}
           (the "Service"). This Privacy Policy describes how we collect, use, disclose, and protect personal
           information, and explains your rights under the California Consumer Privacy Act (CCPA), the
           California Privacy Rights Act (CPRA), and other applicable U.S. state privacy laws.

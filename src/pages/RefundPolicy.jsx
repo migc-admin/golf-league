@@ -64,7 +64,7 @@ export default function RefundPolicy() {
 
         <p className="text-sm leading-relaxed mb-10" style={{ color: '#374151' }}>
           This Refund Policy applies to all subscriptions and purchases made through Scorify Golf
-          at <a href="https://scorifygolf.com" className="underline" style={{ color: GREEN }}>scorifygolf.com</a>.
+          at <a href="https://www.scorifygolf.com" className="underline" style={{ color: GREEN }}>scorifygolf.com</a>.
           By purchasing a plan, you agree to the terms below. Questions? Email{' '}
           <a href="mailto:admin@scorifygolf.com" className="underline" style={{ color: GREEN }}>admin@scorifygolf.com</a>.
         </p>

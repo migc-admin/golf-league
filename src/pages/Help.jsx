@@ -438,7 +438,7 @@ export default function Help() {
         <title>Help & Setup Guide — Scorify Golf</title>
         <meta name="description" content="Step-by-step guide to setting up your golf league, events, players, scoring, Team Play, and more in Scorify Golf." />
         <meta property="og:title" content="Help & Setup Guide — Scorify Golf" />
-        <link rel="canonical" href="https://scorifygolf.com/help" />
+        <link rel="canonical" href="https://www.scorifygolf.com/help" />
       </Helmet>
 
       <div className="min-h-screen flex flex-col" style={{ background: '#fbfaf8', color: INK }}>
