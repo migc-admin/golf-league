@@ -8,6 +8,7 @@
 import { useEffect, useState } from 'react'
 import { useParams } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
+import { matchCH } from '../lib/engines/matchPoints'
 
 const MIGC_ORG  = import.meta.env.VITE_MIGC_ORG_ID
 const GREEN     = '#1B4332'
@@ -71,7 +72,7 @@ export default function Wager() {
       // Load field
       const { data: eps } = await supabase
         .from('event_players')
-        .select('player_id, player:players(first_name, last_name)')
+        .select('player_id, course_handicap, match_play_course_handicap, player:players(first_name, last_name)')
         .eq('event_id', eventId)
         .order('flight').order('adjusted_handicap_index')
       setPlayers((eps ?? []).filter(ep => ep.player && typeof ep.player === 'object'))
@@ -141,7 +142,19 @@ export default function Wager() {
     return { match: m, pool, sideAmt }
   })
   const matchPoolTotal = matchStats.reduce((s, m) => s + m.pool, 0)
-  const matchLabel = m => `Match ${m.match_number}: ${playerName(m.player_a_id)} vs ${playerName(m.player_b_id)}`
+  // Strokes each player receives in a match: the difference in match play handicaps,
+  // given to the higher-handicap player (the lower handicap plays scratch).
+  function matchStrokes(m) {
+    const chA = matchCH(players.find(p => p.player_id === m.player_a_id)) ?? 0
+    const chB = matchCH(players.find(p => p.player_id === m.player_b_id)) ?? 0
+    const diff = Math.abs(chA - chB)
+    return { [m.player_a_id]: chA > chB ? diff : 0, [m.player_b_id]: chB > chA ? diff : 0 }
+  }
+  const strokeLabel = n => (n > 0 ? ` (${n})` : '')
+  const matchLabel = m => {
+    const st = matchStrokes(m)
+    return `Match ${m.match_number}: ${playerName(m.player_a_id)}${strokeLabel(st[m.player_a_id])} vs ${playerName(m.player_b_id)}${strokeLabel(st[m.player_b_id])}`
+  }
 
   // ── Pick helpers ─────────────────────────────────────────────────
   function updatePick(id, field, value) {
@@ -270,7 +283,12 @@ export default function Wager() {
                 Each match is its own pool · Total {fmt(matchPoolTotal)}
               </span>
             </div>
-            {matchStats.map(({ match, pool, sideAmt }, i) => (
+            <div style={{ padding: '6px 16px', fontSize: 11, color: '#6b7280', background: '#f0f4f2', borderBottom: '1px solid #e5e7eb' }}>
+              (#) = strokes received. The player with no number is the lower handicap and plays scratch.
+            </div>
+            {matchStats.map(({ match, pool, sideAmt }, i) => {
+              const strokes = matchStrokes(match)
+              return (
               <div key={match.id} style={{ padding: '10px 16px', borderTop: i === 0 ? 'none' : '1px solid #f3f4f6', background: i % 2 === 0 ? '#fff' : '#fafafa' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, color: '#6b7280', fontWeight: 700, marginBottom: 4 }}>
                   <span>Match {match.match_number}</span>
@@ -280,7 +298,10 @@ export default function Wager() {
                   const amt = sideAmt[pid] ?? 0
                   return (
                     <div key={pid} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, padding: '2px 0' }}>
-                      <span style={{ fontWeight: 700, color: '#111' }}>{playerName(pid)}</span>
+                      <span style={{ fontWeight: 700, color: '#111' }}>
+                        {playerName(pid)}
+                        {strokes[pid] > 0 && <span style={{ color: GREEN }}>{strokeLabel(strokes[pid])}</span>}
+                      </span>
                       <span>
                         {amt > 0
                           ? <><span style={{ fontWeight: 700, color: '#16a34a' }}>{fmt(amt)}</span> <span style={{ color: '#9ca3af', fontSize: 10 }}>{(pool / amt).toFixed(2)}x</span></>
@@ -290,7 +311,8 @@ export default function Wager() {
                   )
                 })}
               </div>
-            ))}
+              )
+            })}
           </div>
         )}
 
@@ -370,6 +392,7 @@ export default function Wager() {
                       {pick.matchId && (() => {
                         const m = pairings.find(x => x.id === pick.matchId)
                         if (!m) return null
+                        const strokes = matchStrokes(m)
                         return (
                           <div style={{ display: 'flex', gap: 8 }}>
                             {[m.player_a_id, m.player_b_id].map(pid => (
@@ -385,7 +408,7 @@ export default function Wager() {
                                   fontWeight: 700, fontSize: 13, cursor: 'pointer',
                                 }}
                               >
-                                {playerName(pid)} to win
+                                {playerName(pid)}{strokeLabel(strokes[pid])} to win
                               </button>
                             ))}
                           </div>
@@ -404,7 +427,7 @@ export default function Wager() {
                     <option value="">— Select player —</option>
                     {players.map(ep => (
                       <option key={ep.player_id} value={ep.player_id}>
-                        {ep.player.first_name} {ep.player.last_name}
+                        {ep.player.first_name} {ep.player.last_name}{ep.course_handicap != null ? ` (CH ${ep.course_handicap})` : ''}
                       </option>
                     ))}
                   </select>
