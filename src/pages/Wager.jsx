@@ -425,7 +425,9 @@ export default function Wager() {
                     style={{ width: '100%', padding: '8px 10px', borderRadius: 8, border: '1px solid #d1d5db', fontSize: 14, background: '#fff', boxSizing: 'border-box' }}
                   >
                     <option value="">— Select player —</option>
-                    {players.map(ep => (
+                    {[...players]
+                      .sort((a, b) => `${a.player.first_name} ${a.player.last_name}`.localeCompare(`${b.player.first_name} ${b.player.last_name}`))
+                      .map(ep => (
                       <option key={ep.player_id} value={ep.player_id}>
                         {ep.player.first_name} {ep.player.last_name}{ep.course_handicap != null ? ` (CH ${ep.course_handicap})` : ''}
                       </option>
