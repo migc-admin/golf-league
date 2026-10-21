@@ -12,6 +12,7 @@ import OrgHome        from './pages/league/OrgHome'
 import LeagueHome     from './pages/league/LeagueHome'
 import Login          from './pages/Login'
 import Home           from './pages/Home'
+import NotFound       from './pages/NotFound'
 import HeroPreview    from './pages/dev/HeroPreview'
 import Dashboard      from './pages/admin/Dashboard'
 import Leagues        from './pages/admin/Leagues'
@@ -195,7 +196,7 @@ export default function App() {
         <Route path="/terms"          element={<Terms />} />
         <Route path="/refund-policy"  element={<RefundPolicy />} />
 
-        <Route path="/" element={<Navigate to="/home" replace />} />
+        <Route path="/" element={<Home />} />
 
         {/* Generic slug-based routes — must be LAST to avoid conflicts */}
         <Route path="/:orgSlug/trip/:tripSlug"                     element={<TripHomeRoute />} />
@@ -206,7 +207,7 @@ export default function App() {
         <Route path="/:orgSlug/:leagueSlug/:eventSlug/scorecard"   element={<OrgRouteWrapper><Scorecard /></OrgRouteWrapper>} />
         <Route path="/:orgSlug/:leagueSlug/:eventSlug/opt-in"      element={<OptIn />} />
 
-        <Route path="*" element={<Navigate to="/home" replace />} />
+        <Route path="*" element={<NotFound />} />
       </Routes>
     </AuthProvider>
   )

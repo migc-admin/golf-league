@@ -37,7 +37,7 @@ export default function Privacy() {
       {/* Header */}
       <header className="sticky top-0 z-50 bg-white" style={{ borderBottom: '1px solid #ebe9e4' }}>
         <div className="max-w-6xl mx-auto px-6 h-14 flex items-center justify-between">
-          <Link to="/home" className="flex items-center gap-2.5">
+          <Link to="/" className="flex items-center gap-2.5">
             <img src="/logo.png" alt="Scorify Golf" className="w-8 h-8 object-contain" />
             <span className="font-bold text-base" style={{ letterSpacing: '-0.02em', color: INK }}>Scorify Golf</span>
           </Link>
@@ -498,7 +498,7 @@ export default function Privacy() {
         </Section>
 
         <div className="mt-12 pt-8 border-t text-xs" style={{ color: '#9ca3af', borderColor: '#e5e7eb' }}>
-          <Link to="/home" className="underline mr-4" style={{ color: '#9ca3af' }}>Home</Link>
+          <Link to="/" className="underline mr-4" style={{ color: '#9ca3af' }}>Home</Link>
           <Link to="/faq"  className="underline mr-4" style={{ color: '#9ca3af' }}>FAQ</Link>
           <a href="mailto:admin@scorifygolf.com" className="underline" style={{ color: '#9ca3af' }}>Privacy Contact</a>
         </div>

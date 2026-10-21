@@ -102,7 +102,7 @@ export default function BlogPost() {
         {/* Header */}
         <header className="sticky top-0 z-50 bg-white" style={{ borderBottom: '1px solid #ebe9e4' }}>
           <div className="max-w-6xl mx-auto px-6 h-14 flex items-center justify-between">
-            <Link to="/home" className="flex items-center gap-2.5">
+            <Link to="/" className="flex items-center gap-2.5">
               <img src="/logo.png" alt="Scorify Golf" className="w-8 h-8 object-contain" />
               <span className="font-bold text-base" style={{ letterSpacing: '-0.02em', color: INK }}>Scorify Golf</span>
             </Link>

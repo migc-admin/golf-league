@@ -4,15 +4,15 @@ const MENU_ITEMS = [
   {
     title: 'Product',
     links: [
-      { text: 'Features',  url: '/home#features' },
-      { text: 'Pricing',   url: '/home#pricing'  },
-      { text: 'Demo',      url: '/home#demo'     },
+      { text: 'Features',  url: '/#features' },
+      { text: 'Pricing',   url: '/#pricing'  },
+      { text: 'Demo',      url: '/#demo'     },
     ],
   },
   {
     title: 'Company',
     links: [
-      { text: 'About',    url: '/home#about'      },
+      { text: 'About',    url: '/#about'      },
       { text: 'Blog',     url: '/blog'             },
       { text: 'Help',     url: '/help'             },
       { text: 'FAQ',      url: '/faq'              },
