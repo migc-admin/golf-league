@@ -296,7 +296,12 @@ export default function Home() {
         "provider": {
           "@type": "Organization",
           "name": "Scorify Golf",
-          "url": "https://www.scorifygolf.com/"
+          "url": "https://www.scorifygolf.com/",
+          "sameAs": [
+            "https://instagram.com/scorifygolf",
+            "https://x.com/scorifygolf",
+            "https://www.linkedin.com/company/scorify-golf/"
+          ]
         }
       })}</script>
     </Helmet>

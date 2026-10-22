@@ -31,6 +31,8 @@ const MENU_ITEMS = [
     title: 'Social',
     links: [
       { text: 'Instagram', url: 'https://instagram.com/scorifygolf' },
+      { text: 'X',         url: 'https://x.com/scorifygolf' },
+      { text: 'LinkedIn',  url: 'https://www.linkedin.com/company/scorify-golf/' },
     ],
   },
 ]
