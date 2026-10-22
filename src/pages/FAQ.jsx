@@ -244,19 +244,18 @@ function FAQItem({ q, a, link }) {
           </svg>
         </span>
       </button>
-      {open && (
-        <div className="text-sm text-gray-600 leading-relaxed pb-5 space-y-2">
-          {a.split('\n\n').map((block, i) => (
-            <p key={i} style={{ whiteSpace: 'pre-line' }}>{block}</p>
-          ))}
-          {link && (
-            <a href={link.href} target="_blank" rel="noopener noreferrer"
-              style={{ display: 'inline-block', marginTop: 8, color: GREEN, fontWeight: 700, fontSize: 13, textDecoration: 'underline' }}>
-              {link.label}
-            </a>
-          )}
-        </div>
-      )}
+      {/* Always rendered (just hidden) so search engines can read every answer. */}
+      <div hidden={!open} className="text-sm text-gray-600 leading-relaxed pb-5 space-y-2">
+        {a.split('\n\n').map((block, i) => (
+          <p key={i} style={{ whiteSpace: 'pre-line' }}>{block}</p>
+        ))}
+        {link && (
+          <a href={link.href} target="_blank" rel="noopener noreferrer"
+            style={{ display: 'inline-block', marginTop: 8, color: GREEN, fontWeight: 700, fontSize: 13, textDecoration: 'underline' }}>
+            {link.label}
+          </a>
+        )}
+      </div>
     </div>
   )
 }

@@ -274,7 +274,7 @@ export default function Home() {
     <>
     <Helmet>
       <title>Scorify Golf — Golf League Management Software</title>
-      <meta name="description" content="Scorify Golf is golf league management software for running weekly, monthly, and season-long leagues — live leaderboards, digital scorecards, handicap tracking, and payouts. Free to start, no credit card required." />
+      <meta name="description" content="Golf league management software for weekly, monthly, and season-long leagues: live scoring, leaderboards, handicaps, and payouts. Free to start." />
       <meta property="og:title" content="Scorify Golf — Golf League Management Software" />
       <meta property="og:description" content="Set up in minutes — online registration, digital scorecards, live leaderboards, and payouts. Free to start, no credit card required." />
       <meta property="og:url" content="https://www.scorifygolf.com/" />

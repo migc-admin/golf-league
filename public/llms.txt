@@ -1,21 +1,19 @@
 # Scorify Golf
 
-> Golf league management software for independent organizers. Free to start.
+> Golf league management software for independent organizers. Free plan available.
 
-Scorify Golf is a web application that helps golf league directors run their leagues — from online registration through live scoring to final payouts — without spreadsheets, group chats, or expensive enterprise software.
+Scorify Golf is a web application that helps golf league directors run their leagues — from registration through live scoring to final payouts — without spreadsheets, group chats, or expensive enterprise software.
 
 ## What Scorify does
 
-- **Online registration**: Players sign up for events through a registration page; organizers collect payment via their own Venmo or PayPal link (Scorify does not process payments)
-- **Group and tee sheet management**: Build playing groups, print tee sheets and cart signs
-- **Live digital scoring**: Players enter scores hole-by-hole on their phones; no app download required
+- **Live digital scoring**: Players enter scores hole-by-hole on their phones in a web browser; no app download or account needed
 - **Real-time leaderboards**: Standings update automatically as scores come in
-- **Skins calculation**: Gross and net skins computed automatically per event
-- **Handicap tracking**: USGA course handicap and ESC-adjusted scoring built in
-- **Payout management**: Track and distribute winnings at the end of every round
-- **Printable assets**: Scorecards, cart signs, and side game (CTP/long drive) signs
-- **Team play and season standings**: TGL-style points tracking across a full season
-- **Flight management**: Split leagues into flights for more competitive groupings
+- **Group and tee sheet management**: Build playing groups, print tee sheets and cart signs
+- **Handicap tracking**: USGA course handicap and net scoring built in, including separate match play handicaps
+- **Printable assets**: Scorecards with QR codes, cart signs, and side game (CTP/long drive) signs
+- **Payout tracking**: Calculate and track winnings for every event (Scorify does not process payments; organizers collect dues through their own Venmo or PayPal)
+- **Flights, side games and skins** (Pro plan and up): Split leagues into flights; run skins, closest to the pin, long drive, and low putts with automatic payouts
+- **Online registration, team play and season standings** (Club plan): Registration pages, TGL-style team points, and standings across a full season
 
 ## Who uses Scorify
 
@@ -23,26 +21,42 @@ Independent golf league directors and organizers running weekly, monthly, or sea
 
 ## Pricing
 
-Free to start. No credit card required. No per-player fees. No transaction fees. Paid plans available for larger leagues wanting advanced features. Organizers collect player dues through their own payment links.
+A free Starter plan is available with no credit card: 1 league, up to 16 players per event. Pro adds unlimited players, flights, side games and skins, and CSV export. Club adds online registration, team play, custom branding, multiple admins, and golf trips. There are no per-player fees and no transaction fees. See the pricing section on the homepage for current plans: https://www.scorifygolf.com/#pricing
 
 ## Key differentiators
 
 - Simpler than Golf Genius or Golf League Tracker — no 250-option configuration screens
 - Built for independent leagues, not golf facilities or country clubs
-- Mobile-first scoring and leaderboards
+- Mobile-first scoring and leaderboards, with no app download
 - No payment processing lock-in — use your own Venmo or PayPal
-- Affordable — free tier covers most small leagues entirely
 
 ## About the founder
 
-Built by Kevin V, a business operations professional who ran golf leagues and got tired of being stuck at the scoring table after every round while everyone else socialized. He built Scorify to eliminate that bottleneck and give any league director the tools to run their league like a pro.
+Built by Kevin Vargas, who helps run a monthly 40-player golf league and got tired of being stuck at the scoring table after every round while everyone else socialized. He built Scorify to eliminate that bottleneck and give any league director the tools to run their league like a pro.
 
 ## Key pages
 
-- Homepage: https://www.scorifygolf.com/
-- Pricing: https://www.scorifygolf.com/pricing
-- Features: https://www.scorifygolf.com/features
-- About: https://www.scorifygolf.com/about
-- FAQ: https://www.scorifygolf.com/faq
-- Blog: https://www.scorifygolf.com/blog
-- Login: https://www.scorifygolf.com/login
+- [Homepage](https://www.scorifygolf.com/): Overview, features, and pricing
+- [FAQ](https://www.scorifygolf.com/faq): Common questions about plans, scoring, and setup
+- [Help & Setup Guide](https://www.scorifygolf.com/help): Step-by-step setup for leagues, events, players, and scoring
+- [Roadmap](https://www.scorifygolf.com/roadmap): What is coming next
+- [Blog](https://www.scorifygolf.com/blog): Guides on running golf leagues
+
+## Blog posts
+
+<!-- blog-posts:start -->
+- [Season-Long Golf League Standings: Money Lists, Team Play, and Playoffs](https://www.scorifygolf.com/blog/season-long-golf-league-standings): How our league runs a season-long money list, team competition, and playoffs, and how to add season-long competition to your own golf league.
+- [Digital vs. Paper Golf Scoring: What Changed When Our League Switched](https://www.scorifygolf.com/blog/digital-vs-paper-golf-scoring): What paper scoring cost our golf league, what digital scoring looks like in practice, and how to decide if it is right for yours.
+- [Running a Golf League: The Commissioner's Handbook](https://www.scorifygolf.com/blog/running-a-golf-league-commissioners-handbook): What works after a season of running a 40-player monthly golf league: booking courses, handling money, flights, and the guest policy.
+- [Golf League Side Games: How to Run Skins, CTP, and Payouts](https://www.scorifygolf.com/blog/golf-league-side-games-skins-ctp-payouts): How one league splits side game money across flights, runs net skins with wraparound carryovers, and settles CTP, long drive, and low putts.
+- [Scorify Golf vs. Golf League Tracker: Which One Fits Your League?](https://www.scorifygolf.com/blog/scorify-vs-golf-league-tracker): Scorify Golf vs. Golf League Tracker: how the two differ on handicaps, live scoring, and standings, and which kind of league director each one fits.
+- [A Beginner's Guide to Golf Handicaps for League Play](https://www.scorifygolf.com/blog/golf-handicaps-for-league-play): A plain-English guide to golf handicaps for league play: course handicaps, net scores, and handicap strokes, and what matters week to week.
+- [Flights vs. Full Field: Choosing the Right Format for Your League](https://www.scorifygolf.com/blog/flights-vs-full-field): Flights can make league competition fairer or just add complexity. Here is how to tell whether flights or a full field fits your golf league.
+- [How to Run a Fair Skins Game](https://www.scorifygolf.com/blog/how-to-run-a-fair-skins-game): How to run a fair skins game: decide gross or net, ties and carryovers, and the payout structure before the first tee shot to avoid disputes.
+<!-- blog-posts:end -->
+
+## Profiles
+
+- [Instagram](https://instagram.com/scorifygolf)
+- [X](https://x.com/scorifygolf)
+- [LinkedIn](https://www.linkedin.com/company/scorify-golf/)

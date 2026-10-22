@@ -3,11 +3,16 @@
 // posts by appending an entry here; Blog.jsx and BlogPost.jsx pick them up
 // automatically.
 //
+// Optional per-post SEO fields: seoTitle (<= 60 chars, shown in search results and the
+// browser tab) and metaDescription (<= 160 chars). They fall back to title/excerpt.
+//
 // content blocks: { type: 'p', text } | { type: 'h2', text } | { type: 'ul', items: string[] }
 
 export const BLOG_POSTS = [
   {
     slug: 'how-to-run-a-fair-skins-game',
+    seoTitle: "How to Run a Fair Skins Game | Scorify Golf",
+    metaDescription: "How to run a fair skins game: decide gross or net, ties and carryovers, and the payout structure before the first tee shot to avoid disputes.",
     title: 'How to Run a Fair Skins Game',
     excerpt: 'Skins games are one of the easiest ways to add stakes to a casual round — but only if the rules are set before the first tee shot. Here\'s how to avoid the most common disputes.',
     date: '2026-08-11',
@@ -26,6 +31,8 @@ export const BLOG_POSTS = [
   },
   {
     slug: 'flights-vs-full-field',
+    seoTitle: "Flights vs. Full Field for Golf Leagues | Scorify Golf",
+    metaDescription: "Flights can make league competition fairer or just add complexity. Here is how to tell whether flights or a full field fits your golf league.",
     title: 'Flights vs. Full Field: Choosing the Right Format for Your League',
     excerpt: 'Splitting your league into flights can make competition fairer — or it can just add complexity for no benefit. Here\'s how to know which format actually fits your group.',
     date: '2026-08-28',
@@ -44,6 +51,8 @@ export const BLOG_POSTS = [
   },
   {
     slug: 'golf-handicaps-for-league-play',
+    seoTitle: "Golf Handicaps for League Play | Scorify Golf",
+    metaDescription: "A plain-English guide to golf handicaps for league play: course handicaps, net scores, and handicap strokes, and what matters week to week.",
     title: "A Beginner's Guide to Golf Handicaps for League Play",
     excerpt: 'If you\'re setting up a league and handicaps feel confusing, you\'re not alone. Here\'s a plain-English breakdown of what actually matters for weekly league play.',
     date: '2026-09-15',
@@ -62,6 +71,8 @@ export const BLOG_POSTS = [
   },
   {
     slug: 'scorify-vs-golf-league-tracker',
+    seoTitle: "Scorify vs. Golf League Tracker: Compared",
+    metaDescription: "Scorify Golf vs. Golf League Tracker: how the two differ on handicaps, live scoring, and standings, and which kind of league director each one fits.",
     title: 'Scorify Golf vs. Golf League Tracker: Which One Fits Your League?',
     excerpt: 'Both platforms handle handicaps, live scoring, and standings for independent leagues. Here\'s how they actually differ, and which type of league director each one is built for.',
     date: '2026-09-22',
@@ -104,6 +115,8 @@ export const BLOG_POSTS = [
   },
   {
     slug: 'running-a-golf-league-commissioners-handbook',
+    seoTitle: "Running a Golf League: Commissioner's Handbook | Scorify",
+    metaDescription: "What works after a season of running a 40-player monthly golf league: booking courses, handling money, flights, and the guest policy.",
     title: "Running a Golf League: The Commissioner's Handbook",
     excerpt: 'What actually works after a season of running a 40-player monthly league — from booking courses six months out to handling the money, the flights, and the guest policy that caused the one real fight all year.',
     date: '2026-10-02',
@@ -232,6 +245,8 @@ export const BLOG_POSTS = [
   },
   {
     slug: 'golf-league-side-games-skins-ctp-payouts',
+    seoTitle: "Golf League Side Games: Skins, CTP & Payouts | Scorify",
+    metaDescription: "How one league splits side game money across flights, runs net skins with wraparound carryovers, and settles CTP, long drive, and low putts.",
     title: 'Golf League Side Games: How to Run Skins, CTP, and Payouts',
     excerpt: 'How we split side game money across flights and the full field, run net skins with wraparound carryovers, and settle closest to the pin, long drive, and low putts without an argument.',
     date: '2026-09-28',
@@ -336,6 +351,8 @@ export const BLOG_POSTS = [
   },
   {
     slug: 'digital-vs-paper-golf-scoring',
+    seoTitle: "Digital vs. Paper Golf Scoring for Leagues | Scorify",
+    metaDescription: "What paper scoring cost our golf league, what digital scoring looks like in practice, and how to decide if it is right for yours.",
     title: 'Digital vs. Paper Golf Scoring: What Changed When Our League Switched',
     excerpt: 'For years we scored on paper cards and entered everything by hand. Here is what paper scoring really cost us, what digital scoring looks like in practice, and how to decide if it is right for your league.',
     date: '2026-10-05',
@@ -429,6 +446,8 @@ export const BLOG_POSTS = [
   },
   {
     slug: 'season-long-golf-league-standings',
+    seoTitle: "Golf League Standings: Money Lists & Playoffs | Scorify",
+    metaDescription: "How our league runs a season-long money list, team competition, and playoffs, and how to add season-long competition to your own golf league.",
     title: 'Season-Long Golf League Standings: Money Lists, Team Play, and Playoffs',
     excerpt: 'A single tournament is fun. A season with something on the line keeps players coming back. Here is how our league runs a money list, team competition, and playoffs, and how to add season-long competition to yours.',
     date: '2026-10-11',
@@ -542,4 +561,22 @@ export const BLOG_POSTS = [
 
 export function getBlogPost(slug) {
   return BLOG_POSTS.find(p => p.slug === slug)
+}
+
+// The pillar page every other post should point readers toward.
+const PILLAR_SLUG = 'running-a-golf-league-commissioners-handbook'
+
+/**
+ * Posts to suggest after `post`: the pillar handbook first (unless this is it),
+ * then posts in the same category, then the newest remaining posts.
+ */
+export function getRelatedPosts(post, count = 3) {
+  const others = BLOG_POSTS.filter(p => p.slug !== post.slug)
+  const newestFirst = [...others].sort((a, b) => new Date(b.date) - new Date(a.date))
+  const ordered = [
+    ...others.filter(p => p.slug === PILLAR_SLUG),
+    ...newestFirst.filter(p => p.category === post.category),
+    ...newestFirst,
+  ]
+  return [...new Map(ordered.map(p => [p.slug, p])).values()].slice(0, count)
 }

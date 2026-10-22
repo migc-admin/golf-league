@@ -420,13 +420,12 @@ function HelpItem({ q, a }) {
           </svg>
         </span>
       </button>
-      {open && (
-        <div className="text-sm text-gray-600 leading-relaxed pb-5 space-y-2">
-          {a.split('\n\n').map((block, i) => (
-            <p key={i} style={{ whiteSpace: 'pre-line' }}>{block}</p>
-          ))}
-        </div>
-      )}
+      {/* Always rendered (just hidden) so search engines can read every answer. */}
+      <div hidden={!open} className="text-sm text-gray-600 leading-relaxed pb-5 space-y-2">
+        {a.split('\n\n').map((block, i) => (
+          <p key={i} style={{ whiteSpace: 'pre-line' }}>{block}</p>
+        ))}
+      </div>
     </div>
   )
 }

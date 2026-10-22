@@ -1,7 +1,7 @@
 import { Link, useParams, Navigate } from 'react-router-dom'
 import { Helmet } from 'react-helmet-async'
 import Footer from '../components/ui/Footer'
-import { getBlogPost, BLOG_POSTS } from '../lib/blogPosts'
+import { getBlogPost, getRelatedPosts } from '../lib/blogPosts'
 import ComparisonTable from '../components/blog/ComparisonTable'
 import LeaderboardPreview from '../components/blog/LeaderboardPreview'
 import PrintAssetGallery from '../components/blog/PrintAssetGallery'
@@ -71,21 +71,22 @@ export default function BlogPost() {
 
   if (!post) return <Navigate to="/blog" replace />
 
-  const related = BLOG_POSTS.filter(p => p.slug !== post.slug).slice(0, 2)
+  const related = getRelatedPosts(post, 3)
+  const description = post.metaDescription ?? post.excerpt
 
   return (
     <>
       <Helmet>
-        <title>{post.title} — Scorify Golf Blog</title>
-        <meta name="description" content={post.excerpt} />
+        <title>{post.seoTitle ?? `${post.title} — Scorify Golf Blog`}</title>
+        <meta name="description" content={description} />
         <meta property="og:title" content={post.title} />
-        <meta property="og:description" content={post.excerpt} />
+        <meta property="og:description" content={description} />
         <link rel="canonical" href={`https://www.scorifygolf.com/blog/${post.slug}`} />
         <script type="application/ld+json">{JSON.stringify({
           "@context": "https://schema.org",
           "@type": "BlogPosting",
           "headline": post.title,
-          "description": post.excerpt,
+          "description": description,
           "datePublished": post.date,
           "author": {
             "@type": "Person",
