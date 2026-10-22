@@ -101,12 +101,12 @@ const FEATURES = [
 // ─── Pricing ─────────────────────────────────────────────────────────────────
 // ─── "See it in action" screens (real product UI, sample data) ───────────────
 const PRODUCT_SCREENS = [
-  { key: 'entry', label: 'Score Entry', src: '/blog/live-scoring/score-entry.png', caption: 'Players tap their score hole-by-hole — no app download, no login.' },
-  { key: 'scorecard', label: 'Full Scorecard', src: '/blog/live-scoring/scorecard.PNG', caption: 'Every hole, every player, gross and net — visible to the whole group in real time.' },
-  { key: 'leaderboard', label: 'Live Leaderboard', src: '/blog/live-scoring/leaderboard.PNG', caption: 'Standings update automatically as scores come in, split by flight.' },
-  { key: 'tee_sheet', label: 'Tee Sheet', src: '/blog/print-assets/tee-sheet.png', caption: 'Groups, tee times, and starting holes — printed for the pro shop or starter.' },
-  { key: 'cart_sign', label: 'Cart Sign', src: '/blog/print-assets/cart-sign.png', caption: 'One per cart — group number and player names, ready to slide into the holder.' },
-  { key: 'ctp_sign', label: 'Closest to the Pin Sign', src: '/blog/print-assets/ctp-sign.png', caption: 'Posted at the tee box — hole number and a sign-in sheet for the side game.' },
+  { key: 'entry', label: 'Score Entry', src: '/blog/live-scoring/score-entry.webp', caption: 'Players tap their score hole-by-hole — no app download, no login.' },
+  { key: 'scorecard', label: 'Full Scorecard', src: '/blog/live-scoring/scorecard.webp', caption: 'Every hole, every player, gross and net — visible to the whole group in real time.' },
+  { key: 'leaderboard', label: 'Live Leaderboard', src: '/blog/live-scoring/leaderboard.webp', caption: 'Standings update automatically as scores come in, split by flight.' },
+  { key: 'tee_sheet', label: 'Tee Sheet', src: '/blog/print-assets/tee-sheet.webp', caption: 'Groups, tee times, and starting holes — printed for the pro shop or starter.' },
+  { key: 'cart_sign', label: 'Cart Sign', src: '/blog/print-assets/cart-sign.webp', caption: 'One per cart — group number and player names, ready to slide into the holder.' },
+  { key: 'ctp_sign', label: 'Closest to the Pin Sign', src: '/blog/print-assets/ctp-sign.webp', caption: 'Posted at the tee box — hole number and a sign-in sheet for the side game.' },
 ]
 
 const PLANS = [

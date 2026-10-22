@@ -5,19 +5,19 @@ const ASSETS = [
   {
     key: 'tee_sheet',
     label: 'Tee Sheet',
-    src: '/blog/print-assets/tee-sheet.png',
+    src: '/blog/print-assets/tee-sheet.webp',
     caption: 'Groups, tee times, and starting holes — printed for the pro shop or starter.',
   },
   {
     key: 'cart_sign',
     label: 'Cart Sign',
-    src: '/blog/print-assets/cart-sign.png',
+    src: '/blog/print-assets/cart-sign.webp',
     caption: 'One per cart — group number and player names, ready to slide into the holder.',
   },
   {
     key: 'ctp_sign',
     label: 'Closest to the Pin Sign',
-    src: '/blog/print-assets/ctp-sign.png',
+    src: '/blog/print-assets/ctp-sign.webp',
     caption: 'Posted at the tee box — hole number and a sign-in sheet for the side game.',
   },
 ]

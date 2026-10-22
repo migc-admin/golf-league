@@ -2,9 +2,9 @@ import { useState } from 'react'
 import Modal from '../ui/Modal'
 
 const SCREENS = [
-  { key: 'entry', label: 'Score Entry', src: '/blog/live-scoring/score-entry.png', caption: 'Players tap their score hole-by-hole — no app download, no login.' },
-  { key: 'scorecard', label: 'Full Scorecard', src: '/blog/live-scoring/scorecard.PNG', caption: 'Every hole, every player, gross and net — visible to the whole group in real time.' },
-  { key: 'leaderboard', label: 'Live Leaderboard', src: '/blog/live-scoring/leaderboard.PNG', caption: 'Standings update automatically as scores come in from every group, split by flight.' },
+  { key: 'entry', label: 'Score Entry', src: '/blog/live-scoring/score-entry.webp', caption: 'Players tap their score hole-by-hole — no app download, no login.' },
+  { key: 'scorecard', label: 'Full Scorecard', src: '/blog/live-scoring/scorecard.webp', caption: 'Every hole, every player, gross and net — visible to the whole group in real time.' },
+  { key: 'leaderboard', label: 'Live Leaderboard', src: '/blog/live-scoring/leaderboard.webp', caption: 'Standings update automatically as scores come in from every group, split by flight.' },
 ]
 
 export default function LiveScoringGallery() {
