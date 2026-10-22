@@ -7,7 +7,7 @@ import { useEffect, useState } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../hooks/useAuth'
-import { computeMatchPoints } from '../lib/engines/matchPoints'
+import { computeWagerSettlement, wagerOutcomes } from '../lib/wagerSettlement'
 
 const MIGC_ORG = import.meta.env.VITE_MIGC_ORG_ID
 const GREEN    = '#1B4332'
@@ -45,6 +45,7 @@ export default function WagerAdmin() {
   const [acting,      setActing]      = useState(null)
   const [showDeleted, setShowDeleted] = useState(false)
   const [toggling,    setToggling]    = useState(false)
+  const [exporting,   setExporting]   = useState(false)
 
   async function loadData() {
     const { data: ev } = await supabase
@@ -144,182 +145,34 @@ export default function WagerAdmin() {
   const active  = wagers.filter(w => !w.deleted_at)
   const deleted = wagers.filter(w =>  w.deleted_at)
 
-  // Pool math — active only
-  const winPool   = active.filter(w => w.pick_1st).reduce((s, w) => s + parseFloat(w.amount), 0)
-  const placePool = active.filter(w => w.pick_2nd).reduce((s, w) => s + parseFloat(w.amount), 0)
-  const totalPot  = winPool + placePool
+  // Pool math, winners and payouts live in lib/wagerSettlement.js (unit tested).
+  const settlement = computeWagerSettlement({ active, players, scores, pairings, course: event.course })
+  const {
+    winPool, placePool, totalPot, winTotals, placeTotals, allPickedIds,
+    winResults, placeResults, matchCards, matchPoolTotal,
+  } = settlement
 
-  const winTotals   = {}
-  const placeTotals = {}
-  for (const w of active) {
-    if (w.pick_1st) winTotals[w.pick_1st]   = (winTotals[w.pick_1st]   ?? 0) + parseFloat(w.amount)
-    if (w.pick_2nd) placeTotals[w.pick_2nd] = (placeTotals[w.pick_2nd] ?? 0) + parseFloat(w.amount)
-  }
-
-  const allPickedIds = [...new Set([...Object.keys(winTotals), ...Object.keys(placeTotals)])]
-    .sort((a, b) => ((winTotals[b] ?? 0) + (placeTotals[b] ?? 0)) - ((winTotals[a] ?? 0) + (placeTotals[a] ?? 0)))
-
-  // ── Winner calculation ─────────────────────────────────────────────
-  // WIN:   pays bettors who picked the 1st place (lowest net) finisher
-  // PLACE: North American pari-mutuel — selection must finish 1st OR 2nd.
-  //        Pool is split 50/50 between the 1st-place group and 2nd-place group.
-  //        Each bettor gets their stake back + proportional share of their group's profit half.
-  //        Dead heats: tied players share their group's half proportionally.
-  let winResults   = null
-  let placeResults = null
-
-  if (scores.length > 0) {
-    const grossByPlayer = {}
-    for (const s of scores) {
-      if (s.gross_score != null)
-        grossByPlayer[s.player_id] = (grossByPlayer[s.player_id] ?? 0) + s.gross_score
-    }
-    const netByPlayer = {}
-    for (const ep of players) {
-      if (grossByPlayer[ep.player_id] != null) {
-        const ch = ep.course_handicap ?? ep.adjusted_handicap_index ?? 0
-        netByPlayer[ep.player_id] = grossByPlayer[ep.player_id] - ch
-      }
-    }
-
-    // Sort all scored players by net ascending
-    const allSorted = Object.entries(netByPlayer).sort((a, b) => a[1] - b[1])
-    if (allSorted.length === 0) { /* no scores yet */ }
-    else {
-      // 1st place: lowest net (may be multiple tied)
-      const net1 = allSorted[0][1]
-      const place1Players = allSorted.filter(([, n]) => n === net1).map(([id]) => id)
-
-      // 2nd place: next distinct net score (may be multiple tied)
-      // If 2+ players tie for 1st, they occupy both 1st and 2nd — no separate 2nd group
-      const twoWayTieForFirst = place1Players.length >= 2
-      let place2Players = []
-      let net2 = null
-      if (!twoWayTieForFirst) {
-        const secondEntry = allSorted.find(([, n]) => n > net1)
-        if (secondEntry) {
-          net2 = secondEntry[1]
-          place2Players = allSorted.filter(([, n]) => n === net2).map(([id]) => id)
-        }
-      }
-
-      // ── WIN pool ──────────────────────────────────────────────────
-      const winBettors = active.filter(w => w.pick_1st && place1Players.includes(w.pick_1st))
-      if (winBettors.length > 0) {
-        const totalStake = winBettors.reduce((s, w) => s + parseFloat(w.amount), 0)
-        winResults = {
-          net: net1,
-          matched: true,
-          bettors: winBettors.map(w => ({
-            name:   w.bettor_name,
-            pid:    w.pick_1st,
-            bet:    parseFloat(w.amount),
-            payout: Math.floor((parseFloat(w.amount) / totalStake) * winPool * 100) / 100,
-          })),
-        }
-      } else {
-        winResults = { net: net1, matched: false, topPlayers: place1Players }
-      }
-
-      // ── PLACE pool ────────────────────────────────────────────────
-      // Group 1 = bettors who picked 1st place finisher(s)
-      // Group 2 = bettors who picked 2nd place finisher(s)
-      // (If 2-way tie for 1st, group1 = tied player A bettors, group2 = tied player B bettors)
-      let g1Players, g2Players
-      if (twoWayTieForFirst) {
-        // Two tied players fill 1st and 2nd — treat each tied player as their own group
-        g1Players = [place1Players[0]]
-        g2Players = place1Players.slice(1) // remaining tied players
-      } else {
-        g1Players = place1Players
-        g2Players = place2Players
-      }
-
-      const g1Bettors = active.filter(w => w.pick_2nd && g1Players.includes(w.pick_2nd))
-      const g2Bettors = active.filter(w => w.pick_2nd && g2Players.includes(w.pick_2nd))
-      const s1 = g1Bettors.reduce((s, w) => s + parseFloat(w.amount), 0)
-      const s2 = g2Bettors.reduce((s, w) => s + parseFloat(w.amount), 0)
-
-      const hasG1 = g1Bettors.length > 0
-      const hasG2 = g2Bettors.length > 0
-
-      if (!hasG1 && !hasG2) {
-        // Nobody bet on 1st or 2nd place finishers
-        placeResults = {
-          net: net1, net2: twoWayTieForFirst ? net1 : net2,
-          matched: false,
-          topPlayers: [...g1Players, ...g2Players],
-        }
-      } else {
-        // Profit = pool minus stakes returned to both groups
-        const stakesReturned = (hasG1 ? s1 : 0) + (hasG2 ? s2 : 0)
-        const profit = placePool - stakesReturned
-        // Each group gets half the profit (if the other group has no bettors, their half rolls to club)
-        const halfProfit = profit / 2
-
-        function placePayouts(bettors, groupStake, groupHalfProfit) {
-          return bettors.map(w => {
-            const bet = parseFloat(w.amount)
-            const profitShare = groupStake > 0 ? Math.floor((bet / groupStake) * groupHalfProfit * 100) / 100 : 0
-            return {
-              name:   w.bettor_name,
-              pid:    w.pick_2nd,
-              bet,
-              payout: Math.floor((bet + profitShare) * 100) / 100,
-            }
-          })
-        }
-
-        placeResults = {
-          net: net1,
-          net2: twoWayTieForFirst ? net1 : net2,
-          twoWayTie: twoWayTieForFirst,
-          matched: true,
-          g1: { players: g1Players, bettors: hasG1 ? placePayouts(g1Bettors, s1, halfProfit) : [], hasMatch: hasG1 },
-          g2: { players: g2Players, bettors: hasG2 ? placePayouts(g2Bettors, s2, halfProfit) : [], hasMatch: hasG2 },
-          halfRollsToClub: (!hasG1 || !hasG2),
-        }
-      }
+  // Excel export of every bet (including removed ones) for tracking payments and payouts.
+  async function exportExcel() {
+    setExporting(true)
+    try {
+      const [{ default: ExcelJS }, { buildWagerWorkbook, downloadWorkbook, wagerExportFilename }] = await Promise.all([
+        import('exceljs'),
+        import('../lib/wagerExport'),
+      ])
+      const workbook = buildWagerWorkbook(ExcelJS, {
+        event, wagers, pairings, nameOf: playerName,
+        outcomes: wagerOutcomes(settlement, active, event.status),
+        settlement,
+      })
+      await downloadWorkbook(workbook, wagerExportFilename(event))
+    } catch (err) {
+      console.error('Wager export failed:', err)
+      alert('Could not create the Excel file: ' + (err?.message ?? err))
+    } finally {
+      setExporting(false)
     }
   }
-
-  // ── Match play wagers ───────────────────────────────────────────────
-  // Each match is its own two-way pool. Winning side splits the whole pool
-  // pro rata to stake. A halved match refunds every stake. If nobody backed
-  // the winner, the pool rolls to the club (same rule as WIN).
-  const matchResultByKey = {}
-  if (pairings.length > 0 && event.course) {
-    const mr = computeMatchPoints(players, scores, event.course, pairings)
-    for (const r of mr.pairings) matchResultByKey[`${r.playerA.player_id}|${r.playerB.player_id}`] = r
-  }
-  const matchCards = pairings.map(m => {
-    const bets = active.filter(w => w.match_pairing_id === m.id)
-    const sideAmt = { [m.player_a_id]: 0, [m.player_b_id]: 0 }
-    for (const w of bets) sideAmt[w.pick_match] = (sideAmt[w.pick_match] ?? 0) + parseFloat(w.amount)
-    const pool = (sideAmt[m.player_a_id] ?? 0) + (sideAmt[m.player_b_id] ?? 0)
-    const result = matchResultByKey[`${m.player_a_id}|${m.player_b_id}`] ?? null
-    const winnerPid = result?.winner === 'A' ? m.player_a_id : result?.winner === 'B' ? m.player_b_id : null
-
-    let settlement = null
-    if (result?.winner === 'halve') {
-      settlement = { type: 'refund', bettors: bets.map(w => ({ name: w.bettor_name, pid: w.pick_match, bet: parseFloat(w.amount), payout: parseFloat(w.amount) })) }
-    } else if (winnerPid) {
-      const winners = bets.filter(w => w.pick_match === winnerPid)
-      const stake = winners.reduce((sum, w) => sum + parseFloat(w.amount), 0)
-      settlement = winners.length === 0
-        ? { type: 'club', winnerPid }
-        : {
-            type: 'paid',
-            winnerPid,
-            bettors: winners.map(w => ({
-              name: w.bettor_name, pid: w.pick_match, bet: parseFloat(w.amount),
-              payout: Math.floor((parseFloat(w.amount) / stake) * pool * 100) / 100,
-            })),
-          }
-    }
-    return { match: m, bets, sideAmt, pool, result, settlement }
-  })
-  const matchPoolTotal = matchCards.reduce((sum, c) => sum + c.pool, 0)
 
   // Who owes what and how: active bets grouped by bettor, split by payment method.
   const payByBettor = {}
@@ -709,12 +562,20 @@ export default function WagerAdmin() {
         <div style={{ background: '#fff', borderRadius: 14, border: '1px solid #e5e7eb', overflow: 'hidden' }}>
           <div style={{ background: GREEN, padding: '10px 16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <span style={{ color: GOLD, fontWeight: 700, fontSize: 13 }}>Active Bets</span>
-            {active.length > 0 && (
-              <button onClick={clearAll}
-                style={{ fontSize: 11, fontWeight: 700, color: '#fca5a5', background: 'rgba(220,38,38,0.15)', border: '1px solid rgba(220,38,38,0.3)', borderRadius: 6, padding: '4px 10px', cursor: 'pointer' }}>
-                Remove All
-              </button>
-            )}
+            <div style={{ display: 'flex', gap: 8 }}>
+              {wagers.length > 0 && (
+                <button onClick={exportExcel} disabled={exporting}
+                  style={{ fontSize: 11, fontWeight: 700, color: GOLD, background: 'transparent', border: `1px solid ${GOLD}`, borderRadius: 6, padding: '4px 10px', cursor: exporting ? 'not-allowed' : 'pointer', opacity: exporting ? 0.6 : 1 }}>
+                  {exporting ? 'Exporting…' : '⬇ Export Excel'}
+                </button>
+              )}
+              {active.length > 0 && (
+                <button onClick={clearAll}
+                  style={{ fontSize: 11, fontWeight: 700, color: '#fca5a5', background: 'rgba(220,38,38,0.15)', border: '1px solid rgba(220,38,38,0.3)', borderRadius: 6, padding: '4px 10px', cursor: 'pointer' }}>
+                  Remove All
+                </button>
+              )}
+            </div>
           </div>
           {active.length === 0 ? (
             <div style={{ padding: '28px 16px', textAlign: 'center', color: '#9ca3af', fontSize: 13 }}>No active bets.</div>
