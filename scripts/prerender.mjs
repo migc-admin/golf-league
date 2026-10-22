@@ -42,7 +42,17 @@ for (const route of PRERENDER_ROUTES) {
     for (const [needle, re] of REPLACEABLE) {
       if (head.includes(needle)) page = page.replace(re, '')
     }
-    page = page.replace('</head>', `${head}\n  </head>`)
+    // X/Twitter cards: if the page sets Open Graph title/description but no twitter:
+    // ones, mirror them so shares don't show the homepage text from index.html.
+    let extraHead = ''
+    for (const prop of ['title', 'description']) {
+      const val = head.match(new RegExp(`<meta[^>]*property="og:${prop}"[^>]*content="([^"]*)"`))?.[1]
+      if (val && !head.includes(`name="twitter:${prop}"`)) {
+        page = page.replace(new RegExp(`<meta\\s+name="twitter:${prop}"[^>]*>\\s*`, 'g'), '')
+        extraHead += `<meta name="twitter:${prop}" content="${val}" />\n`
+      }
+    }
+    page = page.replace('</head>', `${head}\n${extraHead}  </head>`)
     if (!page.includes('<div id="root"></div>')) throw new Error('root element not found in template')
     page = page.replace('<div id="root"></div>', `<div id="root">${html}</div>`)
     const out = route === '/' ? path.join(dist, 'index.html') : path.join(dist, route.slice(1), 'index.html')
