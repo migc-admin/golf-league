@@ -197,7 +197,13 @@ export default function Wager() {
           amount:      parseFloat(p.amount),
         })
 
-    const { error: insErr } = await supabase.from('wagers').insert(rows)
+    // Record how the bettor chose to pay. If the payment_method column hasn't been
+    // added to the database yet, fall back to saving the bet without it rather
+    // than failing the bet.
+    let { error: insErr } = await supabase.from('wagers').insert(rows.map(r => ({ ...r, payment_method: payMethod })))
+    if (insErr && /payment_method/i.test(insErr.message ?? '')) {
+      ({ error: insErr } = await supabase.from('wagers').insert(rows))
+    }
     if (insErr) { alert('Error saving bet: ' + insErr.message); setSubmitting(false); return }
 
     // Reload board (exclude soft-deleted)

@@ -108,6 +108,14 @@ export default function WagerAdmin() {
     setToggling(false)
   }
 
+  async function setPaymentMethod(id, method) {
+    setActing(id)
+    const { error: upErr } = await supabase.from('wagers').update({ payment_method: method || null }).eq('id', id)
+    if (upErr) alert('Could not save payment method: ' + upErr.message)
+    setWagers(await fetchWagers(eventId))
+    setActing(null)
+  }
+
   async function softDelete(id) {
     if (!window.confirm('Remove this bet? It will be saved and can be restored.')) return
     setActing(id)
@@ -313,6 +321,16 @@ export default function WagerAdmin() {
   })
   const matchPoolTotal = matchCards.reduce((sum, c) => sum + c.pool, 0)
 
+  // Who owes what and how: active bets grouped by bettor, split by payment method.
+  const payByBettor = {}
+  for (const w of active) {
+    const key = w.bettor_name.trim().toLowerCase()
+    const row = (payByBettor[key] ??= { name: w.bettor_name.trim(), venmo: 0, cash: 0, unset: 0 })
+    row[w.payment_method === 'venmo' ? 'venmo' : w.payment_method === 'cash' ? 'cash' : 'unset'] += parseFloat(w.amount)
+  }
+  const payRows = Object.values(payByBettor).sort((a, b) => a.name.localeCompare(b.name))
+  const payTotals = payRows.reduce((t, r) => ({ venmo: t.venmo + r.venmo, cash: t.cash + r.cash, unset: t.unset + r.unset }), { venmo: 0, cash: 0, unset: 0 })
+
   const showResults = event.status === 'complete' || event.status === 'active'
   const autoClosed  = isTeeTimePast(event)
   const bettingOpen = !event.wagers_closed && !autoClosed && event.status !== 'complete'
@@ -357,6 +375,27 @@ export default function WagerAdmin() {
         }
       </td>
       <td style={{ padding: '9px 12px', textAlign: 'right', fontWeight: 700, color: '#111' }}>{fmt(w.amount)}</td>
+      <td style={{ padding: '9px 12px', textAlign: 'center' }}>
+        {isDeleted ? (
+          <span style={{ fontSize: 11, color: '#9ca3af' }}>{w.payment_method ? w.payment_method.toUpperCase() : '—'}</span>
+        ) : (
+          <select
+            value={w.payment_method ?? ''}
+            disabled={acting === w.id}
+            onChange={e => setPaymentMethod(w.id, e.target.value)}
+            style={{
+              fontSize: 11, fontWeight: 700, borderRadius: 6, padding: '3px 4px', cursor: 'pointer',
+              border: `1px solid ${w.payment_method === 'cash' ? '#bbf7d0' : w.payment_method === 'venmo' ? '#bfdbfe' : '#e5e7eb'}`,
+              background: w.payment_method === 'cash' ? '#f0fdf4' : w.payment_method === 'venmo' ? '#eff6ff' : '#fff',
+              color: w.payment_method === 'cash' ? '#16a34a' : w.payment_method === 'venmo' ? '#1d4ed8' : '#9ca3af',
+            }}
+          >
+            <option value="">— not set</option>
+            <option value="venmo">Venmo</option>
+            <option value="cash">Cash</option>
+          </select>
+        )}
+      </td>
       <td style={{ padding: '9px 12px', textAlign: 'center', color: '#9ca3af', fontSize: 11 }}>
         {new Date(w.created_at).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}
       </td>
@@ -383,6 +422,7 @@ export default function WagerAdmin() {
         <th style={{ padding: '8px 12px', textAlign: 'left',   color: '#6b7280', fontWeight: 700, fontSize: 11 }}>Pick</th>
         <th style={{ padding: '8px 12px', textAlign: 'center', color: '#6b7280', fontWeight: 700, fontSize: 11 }}>Type</th>
         <th style={{ padding: '8px 12px', textAlign: 'right',  color: '#6b7280', fontWeight: 700, fontSize: 11 }}>Amt</th>
+        <th style={{ padding: '8px 12px', textAlign: 'center', color: '#6b7280', fontWeight: 700, fontSize: 11 }}>Pay</th>
         <th style={{ padding: '8px 12px', textAlign: 'center', color: '#6b7280', fontWeight: 700, fontSize: 11 }}>Time</th>
         <th style={{ padding: '8px 12px' }}></th>
       </tr>
@@ -455,6 +495,40 @@ export default function WagerAdmin() {
             ))}
           </div>
         </div>
+
+        {/* Payments: who owes what, and how they chose to pay */}
+        {payRows.length > 0 && (
+          <div style={{ background: '#fff', borderRadius: 14, border: '1px solid #e5e7eb', overflow: 'hidden' }}>
+            <div style={{ background: GREEN, padding: '10px 16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <span style={{ color: GOLD, fontWeight: 700, fontSize: 13 }}>Payments</span>
+              <span style={{ color: 'rgba(255,255,255,0.6)', fontSize: 11 }}>
+                Venmo {fmt(payTotals.venmo)} · Cash {fmt(payTotals.cash)}{payTotals.unset > 0 ? ` · Not set ${fmt(payTotals.unset)}` : ''}
+              </span>
+            </div>
+            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
+              <thead>
+                <tr style={{ background: '#f0f4f2' }}>
+                  <th style={{ padding: '7px 12px', textAlign: 'left',  color: '#6b7280', fontWeight: 700 }}>Bettor</th>
+                  <th style={{ padding: '7px 12px', textAlign: 'right', color: '#1d4ed8', fontWeight: 700 }}>Venmo</th>
+                  <th style={{ padding: '7px 12px', textAlign: 'right', color: '#16a34a', fontWeight: 700 }}>Cash</th>
+                  <th style={{ padding: '7px 12px', textAlign: 'right', color: '#9ca3af', fontWeight: 700 }}>Not set</th>
+                  <th style={{ padding: '7px 12px', textAlign: 'right', color: '#111', fontWeight: 700 }}>Total</th>
+                </tr>
+              </thead>
+              <tbody>
+                {payRows.map((r, i) => (
+                  <tr key={r.name} style={{ borderTop: '1px solid #f3f4f6', background: i % 2 === 0 ? '#fff' : '#fafafa' }}>
+                    <td style={{ padding: '7px 12px', fontWeight: 700, color: '#111' }}>{r.name}</td>
+                    <td style={{ padding: '7px 12px', textAlign: 'right', color: r.venmo ? '#1d4ed8' : '#d1d5db' }}>{r.venmo ? fmt(r.venmo) : '—'}</td>
+                    <td style={{ padding: '7px 12px', textAlign: 'right', color: r.cash ? '#16a34a' : '#d1d5db' }}>{r.cash ? fmt(r.cash) : '—'}</td>
+                    <td style={{ padding: '7px 12px', textAlign: 'right', color: r.unset ? '#6b7280' : '#d1d5db' }}>{r.unset ? fmt(r.unset) : '—'}</td>
+                    <td style={{ padding: '7px 12px', textAlign: 'right', fontWeight: 700, color: '#111' }}>{fmt(r.venmo + r.cash + r.unset)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
 
         {/* Odds Board */}
         {allPickedIds.length > 0 && (
