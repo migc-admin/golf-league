@@ -2,7 +2,7 @@ import { createContext, useContext, useEffect, useRef, useState } from 'react'
 import { supabase } from '../lib/supabase'
 import * as Sentry from '@sentry/react'
 
-const AuthContext = createContext(null)
+export const AuthContext = createContext(null)
 
 const PROFILE_TIMEOUT_MS = 7000  // if profile fetch hangs, unblock after 7s
 

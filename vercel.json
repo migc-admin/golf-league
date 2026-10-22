@@ -7,7 +7,7 @@
     { "source": "/migc-league/:eventSlug/schedule",    "destination": "/migc/migc-league/:eventSlug/schedule",    "permanent": true },
     { "source": "/migc-league/standings",              "destination": "/migc/migc-league/standings",              "permanent": true }
   ],
-  "rewrites": [{ "source": "/(.*)", "destination": "/index.html" }],
+  "rewrites": [{ "source": "/(.*)", "destination": "/200.html" }],
   "headers": [
     {
       "source": "/(.*)",
