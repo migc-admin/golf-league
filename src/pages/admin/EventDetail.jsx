@@ -2387,8 +2387,9 @@ function MatchPairingsManager({ event, eventId, eventPlayers, allScores = [], co
               ))}
             </select>
             <p className="text-xs text-gray-400">
-              Compares each player's net strokes (after match handicap strokes) over the holes shown; the lower total wins, and the next step is used if still level.
-              You can always pick a winner by hand on any tied match below, which overrides the tiebreaker.
+              Steps run in the order shown; the first one that separates the two players decides the match. Net scores include the match's handicap strokes.
+              {tiePreset === 'putts' && ' Putts only count if putts were entered for both players. A putt-off is played in person, so the match then waits for you to pick the winner.'}
+              {' '}You can always pick a winner by hand on any tied match below, which overrides the tiebreaker.
             </p>
           </div>
         )}
@@ -2543,13 +2544,19 @@ function SortablePairingRow({ pairing, relA, relB, result, onSetWinner, onRemove
       {tied && (
         <div className="mt-2 ml-7 rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 space-y-2">
           <div className="text-xs">
-            {result.needsWinner && <span className="font-semibold text-amber-700">All square after 18. A winner is needed. Pick one below.</span>}
+            {result.needsWinner && (
+              <span className="font-semibold text-amber-700">
+                {result.needsPuttOff
+                  ? 'All square after the tiebreakers. Play the putt-off, then pick the winner below.'
+                  : 'All square after 18. A winner is needed. Pick one below.'}
+              </span>
+            )}
             {!result.needsWinner && tb && tb.by === 'manual' && (
               <span className="font-semibold text-green-700">Winner: {winnerName} (decided by admin)</span>
             )}
             {!result.needsWinner && tb && tb.by !== 'manual' && (
               <span className="font-semibold text-green-700">
-                Winner: {winnerName} on tiebreak ({tb.label}: net {result.winner === 'A' ? tb.netA : tb.netB} vs {result.winner === 'A' ? tb.netB : tb.netA})
+                Winner: {winnerName} on tiebreak ({tb.label}{tb.unit === 'net' ? ' (net)' : ''}: {result.winner === 'A' ? tb.valueA : tb.valueB} vs {result.winner === 'A' ? tb.valueB : tb.valueA})
               </span>
             )}
             {!result.needsWinner && !tb && <span className="font-semibold text-gray-600">All square after 18. Halved (½ point each).</span>}

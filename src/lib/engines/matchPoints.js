@@ -156,20 +156,29 @@ export function computeMatchStrokeMap(eventPlayers, formats = [], teamMatchConfi
 // Some formats (playoffs, bracket matches) need a winner, so an event can carry
 // match_rules = { requireWinner, preset, tiebreak: [...] } to resolve those ties.
 
-/** Tiebreak steps. Each compares the two players' NET strokes (after the match's
- *  relative handicap strokes) over a range of holes; lower total wins. */
+/**
+ * Tiebreak steps, run in order; the first one that separates the players decides the match.
+ *   netRange — net strokes (after the match's relative handicap strokes) over holes from..18; lower wins
+ *   putts    — total putts over all 18 holes; fewer wins. Skipped if putts were not tracked for both players
+ *   netPars  — number of holes made at net par or better; more wins
+ *   manual   — a putt-off: it is played in person, so the match waits for the admin to pick the winner
+ */
 export const TIEBREAK_STEPS = {
-  net_total: { label: 'Net total',     from: 1  },
-  back9:     { label: 'Back 9',        from: 10 },
-  last6:     { label: 'Last 6 holes',  from: 13 },
-  last3:     { label: 'Last 3 holes',  from: 16 },
-  hole18:    { label: 'Hole 18',       from: 18 },
+  net_total: { label: 'Net total',               kind: 'netRange', from: 1,  unit: 'net' },
+  back9:     { label: 'Back 9',                  kind: 'netRange', from: 10, unit: 'net' },
+  last6:     { label: 'Last 6 holes',            kind: 'netRange', from: 13, unit: 'net' },
+  last3:     { label: 'Last 3 holes',            kind: 'netRange', from: 16, unit: 'net' },
+  hole18:    { label: 'Hole 18',                 kind: 'netRange', from: 18, unit: 'net' },
+  putts:     { label: 'Fewest putts',            kind: 'putts',                unit: 'putts' },
+  net_pars:  { label: 'Most net pars or better', kind: 'netPars',              unit: 'net pars or better' },
+  putt_off:  { label: 'Putt-off',                kind: 'manual' },
 }
 
 /** Ready-made tiebreak orders offered in the admin UI. */
 export const TIEBREAK_PRESETS = {
   full:      { label: 'Net total, then back 9, last 6, last 3, last hole', steps: ['net_total', 'back9', 'last6', 'last3', 'hole18'] },
   countback: { label: 'Back 9, then last 6, last 3, last hole',             steps: ['back9', 'last6', 'last3', 'hole18'] },
+  putts:     { label: 'Net total, fewest putts, most net pars or better, putt-off', steps: ['net_total', 'putts', 'net_pars', 'putt_off'] },
   manual:    { label: 'No automatic tiebreaker (I will pick the winner)',    steps: [] },
 }
 
@@ -183,22 +192,52 @@ export function normalizeMatchRules(rules) {
 }
 
 /**
- * Decides a match that finished all square, or returns null if it can't be decided.
+ * Decides a match that finished all square.
+ * Returns { winner, by, label, valueA, valueB, unit } (netA/netB also set for net steps),
+ * or { winner: null, needsPuttOff: true } when it stops at a putt-off, or null if nothing decides it.
  * An admin's manual winner always wins; otherwise the tiebreak steps run in order.
  */
-function resolveTiedMatch(holes, playerA, playerB, opts) {
+function resolveTiedMatch(holes, playerA, playerB, opts, ctx = {}) {
   const manualId = opts.overrideWinnerId
   if (manualId && (manualId === playerA.player_id || manualId === playerB.player_id)) {
     return { winner: manualId === playerA.player_id ? 'A' : 'B', by: 'manual', label: 'Admin decision' }
   }
   const played = holes.filter(h => h.status === 'played')
+  const decide = (key, step, a, b, lowerWins) => {
+    if (a === b) return null
+    const aWins = lowerWins ? a < b : a > b
+    const r = { winner: aWins ? 'A' : 'B', by: key, label: step.label, valueA: a, valueB: b, unit: step.unit }
+    if (step.unit === 'net') { r.netA = a; r.netB = b }
+    return r
+  }
   for (const key of opts.tiebreak ?? []) {
     const step = TIEBREAK_STEPS[key]
-    const range = played.filter(h => h.hole >= step.from)
-    if (range.length === 0) continue
-    const a = range.reduce((t, h) => t + h.netA, 0)
-    const b = range.reduce((t, h) => t + h.netB, 0)
-    if (a !== b) return { winner: a < b ? 'A' : 'B', by: key, label: step.label, netA: a, netB: b }
+    if (step.kind === 'manual') return { winner: null, needsPuttOff: true }
+    let result = null
+    if (step.kind === 'netRange') {
+      const range = played.filter(h => h.hole >= step.from)
+      if (range.length === 0) continue
+      result = decide(key, step, range.reduce((t, h) => t + h.netA, 0), range.reduce((t, h) => t + h.netB, 0), true)
+    } else if (step.kind === 'putts') {
+      const sum = scores => {
+        let total = 0
+        for (let h = 1; h <= 18; h++) {
+          const p = scores?.[h]?.putts
+          if (p == null) return null            // putts not tracked for this player: skip the step
+          total += p
+        }
+        return total
+      }
+      const a = sum(ctx.scoresA), b = sum(ctx.scoresB)
+      if (a == null || b == null) continue
+      result = decide(key, step, a, b, true)
+    } else if (step.kind === 'netPars') {
+      const par = ctx.parPerHole
+      if (!par) continue
+      const count = which => played.filter(h => h[which] <= par[h.hole - 1]).length
+      result = decide(key, step, count('netA'), count('netB'), false)
+    }
+    if (result) return result
   }
   return null
 }
@@ -289,10 +328,11 @@ function computePairingResult(playerA, playerB, allScores, course, baselineCH = 
   // All square after 18: resolve by manual decision / tiebreakers when the event requires a winner
   let tiebreak = null
   let needsWinner = false
+  let needsPuttOff = false
   const tiedAfter18 = winner === 'halve'
   if (tiedAfter18 && (opts.requireWinner || opts.overrideWinnerId)) {
-    const decided = resolveTiedMatch(holes, playerA, playerB, opts)
-    if (decided) {
+    const decided = resolveTiedMatch(holes, playerA, playerB, opts, { scoresA, scoresB, parPerHole })
+    if (decided && decided.winner) {
       tiebreak = decided
       winner = decided.winner
       status = `Tiebreak: ${decided.label}`
@@ -300,8 +340,9 @@ function computePairingResult(playerA, playerB, allScores, course, baselineCH = 
       pointsB = winner === 'B' ? 1 : 0
     } else if (opts.requireWinner) {
       needsWinner = true
+      needsPuttOff = !!decided?.needsPuttOff
       winner = null
-      status = 'Tied — winner needed'
+      status = needsPuttOff ? 'Tied — putt-off needed' : 'Tied — winner needed'
       pointsA = 0
       pointsB = 0
     }
@@ -324,6 +365,7 @@ function computePairingResult(playerA, playerB, allScores, course, baselineCH = 
     tiedAfter18,   // finished all square (before any tiebreak)
     tiebreak,      // { winner, by, label, netA?, netB? } when a tie was resolved
     needsWinner,   // tied, a winner is required, and nothing has decided it yet
+    needsPuttOff,  // ...and the tiebreak order ends in a putt-off the admin must record
   }
 }
 

@@ -71,7 +71,7 @@ export default function WagerAdmin() {
     // Scores always loaded — used for live leaderboard during active event too
     const { data: sc } = await supabase
       .from('scores')
-      .select('player_id, hole_number, gross_score')
+      .select('player_id, hole_number, gross_score, putts')
       .eq('event_id', eventId)
     setScores(sc ?? [])
 
