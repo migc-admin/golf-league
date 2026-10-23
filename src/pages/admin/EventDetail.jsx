@@ -2317,7 +2317,13 @@ function MatchPairingsManager({ event, eventId, eventPlayers, allScores = [], co
 
   async function deletePairing(id) {
     const { error } = await supabase.from('match_pairings').delete().eq('id', id)
-    if (error) { toast.error(error.message); return }
+    if (error) {
+      // 23503 = foreign key violation: wagers still reference this match
+      toast.error(error.code === '23503'
+        ? 'This match has bets on it, so it can\'t be removed. Remove or settle its bets on the wager board first.'
+        : error.message)
+      return
+    }
     // Renumber remaining pairings sequentially after delete
     const remaining = pairings.filter(p => p.id !== id)
     await Promise.all(remaining.map((p, i) =>

@@ -46,6 +46,7 @@ export default function WagerAdmin() {
   const [showDeleted, setShowDeleted] = useState(false)
   const [toggling,    setToggling]    = useState(false)
   const [exporting,   setExporting]   = useState(false)
+  const [extraNames,  setExtraNames]  = useState({}) // id -> name, for picked players no longer in the event
 
   async function loadData() {
     const { data: ev } = await supabase
@@ -66,7 +67,8 @@ export default function WagerAdmin() {
       .eq('event_id', eventId)
     setPlayers(eps ?? [])
 
-    setWagers(await fetchWagers(eventId))
+    const wagerRows = await fetchWagers(eventId)
+    setWagers(wagerRows)
 
     // Scores always loaded — used for live leaderboard during active event too
     const { data: sc } = await supabase
@@ -83,6 +85,19 @@ export default function WagerAdmin() {
       .order('match_number')
     setPairings(mp ?? [])
 
+    // A bet or match can point at a player who is no longer in this event (removed, or a
+    // merge that did not finish). Look their names up so the board can still show who was picked.
+    const inField = new Set((eps ?? []).map(e => e.player_id))
+    const missing = new Set()
+    for (const w of wagerRows) for (const id of [w.pick_1st, w.pick_2nd, w.pick_match]) if (id && !inField.has(id)) missing.add(id)
+    for (const m of mp ?? []) for (const id of [m.player_a_id, m.player_b_id]) if (id && !inField.has(id)) missing.add(id)
+    if (missing.size > 0) {
+      const { data: gone } = await supabase.from('players').select('id, first_name, last_name').in('id', [...missing])
+      setExtraNames(Object.fromEntries((gone ?? []).map(p => [p.id, `${p.first_name} ${p.last_name}`])))
+    } else {
+      setExtraNames({})
+    }
+
     setLoading(false)
   }
 
@@ -97,7 +112,7 @@ export default function WagerAdmin() {
   function playerName(pid) {
     if (!pid) return '—'
     const ep = players.find(p => p.player_id === pid)
-    if (!ep) return '—'
+    if (!ep) return extraNames[pid] ? `${extraNames[pid]} (not in event)` : '—'
     return `${ep.player.first_name} ${ep.player.last_name}`
   }
 
@@ -143,6 +158,16 @@ export default function WagerAdmin() {
   if (error) return <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: "'Manrope', sans-serif", color: '#dc2626' }}>{error}</div>
 
   const active  = wagers.filter(w => !w.deleted_at)
+  const inFieldIds = new Set(players.map(p => p.player_id))
+  const orphanPicks = {}
+  for (const w of active) {
+    const pid = w.pick_match ?? w.pick_1st ?? w.pick_2nd
+    if (pid && !inFieldIds.has(pid)) {
+      const o = (orphanPicks[pid] ??= { name: extraNames[pid] ?? 'Unknown player', bets: 0, amount: 0 })
+      o.bets += 1; o.amount += parseFloat(w.amount)
+    }
+  }
+  const orphanMatches = pairings.filter(m => !inFieldIds.has(m.player_a_id) || !inFieldIds.has(m.player_b_id))
   const deleted = wagers.filter(w =>  w.deleted_at)
 
   // Pool math, winners and payouts live in lib/wagerSettlement.js (unit tested).
@@ -325,6 +350,26 @@ export default function WagerAdmin() {
                 {toggling ? '…' : bettingOpen ? 'Close Betting' : 'Reopen Betting'}
               </button>
             )}
+          </div>
+        )}
+
+        {/* Bets or matches pointing at players who are no longer in this event */}
+        {(Object.keys(orphanPicks).length > 0 || orphanMatches.length > 0) && (
+          <div style={{ background: '#fffbeb', border: '1px solid #fcd34d', borderRadius: 14, padding: '14px 16px' }}>
+            <div style={{ fontWeight: 700, fontSize: 13, color: '#92400e', marginBottom: 6 }}>
+              Some bets are on players who are no longer in this event
+            </div>
+            <ul style={{ margin: 0, paddingLeft: 18, fontSize: 12, color: '#78350f', lineHeight: 1.6 }}>
+              {Object.values(orphanPicks).map(o => (
+                <li key={o.name}>{o.name}: {o.bets} bet{o.bets > 1 ? 's' : ''}, {fmt(o.amount)}</li>
+              ))}
+              {orphanMatches.map(m => (
+                <li key={m.id}>Match {m.match_number} includes a player who is not in the event, so it can't be scored</li>
+              ))}
+            </ul>
+            <div style={{ fontSize: 11, color: '#92400e', marginTop: 8 }}>
+              This usually means a player was removed from the event or a player merge did not finish. Their results and payouts can't be calculated until the player is back in the event (or the merge is completed on the Players page).
+            </div>
           </div>
         )}
 

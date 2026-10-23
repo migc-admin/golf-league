@@ -225,28 +225,10 @@ export default function Players() {
   }
 
   async function handleMerge(sourceId, targetId) {
-    // Copy supplemental fields from source → target if target is missing them
-    const { data: source } = await supabase.from('players').select('email, phone, ghin_number').eq('id', sourceId).single()
-    const { data: target } = await supabase.from('players').select('email, phone, ghin_number').eq('id', targetId).single()
-    if (source && target) {
-      const patch = {}
-      if (!target.email      && source.email)       patch.email       = source.email
-      if (!target.phone      && source.phone)       patch.phone       = source.phone
-      if (!target.ghin_number && source.ghin_number) patch.ghin_number = source.ghin_number
-      if (Object.keys(patch).length) {
-        await supabase.from('players').update(patch).eq('id', targetId)
-      }
-    }
-
-    // Reassign all references from source → target, then delete source
-    await Promise.all([
-      supabase.from('event_players').update({ player_id: targetId }).eq('player_id', sourceId),
-      supabase.from('scores').update({ player_id: targetId }).eq('player_id', sourceId),
-      supabase.from('registrations').update({ player_id: targetId }).eq('player_id', sourceId),
-      supabase.from('tgl_team_members').update({ player_id: targetId }).eq('player_id', sourceId),
-      supabase.from('tgl_event_selections').update({ player_id: targetId }).eq('player_id', sourceId),
-    ])
-    const { error } = await supabase.from('players').delete().eq('id', sourceId)
+    // One all-or-nothing database call: repoints every reference to the source player
+    // (entries, scores, bets, match pairings, side games, trips, ...) and then deletes
+    // the source. If anything fails, nothing is changed.
+    const { error } = await supabase.rpc('merge_players', { source_id: sourceId, target_id: targetId })
     if (error) { toast.error('Merge failed: ' + error.message); return }
     toast.success('Players merged successfully')
     setMergeModal(false)
