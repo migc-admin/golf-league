@@ -9,11 +9,13 @@
  *           split 50/50 between the 1st- and 2nd-place groups; each winner gets
  *           their stake back plus a pro-rata share of their group's half of the profit
  *   MATCH — each match is its own two-way pool; winners split it pro rata, a
- *           halved match refunds every stake, no backers on the winner rolls to the club
+ *           halved match refunds every stake, no backers on the winner rolls to the club.
+ *           When the event requires a winner, a tied match is decided by the tiebreakers
+ *           or the admin's manual pick (and stays Pending until one of them decides it).
  */
 import { computeMatchPoints } from './engines/matchPoints'
 
-export function computeWagerSettlement({ active, players, scores, pairings, course }) {
+export function computeWagerSettlement({ active, players, scores, pairings, course, matchRules = null }) {
   // Pool math — active only
   const winPool   = active.filter(w => w.pick_1st).reduce((s, w) => s + parseFloat(w.amount), 0)
   const placePool = active.filter(w => w.pick_2nd).reduce((s, w) => s + parseFloat(w.amount), 0)
@@ -161,7 +163,7 @@ export function computeWagerSettlement({ active, players, scores, pairings, cour
   // the winner, the pool rolls to the club (same rule as WIN).
   const matchResultByKey = {}
   if (pairings.length > 0 && course) {
-    const mr = computeMatchPoints(players, scores, course, pairings)
+    const mr = computeMatchPoints(players, scores, course, pairings, matchRules)
     for (const r of mr.pairings) matchResultByKey[`${r.playerA.player_id}|${r.playerB.player_id}`] = r
   }
   const matchCards = pairings.map(m => {

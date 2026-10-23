@@ -1693,7 +1693,7 @@ function buildResultsCard({ event, eventPlayers, allScores, course, sideGames, o
   const eventFormats = event.formats ?? []
   const hasMatchPoints   = eventFormats.includes('match_points') || eventFormats.includes('ryder_cup')
   const hasTeamMatchPlay = eventFormats.includes('team_match_play')
-  const matchData     = hasMatchPoints   ? computeMatchPoints(nonGuests, allScores, course, matchPairings) : null
+  const matchData     = hasMatchPoints   ? computeMatchPoints(nonGuests, allScores, course, matchPairings, event.match_rules) : null
   const teamMatchData = hasTeamMatchPlay ? computeTeamMatchPoints(nonGuests, allScores, course, event.team_match_config ?? null) : null
 
   // Skins

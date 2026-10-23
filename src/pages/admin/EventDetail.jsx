@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback, useRef } from 'react'
+import { useEffect, useState, useCallback, useRef, useMemo } from 'react'
 import {
   DndContext, DragOverlay, PointerSensor, useSensor, useSensors,
   closestCenter, useDroppable,
@@ -25,7 +25,7 @@ import Badge, { FlightBadge, StatusBadge } from '../../components/ui/Badge'
 import ImageUpload from '../../components/ui/ImageUpload'
 import UpgradePrompt from '../../components/ui/UpgradePrompt'
 import PrintAssets from '../../components/ui/PrintAssets'
-import { matchCH } from '../../lib/engines/matchPoints'
+import { matchCH, computeMatchPoints, TIEBREAK_PRESETS } from '../../lib/engines/matchPoints'
 import { computePlayerPayouts } from '../../lib/engines/payoutSummary'
 import EventEmailModal from '../../components/ui/EventEmailModal'
 import { atLimit, getLimit, nextTier, TIER_LABELS } from '../../lib/features'
@@ -327,7 +327,7 @@ export default function EventDetail() {
             (event.formats ?? (event.format ? [event.format] : [])).includes('ryder_cup')) && (
             <div className="border-t border-gray-100 pt-6">
               <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-widest mb-3">Match Play Pairings</h3>
-              <MatchPairingsManager event={event} eventId={event.id} eventPlayers={eventPlayers} />
+              <MatchPairingsManager event={event} eventId={event.id} eventPlayers={eventPlayers} allScores={allScores} course={course} onUpdated={load} />
             </div>
           )}
           {(event.formats ?? (event.format ? [event.format] : [])).includes('team_match_play') && (
@@ -2186,7 +2186,7 @@ function AddPlayerModal({ open, onClose, eventId, available, course, defaultTeeN
 
 // ─── Tab: Groups ──────────────────────────────────────────────────
 // ─── Match Pairings Manager ───────────────────────────────────────
-function MatchPairingsManager({ event, eventId, eventPlayers }) {
+function MatchPairingsManager({ event, eventId, eventPlayers, allScores = [], course = null, onUpdated }) {
   const [pairings,    setPairings]    = useState([])
   const [playerAId,   setPlayerAId]   = useState('')
   const [playerBId,   setPlayerBId]   = useState('')
@@ -2196,6 +2196,26 @@ function MatchPairingsManager({ event, eventId, eventPlayers }) {
   const [teamBName,   setTeamBName]   = useState(event?.ryder_cup_teams?.b ?? '')
   const [savingTeams, setSavingTeams] = useState(false)
   const isRyderCup = (event?.formats ?? []).includes('ryder_cup')
+
+  // Tie rules: when on, a match that is all square after 18 holes must get a winner
+  // (decided by the tiebreakers below, or by an admin's manual pick on that match).
+  const [requireWinner, setRequireWinner] = useState(!!event?.match_rules?.requireWinner)
+  const [tiePreset,     setTiePreset]     = useState(event?.match_rules?.preset ?? 'full')
+  const [savingRules,   setSavingRules]   = useState(false)
+  useEffect(() => {
+    setRequireWinner(!!event?.match_rules?.requireWinner)
+    setTiePreset(event?.match_rules?.preset ?? 'full')
+  }, [event?.match_rules])
+
+  async function saveTieRules() {
+    setSavingRules(true)
+    const rules = requireWinner ? { requireWinner: true, preset: tiePreset } : null
+    const { error } = await supabase.from('events').update({ match_rules: rules }).eq('id', eventId)
+    setSavingRules(false)
+    if (error) { toast.error(error.message); return }
+    toast.success(requireWinner ? 'Tie rules saved: every match will have a winner' : 'Tie rules saved: ties are halved')
+    onUpdated?.()
+  }
 
   // Drag-and-drop reordering of the Current Match Pairings list — dragging a
   // row updates match_number (order) for all pairings, not player selection.
@@ -2228,6 +2248,23 @@ function MatchPairingsManager({ event, eventId, eventPlayers }) {
   }
 
   useEffect(() => { loadPairings() }, [eventId])
+
+  // Live result per pairing, using the event's tie rules (and any manual winners)
+  const resultsById = useMemo(() => {
+    if (!course || pairings.length === 0 || allScores.length === 0) return {}
+    const res = computeMatchPoints(eventPlayers, allScores, course, pairings, event?.match_rules)
+    return Object.fromEntries(res.pairings.map(r => [r.pairingId, r]))
+  }, [eventPlayers, allScores, course, pairings, event?.match_rules])
+  const needWinnerCount = Object.values(resultsById).filter(r => r.needsWinner).length
+
+  async function setManualWinner(pairingId, playerId, note) {
+    const { error } = await supabase.from('match_pairings')
+      .update({ winner_player_id: playerId || null, winner_note: playerId ? (note || null) : null })
+      .eq('id', pairingId)
+    if (error) { toast.error(error.message); return }
+    await loadPairings()
+    toast.success(playerId ? 'Winner saved' : 'Manual winner cleared')
+  }
 
   async function saveTeamNames() {
     setSavingTeams(true)
@@ -2328,6 +2365,43 @@ function MatchPairingsManager({ event, eventId, eventPlayers }) {
         </div>
       )}
 
+      {/* Tie rules */}
+      <div className="bg-white rounded-xl border border-gray-200 p-4 space-y-3">
+        <div>
+          <h3 className="text-sm font-semibold text-gray-800">Tie Rules</h3>
+          <p className="text-xs text-gray-400 mt-0.5">What happens when a match is all square after 18 holes.</p>
+        </div>
+        <label className="flex items-start gap-2 text-sm text-gray-700 cursor-pointer">
+          <input type="checkbox" className="mt-0.5" checked={requireWinner} onChange={e => setRequireWinner(e.target.checked)} />
+          <span>
+            Every match must have a winner
+            <span className="block text-xs text-gray-400">Off: a tied match is halved (½ point each). On: a tie is broken as set below.</span>
+          </span>
+        </label>
+        {requireWinner && (
+          <div className="pl-6 space-y-2">
+            <label className="block text-xs font-medium text-gray-600">Tiebreaker</label>
+            <select className="input w-full" value={tiePreset} onChange={e => setTiePreset(e.target.value)}>
+              {Object.entries(TIEBREAK_PRESETS).map(([key, p]) => (
+                <option key={key} value={key}>{p.label}</option>
+              ))}
+            </select>
+            <p className="text-xs text-gray-400">
+              Compares each player's net strokes (after match handicap strokes) over the holes shown; the lower total wins, and the next step is used if still level.
+              You can always pick a winner by hand on any tied match below, which overrides the tiebreaker.
+            </p>
+          </div>
+        )}
+        <div className="flex items-center gap-3">
+          <Button size="sm" onClick={saveTieRules} loading={savingRules}>Save Tie Rules</Button>
+          {needWinnerCount > 0 && (
+            <span className="text-xs font-semibold text-amber-700 bg-amber-50 border border-amber-200 rounded-full px-2.5 py-1">
+              {needWinnerCount} match{needWinnerCount > 1 ? 'es' : ''} need{needWinnerCount > 1 ? '' : 's'} a winner
+            </span>
+          )}
+        </div>
+      </div>
+
       {/* Current pairings — drag to reorder match number */}
       <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
         <div className="px-4 py-3 bg-gray-50 border-b border-gray-100 flex items-center justify-between">
@@ -2350,7 +2424,7 @@ function MatchPairingsManager({ event, eventId, eventPlayers }) {
                 {pairings.map(p => {
                   const { relA, relB } = relativeStrokes(p.player_a_id, p.player_b_id)
                   return (
-                    <SortablePairingRow key={p.id} pairing={p} relA={relA} relB={relB} onRemove={() => deletePairing(p.id)} />
+                    <SortablePairingRow key={p.id} pairing={p} relA={relA} relB={relB} result={resultsById[p.id]} onSetWinner={setManualWinner} onRemove={() => deletePairing(p.id)} />
                   )
                 })}
               </div>
@@ -2442,20 +2516,67 @@ function PairingRowLabel({ pairing: p, relA, relB }) {
   )
 }
 
-function SortablePairingRow({ pairing, relA, relB, onRemove }) {
+function SortablePairingRow({ pairing, relA, relB, result, onSetWinner, onRemove }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: pairing.id })
+  const [note, setNote] = useState(pairing.winner_note ?? '')
+  useEffect(() => { setNote(pairing.winner_note ?? '') }, [pairing.winner_note])
   const style = {
     transform: CSS.Transform.toString(transform),
     transition,
     opacity: isDragging ? 0.4 : 1,
   }
+  const nameA = `${pairing.playerA?.first_name ?? ''} ${pairing.playerA?.last_name ?? ''}`.trim()
+  const nameB = `${pairing.playerB?.first_name ?? ''} ${pairing.playerB?.last_name ?? ''}`.trim()
+  const tied = result?.tiedAfter18
+  const tb = result?.tiebreak
+  const winnerName = result?.winner === 'A' ? nameA : result?.winner === 'B' ? nameB : null
   return (
-    <div ref={setNodeRef} style={style} className="flex items-center justify-between px-4 py-3 bg-white">
-      <div className="flex items-center gap-3 min-w-0">
-        <span {...attributes} {...listeners} className="cursor-grab text-gray-300 hover:text-gray-500 select-none shrink-0" title="Drag to reorder">⠿</span>
-        <PairingRowLabel pairing={pairing} relA={relA} relB={relB} />
+    <div ref={setNodeRef} style={style} className="px-4 py-3 bg-white">
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-3 min-w-0">
+          <span {...attributes} {...listeners} className="cursor-grab text-gray-300 hover:text-gray-500 select-none shrink-0" title="Drag to reorder">⠿</span>
+          <PairingRowLabel pairing={pairing} relA={relA} relB={relB} />
+        </div>
+        <Button size="sm" variant="danger" onClick={onRemove}>Remove</Button>
       </div>
-      <Button size="sm" variant="danger" onClick={onRemove}>Remove</Button>
+
+      {tied && (
+        <div className="mt-2 ml-7 rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 space-y-2">
+          <div className="text-xs">
+            {result.needsWinner && <span className="font-semibold text-amber-700">All square after 18. A winner is needed. Pick one below.</span>}
+            {!result.needsWinner && tb && tb.by === 'manual' && (
+              <span className="font-semibold text-green-700">Winner: {winnerName} (decided by admin)</span>
+            )}
+            {!result.needsWinner && tb && tb.by !== 'manual' && (
+              <span className="font-semibold text-green-700">
+                Winner: {winnerName} on tiebreak ({tb.label}: net {result.winner === 'A' ? tb.netA : tb.netB} vs {result.winner === 'A' ? tb.netB : tb.netA})
+              </span>
+            )}
+            {!result.needsWinner && !tb && <span className="font-semibold text-gray-600">All square after 18. Halved (½ point each).</span>}
+          </div>
+          <div className="flex flex-wrap items-center gap-2">
+            <label className="text-xs text-gray-500">Winner</label>
+            <select
+              className="input text-xs"
+              value={pairing.winner_player_id ?? ''}
+              onChange={e => onSetWinner(pairing.id, e.target.value, note)}
+            >
+              <option value="">Use tiebreaker rules</option>
+              <option value={pairing.player_a_id}>{nameA}</option>
+              <option value={pairing.player_b_id}>{nameB}</option>
+            </select>
+            {pairing.winner_player_id && (
+              <input
+                className="input text-xs flex-1 min-w-[160px]"
+                placeholder="Reason (optional)"
+                value={note}
+                onChange={e => setNote(e.target.value)}
+                onBlur={() => note !== (pairing.winner_note ?? '') && onSetWinner(pairing.id, pairing.winner_player_id, note)}
+              />
+            )}
+          </div>
+        </div>
+      )}
     </div>
   )
 }

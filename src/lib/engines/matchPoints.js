@@ -151,6 +151,58 @@ export function computeMatchStrokeMap(eventPlayers, formats = [], teamMatchConfi
   return map
 }
 
+// ─── Tied matches ────────────────────────────────────────────────────────────
+// A match that is all square after 18 holes is normally "halved" (½ point each).
+// Some formats (playoffs, bracket matches) need a winner, so an event can carry
+// match_rules = { requireWinner, preset, tiebreak: [...] } to resolve those ties.
+
+/** Tiebreak steps. Each compares the two players' NET strokes (after the match's
+ *  relative handicap strokes) over a range of holes; lower total wins. */
+export const TIEBREAK_STEPS = {
+  net_total: { label: 'Net total',     from: 1  },
+  back9:     { label: 'Back 9',        from: 10 },
+  last6:     { label: 'Last 6 holes',  from: 13 },
+  last3:     { label: 'Last 3 holes',  from: 16 },
+  hole18:    { label: 'Hole 18',       from: 18 },
+}
+
+/** Ready-made tiebreak orders offered in the admin UI. */
+export const TIEBREAK_PRESETS = {
+  full:      { label: 'Net total, then back 9, last 6, last 3, last hole', steps: ['net_total', 'back9', 'last6', 'last3', 'hole18'] },
+  countback: { label: 'Back 9, then last 6, last 3, last hole',             steps: ['back9', 'last6', 'last3', 'hole18'] },
+  manual:    { label: 'No automatic tiebreaker (I will pick the winner)',    steps: [] },
+}
+
+/** Normalizes event.match_rules into { requireWinner, tiebreak: string[] }. */
+export function normalizeMatchRules(rules) {
+  if (!rules || !rules.requireWinner) return { requireWinner: false, tiebreak: [] }
+  const steps = Array.isArray(rules.tiebreak)
+    ? rules.tiebreak
+    : (TIEBREAK_PRESETS[rules.preset]?.steps ?? TIEBREAK_PRESETS.full.steps)
+  return { requireWinner: true, tiebreak: steps.filter(k => TIEBREAK_STEPS[k]) }
+}
+
+/**
+ * Decides a match that finished all square, or returns null if it can't be decided.
+ * An admin's manual winner always wins; otherwise the tiebreak steps run in order.
+ */
+function resolveTiedMatch(holes, playerA, playerB, opts) {
+  const manualId = opts.overrideWinnerId
+  if (manualId && (manualId === playerA.player_id || manualId === playerB.player_id)) {
+    return { winner: manualId === playerA.player_id ? 'A' : 'B', by: 'manual', label: 'Admin decision' }
+  }
+  const played = holes.filter(h => h.status === 'played')
+  for (const key of opts.tiebreak ?? []) {
+    const step = TIEBREAK_STEPS[key]
+    const range = played.filter(h => h.hole >= step.from)
+    if (range.length === 0) continue
+    const a = range.reduce((t, h) => t + h.netA, 0)
+    const b = range.reduce((t, h) => t + h.netB, 0)
+    if (a !== b) return { winner: a < b ? 'A' : 'B', by: key, label: step.label, netA: a, netB: b }
+  }
+  return null
+}
+
 /**
  * Compute match play result for a single head-to-head pairing.
  * Uses relative handicaps: lower CH player gets 0 strokes, other gets the difference.
@@ -160,8 +212,9 @@ export function computeMatchStrokeMap(eventPlayers, formats = [], teamMatchConfi
  * @param {Array}    allScores
  * @param {Object}   course
  * @param {number}   [baselineCH]  — optional external baseline (for team context); defaults to min of the two
+ * @param {Object}   [opts]        — { requireWinner, tiebreak: string[], overrideWinnerId } for matches that must have a winner
  */
-function computePairingResult(playerA, playerB, allScores, course, baselineCH = null) {
+function computePairingResult(playerA, playerB, allScores, course, baselineCH = null, opts = {}) {
   const { par_per_hole: parPerHole } = course
   const siA = getStrokeIndexForTee(course, playerA.tee)
   const siB = getStrokeIndexForTee(course, playerB.tee)
@@ -226,9 +279,33 @@ function computePairingResult(playerA, playerB, allScores, course, baselineCH = 
     ? 'Not started'
     : matchStatusLabel(upBy, holesPlayed, isClosed && upBy !== 0)
 
-  const winner = isClosed
+  let winner = isClosed
     ? (upBy > 0 ? 'A' : upBy < 0 ? 'B' : 'halve')
     : null
+  let status = matchStatus
+  let pointsA = upBy > 0 ? 1 : upBy === 0 && holesPlayed === 18 ? 0.5 : 0
+  let pointsB = upBy < 0 ? 1 : upBy === 0 && holesPlayed === 18 ? 0.5 : 0
+
+  // All square after 18: resolve by manual decision / tiebreakers when the event requires a winner
+  let tiebreak = null
+  let needsWinner = false
+  const tiedAfter18 = winner === 'halve'
+  if (tiedAfter18 && (opts.requireWinner || opts.overrideWinnerId)) {
+    const decided = resolveTiedMatch(holes, playerA, playerB, opts)
+    if (decided) {
+      tiebreak = decided
+      winner = decided.winner
+      status = `Tiebreak: ${decided.label}`
+      pointsA = winner === 'A' ? 1 : 0
+      pointsB = winner === 'B' ? 1 : 0
+    } else if (opts.requireWinner) {
+      needsWinner = true
+      winner = null
+      status = 'Tied — winner needed'
+      pointsA = 0
+      pointsB = 0
+    }
+  }
 
   return {
     playerA,
@@ -239,18 +316,22 @@ function computePairingResult(playerA, playerB, allScores, course, baselineCH = 
     holesPlayed,
     matchClosed,
     closedAfterHole,
-    matchStatus,
+    matchStatus: status,
     winner,
     holes,
-    pointsA: upBy > 0 ? 1 : upBy === 0 && holesPlayed === 18 ? 0.5 : 0,
-    pointsB: upBy < 0 ? 1 : upBy === 0 && holesPlayed === 18 ? 0.5 : 0,
+    pointsA,
+    pointsB,
+    tiedAfter18,   // finished all square (before any tiebreak)
+    tiebreak,      // { winner, by, label, netA?, netB? } when a tie was resolved
+    needsWinner,   // tied, a winner is required, and nothing has decided it yet
   }
 }
 
 /**
  * Compute individual match play results for an entire event.
  */
-export function computeMatchPoints(eventPlayers, allScores, course, storedPairings = []) {
+export function computeMatchPoints(eventPlayers, allScores, course, storedPairings = [], matchRules = null) {
+  const rules = normalizeMatchRules(matchRules)
   const pairings = []
   const playerPoints = {}
 
@@ -260,7 +341,12 @@ export function computeMatchPoints(eventPlayers, allScores, course, storedPairin
       const playerA = playerMap[pairing.player_a_id]
       const playerB = playerMap[pairing.player_b_id]
       if (!playerA || !playerB) continue
-      const result = computePairingResult(playerA, playerB, allScores, course)
+      const result = computePairingResult(playerA, playerB, allScores, course, null, {
+        requireWinner: rules.requireWinner,
+        tiebreak: rules.tiebreak,
+        overrideWinnerId: pairing.winner_player_id ?? null,
+      })
+      result.pairingId = pairing.id
       result.groupNumber = pairing.match_number
       pairings.push(result)
       playerPoints[playerA.player_id] = (playerPoints[playerA.player_id] ?? 0) + result.pointsA
@@ -276,7 +362,10 @@ export function computeMatchPoints(eventPlayers, allScores, course, storedPairin
     for (const [groupNum, members] of Object.entries(groups)) {
       const pairs = buildPairings(members)
       for (const { playerA, playerB } of pairs) {
-        const result = computePairingResult(playerA, playerB, allScores, course)
+        const result = computePairingResult(playerA, playerB, allScores, course, null, {
+          requireWinner: rules.requireWinner,
+          tiebreak: rules.tiebreak,
+        })
         result.groupNumber = parseInt(groupNum, 10)
         pairings.push(result)
         playerPoints[playerA.player_id] = (playerPoints[playerA.player_id] ?? 0) + result.pointsA

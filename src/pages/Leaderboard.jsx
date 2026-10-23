@@ -202,7 +202,7 @@ export default function Leaderboard() {
   const stablefordGrossData = course ? computeStableford(eventPlayers, allScores, course, true)      : null
   const blindPartnersData = course ? computeBlindPartners(event, eventPlayers, allScores, course)    : null
   const superSkinsResult  = course ? computeSuperSkins(event, eventPlayers, allScores, course)       : null
-  const matchData       = course ? computeMatchPoints(eventPlayers, allScores, course, matchPairings) : null
+  const matchData       = course ? computeMatchPoints(eventPlayers, allScores, course, matchPairings, event?.match_rules) : null
   const teamMatchData   = course ? computeTeamMatchPoints(eventPlayers, allScores, course, event?.team_match_config ?? null) : null
 
   const tglData = (() => {

@@ -146,7 +146,7 @@ export default function WagerAdmin() {
   const deleted = wagers.filter(w =>  w.deleted_at)
 
   // Pool math, winners and payouts live in lib/wagerSettlement.js (unit tested).
-  const settlement = computeWagerSettlement({ active, players, scores, pairings, course: event.course })
+  const settlement = computeWagerSettlement({ active, players, scores, pairings, course: event.course, matchRules: event.match_rules })
   const {
     winPool, placePool, totalPot, winTotals, placeTotals, allPickedIds,
     winResults, placeResults, matchCards, matchPoolTotal,

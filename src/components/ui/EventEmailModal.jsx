@@ -62,7 +62,7 @@ export default function EventEmailModal({
     }
     const payouts = computePlayerPayouts(event, eventPlayers, allScores, course, sideGames)
     const matchResults = hasMatchPlay && course
-      ? computeMatchPoints(eventPlayers, allScores, course, matchPairings).pairings.filter(r => r.holesPlayed > 0)
+      ? computeMatchPoints(eventPlayers, allScores, course, matchPairings, event.match_rules).pairings.filter(r => r.holesPlayed > 0)
       : []
     return buildPostRoundEmail({
       event, payouts, matchResults, leagueName, logoUrl, note,

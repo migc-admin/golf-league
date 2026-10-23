@@ -120,3 +120,48 @@ describe('wagerOutcomes', () => {
     for (const w of active) expect(o[w.id].result).toBe('Pending')
   })
 })
+
+describe('MATCH pools when the event requires a winner', () => {
+  const tiePairing = id => [{ id: 'm1', match_number: 1, player_a_id: 'p1', player_b_id: 'p4', ...(id ? { winner_player_id: id } : {}) }]
+  const betsOn = [
+    bet('x', 10, { match_pairing_id: 'm1', pick_match: 'p1' }),
+    bet('y', 30, { match_pairing_id: 'm1', pick_match: 'p4' }),
+  ]
+  // p1 and p4 finish all square on holes (p1 wins hole 1, p4 wins hole 18); p4 has the lower net total (71 v 72)
+  const tieScores = [
+    ...Array.from({ length: 18 }, (_, i) => ({ player_id: 'p1', hole_number: i + 1, gross_score: i === 0 ? 3 : i === 17 ? 5 : 4 })),
+    ...Array.from({ length: 18 }, (_, i) => ({ player_id: 'p4', hole_number: i + 1, gross_score: i === 0 ? 4 : i === 17 ? 3 : 4 })),
+  ]
+  // dead even on every hole: nothing to break the tie
+  const evenScores = [...flat('p1', 4), ...flat('p4', 4)]
+  const two = [ep('p1'), ep('p4')]
+  const full = { requireWinner: true, preset: 'full' }
+
+  it('refunds a tied match when ties are allowed (default)', () => {
+    const s = settle({ active: betsOn, players: two, scores: tieScores, pairings: tiePairing() })
+    expect(s.matchCards[0].settlement.type).toBe('refund')
+  })
+
+  it('pays the tiebreak winner the whole match pool', () => {
+    const s = settle({ active: betsOn, players: two, scores: tieScores, pairings: tiePairing(), matchRules: full })
+    const card = s.matchCards[0]
+    expect(card.settlement.type).toBe('paid')
+    expect(card.settlement.winnerPid).toBe('p4')
+    expect(card.settlement.bettors.map(b => [b.id, b.payout])).toEqual([['y', 40]])   // $10 + $30 pool to the p4 backer
+  })
+
+  it('keeps bets Pending until a tie that nothing can break gets a manual winner', () => {
+    const undecided = settle({ active: betsOn, players: two, scores: evenScores, pairings: tiePairing(), matchRules: full })
+    expect(undecided.matchCards[0].settlement).toBeNull()
+    expect(wagerOutcomes(undecided, betsOn, 'active')).toMatchObject({ x: { result: 'Pending' }, y: { result: 'Pending' } })
+
+    const decided = settle({ active: betsOn, players: two, scores: evenScores, pairings: tiePairing('p1'), matchRules: full })
+    expect(decided.matchCards[0].settlement.type).toBe('paid')
+    expect(wagerOutcomes(decided, betsOn, 'active')).toMatchObject({ x: { result: 'Won', payout: 40 }, y: { result: 'Lost', payout: 0 } })
+  })
+
+  it("an admin's manual winner overrides the tiebreaker", () => {
+    const s = settle({ active: betsOn, players: two, scores: tieScores, pairings: tiePairing('p1'), matchRules: full })   // tiebreak says p4
+    expect(s.matchCards[0].settlement.winnerPid).toBe('p1')
+  })
+})
