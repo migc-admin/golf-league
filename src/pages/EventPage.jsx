@@ -370,6 +370,34 @@ function SponsorBar({ sponsors }) {
   )
 }
 
+// Local rules: same look as the other overview cards, collapsed until tapped.
+function LocalRulesCard({ text }) {
+  const [open, setOpen] = useState(false)
+  return (
+    <div style={{ background: '#fff', borderRadius: 16, border: '1px solid #e5e7eb', overflow: 'hidden' }}>
+      <button
+        type="button"
+        onClick={() => setOpen(o => !o)}
+        aria-expanded={open}
+        style={{ display: 'flex', width: '100%', alignItems: 'center', justifyContent: 'space-between', padding: '18px 24px', background: 'none', border: 'none', cursor: 'pointer', textAlign: 'left' }}
+      >
+        <span style={{ fontSize: 10, fontWeight: 700, color: '#9ca3af', textTransform: 'uppercase', letterSpacing: '0.08em' }}>Local Rules</span>
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#9ca3af" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"
+          style={{ transform: open ? 'rotate(180deg)' : 'none', transition: 'transform 0.15s' }} aria-hidden="true">
+          <path d="M6 9l6 6 6-6" />
+        </svg>
+      </button>
+      {open && (
+        <div style={{ padding: '0 24px 20px' }}>
+          <p style={{ fontSize: 14, lineHeight: 1.7, color: '#374151', margin: 0 }}
+            dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(markdownToHtml(text), { ALLOWED_TAGS: ['strong', 'em', 'br'], ALLOWED_ATTR: [] }) }}
+          />
+        </div>
+      )}
+    </div>
+  )
+}
+
 // ─── Overview Tab ─────────────────────────────────────────────────────────────
 function OverviewTab({ event, leaderboardUrl, description, courseAddress, mapsUrl, eventId, showBetLink }) {
   const scheduleItems = (event.schedule_items ?? []).filter(s => s.label?.trim())
@@ -479,14 +507,7 @@ function OverviewTab({ event, leaderboardUrl, description, courseAddress, mapsUr
         </div>
       )}
 
-      {event.local_rules?.trim() && (
-        <div style={{ background: '#fffbeb', borderRadius: 16, padding: '20px 24px', border: '1px solid #fcd34d' }}>
-          <div style={{ fontSize: 10, fontWeight: 700, color: '#92400e', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 10 }}>⚠ Local Rules</div>
-          <p style={{ fontSize: 14, lineHeight: 1.7, color: '#78350f', margin: 0 }}
-            dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(markdownToHtml(event.local_rules), { ALLOWED_TAGS: ['strong', 'em', 'br'], ALLOWED_ATTR: [] }) }}
-          />
-        </div>
-      )}
+      {event.local_rules?.trim() && <LocalRulesCard text={event.local_rules} />}
 
       {courseAddress && (
         <div style={{ background: '#fff', borderRadius: 16, padding: '20px 24px', border: '1px solid #e5e7eb' }}>
