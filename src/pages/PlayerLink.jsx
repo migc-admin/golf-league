@@ -22,6 +22,7 @@ import {
 } from '../lib/playerProfile'
 
 const GUEST_KEY = 'golf_guest_session'
+const RECENT_RESULTS_LIMIT = 5   // how many past events the profile lists
 const MIGC_ORG  = import.meta.env.VITE_MIGC_ORG_ID
 const GOLD  = '#C9A84C'
 const GREEN = '#1B4332'
@@ -79,7 +80,7 @@ export default function PlayerLink() {
         setStatus('ready')
 
         // Past results: compute each recent completed event's leaderboard to find their finish
-        const done = recentCompleted(all, 5)
+        const done = recentCompleted(all, RECENT_RESULTS_LIMIT)
         const entries = await Promise.all(done.map(async r => {
           try {
             const [{ data: field }, { data: scores }] = await Promise.all([
@@ -118,7 +119,7 @@ export default function PlayerLink() {
   const name = `${player.first_name ?? ''} ${player.last_name ?? ''}`.trim()
   const today = localToday()
   const current = pickCurrentEvent(rows, today)
-  const completed = recentCompleted(rows, 5)
+  const completed = recentCompleted(rows, RECENT_RESULTS_LIMIT)
   const hc = handicapSummary(current, completed)
 
   const ev = current?.row.event
