@@ -5,6 +5,7 @@
 
 import { useEffect, useState } from 'react'
 import { FORMAT_LABELS, SIDE_GAME_LABELS } from '../lib/eventLabels'
+import { markdownToHtml } from '../lib/simpleMarkdown'
 import { useParams, useSearchParams, Link } from 'react-router-dom'
 import DOMPurify from 'dompurify'
 import { supabase } from '../lib/supabase'
@@ -413,6 +414,15 @@ function OverviewTab({ event, leaderboardUrl, description, courseAddress, mapsUr
           </div>
           <div style={{ color: '#C9A84C', fontWeight: 900, fontSize: 20 }}>→</div>
         </a>
+      )}
+
+      {event.local_rules?.trim() && (
+        <div style={{ background: '#fffbeb', borderRadius: 16, padding: '20px 24px', border: '1px solid #fcd34d' }}>
+          <div style={{ fontSize: 10, fontWeight: 700, color: '#92400e', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 10 }}>⚠ Local Rules</div>
+          <p style={{ fontSize: 14, lineHeight: 1.7, color: '#78350f', margin: 0 }}
+            dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(markdownToHtml(event.local_rules), { ALLOWED_TAGS: ['strong', 'em', 'br'], ALLOWED_ATTR: [] }) }}
+          />
+        </div>
       )}
 
       {description && (

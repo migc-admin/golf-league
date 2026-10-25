@@ -36,6 +36,7 @@ import { useOfflineQueue } from '../hooks/useOfflineQueue'
 import { getStrokesOnHole, getStrokeIndexForTee } from '../lib/engines/scoring'
 import { computeMatchStrokeMap } from '../lib/engines/matchPoints'
 import toast from 'react-hot-toast'
+import LocalRulesNotice from '../components/LocalRulesNotice'
 
 export default function Scorecard() {
   const { orgSlug, leagueSlug, eventSlug } = useParams()
@@ -552,6 +553,13 @@ export default function Scorecard() {
           <div className="px-4 py-2 text-xs text-center font-medium" style={{ background: '#f4f3f0', color: '#86868b' }}>
             View only — you are not in this group
           </div>
+        )}
+        {!isComplete && (
+          <LocalRulesNotice
+            eventId={event.id}
+            text={event.local_rules}
+            today={event.event_date === new Date().toLocaleDateString('en-CA')}
+          />
         )}
 
         {/* Hole navigator — dot chips */}

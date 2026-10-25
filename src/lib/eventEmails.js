@@ -8,6 +8,7 @@
  */
 import { FORMAT_LABELS, SIDE_GAME_LABELS } from './eventLabels'
 import { matchCH } from './engines/matchPoints'
+import { markdownToHtml } from './simpleMarkdown'
 
 const GREEN = '#1B4332'
 const GOLD  = '#C9A84C'
@@ -201,6 +202,9 @@ export function buildPreRoundEmail({ event, eventPlayers = [], matchPairings = [
       ['Format', esc(formats.join(' · '))],
       ['Side games', esc(games.join(' · '))],
     ])}
+    ${event?.local_rules?.trim() ? `
+      ${sectionTitle('Local Rules')}
+      <div style="font-family:${FONT};font-size:14px;line-height:1.5;color:#78350f;background:#fffbeb;border:1px solid #fcd34d;border-radius:6px;padding:10px 12px;margin:0 0 4px;">${markdownToHtml(event.local_rules.trim())}</div>` : ''}
     ${sectionTitle('Groups & Tee Times')}
     ${groupNums.length
       ? `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border:1px solid #e5e7eb;">${groupRows}</table>`

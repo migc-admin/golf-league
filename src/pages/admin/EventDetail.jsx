@@ -766,7 +766,7 @@ function TabOverview({ event, eventPlayers, allScores, sideGames, course, confli
 }
 
 // ─── Description Editor (markdown bold/italic toolbar) ────────────────────────
-function DescriptionEditor({ value, onChange }) {
+function DescriptionEditor({ value, onChange, rows = 5, placeholder = 'Describe the event — format, rules, prizes, anything players should know…' }) {
   const ref = useRef(null)
 
   function wrap(marker) {
@@ -799,8 +799,8 @@ function DescriptionEditor({ value, onChange }) {
       <textarea
         ref={ref}
         className="w-full px-3 py-2 text-sm focus:outline-none bg-white"
-        rows={5}
-        placeholder="Describe the event — format, rules, prizes, anything players should know…"
+        rows={rows}
+        placeholder={placeholder}
         value={value}
         onChange={e => onChange(e.target.value)}
         style={{ resize: 'vertical' }}
@@ -813,6 +813,7 @@ function DescriptionEditor({ value, onChange }) {
 // ─── Public Event Fields (description, spots, sponsors) ───────────────────────
 function EventPublicFields({ event, onUpdated }) {
   const [description, setDescription] = useState(event.description ?? '')
+  const [localRules,  setLocalRules]  = useState(event.local_rules ?? '')
   const [spots,       setSpots]       = useState(event.registration_spots ?? '')
   const [sponsors,    setSponsors]    = useState(event.sponsors ?? [])
   const [saving,      setSaving]      = useState(false)
@@ -822,12 +823,18 @@ function EventPublicFields({ event, onUpdated }) {
 
   async function save() {
     setSaving(true)
-    await supabase.from('events').update({
+    const payload = {
       description:        description.trim() || null,
       registration_spots: spots !== '' ? parseInt(spots) : null,
       sponsors:           sponsors.length > 0 ? sponsors : null,
-    }).eq('id', event.id)
+    }
+    // Only send local_rules when it changed, so saving other fields keeps working
+    // even before the local_rules column has been added to the database.
+    const newRules = localRules.trim() || null
+    if (newRules !== (event.local_rules?.trim() || null)) payload.local_rules = newRules
+    const { error } = await supabase.from('events').update(payload).eq('id', event.id)
     setSaving(false)
+    if (error) { toast.error(error.message); return }
     toast.success('Saved')
     onUpdated()
   }
@@ -864,6 +871,20 @@ function EventPublicFields({ event, onUpdated }) {
       <div>
         <label className="label">Tournament Description</label>
         <DescriptionEditor value={description} onChange={setDescription} />
+      </div>
+
+      {/* Local rules */}
+      <div>
+        <label className="label">Local Rules</label>
+        <DescriptionEditor
+          value={localRules}
+          onChange={setLocalRules}
+          rows={4}
+          placeholder="e.g. Drops from the cart path are free within one club length. Ground under repair is marked with white lines."
+        />
+        <p className="text-xs text-gray-400 mt-1">
+          Players see a warning in the scoring app with a button to read these, plus a Local Rules section on the event page. Leave blank for none.
+        </p>
       </div>
 
       {/* Registration spots */}
