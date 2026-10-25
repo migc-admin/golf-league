@@ -28,7 +28,7 @@ function writeGuestSession(data) {
 }
 function clearGuestSession() { localStorage.removeItem(GUEST_KEY) }
 
-import { useEffect, useState, useCallback, useRef } from 'react'
+import { Fragment, useEffect, useState, useCallback, useRef } from 'react'
 import { useParams, Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../hooks/useAuth'
@@ -431,6 +431,19 @@ export default function Scorecard() {
   const si         = strokeIndex[hole - 1]
   const yd         = course.yardage?.[hole - 1] ?? '—'
   const trackPutts = (event.side_game_options ?? []).includes('track_putts') || (event.side_game_options ?? []).includes('low_putts')
+  // Local rules notice: shown under the first player until the group saves its first hole
+  // (a hole counts as saved once everyone has a score and it has no unsaved edits, so the banner
+  //  doesn't vanish and shift the cards while the last score is still being typed)
+  const noHoleSavedYet = !Array.from({ length: numHoles }, (_, i) => holeSaved(i + 1) && !dirtyHoles.has(i + 1)).some(Boolean)
+  const localRulesNotice = !isComplete && noHoleSavedYet ? (
+    <LocalRulesNotice
+      card
+      eventId={event.id}
+      text={event.local_rules}
+      today={event.event_date === new Date().toLocaleDateString('en-CA')}
+    />
+  ) : null
+
   const holesEntered = groupPlayers.length > 0
     ? Math.max(0, ...groupPlayers.map(ep => Object.keys(scores[ep.player_id] ?? {}).length))
     : 0
@@ -554,13 +567,6 @@ export default function Scorecard() {
             View only — you are not in this group
           </div>
         )}
-        {!isComplete && (
-          <LocalRulesNotice
-            eventId={event.id}
-            text={event.local_rules}
-            today={event.event_date === new Date().toLocaleDateString('en-CA')}
-          />
-        )}
 
         {/* Hole navigator — dot chips */}
         <div className="px-4 pb-3 flex gap-1.5 overflow-x-auto scrollbar-hide">
@@ -613,6 +619,7 @@ export default function Scorecard() {
 
       {/* Player score cards */}
       <div className="flex-1 p-4 space-y-3 pb-28">
+
         {groupPlayers.length === 0 && (
           <div className="text-center py-12 text-gray-400">
             <p>No players assigned to your group yet.</p>
@@ -621,19 +628,22 @@ export default function Scorecard() {
         )}
         {isScramble ? (
           groupPlayers.length > 0 && (
-            <ScrambleGroupCard
-              players={groupPlayers}
-              hole={hole}
-              par={par}
-              score={getScore(groupPlayers[0].player_id, hole)}
-              allHoleScores={scores[groupPlayers[0].player_id] ?? {}}
-              onChange={(field, val) => updateScrambleScore(hole, field, val)}
-            />
+            <>
+              <ScrambleGroupCard
+                players={groupPlayers}
+                hole={hole}
+                par={par}
+                score={getScore(groupPlayers[0].player_id, hole)}
+                allHoleScores={scores[groupPlayers[0].player_id] ?? {}}
+                onChange={(field, val) => updateScrambleScore(hole, field, val)}
+              />
+              {localRulesNotice}
+            </>
           )
         ) : (
           groupPlayers.map((ep, idx) => (
+            <Fragment key={ep.player_id}>
             <PlayerScoreCard
-              key={ep.player_id}
               ep={ep}
               hole={hole}
               par={par}
@@ -655,6 +665,8 @@ export default function Scorecard() {
                 }
               }}
             />
+            {idx === 0 && localRulesNotice}
+            </Fragment>
           ))
         )}
       </div>

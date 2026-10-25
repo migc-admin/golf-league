@@ -17,7 +17,7 @@ function writeSeen(eventId, value) {
   try { localStorage.setItem(keyFor(eventId), value) } catch { /* private mode: banner just stays prominent */ }
 }
 
-export default function LocalRulesNotice({ eventId, text, today = false }) {
+export default function LocalRulesNotice({ eventId, text, today = false, card = false }) {
   const rules = (text ?? '').trim()
   const fingerprint = textFingerprint(rules)
   const [seen, setSeen] = useState(() => readSeen(eventId) === fingerprint)
@@ -38,12 +38,15 @@ export default function LocalRulesNotice({ eventId, text, today = false }) {
           type="button"
           onClick={() => setOpen(true)}
           className="w-full px-4 py-1.5 text-xs font-semibold text-left"
-          style={{ background: '#fffbeb', color: '#92400e', borderTop: '1px solid #fde68a' }}
+          style={{ background: '#fffbeb', color: '#92400e', ...(card ? { border: '1px solid #fde68a', borderRadius: 12 } : { borderTop: '1px solid #fde68a' }) }}
         >
           ⚠ Local rules in play · <span style={{ textDecoration: 'underline' }}>View</span>
         </button>
       ) : (
-        <div className="px-4 py-3 flex items-center gap-3" style={{ background: '#fef3c7', borderTop: '1px solid #fcd34d', borderBottom: '1px solid #fcd34d' }}>
+        <div
+          className="px-4 py-3 flex items-center gap-3"
+          style={{ background: '#fef3c7', ...(card ? { border: '1px solid #fcd34d', borderRadius: 16 } : { borderTop: '1px solid #fcd34d', borderBottom: '1px solid #fcd34d' }) }}
+        >
           <span style={{ fontSize: 20 }} aria-hidden="true">⚠️</span>
           <div className="flex-1 min-w-0">
             <div className="text-sm font-bold" style={{ color: '#78350f' }}>
