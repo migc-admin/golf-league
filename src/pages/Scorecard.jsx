@@ -28,7 +28,7 @@ function writeGuestSession(data) {
 }
 function clearGuestSession() { localStorage.removeItem(GUEST_KEY) }
 
-import { Fragment, useEffect, useState, useCallback, useRef } from 'react'
+import { useEffect, useState, useCallback, useRef } from 'react'
 import { useParams, Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../hooks/useAuth'
@@ -431,7 +431,7 @@ export default function Scorecard() {
   const si         = strokeIndex[hole - 1]
   const yd         = course.yardage?.[hole - 1] ?? '—'
   const trackPutts = (event.side_game_options ?? []).includes('track_putts') || (event.side_game_options ?? []).includes('low_putts')
-  // Local rules notice: shown under the first player until the group saves its first hole
+  // Local rules notice: shown above the first player until the group saves its first hole
   // (a hole counts as saved once everyone has a score and it has no unsaved edits, so the banner
   //  doesn't vanish and shift the cards while the last score is still being typed)
   const noHoleSavedYet = !Array.from({ length: numHoles }, (_, i) => holeSaved(i + 1) && !dirtyHoles.has(i + 1)).some(Boolean)
@@ -619,6 +619,7 @@ export default function Scorecard() {
 
       {/* Player score cards */}
       <div className="flex-1 p-4 space-y-3 pb-28">
+        {localRulesNotice}
 
         {groupPlayers.length === 0 && (
           <div className="text-center py-12 text-gray-400">
@@ -628,22 +629,19 @@ export default function Scorecard() {
         )}
         {isScramble ? (
           groupPlayers.length > 0 && (
-            <>
-              <ScrambleGroupCard
-                players={groupPlayers}
-                hole={hole}
-                par={par}
-                score={getScore(groupPlayers[0].player_id, hole)}
-                allHoleScores={scores[groupPlayers[0].player_id] ?? {}}
-                onChange={(field, val) => updateScrambleScore(hole, field, val)}
-              />
-              {localRulesNotice}
-            </>
+            <ScrambleGroupCard
+              players={groupPlayers}
+              hole={hole}
+              par={par}
+              score={getScore(groupPlayers[0].player_id, hole)}
+              allHoleScores={scores[groupPlayers[0].player_id] ?? {}}
+              onChange={(field, val) => updateScrambleScore(hole, field, val)}
+            />
           )
         ) : (
           groupPlayers.map((ep, idx) => (
-            <Fragment key={ep.player_id}>
             <PlayerScoreCard
+              key={ep.player_id}
               ep={ep}
               hole={hole}
               par={par}
@@ -665,8 +663,6 @@ export default function Scorecard() {
                 }
               }}
             />
-            {idx === 0 && localRulesNotice}
-            </Fragment>
           ))
         )}
       </div>
