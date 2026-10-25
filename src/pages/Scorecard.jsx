@@ -36,7 +36,7 @@ import { useOfflineQueue } from '../hooks/useOfflineQueue'
 import { getStrokesOnHole, getStrokeIndexForTee } from '../lib/engines/scoring'
 import { computeMatchStrokeMap } from '../lib/engines/matchPoints'
 import toast from 'react-hot-toast'
-import LocalRulesNotice from '../components/LocalRulesNotice'
+import LocalRulesNotice, { LocalRulesLink } from '../components/LocalRulesNotice'
 
 export default function Scorecard() {
   const { orgSlug, leagueSlug, eventSlug } = useParams()
@@ -513,14 +513,14 @@ export default function Scorecard() {
     <div className="min-h-screen flex flex-col" style={{ background: '#fbfaf8' }}>
       {/* Header */}
       <div className="sticky top-0 z-20" style={{ background: '#ffffff', borderBottom: '1px solid #ebe9e4' }}>
-        <div className="px-4 py-3 flex items-center justify-between">
-          <div>
+        <div className="px-4 py-3 flex flex-wrap items-center justify-between gap-y-1">
+          <div className="min-w-0">
             <div className="font-bold text-base text-ink leading-tight">{event.course?.name ?? course.name}</div>
             <div className="text-xs text-ink-muted mt-0.5">
               {event.league?.name} · Event #{event.event_number}
             </div>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1 shrink-0 ml-auto">
             {pendingCount > 0 && (
               <div className="flex items-center gap-1 rounded-full px-2.5 py-1" style={{ background: '#fef9c3' }}>
                 <div className={`w-1.5 h-1.5 rounded-full ${syncing ? 'bg-yellow-400 animate-pulse' : 'bg-yellow-500'}`} />
@@ -536,21 +536,22 @@ export default function Scorecard() {
             {holesEntered > 0 && (
               <button
                 onClick={() => setShowScorecard(true)}
-                className="text-xs font-semibold px-3 py-1.5 rounded-full transition-colors text-ink-muted hover:text-ink hover:bg-surface-high"
+                className="text-xs font-semibold px-2.5 py-1.5 rounded-full transition-colors text-ink-muted hover:text-ink hover:bg-surface-high whitespace-nowrap"
               >
                 {holesEntered >= numHoles ? 'Scorecard' : `Progress (${holesEntered})`}
               </button>
             )}
+            {!isComplete && !noHoleSavedYet && <LocalRulesLink text={event.local_rules} />}
             <Link
               to={`/${orgSlug ?? event.org_slug}/${event.league?.slug}/${event.slug}/leaderboard?eid=${event.id}`}
               state={{ from: 'scorecard', scorecardEventId: event.id }}
-              className="text-xs font-semibold px-3 py-1.5 rounded-full transition-colors text-ink-muted hover:text-ink hover:bg-surface-high"
+              className="text-xs font-semibold px-2.5 py-1.5 rounded-full transition-colors text-ink-muted hover:text-ink hover:bg-surface-high whitespace-nowrap"
             >
               Leaderboard
             </Link>
             {homeLink && <Link to={homeLink} className="text-xs text-ink-muted hover:text-ink px-2">⛳</Link>}
             {user && (
-              <button onClick={handleSignOut} className="text-xs font-semibold px-3 py-1.5 rounded-full transition-colors text-ink-muted hover:text-ink hover:bg-surface-high">
+              <button onClick={handleSignOut} className="text-xs font-semibold px-2.5 py-1.5 rounded-full transition-colors text-ink-muted hover:text-ink hover:bg-surface-high whitespace-nowrap">
                 Sign out
               </button>
             )}
