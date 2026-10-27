@@ -81,14 +81,14 @@ export default function Leagues() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="text-2xl font-bold text-ink" style={{ letterSpacing: '-0.03em' }}>Leagues</h1>
           <p className="text-sm text-ink-muted mt-0.5">Manage your leagues and events</p>
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center gap-3">
           {atLimit(orgTier, 'leagues', leagues.length) && (
-            <span className="text-xs font-medium px-2.5 py-1 rounded-full" style={{ background: '#fef9c3', color: '#854d0e' }}>
+            <span className="text-xs font-medium px-2.5 py-1 rounded-full bg-status-upcoming-bg text-status-upcoming-text">
               {leagues.length} / {getLimit(orgTier, 'leagues')} leagues — {TIER_LABELS[nextTier(orgTier)]} plan required for additional leagues
             </span>
           )}
@@ -101,7 +101,7 @@ export default function Leagues() {
 
       {loading ? (
         <div className="space-y-3 animate-pulse">
-          {[0,1,2].map(i => <div key={i} className="h-16 rounded-xl" style={{ background: '#eceae5' }} />)}
+          {[0,1,2].map(i => <div key={i} className="h-16 rounded-sm bg-surface-high" />)}
         </div>
       ) : leagues.length === 0 ? (
         <Card className="text-center py-16">
@@ -118,8 +118,7 @@ export default function Leagues() {
               onDragEnter={() => handleDragEnter(i)}
               onDragEnd={handleDragEnd}
               onDragOver={e => e.preventDefault()}
-              className="flex items-center gap-3 transition-colors"
-              style={{ borderBottom: i < leagues.length - 1 ? '1px solid #ebe9e4' : 'none' }}
+              className="flex items-center gap-3 transition-colors hover:bg-surface-dim border-b border-surface-border last:border-b-0"
             >
               {/* Drag handle */}
               <div
@@ -137,13 +136,11 @@ export default function Leagues() {
               <button
                 onClick={() => navigate(`/admin/leagues/${league.slug}`)}
                 className="flex-1 flex items-center gap-4 py-4 text-left"
-                onMouseEnter={e => e.currentTarget.parentElement.style.background = '#f4f3f0'}
-                onMouseLeave={e => e.currentTarget.parentElement.style.background = ''}
               >
                 {league.logo_url ? (
-                  <img src={league.logo_url} alt="" className="w-10 h-10 rounded-lg object-cover shrink-0" style={{ border: '1px solid #ebe9e4' }} />
+                  <img src={league.logo_url} alt="" className="w-10 h-10 rounded-sm object-cover shrink-0 border border-surface-border" />
                 ) : (
-                  <div className="w-10 h-10 rounded-lg shrink-0 flex items-center justify-center text-ink-muted text-xs font-bold" style={{ background: '#eceae5' }}>
+                  <div className="w-10 h-10 rounded-sm shrink-0 flex items-center justify-center text-ink-muted text-xs font-bold bg-surface-high">
                     {league.name.slice(0, 2).toUpperCase()}
                   </div>
                 )}
@@ -153,12 +150,14 @@ export default function Leagues() {
                 </div>
                 <span className="text-ink-muted text-sm">→</span>
               </button>
-              <button
+              <Button
+                variant="ghost"
+                size="sm"
+                className="mr-3 shrink-0"
                 onClick={e => { e.stopPropagation(); setEditLeague(league) }}
-                className="pr-4 py-4 text-xs text-ink-muted hover:text-ink transition-colors shrink-0"
               >
                 Edit
-              </button>
+              </Button>
             </div>
           ))}
         </div>

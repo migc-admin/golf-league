@@ -244,13 +244,13 @@ export default function Players() {
 
   return (
     <div className="space-y-5">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Players</h1>
-          <p className="text-sm text-gray-500 mt-0.5">Roster &amp; user account management</p>
+          <h1 className="text-2xl font-bold text-ink" style={{ letterSpacing: '-0.03em' }}>Players</h1>
+          <p className="text-sm text-ink-muted mt-0.5">Roster &amp; user account management</p>
         </div>
         {activeTab === 'Roster' && (
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             <Button variant="secondary" onClick={exportCsv} disabled={filtered.length === 0}>Export CSV</Button>
             <Button onClick={() => { setEditing(null); setModal(true) }}>+ Add Player</Button>
           </div>
@@ -258,7 +258,7 @@ export default function Players() {
       </div>
 
       {/* Tabs */}
-      <div className="border-b border-gray-200">
+      <div className="border-b border-surface-border">
         <nav className="-mb-px flex gap-1">
           {TABS.map(tab => (
             <button
@@ -293,12 +293,12 @@ export default function Players() {
                   onClick={() => setLeagueFilter(chip.key)}
                   className={`text-xs font-medium rounded-full px-3 py-1.5 border transition-colors ${
                     leagueFilter === chip.key
-                      ? 'bg-gray-900 text-white border-gray-900'
-                      : 'bg-white text-gray-600 border-gray-200 hover:border-gray-400'
+                      ? 'bg-ink text-white border-ink'
+                      : 'bg-white text-ink border-surface-border hover:border-surface-outline'
                   }`}
                 >
                   {chip.label}
-                  <span className={leagueFilter === chip.key ? 'ml-1.5 text-gray-300' : 'ml-1.5 text-gray-400'}>
+                  <span className={leagueFilter === chip.key ? 'ml-1.5 text-white/60' : 'ml-1.5 text-ink-muted'}>
                     {chip.count}
                   </span>
                 </button>
@@ -308,11 +308,11 @@ export default function Players() {
 
           {loading ? (
             <div className="space-y-2 animate-pulse">
-              {[0,1,2,3,4].map(i => <div key={i} className="h-14 bg-gray-200 rounded-xl" />)}
+              {[0,1,2,3,4].map(i => <div key={i} className="h-14 bg-surface-high rounded-sm" />)}
             </div>
           ) : filtered.length === 0 ? (
             <Card className="text-center py-10">
-              <p className="text-gray-500">
+              <p className="text-ink-muted">
                 {search || leagueFilter !== 'all' ? 'No players match these filters.' : 'No players yet.'}
               </p>
               {!search && leagueFilter === 'all' && (
@@ -324,7 +324,7 @@ export default function Players() {
               <div className="overflow-x-auto">
                 <table className="w-full text-sm">
                   <thead>
-                    <tr className="bg-gray-50 border-b border-gray-200 text-left">
+                    <tr className="bg-surface-container border-b border-surface-border text-left">
                       {[
                         { key: 'league',      label: 'League', pad: 'px-5' },
                         { key: 'name',        label: 'Name'   },
@@ -337,11 +337,11 @@ export default function Players() {
                           <button
                             onClick={() => toggleSort(col.key)}
                             className={`inline-flex items-center gap-1 text-xs font-semibold uppercase tracking-wide transition-colors ${
-                              sort.key === col.key ? 'text-gray-900' : 'text-gray-500 hover:text-gray-700'
+                              sort.key === col.key ? 'text-ink' : 'text-ink-muted hover:text-ink'
                             }`}
                           >
                             {col.label}
-                            <span className={sort.key === col.key ? 'text-gray-400' : 'text-gray-300'}>
+                            <span className={sort.key === col.key ? 'text-ink-muted' : 'text-surface-outline'}>
                               {sort.key === col.key ? (sort.dir === 'asc' ? '▲' : '▼') : '↕'}
                             </span>
                           </button>
@@ -350,11 +350,11 @@ export default function Players() {
                       <th className="px-5 py-2.5" />
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-gray-100">
+                  <tbody className="divide-y divide-surface-border">
                     {filtered.map(p => {
                       const summary = leagueSummary(p)
                       return (
-                        <tr key={p.id} className="hover:bg-gray-50">
+                        <tr key={p.id} className="hover:bg-surface-container">
                           <td className="px-5 py-3 align-middle">
                             {isGuestPlayer(p) ? (
                               <span
@@ -366,7 +366,7 @@ export default function Players() {
                                 Guest
                               </span>
                             ) : summary.length === 0 ? (
-                              <span className="text-xs text-gray-400">—</span>
+                              <span className="text-xs text-ink-muted">—</span>
                             ) : (
                               <div className="flex flex-wrap gap-1">
                                 {summary.map(s => (
@@ -380,7 +380,7 @@ export default function Players() {
                                     className={`text-xs font-medium rounded-full px-2 py-0.5 border whitespace-nowrap ${
                                       s.guestOnly
                                         ? 'bg-purple-50 text-purple-700 border-purple-200'
-                                        : 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                                        : 'bg-status-active-bg text-status-active-text border-fairway-200'
                                     }`}
                                   >
                                     {s.name}{s.guestOnly && ' · guest'}
@@ -389,19 +389,19 @@ export default function Players() {
                               </div>
                             )}
                           </td>
-                          <td className="px-4 py-3 font-medium text-gray-900 whitespace-nowrap">
+                          <td className="px-4 py-3 font-medium text-ink whitespace-nowrap">
                             {p.first_name} {p.last_name}
                           </td>
-                          <td className="px-4 py-3 text-gray-600">
-                            {p.email || <span className="text-gray-300">—</span>}
+                          <td className="px-4 py-3 text-ink">
+                            {p.email || <span className="text-surface-outline">—</span>}
                           </td>
-                          <td className="px-4 py-3 text-gray-600 tabular-nums whitespace-nowrap">
-                            {p.phone || <span className="text-gray-300">—</span>}
+                          <td className="px-4 py-3 text-ink tabular-nums whitespace-nowrap">
+                            {p.phone || <span className="text-surface-outline">—</span>}
                           </td>
-                          <td className="px-4 py-3 text-gray-600 tabular-nums">
-                            {p.ghin_number || <span className="text-gray-300">—</span>}
+                          <td className="px-4 py-3 text-ink tabular-nums">
+                            {p.ghin_number || <span className="text-surface-outline">—</span>}
                           </td>
-                          <td className="px-4 py-3 text-gray-600 tabular-nums text-right">
+                          <td className="px-4 py-3 text-ink tabular-nums text-right">
                             {totalEvents(p.id)}
                           </td>
                           <td className="px-5 py-3">
@@ -416,7 +416,7 @@ export default function Players() {
                   </tbody>
                 </table>
               </div>
-              <div className="px-5 py-2 bg-gray-50 text-xs text-gray-400 border-t border-gray-100">
+              <div className="px-5 py-2 bg-surface-container text-xs text-ink-muted border-t border-surface-border">
                 {filtered.length} player{filtered.length !== 1 ? 's' : ''}
                 {leagueFilter !== 'all' && ` · filtered from ${searched.length}`}
               </div>
@@ -429,7 +429,7 @@ export default function Players() {
       {activeTab === 'User Accounts' && (
         <div className="space-y-4">
           <div className="flex items-start justify-between gap-4">
-            <p className="text-sm text-gray-600">
+            <p className="text-sm text-ink">
               Manage login accounts and roles for your organization. <strong>Admin</strong> — full access.{' '}
               <strong>None</strong> — can log in but no access.
             </p>
@@ -441,14 +441,14 @@ export default function Players() {
                 >
                   + Invite Admin
                 </Button>
-                <p className="text-xs text-gray-400 mt-1">
+                <p className="text-xs text-ink-muted mt-1">
                   {profiles.filter(p => p.role === 'admin').length} / {MAX_ADMINS} admins used
                 </p>
               </div>
             )}
             {orgTier !== 'club' && (
               <div className="shrink-0">
-                <span className="text-xs text-gray-400 bg-gray-100 rounded-full px-3 py-1">
+                <span className="text-xs text-ink-muted bg-surface-high rounded-full px-3 py-1">
                   Multiple admins — Club plan only
                 </span>
               </div>
@@ -457,23 +457,23 @@ export default function Players() {
 
           {loading ? (
             <div className="space-y-2 animate-pulse">
-              {[0,1,2].map(i => <div key={i} className="h-14 bg-gray-200 rounded-xl" />)}
+              {[0,1,2].map(i => <div key={i} className="h-14 bg-surface-high rounded-sm" />)}
             </div>
           ) : profiles.length === 0 ? (
             <Card className="text-center py-10">
-              <p className="text-gray-500">No user accounts found.</p>
+              <p className="text-ink-muted">No user accounts found.</p>
             </Card>
           ) : (
             <Card className="overflow-hidden p-0">
-              <div className="divide-y divide-gray-100">
+              <div className="divide-y divide-surface-border">
                 {profiles.map(pr => (
                   <div key={pr.id} className="flex items-center justify-between px-5 py-3.5">
                     <div>
-                      <div className="font-medium text-gray-900 flex items-center gap-2">
+                      <div className="font-medium text-ink flex items-center gap-2">
                         {pr.full_name || '—'}
                         <RoleBadge role={pr.role} />
                       </div>
-                      <div className="text-xs text-gray-400 mt-0.5">{pr.email ?? pr.id.slice(0, 12) + '…'}</div>
+                      <div className="text-xs text-ink-muted mt-0.5">{pr.email ?? pr.id.slice(0, 12) + '…'}</div>
                     </div>
                     <div className="flex items-center gap-2">
                       <select
@@ -488,7 +488,7 @@ export default function Players() {
                   </div>
                 ))}
               </div>
-              <div className="px-5 py-2 bg-gray-50 text-xs text-gray-400 border-t border-gray-100">
+              <div className="px-5 py-2 bg-surface-container text-xs text-ink-muted border-t border-surface-border">
                 {profiles.length} user{profiles.length !== 1 ? 's' : ''}
               </div>
             </Card>
@@ -578,7 +578,7 @@ function CreateLoginModal({ open, onClose, players, orgId, onSaved }) {
   return (
     <Modal open={open} onClose={onClose} title="Create Login">
       <form onSubmit={handleSave} className="space-y-4">
-        <div className="bg-blue-50 border border-blue-200 rounded-lg px-4 py-3 text-xs text-blue-800">
+        <div className="bg-surface-container border border-surface-border rounded-sm px-4 py-3 text-xs text-ink">
           Creates a Supabase login so the user can sign in to the app. Share the email and temporary password with them — they can change it later.
         </div>
         <Input
@@ -662,7 +662,7 @@ function InviteAdminModal({ open, onClose, orgId, adminCount, onSaved }) {
   return (
     <Modal open={open} onClose={onClose} title="Invite Admin">
       <form onSubmit={handleInvite} className="space-y-4">
-        <div className="bg-blue-50 border border-blue-200 rounded-lg px-4 py-3 text-xs text-blue-800">
+        <div className="bg-surface-container border border-surface-border rounded-sm px-4 py-3 text-xs text-ink">
           An email invite will be sent. When they accept, their account will be linked to your organization with Admin access.
         </div>
         <Input
@@ -679,7 +679,7 @@ function InviteAdminModal({ open, onClose, orgId, adminCount, onSaved }) {
           onChange={e => setFullName(e.target.value)}
           placeholder="First Last"
         />
-        <p className="text-xs text-gray-400">
+        <p className="text-xs text-ink-muted">
           {adminCount} of {MAX_ADMINS} admin seats used on your Club plan.
         </p>
         <div className="flex justify-end gap-3 pt-2">
@@ -713,13 +713,13 @@ function MergePlayerModal({ open, onClose, source, players, onMerge }) {
   return (
     <Modal open={open} onClose={onClose} title="Merge Players">
       <form onSubmit={handleSubmit} className="space-y-4">
-        <div className="bg-amber-50 border border-amber-200 rounded-lg px-4 py-3 text-xs text-amber-800">
+        <div className="bg-status-upcoming-bg border border-surface-border rounded-sm px-4 py-3 text-xs text-status-upcoming-text">
           All event history (scores, registrations, Team Play) will be moved from the <strong>duplicate</strong> to the <strong>keep</strong> player. The duplicate will be permanently deleted.
         </div>
 
         <div>
           <label className="label">Duplicate (will be deleted)</label>
-          <div className="input bg-gray-50 text-gray-700">
+          <div className="input bg-surface-container text-ink">
             {source ? `${source.first_name} ${source.last_name}${source.email ? ` — ${source.email}` : ''}` : '—'}
           </div>
         </div>
@@ -789,22 +789,22 @@ function PlayerTagSection({ player }) {
   }
 
   return (
-    <div className="rounded-xl border border-gray-200 p-4 flex items-center gap-4">
-      {qr && <img src={qr} alt="Player tag QR code" className="w-20 h-20 rounded-lg shrink-0" />}
+    <div className="rounded-sm border border-surface-border p-4 flex items-center gap-4">
+      {qr && <img src={qr} alt="Player tag QR code" className="w-20 h-20 rounded-sm shrink-0" />}
       <div className="flex-1 min-w-0">
         <p className="text-sm font-semibold text-ink">Player Tag Link</p>
         <p className="text-xs text-ink-muted mt-0.5">
           Permanent link for this player — print the QR or write it to an NFC tag on their bag.
           Jumps straight to whatever event they're playing today, no access code needed.
         </p>
-        {url && <p className="text-xs text-gray-400 mt-1 truncate">{url}</p>}
-        <div className="flex gap-3 mt-2">
-          <button type="button" onClick={copyLink} disabled={!url} className="text-xs font-semibold text-fairway-700 hover:underline disabled:opacity-50">
+        {url && <p className="text-xs text-ink-muted mt-1 truncate">{url}</p>}
+        <div className="flex flex-wrap gap-2 mt-2">
+          <Button type="button" variant="secondary" size="sm" onClick={copyLink} disabled={!url}>
             Copy link
-          </button>
-          <button type="button" onClick={regenerate} disabled={regenerating} className="text-xs font-semibold text-gray-500 hover:underline disabled:opacity-50">
+          </Button>
+          <Button type="button" variant="ghost" size="sm" onClick={regenerate} loading={regenerating}>
             {regenerating ? 'Regenerating…' : 'Regenerate (old tag stops working)'}
-          </button>
+          </Button>
         </div>
       </div>
     </div>
@@ -887,20 +887,16 @@ function PlayerModal({ open, onClose, editing, orgId, onSaved, onOpenMerge }) {
             <option value="admin">Admin</option>
             <option value="guest">Guest</option>
           </select>
-          <p className="text-xs text-gray-400 mt-1">
+          <p className="text-xs text-ink-muted mt-1">
             Admin role is applied immediately if a matching email account exists.
           </p>
         </div>
         {editing && <PlayerTagSection player={editing} />}
         <div className="flex items-center justify-between pt-2">
           {editing && onOpenMerge ? (
-            <button
-              type="button"
-              onClick={() => onOpenMerge(editing)}
-              className="text-xs text-ink-muted hover:text-ink underline"
-            >
+            <Button type="button" variant="ghost" size="sm" onClick={() => onOpenMerge(editing)}>
               Merge duplicate…
-            </button>
+            </Button>
           ) : <span />}
           <div className="flex gap-3">
             <Button type="button" variant="secondary" onClick={onClose}>Cancel</Button>

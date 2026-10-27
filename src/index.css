@@ -72,6 +72,15 @@
     border: 1px solid #ebe9e4;
   }
 
+  /* ── Admin and leaderboard pages: one 8px corner radius for cards, rows and inputs ── */
+  .admin-shell .card,
+  .admin-shell .row-card,
+  .admin-shell .input,
+  .leaderboard-shell .card,
+  .leaderboard-shell .row-card {
+    border-radius: 0.5rem;
+  }
+
   /* ── Inputs ── */
   .input {
     @apply block w-full px-3 py-2 text-sm transition-colors;

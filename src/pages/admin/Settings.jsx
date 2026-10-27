@@ -5,8 +5,7 @@ import { TIER_LABELS } from '../../lib/features'
 import { resolveConfig, BASE_DEFAULTS, TIER_DEFAULTS, FEATURE_TIERS } from '../../lib/tenantConfig'
 import { slugify, checkSlugAvailable } from '../../lib/orgSlug'
 import toast from 'react-hot-toast'
-
-const GREEN = '#1B4332'
+import Button from '../../components/ui/Button'
 
 const PLAN_FEATURES = [
   { label: 'Leagues',              free: '1',          pro: '3',           club: 'Unlimited' },
@@ -21,9 +20,9 @@ const PLAN_FEATURES = [
 ]
 
 const TIER_BADGE = {
-  free:  { bg: '#f3f4f6', color: '#6b7280' },
-  pro:   { bg: '#eff6ff', color: '#1d4ed8' },
-  club:  { bg: '#f0fdf4', color: GREEN     },
+  free:  'bg-surface-high text-ink-muted',
+  pro:   'bg-status-active-bg text-status-active-text',
+  club:  'bg-fairway-700 text-white',
 }
 
 const TIER_ORDER = ['free', 'pro', 'club']
@@ -33,18 +32,18 @@ function meetsMinTier(orgTier, minTier) {
 
 function Check() {
   return (
-    <svg className="w-4 h-4" style={{ color: GREEN }} fill="none" stroke="currentColor" strokeWidth={2.5} viewBox="0 0 24 24">
+    <svg className="w-4 h-4 text-fairway-700" fill="none" stroke="currentColor" strokeWidth={2.5} viewBox="0 0 24 24">
       <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
     </svg>
   )
 }
 function Dash() {
-  return <span className="text-gray-300 font-bold">—</span>
+  return <span className="text-surface-outline font-bold">—</span>
 }
 
 function LockBadge({ minTier }) {
   return (
-    <span className="ml-2 text-[10px] font-bold uppercase tracking-wide px-1.5 py-0.5 rounded bg-gray-100 text-gray-400">
+    <span className="ml-2 text-[10px] font-bold uppercase tracking-wide px-1.5 py-0.5 rounded bg-surface-high text-ink-muted">
       {TIER_LABELS[minTier] ?? minTier} +
     </span>
   )
@@ -52,7 +51,7 @@ function LockBadge({ minTier }) {
 
 function SectionCard({ title, children }) {
   return (
-    <section className="bg-white rounded-2xl border border-gray-200 divide-y divide-gray-100">
+    <section className="bg-white rounded-sm border border-surface-border divide-y divide-surface-border">
       <div className="px-6 py-4">
         <h2 className="text-sm font-bold text-ink">{title}</h2>
       </div>
@@ -65,20 +64,19 @@ function ToggleRow({ label, description, value, onChange, locked, minTier }) {
   return (
     <div className="flex items-start justify-between gap-4">
       <div className="flex-1 min-w-0">
-        <p className="text-sm font-medium text-gray-800 flex items-center gap-1">
+        <p className="text-sm font-medium text-ink flex items-center gap-1">
           {label}
           {locked && <LockBadge minTier={minTier} />}
         </p>
-        {description && <p className="text-xs text-gray-500 mt-0.5">{description}</p>}
+        {description && <p className="text-xs text-ink-muted mt-0.5">{description}</p>}
       </div>
       <button
         type="button"
         onClick={() => !locked && onChange(!value)}
         disabled={locked}
         className={`relative flex-shrink-0 w-10 h-6 rounded-full transition-colors duration-200 focus:outline-none ${
-          locked ? 'opacity-40 cursor-not-allowed' : 'cursor-pointer'
-        }`}
-        style={{ background: value && !locked ? GREEN : '#d1d5db' }}
+          value && !locked ? 'bg-fairway-700' : 'bg-surface-highest'
+        } ${locked ? 'opacity-40 cursor-not-allowed' : 'cursor-pointer'}`}
       >
         <span
           className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform duration-200 ${
@@ -94,17 +92,17 @@ function SelectRow({ label, description, value, onChange, options, locked, minTi
   return (
     <div className="flex items-start justify-between gap-4">
       <div className="flex-1 min-w-0">
-        <p className="text-sm font-medium text-gray-800 flex items-center gap-1">
+        <p className="text-sm font-medium text-ink flex items-center gap-1">
           {label}
           {locked && <LockBadge minTier={minTier} />}
         </p>
-        {description && <p className="text-xs text-gray-500 mt-0.5">{description}</p>}
+        {description && <p className="text-xs text-ink-muted mt-0.5">{description}</p>}
       </div>
       <select
         value={value}
         onChange={e => !locked && onChange(e.target.value)}
         disabled={locked}
-        className="text-sm border border-gray-200 rounded-lg px-3 py-1.5 bg-white text-gray-800 disabled:opacity-40 disabled:cursor-not-allowed"
+        className="text-sm border border-surface-border rounded-sm px-3 py-1.5 bg-white text-ink disabled:opacity-40 disabled:cursor-not-allowed"
       >
         {options.map(o => (
           <option key={o.value} value={o.value}>{o.label}</option>
@@ -118,11 +116,11 @@ function NumberRow({ label, description, value, onChange, min, max, locked, minT
   return (
     <div className="flex items-start justify-between gap-4">
       <div className="flex-1 min-w-0">
-        <p className="text-sm font-medium text-gray-800 flex items-center gap-1">
+        <p className="text-sm font-medium text-ink flex items-center gap-1">
           {label}
           {locked && <LockBadge minTier={minTier} />}
         </p>
-        {description && <p className="text-xs text-gray-500 mt-0.5">{description}</p>}
+        {description && <p className="text-xs text-ink-muted mt-0.5">{description}</p>}
       </div>
       <input
         type="number"
@@ -131,7 +129,7 @@ function NumberRow({ label, description, value, onChange, min, max, locked, minT
         max={max}
         onChange={e => !locked && onChange(Number(e.target.value))}
         disabled={locked}
-        className="w-20 text-sm text-right border border-gray-200 rounded-lg px-3 py-1.5 bg-white text-gray-800 disabled:opacity-40 disabled:cursor-not-allowed"
+        className="w-20 text-sm text-right border border-surface-border rounded-sm px-3 py-1.5 bg-white text-ink disabled:opacity-40 disabled:cursor-not-allowed"
       />
     </div>
   )
@@ -141,11 +139,11 @@ function ColorRow({ label, description, value, onChange, locked, minTier }) {
   return (
     <div className="flex items-start justify-between gap-4">
       <div className="flex-1 min-w-0">
-        <p className="text-sm font-medium text-gray-800 flex items-center gap-1">
+        <p className="text-sm font-medium text-ink flex items-center gap-1">
           {label}
           {locked && <LockBadge minTier={minTier} />}
         </p>
-        {description && <p className="text-xs text-gray-500 mt-0.5">{description}</p>}
+        {description && <p className="text-xs text-ink-muted mt-0.5">{description}</p>}
       </div>
       <div className="flex items-center gap-2">
         <input
@@ -153,9 +151,9 @@ function ColorRow({ label, description, value, onChange, locked, minTier }) {
           value={value}
           onChange={e => !locked && onChange(e.target.value)}
           disabled={locked}
-          className="w-8 h-8 rounded cursor-pointer border border-gray-200 disabled:opacity-40 disabled:cursor-not-allowed"
+          className="w-8 h-8 rounded cursor-pointer border border-surface-border disabled:opacity-40 disabled:cursor-not-allowed"
         />
-        <span className="text-xs text-gray-400 font-mono">{value}</span>
+        <span className="text-xs text-ink-muted font-mono">{value}</span>
       </div>
     </div>
   )
@@ -336,8 +334,8 @@ export default function Settings() {
     }
   }
 
-  if (loading) return <div className="text-sm text-gray-400 py-8">Loading…</div>
-  if (!org)    return <div className="text-sm text-gray-400 py-8">No organization found.</div>
+  if (loading) return <div className="text-sm text-ink-muted py-8">Loading…</div>
+  if (!org)    return <div className="text-sm text-ink-muted py-8">No organization found.</div>
 
   const tier      = (isPrivileged || org.tier === 'club') ? 'club' : (org.tier ?? 'free')
   const tierLabel = TIER_LABELS[tier] ?? tier
@@ -349,10 +347,10 @@ export default function Settings() {
 
   return (
     <div className="max-w-2xl space-y-6">
-      <h1 className="text-xl font-bold text-ink">Settings</h1>
+      <h1 className="text-2xl font-bold text-ink" style={{ letterSpacing: '-0.03em' }}>Settings</h1>
 
       {/* ── Organization ── */}
-      <section className="bg-white rounded-2xl border border-gray-200 divide-y divide-gray-100">
+      <section className="bg-white rounded-sm border border-surface-border divide-y divide-surface-border">
         <div className="px-6 py-4">
           <h2 className="text-sm font-bold text-ink">Organization</h2>
         </div>
@@ -369,14 +367,9 @@ export default function Settings() {
               />
             </div>
             <div className="flex justify-end">
-              <button
-                type="submit"
-                disabled={saving || name.trim() === org.name}
-                className="px-5 py-2 rounded-xl text-sm font-semibold text-white transition-opacity disabled:opacity-40 hover:opacity-90"
-                style={{ background: GREEN }}
-              >
+              <Button type="submit" disabled={saving || name.trim() === org.name}>
                 {saving ? 'Saving…' : 'Save changes'}
-              </button>
+              </Button>
             </div>
           </form>
         </div>
@@ -385,7 +378,7 @@ export default function Settings() {
             <div>
               <label className="label">Custom URL</label>
               <div className="flex items-center gap-1.5 flex-wrap text-sm">
-                <span className="text-gray-400">scorifygolf.com/</span>
+                <span className="text-ink-muted">scorifygolf.com/</span>
                 <input
                   type="text"
                   value={slugInput}
@@ -394,24 +387,19 @@ export default function Settings() {
                   required
                 />
               </div>
-              <p className="text-xs text-gray-500 mt-1.5">
+              <p className="text-xs text-ink-muted mt-1.5">
                 Used for your public URL and subdomain (e.g. {slugify(slugInput) || 'your-url'}.scorifygolf.com). Independent of your organization name above.
               </p>
             </div>
             {slugInput.trim() !== org.slug && (
-              <p className="text-xs text-amber-600">
+              <p className="text-xs text-status-upcoming-text">
                 ⚠ Changing this will break any existing public links (standings, leaderboard, etc.) that use the old URL.
               </p>
             )}
             <div className="flex justify-end">
-              <button
-                type="submit"
-                disabled={savingSlug || slugInput.trim() === org.slug}
-                className="px-5 py-2 rounded-xl text-sm font-semibold text-white transition-opacity disabled:opacity-40 hover:opacity-90"
-                style={{ background: GREEN }}
-              >
+              <Button type="submit" disabled={savingSlug || slugInput.trim() === org.slug}>
                 {savingSlug ? 'Saving…' : 'Save URL'}
-              </button>
+              </Button>
             </div>
           </form>
         </div>
@@ -419,25 +407,20 @@ export default function Settings() {
 
       {/* ── League Configuration ── */}
       {configDraft && (
-        <section className="bg-white rounded-2xl border border-gray-200 divide-y divide-gray-100">
+        <section className="bg-white rounded-sm border border-surface-border divide-y divide-surface-border">
           <div className="px-6 py-4 flex items-center justify-between">
             <div>
               <h2 className="text-sm font-bold text-ink">League Configuration</h2>
-              <p className="text-xs text-gray-500 mt-0.5">Customize defaults for all leagues and events in your organization.</p>
+              <p className="text-xs text-ink-muted mt-0.5">Customize defaults for all leagues and events in your organization.</p>
             </div>
-            <button
-              onClick={handleSaveConfig}
-              disabled={savingConfig}
-              className="px-4 py-2 rounded-xl text-sm font-semibold text-white transition-opacity disabled:opacity-40 hover:opacity-90"
-              style={{ background: GREEN }}
-            >
+            <Button onClick={handleSaveConfig} disabled={savingConfig}>
               {savingConfig ? 'Saving…' : 'Save'}
-            </button>
+            </Button>
           </div>
 
           {/* Scoring */}
           <div className="px-6 py-5 space-y-4">
-            <p className="text-xs font-bold text-gray-400 uppercase tracking-wide">Scoring</p>
+            <p className="text-xs font-bold text-ink-muted uppercase tracking-wide">Scoring</p>
             <SelectRow
               label="Handicap Method"
               description="How player handicaps are calculated for net scoring."
@@ -477,7 +460,7 @@ export default function Settings() {
 
           {/* Display */}
           <div className="px-6 py-5 space-y-4">
-            <p className="text-xs font-bold text-gray-400 uppercase tracking-wide">Display</p>
+            <p className="text-xs font-bold text-ink-muted uppercase tracking-wide">Display</p>
             <ToggleRow
               label="Public Leaderboard"
               description="Anyone with the event link can view live standings."
@@ -506,7 +489,7 @@ export default function Settings() {
 
           {/* Registration */}
           <div className="px-6 py-5 space-y-4">
-            <p className="text-xs font-bold text-gray-400 uppercase tracking-wide">Registration</p>
+            <p className="text-xs font-bold text-ink-muted uppercase tracking-wide">Registration</p>
             <ToggleRow
               label="Public Registration"
               description="Allow anyone with the event link to register themselves."
@@ -527,7 +510,7 @@ export default function Settings() {
 
           {/* Branding */}
           <div className="px-6 py-5 space-y-4">
-            <p className="text-xs font-bold text-gray-400 uppercase tracking-wide">Branding</p>
+            <p className="text-xs font-bold text-ink-muted uppercase tracking-wide">Branding</p>
             <ColorRow
               label="Primary Color"
               description="Main brand color used across your public pages."
@@ -545,9 +528,9 @@ export default function Settings() {
               minTier="club"
             />
             {!isClub && (
-              <p className="text-xs text-gray-400">
+              <p className="text-xs text-ink-muted">
                 Custom branding is available on the Club plan.{' '}
-                <a href="/upgrade" className="underline" style={{ color: GREEN }}>Upgrade →</a>
+                <a href="/upgrade" className="underline text-fairway-700">Upgrade →</a>
               </p>
             )}
           </div>
@@ -555,47 +538,34 @@ export default function Settings() {
       )}
 
       {/* ── Subscription ── */}
-      <section className="bg-white rounded-2xl border border-gray-200 divide-y divide-gray-100">
+      <section className="bg-white rounded-sm border border-surface-border divide-y divide-surface-border">
         <div className="px-6 py-4">
           <h2 className="text-sm font-bold text-ink">Subscription</h2>
         </div>
         <div className="px-6 py-5 space-y-4">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-xs text-gray-500 mb-1">Current Plan</p>
-              <span
-                className="text-sm font-bold px-3 py-1 rounded-full"
-                style={{ background: badge.bg, color: badge.color }}
-              >
+              <p className="text-xs text-ink-muted mb-1">Current Plan</p>
+              <span className={`text-sm font-bold px-3 py-1 rounded-full ${badge}`}>
                 {tierLabel}
               </span>
             </div>
             {!isPaid && tier !== 'club' && (
-              <a
-                href="/upgrade"
-                className="px-4 py-2 rounded-xl text-sm font-semibold text-white transition-opacity hover:opacity-90"
-                style={{ background: GREEN }}
-              >
-                Upgrade →
-              </a>
+              <Button href="/upgrade">Upgrade →</Button>
             )}
           </div>
 
           {isPaid && (
             <div className="flex items-center justify-between pt-1">
-              <p className="text-xs text-gray-500">
+              <p className="text-xs text-ink-muted">
                 {org.stripe_customer_id
                   ? 'Manage billing, update payment method, or cancel anytime.'
                   : 'No active subscription on file.'}
               </p>
               {org.stripe_customer_id && (
-                <button
-                  onClick={handleManageBilling}
-                  disabled={portalLoading}
-                  className="px-4 py-2 rounded-xl text-sm font-semibold border border-gray-300 text-ink hover:bg-gray-50 transition-colors disabled:opacity-50"
-                >
+                <Button variant="secondary" onClick={handleManageBilling} disabled={portalLoading}>
                   {portalLoading ? 'Loading…' : 'Manage billing'}
-                </button>
+                </Button>
               )}
             </div>
           )}
@@ -603,30 +573,29 @@ export default function Settings() {
       </section>
 
       {/* ── Plan Details ── */}
-      <section className="bg-white rounded-2xl border border-gray-200 divide-y divide-gray-100">
+      <section className="bg-white rounded-sm border border-surface-border divide-y divide-surface-border">
         <div className="px-6 py-4">
           <h2 className="text-sm font-bold text-ink">Plan Details</h2>
         </div>
         <div className="px-6 py-2 overflow-x-auto">
           <table className="w-full text-sm min-w-[340px]">
             <thead>
-              <tr className="text-xs text-gray-400 uppercase tracking-wide">
+              <tr className="text-xs text-ink-muted uppercase tracking-wide">
                 <th className="text-left py-3 font-semibold">Feature</th>
                 <th className="text-center py-3 font-semibold">Starter</th>
                 <th className="text-center py-3 font-semibold">Pro</th>
                 <th className="text-center py-3 font-semibold">Club</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-gray-50">
+            <tbody className="divide-y divide-surface-border">
               {PLAN_FEATURES.map(f => (
                 <tr key={f.label}>
-                  <td className="py-2.5 text-gray-700">{f.label}</td>
+                  <td className="py-2.5 text-ink">{f.label}</td>
                   {['free', 'pro', 'club'].map(t => {
                     const val = f[t]
                     const isCurrentTier = t === tier
                     return (
-                      <td key={t} className={`py-2.5 text-center ${isCurrentTier ? 'font-semibold' : ''}`}
-                        style={isCurrentTier ? { color: GREEN } : {}}>
+                      <td key={t} className={`py-2.5 text-center ${isCurrentTier ? 'font-semibold text-fairway-700' : ''}`}>
                         {val === true  ? <span className="flex justify-center"><Check /></span>
                         : val === false ? <span className="flex justify-center"><Dash /></span>
                         : <span className="text-xs">{val}</span>}
@@ -640,13 +609,7 @@ export default function Settings() {
         </div>
         {tier !== 'club' && (
           <div className="px-6 py-4 flex justify-end">
-            <a
-              href="/upgrade"
-              className="px-4 py-2 rounded-xl text-sm font-semibold text-white transition-opacity hover:opacity-90"
-              style={{ background: GREEN }}
-            >
-              Upgrade to {tier === 'free' ? 'Pro' : 'Club'} →
-            </a>
+            <Button href="/upgrade">Upgrade to {tier === 'free' ? 'Pro' : 'Club'} →</Button>
           </div>
         )}
       </section>

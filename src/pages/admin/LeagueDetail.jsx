@@ -115,8 +115,8 @@ export function LeagueDetailView({ leagueSlug, containerLabel = 'League', roundL
   if (loading) {
     return (
       <div className="space-y-4 animate-pulse">
-        <div className="h-8 w-48 rounded-lg" style={{ background: '#eceae5' }} />
-        <div className="h-40 rounded-xl" style={{ background: '#eceae5' }} />
+        <div className="h-8 w-48 rounded-sm bg-surface-high" />
+        <div className="h-40 rounded-sm bg-surface-high" />
       </div>
     )
   }
@@ -133,7 +133,7 @@ export function LeagueDetailView({ leagueSlug, containerLabel = 'League', roundL
       {/* League header card */}
       <div className="card overflow-hidden p-0">
         {hideHeader ? (
-          <div className="flex items-center justify-between gap-3 flex-wrap px-5 py-4" style={{ borderBottom: '1px solid #ebe9e4' }}>
+          <div className="flex items-center justify-between gap-3 flex-wrap px-5 py-4 border-b border-surface-border">
             <div>
               <h2 className="text-lg font-bold text-ink" style={{ letterSpacing: '-0.02em' }}>{roundLabel}s</h2>
               <p className="text-sm text-ink-muted mt-0.5">
@@ -141,17 +141,17 @@ export function LeagueDetailView({ leagueSlug, containerLabel = 'League', roundL
               </p>
             </div>
             <div className="flex items-center gap-2 flex-wrap justify-end shrink-0">
-              <Link to={`/admin/leagues/${leagueSlug}/new-event`} className="btn btn-primary btn-sm">+ {roundLabel}</Link>
-              <Link to={`/${orgSlug}/${league.slug}/standings`} className="btn btn-secondary btn-sm">Standings</Link>
+              <Button as={Link} size="sm" to={`/admin/leagues/${leagueSlug}/new-event`}>+ {roundLabel}</Button>
+              <Button as={Link} size="sm" variant="secondary" to={`/${orgSlug}/${league.slug}/standings`}>Standings</Button>
               {checkFeature(orgTier, 'tgl') ? (
                 <Button size="sm" variant="secondary" onClick={() => setTglModal(true)}>{league.team_play_label || 'Team Play'}</Button>
               ) : (
-                <span className="text-xs text-ink-muted rounded-full px-3 py-1" style={{ background: '#eceae5' }}>Team Play — Club</span>
+                <span className="text-xs text-ink-muted rounded-full px-3 py-1 bg-surface-high">Team Play — Club</span>
               )}
             </div>
           </div>
         ) : (
-        <div className="flex items-start gap-5 px-5 py-5" style={{ borderBottom: '1px solid #ebe9e4' }}>
+        <div className="flex flex-col gap-4 px-5 py-5 border-b border-surface-border sm:flex-row sm:items-start sm:gap-5">
           {/* Logo upload — Club tier only */}
           <div className="shrink-0">
             {checkFeature(orgTier ?? 'free', 'custom_branding') ? (
@@ -170,12 +170,11 @@ export function LeagueDetailView({ leagueSlug, containerLabel = 'League', roundL
                 label="League Logo"
               />
             ) : (
-              <div className="w-20 h-20 rounded-xl flex flex-col items-center justify-center text-center gap-1"
-                style={{ border: '2px dashed #d1d5db', background: '#f9fafb' }}>
-                <svg width="20" height="20" fill="none" stroke="#9ca3af" strokeWidth="1.5" viewBox="0 0 24 24">
+              <div className="w-20 h-20 rounded-sm flex flex-col items-center justify-center text-center gap-1 border-2 border-dashed border-surface-highest bg-surface-container text-ink-muted">
+                <svg width="20" height="20" fill="none" stroke="currentColor" strokeWidth="1.5" viewBox="0 0 24 24">
                   <rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0110 0v4"/>
                 </svg>
-                <span className="text-xs text-gray-400 leading-tight">Club plan</span>
+                <span className="text-xs text-ink-muted leading-tight">Club plan</span>
               </div>
             )}
           </div>
@@ -190,14 +189,14 @@ export function LeagueDetailView({ leagueSlug, containerLabel = 'League', roundL
           </div>
 
           {/* Actions */}
-          <div className="flex items-center gap-2 flex-wrap justify-end shrink-0">
-            <Link to={`/admin/leagues/${leagueSlug}/new-event`} className="btn btn-primary btn-sm">+ {roundLabel}</Link>
+          <div className="flex items-center gap-2 flex-wrap sm:justify-end sm:shrink-0">
+            <Button as={Link} size="sm" to={`/admin/leagues/${leagueSlug}/new-event`}>+ {roundLabel}</Button>
             <Button size="sm" variant="secondary" onClick={() => setLeagueModal(true)}>Edit League</Button>
-            <Link to={`/${orgSlug}/${league.slug}/standings`} className="btn btn-secondary btn-sm">Standings</Link>
+            <Button as={Link} size="sm" variant="secondary" to={`/${orgSlug}/${league.slug}/standings`}>Standings</Button>
             {checkFeature(orgTier, 'tgl') ? (
               <Button size="sm" variant="secondary" onClick={() => setTglModal(true)}>{league.team_play_label || 'Team Play'}</Button>
             ) : (
-              <span className="text-xs text-ink-muted rounded-full px-3 py-1" style={{ background: '#eceae5' }}>Team Play — Club</span>
+              <span className="text-xs text-ink-muted rounded-full px-3 py-1 bg-surface-high">Team Play — Club</span>
             )}
             <Button size="sm" variant="danger" onClick={() => setDeleteModal(true)}>Delete</Button>
           </div>
@@ -219,8 +218,7 @@ export function LeagueDetailView({ leagueSlug, containerLabel = 'League', roundL
                 onDragEnter={() => handleDragEnter(i)}
                 onDragEnd={handleDragEnd}
                 onDragOver={e => e.preventDefault()}
-                className="flex items-center gap-2 transition-colors"
-                style={{ borderBottom: i < events.length - 1 ? '1px solid #ebe9e4' : 'none' }}
+                className="flex items-center gap-2 transition-colors hover:bg-surface-dim border-b border-surface-border last:border-b-0"
               >
                 {/* Drag handle */}
                 <div className="pl-3 py-4 cursor-grab active:cursor-grabbing text-ink-muted flex-shrink-0" style={{ touchAction: 'none' }}>
@@ -234,8 +232,6 @@ export function LeagueDetailView({ leagueSlug, containerLabel = 'League', roundL
                 <Link
                   to={`/admin/${orgSlug}/${league.slug}/${ev.slug}`}
                   className="flex flex-1 items-center justify-between pr-5 py-3 min-w-0"
-                  onMouseEnter={e => e.currentTarget.closest('div[draggable]').style.background = '#f4f3f0'}
-                  onMouseLeave={e => e.currentTarget.closest('div[draggable]').style.background = ''}
                 >
                   <div className="flex items-center gap-3 min-w-0">
                     <span className="text-sm font-semibold text-ink truncate">
@@ -529,14 +525,14 @@ function TGLTeamsModal({ open, onClose, league }) {
             <Input label="New Team Name" value={newName} onChange={e => setNewName(e.target.value)} placeholder="e.g. Just the Tips" />
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Color</label>
-            <input type="color" value={newColor} onChange={e => setNewColor(e.target.value)} className="h-9 w-14 rounded border border-gray-300 cursor-pointer" />
+            <label className="block text-sm font-medium text-ink mb-1">Color</label>
+            <input type="color" value={newColor} onChange={e => setNewColor(e.target.value)} className="h-9 w-14 rounded-sm border border-surface-highest cursor-pointer" />
           </div>
           <Button onClick={createTeam} disabled={saving || !newName.trim()}>Add Team</Button>
         </div>
 
         {teams.length === 0 && (
-          <p className="text-sm text-gray-400 italic text-center py-4">No teams yet. Add up to 4 teams above.</p>
+          <p className="text-sm text-ink-muted italic text-center py-4">No teams yet. Add up to 4 teams above.</p>
         )}
 
         <div className="space-y-3">
@@ -545,28 +541,28 @@ function TGLTeamsModal({ open, onClose, league }) {
             const teamMembers = members.filter(m => m.team_id === team.id)
             const expanded = rosterTeam === team.id
             return (
-              <div key={team.id} className="border border-gray-200 rounded-xl overflow-hidden">
+              <div key={team.id} className="border border-surface-border rounded-sm overflow-hidden">
                 <div className="flex items-center justify-between px-4 py-3" style={{ borderLeft: `4px solid ${team.color}` }}>
                   <div className="flex items-center gap-2">
                     <span className="w-3 h-3 rounded-full" style={{ backgroundColor: team.color }} />
-                    <span className="font-semibold text-gray-900">{team.name}</span>
-                    <span className="text-xs text-gray-400">({teamMembers.length} members)</span>
+                    <span className="font-semibold text-ink">{team.name}</span>
+                    <span className="text-xs text-ink-muted">({teamMembers.length} members)</span>
                   </div>
                   <div className="flex gap-2">
-                    <button onClick={() => setRosterTeam(expanded ? null : team.id)} className="text-xs text-blue-600 hover:text-blue-800 font-medium">
-                      {expanded ? 'Hide Roster' : 'Edit Roster'}
-                    </button>
-                    <button onClick={() => deleteTeam(team.id)} className="text-xs text-red-500 hover:text-red-700">Delete</button>
+                    <Button variant="ghost" size="sm" onClick={() => setRosterTeam(expanded ? null : team.id)}>
+                      {expanded ? 'Hide roster' : 'Edit roster'}
+                    </Button>
+                    <Button variant="ghost" size="sm" className="!text-red-600 hover:!text-red-700" onClick={() => deleteTeam(team.id)}>Delete</Button>
                   </div>
                 </div>
                 {expanded && (
-                  <div className="px-4 py-3 border-t border-gray-100 bg-gray-50">
-                    <p className="text-xs font-medium text-gray-500 mb-2">Select season roster members:</p>
+                  <div className="px-4 py-3 border-t border-surface-border bg-surface-container">
+                    <p className="text-xs font-medium text-ink-muted mb-2">Select season roster members:</p>
                     <div className="grid grid-cols-2 gap-1 max-h-48 overflow-y-auto">
                       {allPlayers.map(p => (
                         <label key={p.id} className="flex items-center gap-2 py-1 px-2 rounded hover:bg-white cursor-pointer text-sm">
                           <input type="checkbox" checked={mIds.has(p.id)} onChange={() => toggleMember(team.id, p.id)} className="rounded text-green-600 accent-green-600" />
-                          <span className={mIds.has(p.id) ? 'font-medium text-gray-900' : 'text-gray-600'}>
+                          <span className={mIds.has(p.id) ? 'font-medium text-ink' : 'text-ink-muted'}>
                             {p.first_name} {p.last_name}
                           </span>
                         </label>
@@ -655,8 +651,7 @@ function StandingsSettings({ league, onSaved }) {
                 onChange={() => toggle(key)}
               />
               <div
-                className="w-9 h-5 rounded-full transition-colors"
-                style={{ background: local[key] ? '#1B4332' : '#d1d5db' }}
+                className={`w-9 h-5 rounded-full transition-colors ${local[key] ? 'bg-fairway-700' : 'bg-surface-highest'}`}
               />
               <div
                 className="absolute top-0.5 left-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform"

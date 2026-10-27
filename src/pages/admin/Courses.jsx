@@ -175,7 +175,7 @@ export default function Courses() {
 
   return (
     <div className="space-y-5">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="text-2xl font-bold text-ink" style={{ letterSpacing: '-0.03em' }}>Courses</h1>
           <p className="text-sm text-ink-muted mt-0.5">Manage course details, tees, and hole data</p>
@@ -184,22 +184,22 @@ export default function Courses() {
       </div>
 
       {/* Disclaimer */}
-      <div className="flex items-start gap-3 px-4 py-3 rounded-xl text-sm" style={{ background: '#fffbeb', border: '1px solid #fde68a' }}>
-        <svg width="18" height="18" fill="none" stroke="#d97706" strokeWidth="2" viewBox="0 0 24 24" style={{ flexShrink: 0, marginTop: 1 }}>
+      <div className="flex items-start gap-3 px-4 py-3 rounded-sm text-sm bg-status-upcoming-bg border border-surface-border text-status-upcoming-text">
+        <svg width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24" style={{ flexShrink: 0, marginTop: 1 }}>
           <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" />
         </svg>
-        <p style={{ color: '#92400e' }}>
+        <p>
           <strong>Please verify before play:</strong> Course Rating, Slope, and Hole Stroke Index imported from the API may not reflect current official ratings. Always confirm with the course or your local golf association prior to use in handicap calculations.
         </p>
       </div>
 
       {loading ? (
         <div className="space-y-3 animate-pulse">
-          {[0,1,2].map(i => <div key={i} className="h-20 bg-gray-200 rounded-xl" />)}
+          {[0,1,2].map(i => <div key={i} className="h-20 bg-surface-high rounded-sm" />)}
         </div>
       ) : courses.length === 0 ? (
         <Card className="text-center py-12">
-          <p className="text-gray-500 font-medium">No courses yet</p>
+          <p className="text-ink-muted font-medium">No courses yet</p>
           <Button className="mt-4" onClick={() => { setEditing(null); setModal(true) }}>Add Course</Button>
         </Card>
       ) : (
@@ -207,14 +207,14 @@ export default function Courses() {
           {courses.map(c => {
             const tees = c.tees ?? []
             return (
-              <Card key={c.id} className="flex items-center justify-between">
+              <Card key={c.id} className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                 <div className="flex items-center gap-3">
                   {c.photo_url && (
-                    <img src={c.photo_url} alt={c.name} className="w-14 h-14 rounded-lg object-cover shrink-0" />
+                    <img src={c.photo_url} alt={c.name} className="w-14 h-14 rounded-sm object-cover shrink-0" />
                   )}
                   <div>
-                    <div className="font-semibold text-gray-900">{c.name}</div>
-                    <div className="text-sm text-gray-500">
+                    <div className="font-semibold text-ink">{c.name}</div>
+                    <div className="text-sm text-ink-muted">
                       Par {c.par}
                       {tees.length > 0
                         ? ` · ${tees.map(t => `${t.name} (${t.slope}/${t.rating})`).join(' · ')}`
@@ -525,7 +525,7 @@ function CourseModal({ open, onClose, editing, orgId, orgSlug, onSaved }) {
               />
               {searching && (
                 <div className="absolute right-3 top-1/2 -translate-y-1/2">
-                  <svg className="animate-spin h-4 w-4 text-gray-400" fill="none" viewBox="0 0 24 24">
+                  <svg className="animate-spin h-4 w-4 text-ink-muted" fill="none" viewBox="0 0 24 24">
                     <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
                     <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
                   </svg>
@@ -533,16 +533,16 @@ function CourseModal({ open, onClose, editing, orgId, orgSlug, onSaved }) {
               )}
             </div>
             {showResults && searchResults.length > 0 && (
-              <div className="absolute z-50 w-full mt-1 bg-white border border-gray-200 rounded-xl shadow-lg overflow-hidden max-h-64 overflow-y-auto">
+              <div className="absolute z-50 w-full mt-1 bg-white border border-surface-border rounded-sm shadow-lg overflow-hidden max-h-64 overflow-y-auto">
                 {searchResults.map((r, i) => (
                   <button
                     key={i}
                     type="button"
                     onClick={() => importCourse(r)}
-                    className="w-full text-left px-4 py-3 hover:bg-gray-50 transition-colors border-b border-gray-100 last:border-0"
+                    className="w-full text-left px-4 py-3 hover:bg-surface-dim transition-colors border-b border-surface-border last:border-0"
                   >
-                    <div className="text-sm font-semibold text-gray-800">{r.name}</div>
-                    <div className="text-xs text-gray-500 mt-0.5">
+                    <div className="text-sm font-semibold text-ink">{r.name}</div>
+                    <div className="text-xs text-ink-muted mt-0.5">
                       {[r.city, r.state, r.country].filter(Boolean).join(', ')}
                       {r.teeBoxes?.length > 0 && ` · ${r.teeBoxes.length} tee${r.teeBoxes.length !== 1 ? 's' : ''}`}
                       {r.scorecard?.length > 0 && ` · ${r.scorecard.length} holes`}
@@ -552,11 +552,11 @@ function CourseModal({ open, onClose, editing, orgId, orgSlug, onSaved }) {
               </div>
             )}
             {showResults && searchResults.length === 0 && !searching && (
-              <div className="absolute z-50 w-full mt-1 bg-white border border-gray-200 rounded-xl shadow-lg px-4 py-3 text-sm text-gray-500">
+              <div className="absolute z-50 w-full mt-1 bg-white border border-surface-border rounded-sm shadow-lg px-4 py-3 text-sm text-ink-muted">
                 No courses found — try a different name or add manually below.
               </div>
             )}
-            <p className="text-xs text-gray-400 mt-1">
+            <p className="text-xs text-ink-muted mt-1">
               Imports hole-by-hole par, stroke index, yardages, and tee ratings automatically.
             </p>
           </div>
@@ -587,12 +587,12 @@ function CourseModal({ open, onClose, editing, orgId, orgSlug, onSaved }) {
         />
 
         {/* Holes toggle */}
-        <div className="bg-gray-50 rounded-xl px-4 py-3 flex items-center justify-between">
+        <div className="bg-surface-container rounded-sm px-4 py-3 flex items-center justify-between">
           <div>
-            <div className="text-sm font-medium text-gray-800">Number of Holes</div>
-            <div className="text-xs text-gray-400 mt-0.5">Select 9 for an executive or nine-hole course.</div>
+            <div className="text-sm font-medium text-ink">Number of Holes</div>
+            <div className="text-xs text-ink-muted mt-0.5">Select 9 for an executive or nine-hole course.</div>
           </div>
-          <div className="flex rounded-lg border border-gray-300 overflow-hidden text-sm font-semibold">
+          <div className="flex rounded-sm border border-surface-highest overflow-hidden text-sm font-semibold">
             {[18, 9].map(n => (
               <button
                 key={n}
@@ -615,7 +615,7 @@ function CourseModal({ open, onClose, editing, orgId, orgSlug, onSaved }) {
                     return extended
                   })
                 }}
-                className={`px-4 py-1.5 transition-colors ${numHoles === n ? 'bg-fairway-700 text-white' : 'bg-white text-gray-600 hover:bg-gray-100'}`}
+                className={`px-4 py-1.5 transition-colors ${numHoles === n ? 'bg-fairway-700 text-white' : 'bg-white text-ink hover:bg-surface-dim'}`}
               >
                 {n}
               </button>
@@ -624,18 +624,18 @@ function CourseModal({ open, onClose, editing, orgId, orgSlug, onSaved }) {
         </div>
 
         {/* Rated course toggle */}
-        <div className="bg-gray-50 rounded-xl px-4 py-3 flex items-center justify-between">
+        <div className="bg-surface-container rounded-sm px-4 py-3 flex items-center justify-between">
           <div>
-            <div className="text-sm font-medium text-gray-800">Officially Rated Course?</div>
-            <div className="text-xs text-gray-400 mt-0.5">When No, Slope, Rating, and Stroke Index are not required.</div>
+            <div className="text-sm font-medium text-ink">Officially Rated Course?</div>
+            <div className="text-xs text-ink-muted mt-0.5">When No, Slope, Rating, and Stroke Index are not required.</div>
           </div>
-          <div className="flex rounded-lg border border-gray-300 overflow-hidden text-sm font-semibold">
+          <div className="flex rounded-sm border border-surface-highest overflow-hidden text-sm font-semibold">
             {[true, false].map(v => (
               <button
                 key={String(v)}
                 type="button"
                 onClick={() => setIsRated(v)}
-                className={`px-4 py-1.5 transition-colors ${isRated === v ? 'bg-fairway-700 text-white' : 'bg-white text-gray-600 hover:bg-gray-100'}`}
+                className={`px-4 py-1.5 transition-colors ${isRated === v ? 'bg-fairway-700 text-white' : 'bg-white text-ink hover:bg-surface-dim'}`}
               >
                 {v ? 'Yes' : 'No'}
               </button>
@@ -645,18 +645,18 @@ function CourseModal({ open, onClose, editing, orgId, orgSlug, onSaved }) {
 
         {/* Per-tee stroke index toggle */}
         {isRated && (
-          <div className="bg-gray-50 rounded-xl px-4 py-3 flex items-center justify-between">
+          <div className="bg-surface-container rounded-sm px-4 py-3 flex items-center justify-between">
             <div>
-              <div className="text-sm font-medium text-gray-800">Different Stroke Index per Tee?</div>
-              <div className="text-xs text-gray-400 mt-0.5">Enable if this course rates hole handicap allocation differently per tee.</div>
+              <div className="text-sm font-medium text-ink">Different Stroke Index per Tee?</div>
+              <div className="text-xs text-ink-muted mt-0.5">Enable if this course rates hole handicap allocation differently per tee.</div>
             </div>
-            <div className="flex rounded-lg border border-gray-300 overflow-hidden text-sm font-semibold">
+            <div className="flex rounded-sm border border-surface-highest overflow-hidden text-sm font-semibold">
               {[false, true].map(v => (
                 <button
                   key={String(v)}
                   type="button"
                   onClick={() => setPerTeeSI(v)}
-                  className={`px-4 py-1.5 transition-colors ${perTeeSI === v ? 'bg-fairway-700 text-white' : 'bg-white text-gray-600 hover:bg-gray-100'}`}
+                  className={`px-4 py-1.5 transition-colors ${perTeeSI === v ? 'bg-fairway-700 text-white' : 'bg-white text-ink hover:bg-surface-dim'}`}
                 >
                   {v ? 'Yes' : 'No'}
                 </button>
@@ -665,7 +665,7 @@ function CourseModal({ open, onClose, editing, orgId, orgSlug, onSaved }) {
           </div>
         )}
         {isRated && perTeeSI && (
-          <p className="text-xs text-amber-700 -mt-3">
+          <p className="text-xs text-status-upcoming-text -mt-3">
             Each tee's Stroke Index column must independently contain unique values 1–{numHoles}.
           </p>
         )}
@@ -674,30 +674,30 @@ function CourseModal({ open, onClose, editing, orgId, orgSlug, onSaved }) {
         <div>
           <div className="flex items-center justify-between mb-3">
             <div>
-              <h3 className="text-sm font-semibold text-gray-800">Tee Sets</h3>
-              <p className="text-xs text-gray-500 mt-0.5">Flight A typically plays Back tees; Flight B plays Middle or Forward</p>
+              <h3 className="text-sm font-semibold text-ink">Tee Sets</h3>
+              <p className="text-xs text-ink-muted mt-0.5">Flight A typically plays Back tees; Flight B plays Middle or Forward</p>
             </div>
             <Button type="button" variant="secondary" size="sm" onClick={addTee}>+ Add Tee</Button>
           </div>
           <div className="grid sm:grid-cols-3 gap-3">
             {tees.map((t, i) => (
-              <div key={i} className={`border rounded-xl p-3 space-y-2 cursor-pointer transition-all ${activeTeeIdx === i ? 'border-fairway-500 bg-fairway-50' : 'border-gray-200 hover:border-gray-300'}`}
+              <div key={i} className={`border rounded-sm p-3 space-y-2 cursor-pointer transition-all ${activeTeeIdx === i ? 'border-fairway-500 bg-fairway-50' : 'border-surface-border hover:border-surface-outline'}`}
                 onClick={() => setActiveTeeIdx(i)}
               >
                 <div className="flex items-center justify-between">
-                  <span className="text-xs font-bold text-gray-600">Tee {i + 1}</span>
+                  <span className="text-xs font-bold text-ink">Tee {i + 1}</span>
                   {tees.length > 1 && (
-                    <button type="button" onClick={e => { e.stopPropagation(); removeTee(i) }} className="text-red-400 hover:text-red-600 text-xs">✕</button>
+                    <Button type="button" variant="ghost" size="sm" iconOnly label={`Remove tee ${i + 1}`} className="!text-red-600 hover:!text-red-700" onClick={e => { e.stopPropagation(); removeTee(i) }}>✕</Button>
                   )}
                 </div>
                 <div className="grid grid-cols-2 gap-2">
                   <div>
-                    <label className="text-xs text-gray-400">Name</label>
+                    <label className="text-xs text-ink-muted">Name</label>
                     <input value={t.name} onChange={e => updateTee(i, 'name', e.target.value)}
                       className="input py-1 text-xs w-full" placeholder="Back" onClick={e => e.stopPropagation()} />
                   </div>
                   <div>
-                    <label className="text-xs text-gray-400">Color</label>
+                    <label className="text-xs text-ink-muted">Color</label>
                     <select value={t.color} onChange={e => updateTee(i, 'color', e.target.value)}
                       className="input py-1 text-xs w-full bg-white" onClick={e => e.stopPropagation()}>
                       {TEE_COLORS.map(c => <option key={c}>{c}</option>)}
@@ -706,12 +706,12 @@ function CourseModal({ open, onClose, editing, orgId, orgSlug, onSaved }) {
                   {isRated && (
                     <>
                       <div>
-                        <label className="text-xs text-gray-400">Slope</label>
+                        <label className="text-xs text-ink-muted">Slope</label>
                         <input type="number" value={t.slope} onChange={e => updateTee(i, 'slope', e.target.value)}
                           className="input py-1 text-xs w-full" min="55" max="155" onClick={e => e.stopPropagation()} />
                       </div>
                       <div>
-                        <label className="text-xs text-gray-400">Rating</label>
+                        <label className="text-xs text-ink-muted">Rating</label>
                         <input type="number" step="0.1" value={t.rating} onChange={e => updateTee(i, 'rating', e.target.value)}
                           className="input py-1 text-xs w-full" min="60" max="80" onClick={e => e.stopPropagation()} />
                       </div>
@@ -727,7 +727,7 @@ function CourseModal({ open, onClose, editing, orgId, orgSlug, onSaved }) {
         </div>
 
         {/* Summary */}
-        <div className="flex gap-6 text-sm text-gray-600 bg-gray-50 rounded-lg px-4 py-2 flex-wrap">
+        <div className="flex gap-6 text-sm text-ink bg-surface-container rounded-sm px-4 py-2 flex-wrap">
           <span>Total Par: <strong>{totalPar}</strong></span>
           <span>{tees[activeTeeIdx]?.name ?? ''} Tee Yards: <strong>{activeTeeYds.toLocaleString()}</strong></span>
           <span>Par 3s: <strong>{holes.filter(h => h.par == 3).length}</strong></span>
@@ -738,7 +738,7 @@ function CourseModal({ open, onClose, editing, orgId, orgSlug, onSaved }) {
         <div className="overflow-x-auto">
           <table className="w-full text-sm min-w-[500px]">
             <thead>
-              <tr className="text-left text-xs font-semibold text-gray-500 border-b">
+              <tr className="text-left text-xs font-semibold text-ink-muted border-b">
                 <th className="py-2 pr-2 w-8">#</th>
                 <th className="py-2 px-2 w-16">Par</th>
                 {isRated && !perTeeSI && <th className="py-2 px-2 w-16">S.I.</th>}
@@ -747,21 +747,21 @@ function CourseModal({ open, onClose, editing, orgId, orgSlug, onSaved }) {
                     {isRated && perTeeSI && (
                       <th className="py-2 px-2 w-14 text-center">
                         S.I.
-                        <div className="text-xs font-normal mt-0.5 text-gray-400">{t.name}</div>
+                        <div className="text-xs font-normal mt-0.5 text-ink-muted">{t.name}</div>
                       </th>
                     )}
                     <th className={`py-2 px-2 text-center ${activeTeeIdx === i ? 'text-fairway-700 font-bold' : ''}`}>
                       {t.name} Yds
-                      <div className={`text-xs font-normal mt-0.5 ${activeTeeIdx === i ? 'text-fairway-500' : 'text-gray-400'}`}>{t.color}</div>
+                      <div className={`text-xs font-normal mt-0.5 ${activeTeeIdx === i ? 'text-fairway-500' : 'text-ink-muted'}`}>{t.color}</div>
                     </th>
                   </Fragment>
                 ))}
               </tr>
             </thead>
-            <tbody className="divide-y divide-gray-100">
+            <tbody className="divide-y divide-surface-border">
               {holes.map((h, i) => (
-                <tr key={i} className={numHoles === 18 && i === 9 ? 'border-t-2 border-gray-300' : ''}>
-                  <td className="py-1.5 pr-2 font-medium text-gray-500 text-xs">{h.hole}</td>
+                <tr key={i} className={numHoles === 18 && i === 9 ? 'border-t-2 border-surface-highest' : ''}>
+                  <td className="py-1.5 pr-2 font-medium text-ink-muted text-xs">{h.hole}</td>
                   <td className="py-1.5 px-2">
                     <select value={h.par} onChange={e => updateHole(i, 'par', e.target.value)} className="input py-1 text-xs w-14">
                       <option value={3}>3</option>
@@ -795,7 +795,7 @@ function CourseModal({ open, onClose, editing, orgId, orgSlug, onSaved }) {
           </table>
         </div>
 
-        <div className="flex justify-end gap-3 pt-4 border-t border-gray-200">
+        <div className="flex justify-end gap-3 pt-4 border-t border-surface-border">
           <Button type="button" variant="secondary" onClick={onClose}>Cancel</Button>
           <Button type="submit" loading={saving}>{editing ? 'Save Changes' : 'Create Course'}</Button>
         </div>

@@ -1,5 +1,6 @@
 import { useRef, useState } from 'react'
 import { supabase } from '../../lib/supabase'
+import Button from './Button'
 
 /**
  * ImageUpload — click or drag to upload an image to Supabase Storage.
@@ -50,14 +51,14 @@ export default function ImageUpload({ bucket = 'media', path, currentUrl, onUplo
         onClick={() => inputRef.current?.click()}
         onDragOver={e => e.preventDefault()}
         onDrop={e => { e.preventDefault(); handleFile(e.dataTransfer.files[0]) }}
-        className={`relative cursor-pointer overflow-hidden border-2 border-dashed border-gray-300 hover:border-fairway-500 transition-colors bg-gray-50 flex items-center justify-center ${
+        className={`relative cursor-pointer overflow-hidden border-2 border-dashed border-surface-highest hover:border-fairway-500 transition-colors bg-surface-container flex items-center justify-center ${
           isCircle ? 'w-24 h-24 rounded-full' : 'w-full h-32 rounded-xl'
         }`}
       >
         {preview ? (
           <img src={preview} alt="upload preview" className={`w-full h-full object-cover ${isCircle ? 'rounded-full' : ''}`} />
         ) : (
-          <div className="text-center text-gray-400 text-xs px-2">
+          <div className="text-center text-ink-muted text-xs px-2">
             <div className="text-2xl mb-1">📷</div>
             <div>{uploading ? 'Uploading…' : 'Click or drop'}</div>
           </div>
@@ -71,15 +72,16 @@ export default function ImageUpload({ bucket = 'media', path, currentUrl, onUplo
           </div>
         )}
       </div>
-      {label && <span className="text-xs text-gray-500">{label}</span>}
+      {label && <span className="text-xs text-ink-muted">{label}</span>}
       {preview && onRemoved && (
-        <button
-          type="button"
+        <Button
+          variant="ghost"
+          size="sm"
+          className="!text-red-600 hover:!text-red-700"
           onClick={() => { setPreview(null); onRemoved() }}
-          className="text-xs text-red-500 hover:text-red-700 underline"
         >
           Remove image
-        </button>
+        </Button>
       )}
       <input ref={inputRef} type="file" accept="image/*" className="hidden" onChange={e => handleFile(e.target.files[0])} />
     </div>

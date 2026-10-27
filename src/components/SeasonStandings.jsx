@@ -147,12 +147,12 @@ export function useSeasonStandings() {
 export function StatusBadge({ status }) {
   const styles = {
     upcoming: 'bg-blue-100 text-blue-700',
-    active:   'bg-green-100 text-green-700',
-    complete: 'bg-gray-100 text-gray-500',
+    active:   'bg-status-active-bg text-status-active-text',
+    complete: 'bg-surface-high text-ink-muted',
   }
   const labels = { upcoming: 'Upcoming', active: 'Active', complete: 'Complete' }
   return (
-    <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${styles[status] || 'bg-gray-100 text-gray-500'}`}>
+    <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${styles[status] || 'bg-surface-high text-ink-muted'}`}>
       {labels[status] || status}
     </span>
   )
@@ -165,15 +165,15 @@ export function EventCard({ event, leagueSlug, orgSlug, muted = false }) {
     : null
   const course = event.course?.name
   return (
-    <div className={`bg-white border rounded-xl shadow-sm p-5 flex flex-col gap-2 ${muted ? 'opacity-70' : 'hover:shadow-md transition-shadow'}`}>
+    <div className={`bg-white border rounded-sm shadow-sm p-5 flex flex-col gap-2 ${muted ? 'opacity-70' : 'hover:shadow-md transition-shadow'}`}>
       <div className="flex items-center justify-between">
-        <h3 className={`font-bold text-base ${muted ? 'text-gray-500' : ''}`} style={muted ? {} : { color: GREEN }}>
+        <h3 className={`font-bold text-base ${muted ? 'text-ink-muted' : ''}`} style={muted ? {} : { color: GREEN }}>
           {title}
         </h3>
         <StatusBadge status={event.status} />
       </div>
-      {date   && <p className="text-sm text-gray-500">{date}</p>}
-      {course && <p className="text-sm text-gray-400">{course}</p>}
+      {date   && <p className="text-sm text-ink-muted">{date}</p>}
+      {course && <p className="text-sm text-ink-muted">{course}</p>}
       {event.slug && (
         <Link
           to={orgSlug ? `/${orgSlug}/${leagueSlug}/${event.slug}/event` : `/${leagueSlug}/${event.slug}`}
@@ -189,10 +189,10 @@ export function EventCard({ event, leagueSlug, orgSlug, muted = false }) {
 
 export function StatCard({ label, value, sub }) {
   return (
-    <div className="bg-white border rounded-xl p-4 flex flex-col gap-1 shadow-sm">
-      <div className="text-xs font-semibold text-gray-400 uppercase tracking-widest">{label}</div>
+    <div className="bg-white border rounded-sm p-4 flex flex-col gap-1 shadow-sm">
+      <div className="text-xs font-semibold text-ink-muted uppercase tracking-widest">{label}</div>
       <div className="text-lg font-bold text-ink leading-tight">{value ?? '—'}</div>
-      {sub && <div className="text-xs text-gray-400">{sub}</div>}
+      {sub && <div className="text-xs text-ink-muted">{sub}</div>}
     </div>
   )
 }
@@ -203,10 +203,10 @@ export function MoneyList({ standings, events }) {
   const medals = ['🥇', '🥈', '🥉']
 
   return (
-    <div className="bg-white border rounded-xl overflow-hidden shadow-sm">
+    <div className="bg-white border rounded-sm overflow-hidden shadow-sm">
       <table className="w-full text-sm">
         <thead>
-          <tr className="text-left text-xs font-semibold text-gray-400 uppercase tracking-widest" style={{ background: '#f4f3f0', borderBottom: '1px solid #ebe9e4' }}>
+          <tr className="text-left text-xs font-semibold text-ink-muted uppercase tracking-widest" style={{ background: '#f4f3f0', borderBottom: '1px solid #ebe9e4' }}>
             <th className="px-4 py-3">Rank</th>
             <th className="px-4 py-3">Player</th>
             <th className="px-4 py-3 text-center">Events</th>
@@ -233,12 +233,12 @@ export function MoneyList({ standings, events }) {
                   <td className="px-4 py-3 font-semibold text-ink">
                     <span className="flex items-center gap-1.5">
                       {s.player?.first_name} {s.player?.last_name}
-                      <svg className="w-3 h-3 text-gray-400 transition-transform" style={{ transform: isExpanded ? 'rotate(180deg)' : '' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <svg className="w-3 h-3 text-ink-muted transition-transform" style={{ transform: isExpanded ? 'rotate(180deg)' : '' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
                       </svg>
                     </span>
                   </td>
-                  <td className="px-4 py-3 text-center text-gray-400">{s.eventsPlayed}</td>
+                  <td className="px-4 py-3 text-center text-ink-muted">{s.eventsPlayed}</td>
                   <td className="px-4 py-3 text-right font-bold" style={{ color: GREEN }}>${s.totalEarnings.toFixed(2)}</td>
                 </tr>
                 {isExpanded && (
@@ -249,14 +249,14 @@ export function MoneyList({ standings, events }) {
                           .filter(ev => s.itemsByEvent?.[ev.id]?.length)
                           .map(ev => (
                             <div key={ev.id}>
-                              <p className="text-xs font-semibold text-gray-400 mb-1">
+                              <p className="text-xs font-semibold text-ink-muted mb-1">
                                 Event #{ev.event_number}{ev.name ? ` — ${ev.name}` : ''}
                                 {ev.event_date ? ` · ${new Date(ev.event_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}` : ''}
                               </p>
                               <div className="space-y-0.5">
                                 {s.itemsByEvent[ev.id].map((item, j) => (
                                   <div key={j} className="flex items-center justify-between text-xs">
-                                    <span className="text-gray-400">{item.category}</span>
+                                    <span className="text-ink-muted">{item.category}</span>
                                     <span className="font-medium text-ink">${item.amount.toFixed(2)}</span>
                                   </div>
                                 ))}
@@ -283,10 +283,10 @@ export function MoneyList({ standings, events }) {
 // ─── Side Game Table ──────────────────────────────────────────────────────────
 export function SideGameTable({ stats, hasSkins, hasCTP, hasLD }) {
   return (
-    <div className="bg-white border rounded-xl overflow-hidden shadow-sm">
+    <div className="bg-white border rounded-sm overflow-hidden shadow-sm">
       <table className="w-full text-sm">
         <thead>
-          <tr className="text-left text-xs font-semibold text-gray-400 uppercase tracking-widest" style={{ background: '#f4f3f0', borderBottom: '1px solid #ebe9e4' }}>
+          <tr className="text-left text-xs font-semibold text-ink-muted uppercase tracking-widest" style={{ background: '#f4f3f0', borderBottom: '1px solid #ebe9e4' }}>
             <th className="px-4 py-3">Player</th>
             {hasSkins && <th className="px-4 py-3 text-center">Skins Won</th>}
             {hasCTP   && <th className="px-4 py-3 text-center">CTP Wins</th>}

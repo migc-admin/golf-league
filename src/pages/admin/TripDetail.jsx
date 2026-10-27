@@ -50,8 +50,8 @@ export default function TripDetail() {
   if (loading || !trip) {
     return (
       <div className="space-y-4 animate-pulse">
-        <div className="h-8 w-48 rounded-lg" style={{ background: '#eceae5' }} />
-        <div className="h-40 rounded-xl" style={{ background: '#eceae5' }} />
+        <div className="h-8 w-48 rounded-sm bg-surface-high" />
+        <div className="h-40 rounded-sm bg-surface-high" />
       </div>
     )
   }
@@ -65,12 +65,12 @@ export default function TripDetail() {
 
       {/* Trip header card */}
       <div className="card overflow-hidden p-0">
-        <div className="flex items-start gap-5 px-5 py-5" style={{ borderBottom: '1px solid #ebe9e4' }}>
+        <div className="flex flex-col gap-4 px-5 py-5 border-b border-surface-border sm:flex-row sm:items-start sm:gap-5">
           <div className="shrink-0">
             {trip.logo_url ? (
-              <img src={trip.logo_url} alt="" className="w-20 h-20 rounded-xl object-cover" style={{ border: '1px solid #ebe9e4' }} />
+              <img src={trip.logo_url} alt="" className="w-20 h-20 rounded-sm object-cover border border-surface-border" />
             ) : (
-              <div className="w-20 h-20 rounded-xl flex items-center justify-center text-ink-muted text-xl font-bold" style={{ background: '#eceae5' }}>
+              <div className="w-20 h-20 rounded-sm flex items-center justify-center text-ink-muted text-xl font-bold bg-surface-high">
                 {trip.name.slice(0, 2).toUpperCase()}
               </div>
             )}
@@ -84,11 +84,11 @@ export default function TripDetail() {
             {trip.description && <p className="text-sm text-ink-muted mt-2">{trip.description}</p>}
           </div>
 
-          <div className="flex items-center gap-2 flex-wrap justify-end shrink-0">
+          <div className="flex items-center gap-2 flex-wrap sm:justify-end sm:shrink-0">
             {orgSlug && (
-              <a href={`/${orgSlug}/trip/${trip.slug}`} target="_blank" rel="noopener noreferrer" className="btn-secondary btn-sm btn">
-                Trip Page ↗
-              </a>
+              <Button size="sm" variant="secondary" href={`/${orgSlug}/trip/${trip.slug}`} target="_blank">
+                Trip page <span aria-hidden="true">↗</span>
+              </Button>
             )}
             <Button size="sm" variant="secondary" onClick={() => setEditModal(true)}>Edit Trip</Button>
             <Button size="sm" variant="danger" onClick={() => setDeleteModal(true)}>Delete</Button>
@@ -175,7 +175,7 @@ function TripInfoCard({ trip, onEdit }) {
         <InfoSection title="Day-by-Day Schedule">
           <div className="space-y-3">
             {itinerary.map((entry, i) => (
-              <div key={i} className="pl-3" style={{ borderLeft: '2px solid #ebe9e4' }}>
+              <div key={i} className="pl-3 border-l-2 border-surface-border">
                 {formatItineraryDay(entry) && <p className="text-sm font-semibold text-ink">{formatItineraryDay(entry)}</p>}
                 {entry.text && <p className="text-sm text-ink-muted whitespace-pre-wrap">{entry.text}</p>}
               </div>

@@ -261,7 +261,7 @@ export default function Leaderboard() {
       <meta property="og:title" content={pageTitle} />
       <meta name="robots" content="noindex" />
     </Helmet>
-    <div className="min-h-screen" style={{ background: '#fbfaf8' }}>
+    <div className="leaderboard-shell min-h-screen" style={{ background: '#fbfaf8' }}>
       {/* Back nav */}
       <div className="px-4 py-2 flex items-center justify-between" style={{ background: '#fbfaf8' }}>
         <button
@@ -283,7 +283,7 @@ export default function Leaderboard() {
         <div className="max-w-2xl mx-auto px-4 py-3 flex items-center justify-between gap-3">
           {/* Logo */}
           {orgLogo && (
-            <img src={orgLogo} alt={orgName ?? ''} className="w-9 h-9 object-contain rounded-lg shrink-0" />
+            <img src={orgLogo} alt={orgName ?? ''} className="w-9 h-9 object-contain rounded-sm shrink-0" />
           )}
           <div className="flex-1 min-w-0">
             <div className="font-bold text-base text-ink truncate">{event.course?.name}</div>
@@ -353,7 +353,7 @@ export default function Leaderboard() {
               aria-pressed={activeFlight === f}
               className={`px-4 py-1.5 rounded-full text-sm font-semibold transition-colors cursor-pointer ${
                 activeFlight === f
-                  ? ['bg-blue-50 text-blue-700', 'bg-purple-50 text-purple-700', 'bg-emerald-50 text-emerald-700', 'bg-amber-50 text-amber-700'][flightLetters.indexOf(f)] ?? 'bg-gray-100 text-gray-700'
+                  ? ['bg-blue-50 text-blue-700', 'bg-purple-50 text-purple-700', 'bg-emerald-50 text-emerald-700', 'bg-status-upcoming-bg text-status-upcoming-text'][flightLetters.indexOf(f)] ?? 'bg-surface-high text-ink'
                   : 'text-ink-muted hover:text-ink hover:bg-surface-high'
               }`}
             >
@@ -570,7 +570,7 @@ function ScrambleLeaderboard({ eventPlayers, allScores, course }) {
 
   if (!all.length) {
     return (
-      <div className="text-center py-12 text-gray-400">
+      <div className="text-center py-12 text-ink-muted">
         <p className="font-medium">No groups assigned yet</p>
       </div>
     )
@@ -739,12 +739,12 @@ function NetLeaderboard({ complete, inProgress, flight, vsParKey = 'netVsPar', g
               className="grid grid-cols-[2.5rem_1fr_3.5rem_3rem] items-center px-4 py-3"
               style={{ background: '#fffbeb', borderBottom: '1px solid #ebe9e4', opacity: 0.7 }}
             >
-              <span className="text-xs text-amber-600 font-semibold">—</span>
+              <span className="text-xs text-status-upcoming-text font-semibold">—</span>
               <div>
                 <div className="font-semibold text-sm text-ink leading-tight">
                   {p.player?.first_name} {p.player?.last_name}
                 </div>
-                <div className="text-[10px] text-amber-600 mt-0.5">No Show</div>
+                <div className="text-[10px] text-status-upcoming-text mt-0.5">No Show</div>
               </div>
               <span className="text-xs text-ink-muted text-right">—</span>
               <span className="text-xs text-ink-muted text-right">—</span>
@@ -792,7 +792,7 @@ function NetLeaderboard({ complete, inProgress, flight, vsParKey = 'netVsPar', g
 function PuttLeaderboard({ data, playerMap, allScores = [], course = null }) {
   const [scorecardPlayer, setScorecardPlayer] = useState(null)
   if (!data?.length) return (
-    <div className="text-center py-12 text-gray-400">
+    <div className="text-center py-12 text-ink-muted">
       <p>No complete rounds yet.</p>
     </div>
   )
@@ -850,7 +850,7 @@ function SuperSkinsBoard({ event, eventPlayers, allScores, course, playerMap }) 
   const allResults = computeSuperSkins(event, eventPlayers, allScores, course)
 
   if (!allResults) {
-    return <p className="text-sm text-gray-400 text-center py-8">No players have opted in to Super Skins yet.</p>
+    return <p className="text-sm text-ink-muted text-center py-8">No players have opted in to Super Skins yet.</p>
   }
 
   // Only show the flight toggle when Super Skins is actually scoped per flight
@@ -875,7 +875,7 @@ function SuperSkinsBoard({ event, eventPlayers, allScores, course, playerMap }) 
               className={`px-4 py-1.5 rounded-full text-sm font-semibold transition-colors cursor-pointer ${
                 activeFlight === f
                   ? f === 'A' ? 'bg-blue-600 text-white' : 'bg-purple-600 text-white'
-                  : 'bg-white text-gray-500 border border-gray-200'
+                  : 'bg-white text-ink-muted border border-surface-border'
               }`}
             >
               Flight {f}
@@ -885,7 +885,7 @@ function SuperSkinsBoard({ event, eventPlayers, allScores, course, playerMap }) 
       )}
 
       {result.carryoverToNext && (
-        <div className="bg-orange-50 border border-orange-200 rounded-lg px-4 py-3 text-sm text-orange-800">
+        <div className="bg-status-upcoming-bg border border-surface-border rounded-sm px-4 py-3 text-sm text-status-upcoming-text">
           {result.carryoverAmount} skin{result.carryoverAmount !== 1 ? 's' : ''} carry to next event (no winner this round)
         </div>
       )}
@@ -926,7 +926,7 @@ function SuperSkinsBoard({ event, eventPlayers, allScores, course, playerMap }) 
               <div key={h.hole} className="flex items-center gap-3 px-4 py-2.5" style={{ borderBottom: '1px solid #ebe9e4' }}>
                 <span className="w-8 text-sm font-semibold text-ink-muted">#{h.hole}</span>
                 {h.tied && !h.winner && (
-                  <span className="text-xs text-orange-600 font-medium">
+                  <span className="text-xs text-status-upcoming-text font-medium">
                     Tied — {h.carryoverIn + 1} skin{h.carryoverIn + 1 !== 1 ? 's' : ''} carried
                   </span>
                 )}
@@ -937,7 +937,7 @@ function SuperSkinsBoard({ event, eventPlayers, allScores, course, playerMap }) 
                     </span>
                     <span className="ml-auto text-xs font-bold text-ink-muted">
                       {h.skinsWon} skin{h.skinsWon !== 1 ? 's' : ''}
-                      {h.carryoverIn > 0 && <span className="text-orange-500"> (+{h.carryoverIn} carry)</span>}
+                      {h.carryoverIn > 0 && <span className="text-status-upcoming-text"> (+{h.carryoverIn} carry)</span>}
                       {h.wraparound > 0 && <span className="text-purple-500"> (+{h.wraparound} wraparound)</span>}
                     </span>
                   </>
@@ -970,12 +970,12 @@ function BlindPartnersLeaderboard({ event, eventPlayers, allScores, course }) {
     ranked.filter(x => x.rank === pair.rank).length > 1 ? `T${pair.rank}` : `${pair.rank}`
 
   if (pairs.length === 0) {
-    return <p className="text-sm text-gray-400 text-center py-8">No pairs drawn yet.</p>
+    return <p className="text-sm text-ink-muted text-center py-8">No pairs drawn yet.</p>
   }
 
   return (
     <div className="space-y-2">
-      <p className="text-xs text-gray-400 mb-3">
+      <p className="text-xs text-ink-muted mb-3">
         {isStableford
           ? 'Combined Stableford points per pair — highest wins.'
           : 'Combined net score per pair — lowest wins.'}
@@ -985,27 +985,27 @@ function BlindPartnersLeaderboard({ event, eventPlayers, allScores, course }) {
         const color = isStableford
           ? 'text-status-active-text'
           : pair.combinedScore < parTotal ? 'text-red-600'
-          : pair.combinedScore === parTotal ? 'text-gray-600'
+          : pair.combinedScore === parTotal ? 'text-ink'
           : 'text-black'
         return (
-          <div key={pair.idx} className="flex items-center justify-between bg-white rounded-xl px-4 py-3 shadow-sm border border-gray-100">
+          <div key={pair.idx} className="flex items-center justify-between bg-white rounded-sm px-4 py-3 shadow-sm border border-surface-border">
             <div className="flex items-center gap-3">
-              <span className="text-sm font-bold text-gray-400 w-6">{rankLabel(pair)}</span>
+              <span className="text-sm font-bold text-ink-muted w-6">{rankLabel(pair)}</span>
               <div>
-                <div className="text-sm font-semibold text-gray-800">{playerName(pair.p1)}</div>
+                <div className="text-sm font-semibold text-ink">{playerName(pair.p1)}</div>
                 {pair.p2
-                  ? <div className="text-sm font-semibold text-gray-800">{playerName(pair.p2)}</div>
+                  ? <div className="text-sm font-semibold text-ink">{playerName(pair.p2)}</div>
                   : pair.oddConfig?.type === 'ghost'
-                    ? <div className="text-xs text-amber-600 italic">👻 Ghost ({pair.oddConfig.score ?? '?'} {isStableford ? 'pts' : 'net'})</div>
+                    ? <div className="text-xs text-status-upcoming-text italic">👻 Ghost ({pair.oddConfig.score ?? '?'} {isStableford ? 'pts' : 'net'})</div>
                     : pair.oddConfig?.type === 'blind' && pair.oddConfig.player_id
-                      ? <div className="text-xs text-amber-600 italic">🔀 {playerName(pair.oddConfig.player_id)}'s score</div>
-                      : <div className="text-xs text-gray-400 italic">no partner assigned</div>
+                      ? <div className="text-xs text-status-upcoming-text italic">🔀 {playerName(pair.oddConfig.player_id)}'s score</div>
+                      : <div className="text-xs text-ink-muted italic">no partner assigned</div>
                 }
               </div>
             </div>
             <div className="text-right">
               <div className={`text-lg font-bold tabular-nums ${color}`}>{pair.combinedScore}</div>
-              <div className="text-xs text-gray-400">{pair.holesPlayed} holes</div>
+              <div className="text-xs text-ink-muted">{pair.holesPlayed} holes</div>
             </div>
           </div>
         )
@@ -1032,7 +1032,7 @@ function SkinsBoard({ skinsResults, playerMap }) {
             className={`px-4 py-1.5 rounded-full text-sm font-semibold transition-colors cursor-pointer ${
               flight === f
                 ? f === 'A' ? 'bg-blue-600 text-white' : 'bg-purple-600 text-white'
-                : 'bg-white text-gray-500 border border-gray-200'
+                : 'bg-white text-ink-muted border border-surface-border'
             }`}
           >
             Flight {f}
@@ -1041,7 +1041,7 @@ function SkinsBoard({ skinsResults, playerMap }) {
       </div>
 
       {result.carryoverToNext && (
-        <div className="bg-orange-50 border border-orange-200 rounded-lg px-4 py-3 text-sm text-orange-800">
+        <div className="bg-status-upcoming-bg border border-surface-border rounded-sm px-4 py-3 text-sm text-status-upcoming-text">
           {result.carryoverAmount} skin{result.carryoverAmount !== 1 ? 's' : ''} carry to next event (no winner this round)
         </div>
       )}
@@ -1085,7 +1085,7 @@ function SkinsBoard({ skinsResults, playerMap }) {
               <div key={h.hole} className="flex items-center gap-3 px-4 py-2.5" style={{ borderBottom: '1px solid #ebe9e4' }}>
                 <span className="w-8 text-sm font-semibold text-ink-muted">#{h.hole}</span>
                 {h.tied && !h.winner && (
-                  <span className="text-xs text-orange-600 font-medium">
+                  <span className="text-xs text-status-upcoming-text font-medium">
                     Tied — {h.carryoverIn + 1} skin{h.carryoverIn + 1 !== 1 ? 's' : ''} carried
                   </span>
                 )}
@@ -1096,7 +1096,7 @@ function SkinsBoard({ skinsResults, playerMap }) {
                     </span>
                     <span className="ml-auto text-xs font-bold text-ink-muted">
                       {h.skinsWon} skin{h.skinsWon !== 1 ? 's' : ''}
-                      {h.carryoverIn > 0 && <span className="text-orange-500"> (+{h.carryoverIn} carry)</span>}
+                      {h.carryoverIn > 0 && <span className="text-status-upcoming-text"> (+{h.carryoverIn} carry)</span>}
                       {h.wraparound > 0 && <span className="text-purple-500"> (+{h.wraparound} wraparound)</span>}
                     </span>
                   </>
@@ -1120,8 +1120,8 @@ function StablefordLeaderboard({ data, activeFlight, allScores = [], course = nu
     list.filter(x => x.rank === p.rank).length > 1 ? `T${p.rank}` : `${p.rank}`
 
   if (!list.length) return (
-    <div className="text-center py-12 text-gray-400">
-      <svg className="mx-auto mb-3 w-10 h-10 text-gray-300" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.5"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="5"/><circle cx="12" cy="12" r="1" fill="currentColor"/></svg>
+    <div className="text-center py-12 text-ink-muted">
+      <svg className="mx-auto mb-3 w-10 h-10 text-surface-outline" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.5"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="5"/><circle cx="12" cy="12" r="1" fill="currentColor"/></svg>
       <p className="font-medium">No scores yet for Flight {activeFlight}</p>
     </div>
   )
@@ -1192,8 +1192,8 @@ function NassauBoard({ leaderboards, event, activeFlight }) {
 
   const anyScores = variants.some(v => betsFor(v.key).some(b => b.list.length > 0))
   if (!anyScores) return (
-    <div className="text-center py-12 text-gray-400">
-      <svg className="mx-auto mb-3 w-10 h-10 text-gray-300" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.5"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="5"/><circle cx="12" cy="12" r="1" fill="currentColor"/></svg>
+    <div className="text-center py-12 text-ink-muted">
+      <svg className="mx-auto mb-3 w-10 h-10 text-surface-outline" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.5"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="5"/><circle cx="12" cy="12" r="1" fill="currentColor"/></svg>
       <p className="font-medium">No Nassau scores yet for Flight {activeFlight}</p>
     </div>
   )
@@ -1262,11 +1262,11 @@ function compactSideColor(side, entity) {
   if (side === 'A') {
     if (isWinner) return 'bg-blue-700 text-white'
     if (isLeading) return 'bg-blue-500 text-white'
-    return 'bg-blue-50 text-gray-900'
+    return 'bg-blue-50 text-ink'
   }
   if (isWinner) return 'bg-red-700 text-white'
   if (isLeading) return 'bg-red-500 text-white'
-  return 'bg-red-50 text-gray-900'
+  return 'bg-red-50 text-ink'
 }
 
 // Player name with match-play strokes (relative to the lower-handicap
@@ -1290,8 +1290,8 @@ function MatchPointsBoard({ matchData, event }) {
   const teamBLabel = teamNames.b?.trim() || 'Flight B'
 
   if (!pairings.length) return (
-    <div className="text-center py-12 text-gray-400">
-      <svg className="mx-auto mb-3 w-10 h-10 text-gray-300" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.5"><path strokeLinecap="round" strokeLinejoin="round" d="M18 18.72a9.094 9.094 0 003.741-.479 3 3 0 00-4.682-2.72m.94 3.198l.001.031c0 .225-.012.447-.037.666A11.944 11.944 0 0112 21c-2.17 0-4.207-.576-5.963-1.584A6.062 6.062 0 016 18.719m12 0a5.971 5.971 0 00-.941-3.197m0 0A5.995 5.995 0 0012 12.75a5.995 5.995 0 00-5.058 2.772m0 0a3 3 0 00-4.681 2.72 8.986 8.986 0 003.74.477m.94-3.197a5.971 5.971 0 00-.94 3.197M15 6.75a3 3 0 11-6 0 3 3 0 016 0zm6 3a2.25 2.25 0 11-4.5 0 2.25 2.25 0 014.5 0zm-13.5 0a2.25 2.25 0 11-4.5 0 2.25 2.25 0 014.5 0z"/></svg>
+    <div className="text-center py-12 text-ink-muted">
+      <svg className="mx-auto mb-3 w-10 h-10 text-surface-outline" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.5"><path strokeLinecap="round" strokeLinejoin="round" d="M18 18.72a9.094 9.094 0 003.741-.479 3 3 0 00-4.682-2.72m.94 3.198l.001.031c0 .225-.012.447-.037.666A11.944 11.944 0 0112 21c-2.17 0-4.207-.576-5.963-1.584A6.062 6.062 0 016 18.719m12 0a5.971 5.971 0 00-.941-3.197m0 0A5.995 5.995 0 0012 12.75a5.995 5.995 0 00-5.058 2.772m0 0a3 3 0 00-4.681 2.72 8.986 8.986 0 003.74.477m.94-3.197a5.971 5.971 0 00-.94 3.197M15 6.75a3 3 0 11-6 0 3 3 0 016 0zm6 3a2.25 2.25 0 11-4.5 0 2.25 2.25 0 014.5 0zm-13.5 0a2.25 2.25 0 11-4.5 0 2.25 2.25 0 014.5 0z"/></svg>
       <p className="font-medium">No match play pairings set up yet.</p>
       <p className="text-sm mt-1">An admin can assign pairings in the event settings.</p>
     </div>
@@ -1306,9 +1306,9 @@ function MatchPointsBoard({ matchData, event }) {
     <div className="space-y-4">
       {/* Team banner — only when cross-flight (Ryder Cup style) */}
       {hasTeams && teamPoints.A + teamPoints.B > 0 && (
-        <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
-          <div className="bg-gray-50 px-4 py-2 border-b border-gray-100">
-            <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Team Score</h3>
+        <div className="bg-white rounded-sm border border-surface-border overflow-hidden">
+          <div className="bg-surface-container px-4 py-2 border-b border-surface-border">
+            <h3 className="text-xs font-semibold text-ink-muted uppercase tracking-wide">Team Score</h3>
           </div>
           <div className="flex">
             <div className="flex-1 text-center py-4 bg-blue-50">
@@ -1316,7 +1316,7 @@ function MatchPointsBoard({ matchData, event }) {
               <div className="text-4xl font-black text-blue-700">{teamPoints.A}</div>
               {isComplete && <div className="text-xs text-blue-400 mt-0.5">matches won</div>}
             </div>
-            <div className="w-px bg-gray-200" />
+            <div className="w-px bg-surface-high" />
             <div className="flex-1 text-center py-4 bg-red-50">
               <div className="text-xs font-bold text-red-600 mb-1">{teamBLabel}</div>
               <div className="text-4xl font-black text-red-700">{teamPoints.B}</div>
@@ -1324,12 +1324,12 @@ function MatchPointsBoard({ matchData, event }) {
             </div>
           </div>
           {!isComplete && (
-            <div className="text-center py-2 border-t border-gray-100 bg-amber-50">
-              <span className="text-xs font-semibold text-amber-700">Matches are in Progress</span>
+            <div className="text-center py-2 border-t border-surface-border bg-status-upcoming-bg">
+              <span className="text-xs font-semibold text-status-upcoming-text">Matches are in Progress</span>
             </div>
           )}
-          <div className="text-center py-2 border-t border-gray-100">
-            <span className="text-xs font-semibold text-gray-600">{teamLeader}</span>
+          <div className="text-center py-2 border-t border-surface-border">
+            <span className="text-xs font-semibold text-ink">{teamLeader}</span>
           </div>
         </div>
       )}
@@ -1343,8 +1343,8 @@ function MatchPointsBoard({ matchData, event }) {
         const stylesB = { label: 'text-red-600', winner: 'text-red-700', leading: 'text-red-600', bg: 'bg-red-50', status: { win: 'bg-red-600 text-white', lead: 'bg-red-100 text-red-700' } }
 
         const statusColor = isFinished
-          ? (pair.winner === 'A' ? stylesA.status.win : pair.winner === 'B' ? stylesB.status.win : 'bg-gray-200 text-gray-700')
-          : (leaderSide === 'A' ? stylesA.status.lead : leaderSide === 'B' ? stylesB.status.lead : 'bg-gray-100 text-gray-600')
+          ? (pair.winner === 'A' ? stylesA.status.win : pair.winner === 'B' ? stylesB.status.win : 'bg-surface-high text-ink')
+          : (leaderSide === 'A' ? stylesA.status.lead : leaderSide === 'B' ? stylesB.status.lead : 'bg-surface-high text-ink')
 
         // playerA is always Team A, playerB always Team B — show team name if set
         const labelA = teamALabel || null
@@ -1355,7 +1355,7 @@ function MatchPointsBoard({ matchData, event }) {
         const rightEdge = edgeStatus('B', pair)
 
         return (
-          <div key={idx} className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+          <div key={idx} className="bg-white rounded-sm border border-surface-border overflow-hidden">
             {/* Compact row — click to expand */}
             <button type="button" onClick={() => toggle(idx)} className="block w-full text-left cursor-pointer">
               <div className="flex items-stretch">
@@ -1367,7 +1367,7 @@ function MatchPointsBoard({ matchData, event }) {
                     {matchPlayerLabel(pair.playerA, pair.relHandicapA)}
                   </span>
                 </div>
-                <div className="flex items-center justify-center px-2 sm:px-3 bg-gray-900 text-white text-xs font-bold whitespace-nowrap">
+                <div className="flex items-center justify-center px-2 sm:px-3 bg-ink text-white text-xs font-bold whitespace-nowrap">
                   {middleLabel}
                 </div>
                 <div className={`flex-1 min-w-0 px-2 sm:px-3 py-3 flex items-center justify-start text-left ${compactSideColor('B', pair)}`}>
@@ -1378,50 +1378,50 @@ function MatchPointsBoard({ matchData, event }) {
                 <div className={`w-8 sm:w-14 flex-shrink-0 flex items-center justify-center text-xs font-bold ${compactSideColor('B', pair)}`}>
                   {rightEdge}
                 </div>
-                <div className="flex items-center px-2 text-gray-400 flex-shrink-0">
+                <div className="flex items-center px-2 text-ink-muted flex-shrink-0">
                   <svg className={`w-4 h-4 transition-transform ${isOpen ? 'rotate-180' : ''}`} viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 11.168l3.71-3.938a.75.75 0 111.08 1.04l-4.25 4.5a.75.75 0 01-1.08 0l-4.25-4.5a.75.75 0 01.02-1.06z" clipRule="evenodd" /></svg>
                 </div>
               </div>
             </button>
 
             {isOpen && (
-              <div className="border-t border-gray-100">
+              <div className="border-t border-surface-border">
                 {/* Match header */}
-                <div className="bg-gray-50 px-4 py-2 border-b border-gray-100 flex items-center justify-between">
-                  <span className="text-xs font-semibold text-gray-600">Match {idx + 1}</span>
+                <div className="bg-surface-container px-4 py-2 border-b border-surface-border flex items-center justify-between">
+                  <span className="text-xs font-semibold text-ink">Match {idx + 1}</span>
                   <span className={`text-xs font-bold px-2.5 py-1 rounded-full ${statusColor}`}>
                     {pair.holesPlayed === 0 ? 'Not started' : shortStatus(pair.matchStatus)}
                   </span>
                 </div>
 
                 {/* Players vs layout */}
-                <div className="flex items-stretch divide-x divide-gray-100">
+                <div className="flex items-stretch divide-x divide-surface-border">
                   {/* Player A */}
                   <div className={`flex-1 px-4 py-3 ${leaderSide === 'A' || pair.winner === 'A' ? stylesA.bg : ''}`}>
                     {labelA && <div className={`text-xs font-bold ${stylesA.label} mb-0.5`}>{labelA}</div>}
-                    <div className="font-semibold text-sm text-gray-900 leading-tight">
+                    <div className="font-semibold text-sm text-ink leading-tight">
                       {matchPlayerLabel(pair.playerA, pair.relHandicapA)}
                     </div>
-                    <div className="text-xs text-gray-400">CH {pair.playerA.course_handicap ?? '—'}</div>
+                    <div className="text-xs text-ink-muted">CH {pair.playerA.course_handicap ?? '—'}</div>
                     {pair.holesPlayed > 0 && (
-                      <div className={`text-lg font-black mt-1 ${pair.winner === 'A' ? stylesA.winner : pair.winner === 'B' ? 'text-gray-300' : leaderSide === 'A' ? stylesA.leading : leaderSide === 'B' ? 'text-gray-500' : 'text-gray-500'}`}>
+                      <div className={`text-lg font-black mt-1 ${pair.winner === 'A' ? stylesA.winner : pair.winner === 'B' ? 'text-surface-outline' : leaderSide === 'A' ? stylesA.leading : leaderSide === 'B' ? 'text-ink-muted' : 'text-ink-muted'}`}>
                         {pair.winner === 'A' ? `W ${shortStatus(pair.matchStatus)}` : pair.winner === 'B' ? 'Lost' : pair.winner === 'halve' ? '½' : leaderSide === 'A' ? `↑ ${shortStatus(pair.matchStatus)}` : leaderSide === 'B' ? `↓ ${Math.abs(pair.upBy)} DN` : 'AS'}
                       </div>
                     )}
                   </div>
 
                   {/* VS divider */}
-                  <div className="flex items-center justify-center w-8 bg-gray-50 text-xs text-gray-400 font-bold">vs</div>
+                  <div className="flex items-center justify-center w-8 bg-surface-container text-xs text-ink-muted font-bold">vs</div>
 
                   {/* Player B */}
                   <div className={`flex-1 px-4 py-3 ${leaderSide === 'B' || pair.winner === 'B' ? stylesB.bg : ''}`}>
                     {labelB && <div className={`text-xs font-bold ${stylesB.label} mb-0.5`}>{labelB}</div>}
-                    <div className="font-semibold text-sm text-gray-900 leading-tight">
+                    <div className="font-semibold text-sm text-ink leading-tight">
                       {matchPlayerLabel(pair.playerB, pair.relHandicapB)}
                     </div>
-                    <div className="text-xs text-gray-400">CH {pair.playerB.course_handicap ?? '—'}</div>
+                    <div className="text-xs text-ink-muted">CH {pair.playerB.course_handicap ?? '—'}</div>
                     {pair.holesPlayed > 0 && (
-                      <div className={`text-lg font-black mt-1 ${pair.winner === 'B' ? stylesB.winner : pair.winner === 'A' ? 'text-gray-300' : leaderSide === 'B' ? stylesB.leading : leaderSide === 'A' ? 'text-gray-500' : 'text-gray-500'}`}>
+                      <div className={`text-lg font-black mt-1 ${pair.winner === 'B' ? stylesB.winner : pair.winner === 'A' ? 'text-surface-outline' : leaderSide === 'B' ? stylesB.leading : leaderSide === 'A' ? 'text-ink-muted' : 'text-ink-muted'}`}>
                         {pair.winner === 'B' ? `W ${shortStatus(pair.matchStatus)}` : pair.winner === 'A' ? 'Lost' : pair.winner === 'halve' ? '½' : leaderSide === 'B' ? `↑ ${shortStatus(pair.matchStatus)}` : leaderSide === 'A' ? `↓ ${Math.abs(pair.upBy)} DN` : 'AS'}
                       </div>
                     )}
@@ -1430,16 +1430,16 @@ function MatchPointsBoard({ matchData, event }) {
 
                 {/* Hole-by-hole dots — colored by who won the hole, tooltip shows running state */}
                 {pair.holesPlayed > 0 && (
-                  <div className="px-4 py-3 border-t border-gray-100 overflow-x-auto">
+                  <div className="px-4 py-3 border-t border-surface-border overflow-x-auto">
                     <div className="flex gap-1 min-w-0">
                       {pair.holes.map(h => {
                         if (h.status === 'pending' || h.status === 'conceded') return (
-                          <div key={h.hole} className={`w-7 h-7 rounded-full flex flex-col items-center justify-center text-xs ${h.status === 'conceded' ? 'bg-gray-50 text-gray-200' : 'bg-gray-100 text-gray-400'}`}>
+                          <div key={h.hole} className={`w-7 h-7 rounded-full flex flex-col items-center justify-center text-xs ${h.status === 'conceded' ? 'bg-surface-container text-surface-highest' : 'bg-surface-high text-ink-muted'}`}>
                             {h.hole}
                           </div>
                         )
-                        const bg = h.result === 'A' ? 'bg-blue-500' : h.result === 'B' ? 'bg-red-500' : 'bg-gray-200'
-                        const textCol = h.result === 'halve' ? 'text-gray-500' : 'text-white'
+                        const bg = h.result === 'A' ? 'bg-blue-500' : h.result === 'B' ? 'bg-red-500' : 'bg-surface-high'
+                        const textCol = h.result === 'halve' ? 'text-ink-muted' : 'text-white'
                         const stateLabel = h.upByAfter === 0 ? 'AS' : `${Math.abs(h.upByAfter)} UP`
                         return (
                           <div key={h.hole} title={`Hole ${h.hole} — A net ${h.netA}, B net ${h.netB} — ${stateLabel}`}
@@ -1450,10 +1450,10 @@ function MatchPointsBoard({ matchData, event }) {
                         )
                       })}
                     </div>
-                    <div className="mt-1.5 flex gap-3 text-xs text-gray-400">
+                    <div className="mt-1.5 flex gap-3 text-xs text-ink-muted">
                       <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-full bg-blue-500 inline-block"/> A wins hole</span>
                       <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-full bg-red-500 inline-block"/> B wins hole</span>
-                      <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-full bg-gray-200 inline-block"/> Halved</span>
+                      <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-full bg-surface-high inline-block"/> Halved</span>
                     </div>
                   </div>
                 )}
@@ -1477,7 +1477,7 @@ function TeamMatchBoard({ teamMatchData, teamAName = 'Team A', teamBName = 'Team
   })
 
   if (!groupMatches.length) return (
-    <div className="text-center py-12 text-gray-400">
+    <div className="text-center py-12 text-ink-muted">
       <p className="font-medium">No team match results yet.</p>
       <p className="text-sm mt-1">Assign players to teams in the Team Play tab on the event admin page.</p>
     </div>
@@ -1490,9 +1490,9 @@ function TeamMatchBoard({ teamMatchData, teamAName = 'Team A', teamBName = 'Team
     <div className="space-y-4">
       {/* Overall team score */}
       {totalA + totalB > 0 && (
-        <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
-          <div className="bg-gray-50 px-4 py-2 border-b border-gray-100">
-            <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Team Best Ball — Overall</h3>
+        <div className="bg-white rounded-sm border border-surface-border overflow-hidden">
+          <div className="bg-surface-container px-4 py-2 border-b border-surface-border">
+            <h3 className="text-xs font-semibold text-ink-muted uppercase tracking-wide">Team Best Ball — Overall</h3>
           </div>
           <div className="flex">
             <div className="flex-1 text-center py-4 bg-blue-50">
@@ -1500,15 +1500,15 @@ function TeamMatchBoard({ teamMatchData, teamAName = 'Team A', teamBName = 'Team
               <div className="text-4xl font-black text-blue-700">{totalA}</div>
               <div className="text-xs text-blue-400 mt-0.5">{matchesLabel}</div>
             </div>
-            <div className="w-px bg-gray-200" />
+            <div className="w-px bg-surface-high" />
             <div className="flex-1 text-center py-4 bg-red-50">
               <div className="text-xs font-bold text-red-600 mb-1">{teamBName}</div>
               <div className="text-4xl font-black text-red-700">{totalB}</div>
               <div className="text-xs text-red-400 mt-0.5">{matchesLabel}</div>
             </div>
           </div>
-          <div className="text-center py-2 border-t border-gray-100">
-            <span className="text-xs font-semibold text-gray-600">{totalLeader}</span>
+          <div className="text-center py-2 border-t border-surface-border">
+            <span className="text-xs font-semibold text-ink">{totalLeader}</span>
           </div>
         </div>
       )}
@@ -1518,8 +1518,8 @@ function TeamMatchBoard({ teamMatchData, teamAName = 'Team A', teamBName = 'Team
         const leaderSide = match.upBy > 0 ? 'A' : match.upBy < 0 ? 'B' : null
         const isFinished = match.winner != null
         const statusColor = isFinished
-          ? (match.winner === 'A' ? 'bg-blue-600 text-white' : match.winner === 'B' ? 'bg-red-600 text-white' : 'bg-gray-200 text-gray-700')
-          : (leaderSide === 'A' ? 'bg-blue-100 text-blue-700' : leaderSide === 'B' ? 'bg-red-100 text-red-700' : 'bg-gray-100 text-gray-600')
+          ? (match.winner === 'A' ? 'bg-blue-600 text-white' : match.winner === 'B' ? 'bg-red-600 text-white' : 'bg-surface-high text-ink')
+          : (leaderSide === 'A' ? 'bg-blue-100 text-blue-700' : leaderSide === 'B' ? 'bg-red-100 text-red-700' : 'bg-surface-high text-ink')
 
         const isOpen = expandedIds.has(idx)
         const namesA = match.teamA.map(ep => ep.player?.last_name).filter(Boolean).join(' + ')
@@ -1529,7 +1529,7 @@ function TeamMatchBoard({ teamMatchData, teamAName = 'Team A', teamBName = 'Team
         const rightEdge = edgeStatus('B', match)
 
         return (
-          <div key={idx} className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+          <div key={idx} className="bg-white rounded-sm border border-surface-border overflow-hidden">
             {/* Compact row — click to expand */}
             <button type="button" onClick={() => toggle(idx)} className="block w-full text-left cursor-pointer">
               <div className="flex items-stretch">
@@ -1541,7 +1541,7 @@ function TeamMatchBoard({ teamMatchData, teamAName = 'Team A', teamBName = 'Team
                     {namesA}
                   </span>
                 </div>
-                <div className="flex items-center justify-center px-2 sm:px-3 bg-gray-900 text-white text-xs font-bold whitespace-nowrap">
+                <div className="flex items-center justify-center px-2 sm:px-3 bg-ink text-white text-xs font-bold whitespace-nowrap">
                   {middleLabel}
                 </div>
                 <div className={`flex-1 min-w-0 px-2 sm:px-3 py-3 flex items-center justify-start text-left ${compactSideColor('B', match)}`}>
@@ -1552,55 +1552,55 @@ function TeamMatchBoard({ teamMatchData, teamAName = 'Team A', teamBName = 'Team
                 <div className={`w-8 sm:w-14 flex-shrink-0 flex items-center justify-center text-xs font-bold ${compactSideColor('B', match)}`}>
                   {rightEdge}
                 </div>
-                <div className="flex items-center px-2 text-gray-400 flex-shrink-0">
+                <div className="flex items-center px-2 text-ink-muted flex-shrink-0">
                   <svg className={`w-4 h-4 transition-transform ${isOpen ? 'rotate-180' : ''}`} viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 11.168l3.71-3.938a.75.75 0 111.08 1.04l-4.25 4.5a.75.75 0 01-1.08 0l-4.25-4.5a.75.75 0 01.02-1.06z" clipRule="evenodd" /></svg>
                 </div>
               </div>
             </button>
 
             {isOpen && (
-              <div className="border-t border-gray-100">
-                <div className="bg-gray-50 px-4 py-2 border-b border-gray-100 flex items-center justify-between">
-                  <span className="text-xs font-semibold text-gray-600">Group {match.groupNumber} — Best Ball</span>
+              <div className="border-t border-surface-border">
+                <div className="bg-surface-container px-4 py-2 border-b border-surface-border flex items-center justify-between">
+                  <span className="text-xs font-semibold text-ink">Group {match.groupNumber} — Best Ball</span>
                   <span className={`text-xs font-bold px-2.5 py-1 rounded-full ${statusColor}`}>
                     {match.holesPlayed === 0 ? 'Not started' : shortStatus(match.matchStatus)}
                   </span>
                 </div>
 
-                <div className="flex items-stretch divide-x divide-gray-100">
+                <div className="flex items-stretch divide-x divide-surface-border">
                   {/* Team A */}
                   <div className={`flex-1 px-4 py-3 ${leaderSide === 'A' || match.winner === 'A' ? 'bg-blue-50' : ''}`}>
                     <div className="text-xs font-bold text-blue-600 mb-1">{teamAName}</div>
                     {match.teamA.map(ep => (
-                      <div key={ep.player_id} className="text-sm text-gray-800 leading-snug">
+                      <div key={ep.player_id} className="text-sm text-ink leading-snug">
                         {ep.player?.first_name} {ep.player?.last_name}
                         {match.relCH[ep.player_id] > 0 && (
-                          <span className="text-xs text-gray-400 ml-1">({match.relCH[ep.player_id]})</span>
+                          <span className="text-xs text-ink-muted ml-1">({match.relCH[ep.player_id]})</span>
                         )}
                       </div>
                     ))}
                     {match.holesPlayed > 0 && (
-                      <div className={`text-lg font-black mt-2 ${match.winner === 'A' ? 'text-blue-700' : match.winner === 'B' ? 'text-gray-300' : leaderSide === 'A' ? 'text-blue-600' : leaderSide === 'B' ? 'text-gray-500' : 'text-gray-500'}`}>
+                      <div className={`text-lg font-black mt-2 ${match.winner === 'A' ? 'text-blue-700' : match.winner === 'B' ? 'text-surface-outline' : leaderSide === 'A' ? 'text-blue-600' : leaderSide === 'B' ? 'text-ink-muted' : 'text-ink-muted'}`}>
                         {match.winner === 'A' ? `W ${shortStatus(match.matchStatus)}` : match.winner === 'B' ? 'Lost' : match.winner === 'halve' ? '½' : leaderSide === 'A' ? `↑ ${shortStatus(match.matchStatus)}` : leaderSide === 'B' ? `↓ ${Math.abs(match.upBy)} DN` : 'AS'}
                       </div>
                     )}
                   </div>
 
-                  <div className="flex items-center justify-center w-8 bg-gray-50 text-xs text-gray-400 font-bold">vs</div>
+                  <div className="flex items-center justify-center w-8 bg-surface-container text-xs text-ink-muted font-bold">vs</div>
 
                   {/* Team B */}
                   <div className={`flex-1 px-4 py-3 ${leaderSide === 'B' || match.winner === 'B' ? 'bg-red-50' : ''}`}>
                     <div className="text-xs font-bold text-red-600 mb-1">{teamBName}</div>
                     {match.teamB.map(ep => (
-                      <div key={ep.player_id} className="text-sm text-gray-800 leading-snug">
+                      <div key={ep.player_id} className="text-sm text-ink leading-snug">
                         {ep.player?.first_name} {ep.player?.last_name}
                         {match.relCH[ep.player_id] > 0 && (
-                          <span className="text-xs text-gray-400 ml-1">({match.relCH[ep.player_id]})</span>
+                          <span className="text-xs text-ink-muted ml-1">({match.relCH[ep.player_id]})</span>
                         )}
                       </div>
                     ))}
                     {match.holesPlayed > 0 && (
-                      <div className={`text-lg font-black mt-2 ${match.winner === 'B' ? 'text-red-700' : match.winner === 'A' ? 'text-gray-300' : leaderSide === 'B' ? 'text-red-600' : leaderSide === 'A' ? 'text-gray-500' : 'text-gray-500'}`}>
+                      <div className={`text-lg font-black mt-2 ${match.winner === 'B' ? 'text-red-700' : match.winner === 'A' ? 'text-surface-outline' : leaderSide === 'B' ? 'text-red-600' : leaderSide === 'A' ? 'text-ink-muted' : 'text-ink-muted'}`}>
                         {match.winner === 'B' ? `W ${shortStatus(match.matchStatus)}` : match.winner === 'A' ? 'Lost' : match.winner === 'halve' ? '½' : leaderSide === 'B' ? `↑ ${shortStatus(match.matchStatus)}` : leaderSide === 'A' ? `↓ ${Math.abs(match.upBy)} DN` : 'AS'}
                       </div>
                     )}
@@ -1609,17 +1609,17 @@ function TeamMatchBoard({ teamMatchData, teamAName = 'Team A', teamBName = 'Team
 
                 {/* Hole-by-hole contributor summary */}
                 {match.holesPlayed > 0 && (
-                  <div className="px-4 py-3 border-t border-gray-100 bg-gray-50">
-                    <p className="text-xs font-semibold text-gray-500 mb-2 uppercase tracking-wide">Best Ball by Hole</p>
+                  <div className="px-4 py-3 border-t border-surface-border bg-surface-container">
+                    <p className="text-xs font-semibold text-ink-muted mb-2 uppercase tracking-wide">Best Ball by Hole</p>
                     <div className="flex flex-wrap gap-1.5">
                       {match.holes.filter(h => h.status === 'played').map(h => {
-                        const bgColor = h.result === 'A' ? 'bg-blue-100 text-blue-700' : h.result === 'B' ? 'bg-red-100 text-red-700' : 'bg-gray-100 text-gray-500'
+                        const bgColor = h.result === 'A' ? 'bg-blue-100 text-blue-700' : h.result === 'B' ? 'bg-red-100 text-red-700' : 'bg-surface-high text-ink-muted'
                         const contributor = h.result === 'A' ? h.contributorA : h.result === 'B' ? h.contributorB : null
                         const initials = contributor
                           ? `${contributor.player?.first_name?.[0] ?? ''}${contributor.player?.last_name?.[0] ?? ''}`
                           : '½'
                         return (
-                          <div key={h.hole} className={`text-xs font-bold px-2 py-1 rounded-lg ${bgColor}`} title={contributor ? `${contributor.player?.first_name} ${contributor.player?.last_name}` : 'Halved'}>
+                          <div key={h.hole} className={`text-xs font-bold px-2 py-1 rounded-sm ${bgColor}`} title={contributor ? `${contributor.player?.first_name} ${contributor.player?.last_name}` : 'Halved'}>
                             #{h.hole} {initials}
                           </div>
                         )
@@ -1640,7 +1640,7 @@ function TeamMatchBoard({ teamMatchData, teamAName = 'Team A', teamBName = 'Team
 function PayoutsBoard({ event, eventPlayers, leaderboards, sideGames, skinsResults, stablefordData, stablefordGrossData, blindPartnersData, superSkinsResult, playerMap }) {
   if (!event?.payout_config || eventPlayers.length === 0) {
     return (
-      <div className="text-center py-12 text-gray-400">
+      <div className="text-center py-12 text-ink-muted">
         <div className="text-4xl mb-3">💰</div>
         <p>No payout configuration set for this event.</p>
       </div>
@@ -1813,12 +1813,12 @@ function PlayerScorecardModal({ player, allScores, course, onClose }) {
     <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center" onClick={onClose}>
       <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" />
       <div
-        className="relative bg-white w-full sm:max-w-md rounded-t-2xl sm:rounded-2xl shadow-2xl flex flex-col"
+        className="relative bg-white w-full sm:max-w-md rounded-t-sm sm:rounded-sm shadow-2xl flex flex-col"
         style={{ maxHeight: '92dvh' }}
         onClick={e => e.stopPropagation()}
       >
         {/* Header */}
-        <div className="px-5 py-4 flex items-center justify-between rounded-t-2xl flex-shrink-0" style={{ background: '#1d1d1f', color: '#ffffff' }}>
+        <div className="px-5 py-4 flex items-center justify-between rounded-t-sm flex-shrink-0" style={{ background: '#1d1d1f', color: '#ffffff' }}>
           <div>
             <div className="font-bold text-base leading-tight">{name}</div>
             <div className="text-xs mt-0.5" style={{ color: '#86868b' }}>CH {ch} · {course.name}</div>
@@ -1834,54 +1834,54 @@ function PlayerScorecardModal({ player, allScores, course, onClose }) {
         </div>
 
         {/* Two-column 9-hole grids side by side */}
-        <div className="flex divide-x divide-gray-100 flex-shrink-0">
+        <div className="flex divide-x divide-surface-border flex-shrink-0">
           {[{ label: 'Front 9', holeList: frontHoles, grossTotal: frontGross, netTotal: frontNet },
             { label: 'Back 9',  holeList: backHoles,  grossTotal: backGross,  netTotal: backNet }
           ].map(({ label, holeList, grossTotal, netTotal }) => (
             <div key={label} className="flex-1">
               {/* Section label */}
-              <div className="bg-gray-50 px-3 py-1.5 border-b border-gray-100">
-                <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">{label}</span>
+              <div className="bg-surface-container px-3 py-1.5 border-b border-surface-border">
+                <span className="text-[10px] font-bold text-ink-muted uppercase tracking-widest">{label}</span>
               </div>
               {/* Column headers */}
-              <div className={`grid ${hasPutts ? 'grid-cols-[1.5rem_1.5rem_2rem_2rem_2rem]' : 'grid-cols-[1.5rem_1.5rem_2rem_2rem]'} gap-0 px-3 py-1.5 border-b border-gray-100`}>
-                <span className="text-[10px] font-bold text-gray-400 uppercase">Hole</span>
-                <span className="text-[10px] font-bold text-gray-400 uppercase text-center">Par</span>
-                <span className="text-[10px] font-bold text-gray-400 uppercase text-center">Grs</span>
-                <span className="text-[10px] font-bold text-gray-400 uppercase text-center">Net</span>
-                {hasPutts && <span className="text-[10px] font-bold text-gray-400 uppercase text-center">Pts</span>}
+              <div className={`grid ${hasPutts ? 'grid-cols-[1.5rem_1.5rem_2rem_2rem_2rem]' : 'grid-cols-[1.5rem_1.5rem_2rem_2rem]'} gap-0 px-3 py-1.5 border-b border-surface-border`}>
+                <span className="text-[10px] font-bold text-ink-muted uppercase">Hole</span>
+                <span className="text-[10px] font-bold text-ink-muted uppercase text-center">Par</span>
+                <span className="text-[10px] font-bold text-ink-muted uppercase text-center">Grs</span>
+                <span className="text-[10px] font-bold text-ink-muted uppercase text-center">Net</span>
+                {hasPutts && <span className="text-[10px] font-bold text-ink-muted uppercase text-center">Pts</span>}
               </div>
               {/* Hole rows */}
               {holeList.map(({ h, g, putts, net, netVsPar, par, strokes }, i) => (
                 <div key={h} className={`grid ${hasPutts ? 'grid-cols-[1.5rem_1.5rem_2rem_2rem_2rem]' : 'grid-cols-[1.5rem_1.5rem_2rem_2rem]'} gap-0 px-3 py-1.5 ${i % 2 === 1 ? 'bg-[rgba(27,67,50,0.025)]' : ''}`}>
-                  <span className="text-xs font-semibold text-gray-400 tabular-nums">{h}</span>
-                  <span className="text-xs text-gray-400 text-center tabular-nums">{par}</span>
-                  <span className="text-xs font-semibold text-gray-700 text-center tabular-nums">
-                    {g ?? <span className="text-gray-200">—</span>}
+                  <span className="text-xs font-semibold text-ink-muted tabular-nums">{h}</span>
+                  <span className="text-xs text-ink-muted text-center tabular-nums">{par}</span>
+                  <span className="text-xs font-semibold text-ink text-center tabular-nums">
+                    {g ?? <span className="text-surface-highest">—</span>}
                   </span>
                   <span className={`text-xs text-center tabular-nums ${netColor(netVsPar)}`}>
-                    {net != null ? net : <span className="text-gray-200">—</span>}
+                    {net != null ? net : <span className="text-surface-highest">—</span>}
                   </span>
                   {hasPutts && (
-                    <span className="text-xs text-center tabular-nums text-gray-600">
-                      {putts != null ? putts : <span className="text-gray-200">—</span>}
+                    <span className="text-xs text-center tabular-nums text-ink">
+                      {putts != null ? putts : <span className="text-surface-highest">—</span>}
                     </span>
                   )}
                 </div>
               ))}
               {/* Subtotal */}
-              <div className={`grid ${hasPutts ? 'grid-cols-[1.5rem_1.5rem_2rem_2rem_2rem]' : 'grid-cols-[1.5rem_1.5rem_2rem_2rem]'} gap-0 px-3 py-2 bg-[#012d1d]/5 border-t border-gray-200 mt-0.5`}>
-                <span className="text-[10px] font-bold text-gray-500 uppercase col-span-2">Tot</span>
-                <span className="text-xs font-black text-gray-800 text-center tabular-nums">{grossTotal || '—'}</span>
-                <span className="text-xs font-black text-gray-800 text-center tabular-nums">{netTotal || '—'}</span>
-                {hasPutts && <span className="text-xs font-black text-gray-800 text-center tabular-nums">{(label === 'Front 9' ? frontPutts : backPutts) || '—'}</span>}
+              <div className={`grid ${hasPutts ? 'grid-cols-[1.5rem_1.5rem_2rem_2rem_2rem]' : 'grid-cols-[1.5rem_1.5rem_2rem_2rem]'} gap-0 px-3 py-2 bg-[#012d1d]/5 border-t border-surface-border mt-0.5`}>
+                <span className="text-[10px] font-bold text-ink-muted uppercase col-span-2">Tot</span>
+                <span className="text-xs font-black text-ink text-center tabular-nums">{grossTotal || '—'}</span>
+                <span className="text-xs font-black text-ink text-center tabular-nums">{netTotal || '—'}</span>
+                {hasPutts && <span className="text-xs font-black text-ink text-center tabular-nums">{(label === 'Front 9' ? frontPutts : backPutts) || '—'}</span>}
               </div>
             </div>
           ))}
         </div>
 
         {/* Overall totals footer */}
-        <div className="flex items-center justify-between px-5 py-3 rounded-b-2xl flex-shrink-0" style={{ borderTop: '1px solid #ebe9e4', background: '#f4f3f0' }}>
+        <div className="flex items-center justify-between px-5 py-3 rounded-b-sm flex-shrink-0" style={{ borderTop: '1px solid #ebe9e4', background: '#f4f3f0' }}>
           <div className={`grid ${hasPutts ? 'grid-cols-3' : 'grid-cols-2'} gap-6 text-center`}>
             <div>
               <div className="text-[10px] text-ink-muted uppercase tracking-wide font-bold">Gross</div>
@@ -1914,7 +1914,7 @@ function PlayerScorecardModal({ player, allScores, course, onClose }) {
 function TGLBoard({ tglData, locked }) {
   if (!tglData) {
     return (
-      <div className="text-center py-12 text-gray-400">
+      <div className="text-center py-12 text-ink-muted">
         <p className="font-medium">No Team Play data yet</p>
         <p className="text-sm mt-1">Assign team selections in the admin Team Play tab, then scores will appear here.</p>
       </div>
@@ -1926,7 +1926,7 @@ function TGLBoard({ tglData, locked }) {
   return (
     <div className="space-y-4">
       {!locked && (
-        <div className="bg-amber-50 border border-amber-200 rounded-lg px-4 py-2 text-xs text-amber-700 font-medium">
+        <div className="bg-status-upcoming-bg border border-surface-border rounded-sm px-4 py-2 text-xs text-status-upcoming-text font-medium">
           ⚠ Selections not yet submitted — results may change until admin locks this event.
         </div>
       )}
@@ -1935,18 +1935,18 @@ function TGLBoard({ tglData, locked }) {
         {teamResults.map((tr, i) => (
           <div
             key={tr.team.id}
-            className="rounded-xl overflow-hidden border border-gray-200"
+            className="rounded-sm overflow-hidden border border-surface-border"
             style={{ borderLeftWidth: 4, borderLeftColor: tr.team.color }}
           >
             <div className="flex items-center justify-between px-4 py-3 bg-white">
               <div className="flex items-center gap-3">
-                <span className="text-lg font-bold text-gray-400 w-6">#{tr.rank}</span>
+                <span className="text-lg font-bold text-ink-muted w-6">#{tr.rank}</span>
                 <div>
                   <div className="flex items-center gap-2">
                     <span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: tr.team.color }} />
-                    <span className="font-bold text-gray-900">{tr.team.name}</span>
+                    <span className="font-bold text-ink">{tr.team.name}</span>
                   </div>
-                  <div className="text-xs text-gray-500 mt-0.5 pl-4">
+                  <div className="text-xs text-ink-muted mt-0.5 pl-4">
                     {tr.selectedPlayers.length === 0
                       ? 'No players selected'
                       : tr.selectedPlayers.map(p => `${p.name} (#${p.rank ?? '?'})`).join(' · ')}
@@ -1964,7 +1964,7 @@ function TGLBoard({ tglData, locked }) {
         ))}
       </div>
 
-      <p className="text-xs text-gray-400 text-center pt-1">
+      <p className="text-xs text-ink-muted text-center pt-1">
         Points: field size − finishing position + 1 · ties split equally
       </p>
     </div>
@@ -1976,7 +1976,7 @@ function LeaderboardSkeleton() {
     <div className="min-h-screen" style={{ background: '#fbfaf8' }}>
       <div className="h-24 animate-pulse" style={{ background: '#eceae5' }} />
       <div className="max-w-2xl mx-auto px-4 py-4 space-y-3">
-        {[0,1,2,3].map(i => <div key={i} className="h-16 rounded-xl animate-pulse" style={{ background: '#eceae5' }} />)}
+        {[0,1,2,3].map(i => <div key={i} className="h-16 rounded-sm animate-pulse" style={{ background: '#eceae5' }} />)}
       </div>
     </div>
   )

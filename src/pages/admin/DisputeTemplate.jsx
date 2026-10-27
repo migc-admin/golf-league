@@ -10,15 +10,15 @@ import { useAuth } from '../../hooks/useAuth'
 import { supabase } from '../../lib/supabase'
 import { useOrg } from '../../lib/OrgContext'
 import toast from 'react-hot-toast'
+import Button from '../../components/ui/Button'
 
-const GREEN = '#1B4332'
 const RED   = '#7f1d1d'
 
 function Field({ label, value }) {
   return (
-    <div className="flex flex-col sm:flex-row sm:items-start gap-1 sm:gap-4 py-2.5 border-b border-gray-100 last:border-0">
-      <span className="text-xs text-gray-400 font-medium sm:w-44 shrink-0 pt-0.5">{label}</span>
-      <span className="text-sm text-gray-800 font-medium break-all">{value || '—'}</span>
+    <div className="flex flex-col sm:flex-row sm:items-start gap-1 sm:gap-4 py-2.5 border-b border-surface-border last:border-0">
+      <span className="text-xs text-ink-muted font-medium sm:w-44 shrink-0 pt-0.5">{label}</span>
+      <span className="text-sm text-ink font-medium break-all">{value || '—'}</span>
     </div>
   )
 }
@@ -176,18 +176,18 @@ Date: ${today}
             Dispute Response
           </span>
         </div>
-        <h1 className="text-2xl font-bold text-gray-900">Chargeback Response Template</h1>
-        <p className="text-sm text-gray-500 mt-1">
+        <h1 className="text-2xl font-bold text-ink">Chargeback Response Template</h1>
+        <p className="text-sm text-ink-muted mt-1">
           Fill in the dispute details from your Stripe alert email, then copy the evidence block
           and paste it into Stripe's dispute response form.
         </p>
       </div>
 
       {/* Alert box */}
-      <div className="rounded-xl px-5 py-4 text-sm" style={{ background: '#fff7f7', border: '1px solid #fecaca' }}>
+      <div className="rounded-sm px-5 py-4 text-sm" style={{ background: '#fff7f7', border: '1px solid #fecaca' }}>
         <p className="font-semibold mb-1" style={{ color: RED }}>Before submitting to Stripe</p>
-        <ol className="list-decimal pl-5 space-y-1 text-gray-700">
-          <li>Open the dispute in your <a href="https://dashboard.stripe.com/disputes" target="_blank" rel="noopener noreferrer" className="underline" style={{ color: GREEN }}>Stripe Dashboard</a></li>
+        <ol className="list-decimal pl-5 space-y-1 text-ink">
+          <li>Open the dispute in your <a href="https://dashboard.stripe.com/disputes" target="_blank" rel="noopener noreferrer" className="underline text-fairway-700">Stripe Dashboard</a></li>
           <li>Fill in the fields below from the dispute details</li>
           <li>Copy the generated evidence text and paste into Stripe's "Additional information" field</li>
           <li>Attach the screenshots listed at the bottom of the evidence block</li>
@@ -196,10 +196,10 @@ Date: ${today}
       </div>
 
       {/* Step 1: Fill in dispute details */}
-      <div className="bg-white rounded-2xl border border-gray-200 overflow-hidden">
-        <div className="px-6 py-4 border-b border-gray-100">
-          <h2 className="text-sm font-bold text-gray-900">Step 1 — Enter Dispute Details</h2>
-          <p className="text-xs text-gray-400 mt-0.5">From your Stripe alert email or the Stripe dashboard</p>
+      <div className="bg-white rounded-sm border border-surface-border overflow-hidden">
+        <div className="px-6 py-4 border-b border-surface-border">
+          <h2 className="text-sm font-bold text-ink">Step 1 — Enter Dispute Details</h2>
+          <p className="text-xs text-ink-muted mt-0.5">From your Stripe alert email or the Stripe dashboard</p>
         </div>
         <div className="px-6 py-5 grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div>
@@ -243,12 +243,12 @@ Date: ${today}
       </div>
 
       {/* Step 2: Auto-populated account evidence */}
-      <div className="bg-white rounded-2xl border border-gray-200 overflow-hidden">
-        <div className="px-6 py-4 border-b border-gray-100">
-          <h2 className="text-sm font-bold text-gray-900">Step 2 — Verify Account Evidence</h2>
-          <p className="text-xs text-gray-400 mt-0.5">Auto-populated from your Scorify Golf account</p>
+      <div className="bg-white rounded-sm border border-surface-border overflow-hidden">
+        <div className="px-6 py-4 border-b border-surface-border">
+          <h2 className="text-sm font-bold text-ink">Step 2 — Verify Account Evidence</h2>
+          <p className="text-xs text-ink-muted mt-0.5">Auto-populated from your Scorify Golf account</p>
         </div>
-        <div className="px-6 py-2 divide-y divide-gray-50">
+        <div className="px-6 py-2 divide-y divide-surface-border">
           <Field label="Organization" value={org?.name} />
           <Field label="Organization ID" value={org?.id} />
           <Field label="Subscription Tier" value={org?.tier} />
@@ -256,44 +256,40 @@ Date: ${today}
           <Field label="Refund Policy URL" value="scorifygolf.com/refund-policy" />
           <Field label="Support Email" value="admin@scorifygolf.com" />
         </div>
-        <div className="px-6 py-4 border-t border-gray-100">
-          <p className="text-xs text-gray-500">
+        <div className="px-6 py-4 border-t border-surface-border">
+          <p className="text-xs text-ink-muted">
             To pull security logs for this dispute, go to your{' '}
-            <a href="https://supabase.com/dashboard" target="_blank" rel="noopener noreferrer" className="underline" style={{ color: GREEN }}>
+            <a href="https://supabase.com/dashboard" target="_blank" rel="noopener noreferrer" className="underline text-fairway-700">
               Supabase Dashboard
             </a>{' '}
-            → Table Editor → <code className="bg-gray-100 px-1 rounded text-xs">security_log</code> → filter by <code className="bg-gray-100 px-1 rounded text-xs">org_id</code>.
+            → Table Editor → <code className="bg-surface-high px-1 rounded text-xs">security_log</code> → filter by <code className="bg-surface-high px-1 rounded text-xs">org_id</code>.
           </p>
         </div>
       </div>
 
       {/* Step 3: Generated evidence text */}
-      <div className="bg-white rounded-2xl border border-gray-200 overflow-hidden">
-        <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between gap-3">
+      <div className="bg-white rounded-sm border border-surface-border overflow-hidden">
+        <div className="px-6 py-4 border-b border-surface-border flex items-center justify-between gap-3">
           <div>
-            <h2 className="text-sm font-bold text-gray-900">Step 3 — Copy Evidence Text</h2>
-            <p className="text-xs text-gray-400 mt-0.5">Paste this into Stripe's "Additional information" field</p>
+            <h2 className="text-sm font-bold text-ink">Step 3 — Copy Evidence Text</h2>
+            <p className="text-xs text-ink-muted mt-0.5">Paste this into Stripe's "Additional information" field</p>
           </div>
-          <button
-            onClick={copyToClipboard}
-            className="shrink-0 px-4 py-2 rounded-xl text-sm font-semibold text-white transition-opacity hover:opacity-90"
-            style={{ background: copied ? '#16a34a' : GREEN }}
-          >
-            {copied ? '✓ Copied' : 'Copy Text'}
-          </button>
+          <Button className="shrink-0" onClick={copyToClipboard}>
+            {copied ? 'Copied' : 'Copy text'}
+          </Button>
         </div>
         <div className="px-6 py-4">
-          <pre className="text-xs leading-relaxed whitespace-pre-wrap font-mono text-gray-700 bg-gray-50 rounded-xl p-4 overflow-x-auto" style={{ maxHeight: 400 }}>
+          <pre className="text-xs leading-relaxed whitespace-pre-wrap font-mono text-ink bg-surface-container rounded-sm p-4 overflow-x-auto" style={{ maxHeight: 400 }}>
             {evidenceText}
           </pre>
         </div>
       </div>
 
       {/* Step 4: Checklist */}
-      <div className="bg-white rounded-2xl border border-gray-200 overflow-hidden">
-        <div className="px-6 py-4 border-b border-gray-100">
-          <h2 className="text-sm font-bold text-gray-900">Step 4 — Screenshot Checklist</h2>
-          <p className="text-xs text-gray-400 mt-0.5">Attach these to the Stripe dispute form</p>
+      <div className="bg-white rounded-sm border border-surface-border overflow-hidden">
+        <div className="px-6 py-4 border-b border-surface-border">
+          <h2 className="text-sm font-bold text-ink">Step 4 — Screenshot Checklist</h2>
+          <p className="text-xs text-ink-muted mt-0.5">Attach these to the Stripe dispute form</p>
         </div>
         <ul className="px-6 py-4 space-y-3">
           {[
@@ -307,15 +303,15 @@ Date: ${today}
             <li key={item} className="flex items-start gap-3">
               <input type="checkbox" className="mt-0.5 shrink-0 rounded" />
               <div>
-                <p className="text-sm font-medium text-gray-800">{item}</p>
-                <p className="text-xs text-gray-400 mt-0.5">{detail}</p>
+                <p className="text-sm font-medium text-ink">{item}</p>
+                <p className="text-xs text-ink-muted mt-0.5">{detail}</p>
               </div>
             </li>
           ))}
         </ul>
       </div>
 
-      <p className="text-xs text-center text-gray-400 pb-6">
+      <p className="text-xs text-center text-ink-muted pb-6">
         Questions? Email <a href="mailto:admin@scorifygolf.com" className="underline">admin@scorifygolf.com</a>
       </p>
     </div>

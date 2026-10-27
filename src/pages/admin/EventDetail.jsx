@@ -28,6 +28,11 @@ import PrintAssets from '../../components/ui/PrintAssets'
 import { matchCH, computeMatchPoints, TIEBREAK_PRESETS } from '../../lib/engines/matchPoints'
 import { computePlayerPayouts } from '../../lib/engines/payoutSummary'
 import EventEmailModal from '../../components/ui/EventEmailModal'
+import { ActionButton } from '../../components/ui/Button'
+import ExportRow from '../../components/ui/ExportRow'
+import SectionCard, { LockedSectionCard } from '../../components/ui/SectionCard'
+import HeroEmailCard from '../../components/ui/HeroEmailCard'
+import EventAdminHeader from '../../components/ui/EventAdminHeader'
 import { atLimit, getLimit, nextTier, TIER_LABELS } from '../../lib/features'
 import { BUY_IN_ELIGIBLE_KEYS, OPT_IN_GAME_LABELS, optInAmount, isBuyInEnabled, baseSideGameKey, isPerFlight } from '../../lib/sideGames'
 
@@ -124,6 +129,7 @@ export default function EventDetail() {
   const [tglSelections,  setTglSelections]  = useState([])
   const [tglLocked,      setTglLocked]      = useState(false)
   const [loading,        setLoading]        = useState(true)
+  const [headerEditOpen, setHeaderEditOpen] = useState(false)
   const [printAsset,     setPrintAsset]     = useState(null) // 'cards' | 'tee_sheet' | 'cart_signs'
   const [searchParams,   setSearchParams]   = useSearchParams()
   const activeTab = searchParams.get('tab') ?? 'Overview'
@@ -219,8 +225,8 @@ export default function EventDetail() {
     if (inserted?.slug) navigate(`/admin/${orgSlug}/${leagueSlug}/${inserted.slug}`)
   }
 
-  if (loading) return <div className="animate-pulse space-y-4"><div className="h-10 w-64 bg-gray-200 rounded" /><div className="h-48 bg-gray-200 rounded-xl" /></div>
-  if (!event)  return <p className="text-gray-500">Event not found.</p>
+  if (loading) return <div className="animate-pulse space-y-4"><div className="h-10 w-64 bg-surface-high rounded" /><div className="h-48 bg-surface-high rounded-sm" /></div>
+  if (!event)  return <p className="text-ink-muted">Event not found.</p>
 
   // Only computed when the "Payouts per Player" print asset is open — mirrors
   // TabPayoutSummary's exact computation so the printed sheet always matches
@@ -232,46 +238,38 @@ export default function EventDetail() {
   return (
     <div className="space-y-5">
       {/* Breadcrumb */}
-      <nav className="text-sm text-gray-500 flex items-center gap-1.5">
-        <Link to="/admin" className="hover:text-gray-700">Home</Link>
+      <nav className="text-sm text-ink-muted flex items-center gap-1.5">
+        <Link to="/admin" className="hover:text-ink">Home</Link>
         <span>/</span>
-        <Link to="/admin/leagues" className="hover:text-gray-700">Leagues</Link>
+        <Link to="/admin/leagues" className="hover:text-ink">Leagues</Link>
         <span>/</span>
-        <span className="text-gray-800 font-medium">{event.name ?? `Event #${event.event_number}`}</span>
+        <span className="text-ink font-medium">{event.name ?? `Event #${event.event_number}`}</span>
       </nav>
 
       {/* Header */}
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between sm:gap-4">
-        <div className="min-w-0">
-          <div className="flex flex-wrap items-center gap-2">
-            <h1 className="text-xl sm:text-2xl font-bold text-gray-900 leading-tight">
-              {event.league?.name} — {event.name ? event.name : `Event #${event.event_number}`}
-            </h1>
-            <StatusBadge status={event.status} />
-          </div>
-          <p className="text-sm text-gray-500 mt-1">
-            {event.course?.name} · {formatDate(event.event_date)} · Entry: ${event.entry_fee}
-          </p>
-        </div>
-        <div className="flex gap-2 shrink-0 flex-wrap">
-          <a href={`/${orgSlug}/${event.league?.slug}/${event.slug}/event`} target="_blank" rel="noopener noreferrer" className="btn-secondary btn-sm btn">
-            Event Page ↗
-          </a>
-          {event.league?.org_id === import.meta.env.VITE_MIGC_ORG_ID && (
-            <a href={`/wager/${event.id}/board`} target="_blank" rel="noopener noreferrer" className="btn-secondary btn-sm btn">
-              Wager Board ↗
-            </a>
-          )}
-          <button type="button" onClick={handleClone} className="btn-secondary btn-sm btn">
-            Clone Event
-          </button>
-          <EventStatusControl event={event} onUpdated={load} />
-        </div>
-      </div>
-
+      <EventAdminHeader
+        clubName={event.league?.name}
+        title={event.name ? event.name : `Event #${event.event_number}`}
+        statusBadge={<StatusBadge status={event.status} />}
+        meta={`${event.course?.name} · ${formatDate(event.event_date)} · Entry fee $${event.entry_fee}`}
+        links={[
+          { href: `/${orgSlug}/${event.league?.slug}/${event.slug}/event`, label: 'Event page' },
+          ...(event.league?.org_id === import.meta.env.VITE_MIGC_ORG_ID
+            ? [{ href: `/wager/${event.id}/board`, label: 'Wager board' }]
+            : []),
+        ]}
+        quietActions={
+          <>
+            <ActionButton variant="ghost" onClick={() => setHeaderEditOpen(true)}>Edit event</ActionButton>
+            <ActionButton variant="ghost" onClick={handleClone}>Clone event</ActionButton>
+            <EventStatusControl event={event} onUpdated={load} />
+          </>
+        }
+      />
+      <EditEventModal open={headerEditOpen} onClose={() => setHeaderEditOpen(false)} event={event} onSaved={load} />
 
       {/* Tabs — rendered in sidebar on desktop; shown here on mobile only */}
-      <div className="border-b border-gray-200 md:hidden">
+      <div className="border-b border-surface-border md:hidden">
         <nav className="-mb-px flex gap-1 overflow-x-auto">
           {ALL_ADMIN_TABS.filter(tab => {
             if (tab === 'Team Play') return hasFeature('tgl') && tglTeams.length > 0
@@ -299,11 +297,11 @@ export default function EventDetail() {
         <div className="space-y-6">
           {hasFeature('registration') ? (
             <div id="registrations">
-              <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-widest mb-3">Registrations</h3>
+              <h3 className="text-xs font-semibold text-ink-muted uppercase tracking-widest mb-3">Registrations</h3>
               <TabRegistrations event={event} onUpdated={load} orgId={org?.id} />
             </div>
           ) : (
-            <div className="flex items-center gap-3 px-4 py-3 rounded-xl text-sm" style={{ background: '#eff6ff', border: '1px solid #bfdbfe' }}>
+            <div className="flex items-center gap-3 px-4 py-3 rounded-sm text-sm" style={{ background: '#eff6ff', border: '1px solid #bfdbfe' }}>
               <svg width="16" height="16" fill="none" stroke="#1d4ed8" strokeWidth="2" viewBox="0 0 24 24" style={{ flexShrink: 0 }}>
                 <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0110 0v4"/>
               </svg>
@@ -313,8 +311,8 @@ export default function EventDetail() {
               </span>
             </div>
           )}
-          <div id="roster" className="border-t border-gray-100 pt-6">
-            <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-widest mb-3">Players &amp; Flights</h3>
+          <div id="roster" className="border-t border-surface-border pt-6">
+            <h3 className="text-xs font-semibold text-ink-muted uppercase tracking-widest mb-3">Players &amp; Flights</h3>
             <TabFlights event={event} eventPlayers={eventPlayers} course={course} allPlayers={allPlayers} onUpdated={load} />
           </div>
         </div>
@@ -325,14 +323,14 @@ export default function EventDetail() {
           <TabGroups event={event} eventPlayers={eventPlayers} onUpdated={load} orgSlug={orgSlug} allScores={allScores} course={course} />
           {((event.formats ?? (event.format ? [event.format] : [])).includes('match_points') ||
             (event.formats ?? (event.format ? [event.format] : [])).includes('ryder_cup')) && (
-            <div className="border-t border-gray-100 pt-6">
-              <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-widest mb-3">Match Play Pairings</h3>
+            <div className="border-t border-surface-border pt-6">
+              <h3 className="text-xs font-semibold text-ink-muted uppercase tracking-widest mb-3">Match Play Pairings</h3>
               <MatchPairingsManager event={event} eventId={event.id} eventPlayers={eventPlayers} allScores={allScores} course={course} onUpdated={load} />
             </div>
           )}
           {(event.formats ?? (event.format ? [event.format] : [])).includes('team_match_play') && (
-            <div className="border-t border-gray-100 pt-6">
-              <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-widest mb-3">Team Match Setup</h3>
+            <div className="border-t border-surface-border pt-6">
+              <h3 className="text-xs font-semibold text-ink-muted uppercase tracking-widest mb-3">Team Match Setup</h3>
               <TeamMatchSetup event={event} eventPlayers={eventPlayers} onUpdated={load} />
             </div>
           )}
@@ -354,11 +352,11 @@ export default function EventDetail() {
       {activeTab === 'Payout' && (
         <div className="space-y-6">
           <div id="payout-config">
-            <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-widest mb-3">Payout Config</h3>
+            <h3 className="text-xs font-semibold text-ink-muted uppercase tracking-widest mb-3">Payout Config</h3>
             <TabPayoutConfig event={event} eventPlayers={eventPlayers} course={course} onUpdated={load} />
           </div>
-          <div id="payout-summary" className="border-t border-gray-100 pt-6">
-            <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-widest mb-3">Payout Summary</h3>
+          <div id="payout-summary" className="border-t border-surface-border pt-6">
+            <h3 className="text-xs font-semibold text-ink-muted uppercase tracking-widest mb-3">Payout Summary</h3>
             <TabPayoutSummary event={event} eventPlayers={eventPlayers} allScores={allScores} sideGames={sideGames} course={course} />
           </div>
         </div>
@@ -741,15 +739,15 @@ function TabOverview({ event, eventPlayers, allScores, sideGames, course, confli
           />
           <div className="space-y-2 mt-1">
             {conflicts.map((c, i) => (
-              <div key={i} className="flex items-start justify-between text-sm bg-white border border-red-200 rounded-lg px-3 py-2">
+              <div key={i} className="flex items-start justify-between text-sm bg-white border border-red-200 rounded-sm px-3 py-2">
                 <div>
-                  <span className="font-semibold text-gray-900">
+                  <span className="font-semibold text-ink">
                     {c.player?.first_name} {c.player?.last_name}
                   </span>
-                  <span className="text-gray-500 ml-2">· Hole {c.hole_number}</span>
+                  <span className="text-ink-muted ml-2">· Hole {c.hole_number}</span>
                 </div>
-                <div className="text-right text-xs text-gray-600">
-                  <div><span className="text-gray-400">Was</span> <strong>{c.previous_score}</strong> by <em>{c.previous_entered_by}</em></div>
+                <div className="text-right text-xs text-ink">
+                  <div><span className="text-ink-muted">Was</span> <strong>{c.previous_score}</strong> by <em>{c.previous_entered_by}</em></div>
                   <div><span className="text-red-500">Changed to</span> <strong>{c.new_score}</strong> by <em>{c.entered_by}</em></div>
                 </div>
               </div>
@@ -786,15 +784,15 @@ function DescriptionEditor({ value, onChange, rows = 5, placeholder = 'Describe 
   }
 
   return (
-    <div className="border border-gray-300 rounded-lg overflow-hidden focus-within:ring-2 focus-within:ring-green-600">
-      <div className="flex gap-1 px-2 py-1.5 bg-gray-50 border-b border-gray-200">
+    <div className="border border-surface-highest rounded-sm overflow-hidden focus-within:ring-2 focus-within:ring-fairway-500">
+      <div className="flex gap-1 px-2 py-1.5 bg-surface-container border-b border-surface-border">
         <button type="button" onMouseDown={e => { e.preventDefault(); wrap('**') }}
-          className="px-2 py-0.5 text-sm font-bold text-gray-700 hover:bg-gray-200 rounded"
+          className="px-2 py-0.5 text-sm font-bold text-ink hover:bg-surface-high rounded"
           title="Bold (**text**)">B</button>
         <button type="button" onMouseDown={e => { e.preventDefault(); wrap('*') }}
-          className="px-2 py-0.5 text-sm italic text-gray-700 hover:bg-gray-200 rounded"
+          className="px-2 py-0.5 text-sm italic text-ink hover:bg-surface-high rounded"
           title="Italic (*text*)">I</button>
-        <span className="text-xs text-gray-400 ml-2 self-center">Select text then click B or I</span>
+        <span className="text-xs text-ink-muted ml-2 self-center">Select text then click B or I</span>
       </div>
       <textarea
         ref={ref}
@@ -882,7 +880,7 @@ function EventPublicFields({ event, onUpdated }) {
           rows={4}
           placeholder="e.g. Drops from the cart path are free within one club length. Ground under repair is marked with white lines."
         />
-        <p className="text-xs text-gray-400 mt-1">
+        <p className="text-xs text-ink-muted mt-1">
           Players see a warning in the scoring app with a button to read these, plus a Local Rules section on the event page. Leave blank for none.
         </p>
       </div>
@@ -904,12 +902,12 @@ function EventPublicFields({ event, onUpdated }) {
         <label className="label">Sponsors</label>
         <div className="space-y-2 mb-3">
           {sponsors.map((s, idx) => (
-            <div key={idx} className="bg-gray-50 rounded-xl px-3 py-2 border border-gray-200 space-y-2">
+            <div key={idx} className="bg-surface-container rounded-sm px-3 py-2 border border-surface-border space-y-2">
               <div className="flex items-center gap-3">
                 {s.logo_url ? (
                   <img src={s.logo_url} alt={s.name} style={{ height: 32, maxWidth: 80, objectFit: 'contain' }} />
                 ) : (
-                  <div className="text-xs text-gray-400 w-20 text-center">No logo</div>
+                  <div className="text-xs text-ink-muted w-20 text-center">No logo</div>
                 )}
                 <span className="text-sm font-semibold flex-1">{s.name}</span>
                 <label className="text-xs text-fairway-600 cursor-pointer underline">
@@ -917,7 +915,7 @@ function EventPublicFields({ event, onUpdated }) {
                   <input type="file" accept="image/*" className="hidden"
                     onChange={e => uploadSponsorLogo(e.target.files[0], idx)} />
                 </label>
-                <button type="button" onClick={() => removeSponsor(idx)} className="text-red-400 hover:text-red-600 text-xs">✕</button>
+                <Button type="button" variant="ghost" size="sm" iconOnly label="Remove sponsor" className="hover:!text-red-600" onClick={() => removeSponsor(idx)}>✕</Button>
               </div>
               <input
                 type="url"
@@ -1007,11 +1005,11 @@ function AdminScoreEditor({ event, eventPlayers, allScores, course, onClose, onS
 
   return (
     <div className="fixed inset-0 z-50 flex" style={{ background: 'rgba(0,0,0,0.6)' }}>
-      <div className="flex w-full max-w-5xl mx-auto my-4 bg-white rounded-xl overflow-hidden shadow-2xl">
+      <div className="flex w-full max-w-5xl mx-auto my-4 bg-white rounded-sm overflow-hidden shadow-2xl">
 
         {/* Sidebar — player list */}
-        <div className="w-56 shrink-0 border-r border-gray-200 flex flex-col" style={{ background: '#f8f9fa' }}>
-          <div className="px-4 py-3 border-b border-gray-200" style={{ background: '#1B4332' }}>
+        <div className="w-56 shrink-0 border-r border-surface-border flex flex-col" style={{ background: '#f8f9fa' }}>
+          <div className="px-4 py-3 border-b border-surface-border" style={{ background: '#1B4332' }}>
             <p className="text-xs font-bold uppercase tracking-wider text-white/70">Players</p>
           </div>
           <div className="flex-1 overflow-y-auto">
@@ -1027,7 +1025,7 @@ function AdminScoreEditor({ event, eventPlayers, allScores, course, onClose, onS
                     <button
                       key={ep.player_id}
                       onClick={() => setSelectedId(ep.player_id)}
-                      className="w-full text-left px-3 py-2.5 border-b border-gray-100 transition-colors"
+                      className="w-full text-left px-3 py-2.5 border-b border-surface-border transition-colors"
                       style={{ background: isSelected ? '#1B4332' : 'transparent', color: isSelected ? '#fff' : '#212529' }}
                     >
                       <div className="text-xs font-semibold truncate">{ep.player?.first_name} {ep.player?.last_name}</div>
@@ -1045,7 +1043,7 @@ function AdminScoreEditor({ event, eventPlayers, allScores, course, onClose, onS
         {/* Main — score grid */}
         <div className="flex-1 flex flex-col overflow-hidden">
           {/* Header */}
-          <div className="flex items-center justify-between px-5 py-3 border-b border-gray-200" style={{ background: '#1B4332', borderBottom: '2px solid #D4AF37' }}>
+          <div className="flex items-center justify-between px-5 py-3 border-b border-surface-border" style={{ background: '#1B4332', borderBottom: '2px solid #D4AF37' }}>
             <div>
               <p style={{ fontFamily: "'Manrope',sans-serif", color: '#D4AF37', fontWeight: 700, fontSize: '1rem' }}>
                 Admin Score Entry
@@ -1065,7 +1063,7 @@ function AdminScoreEditor({ event, eventPlayers, allScores, course, onClose, onS
           {/* Score grid */}
           <div className="flex-1 overflow-y-auto p-4">
             {!course ? (
-              <p className="text-sm text-gray-400 text-center py-8">No course data available.</p>
+              <p className="text-sm text-ink-muted text-center py-8">No course data available.</p>
             ) : (
               [['Front 9', holes.slice(0,9)], ['Back 9', holes.slice(9)]].map(([label, holeGroup]) => (
                 <div key={label} className="mb-5">
@@ -1092,7 +1090,7 @@ function AdminScoreEditor({ event, eventPlayers, allScores, course, onClose, onS
                         </tr>
                       </thead>
                       <tbody>
-                        <tr className="border-t border-gray-200">
+                        <tr className="border-t border-surface-border">
                           <td className="px-2 py-1 font-semibold" style={{ color: '#1B4332' }}>Gross</td>
                           {holeGroup.map(h => {
                             const val = getVal(h, 'gross')
@@ -1106,7 +1104,7 @@ function AdminScoreEditor({ event, eventPlayers, allScores, course, onClose, onS
                                   min="1" max="15"
                                   value={val}
                                   onChange={e => setVal(h, 'gross', e.target.value)}
-                                  className="w-10 text-center font-bold text-sm border border-gray-200 rounded focus:outline-none focus:border-fairway-500"
+                                  className="w-10 text-center font-bold text-sm border border-surface-border rounded focus:outline-none focus:border-fairway-500"
                                   style={{ background: 'transparent' }}
                                   inputMode="numeric"
                                 />
@@ -1120,7 +1118,7 @@ function AdminScoreEditor({ event, eventPlayers, allScores, course, onClose, onS
                             }, 0) || '—'}
                           </td>
                         </tr>
-                        <tr className="border-t border-gray-100">
+                        <tr className="border-t border-surface-border">
                           <td className="px-2 py-1 font-semibold" style={{ color: '#6c757d' }}>Putts</td>
                           {holeGroup.map(h => (
                             <td key={h} className="px-1 py-1 text-center">
@@ -1129,7 +1127,7 @@ function AdminScoreEditor({ event, eventPlayers, allScores, course, onClose, onS
                                 min="0" max="10"
                                 value={getVal(h, 'putts')}
                                 onChange={e => setVal(h, 'putts', e.target.value)}
-                                className="w-10 text-center text-xs border border-gray-200 rounded focus:outline-none focus:border-fairway-500"
+                                className="w-10 text-center text-xs border border-surface-border rounded focus:outline-none focus:border-fairway-500"
                                 inputMode="numeric"
                               />
                             </td>
@@ -1150,8 +1148,8 @@ function AdminScoreEditor({ event, eventPlayers, allScores, course, onClose, onS
           </div>
 
           {/* Footer */}
-          <div className="border-t border-gray-200 px-5 py-3 flex items-center justify-between bg-gray-50">
-            <p className="text-xs text-gray-400">Scores are saved per player. Switch players using the sidebar.</p>
+          <div className="border-t border-surface-border px-5 py-3 flex items-center justify-between bg-surface-container">
+            <p className="text-xs text-ink-muted">Scores are saved per player. Switch players using the sidebar.</p>
             <Button onClick={savePlayer} loading={saving}>Save Scores</Button>
           </div>
         </div>
@@ -1236,9 +1234,9 @@ function EditHandicapModal({ ep, course, onClose, onSaved }) {
 
   return (
     <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
-      <div className="bg-white rounded-2xl shadow-xl w-full max-w-sm p-6 space-y-4">
-        <h2 className="text-lg font-bold text-gray-900">Edit Handicap</h2>
-        <p className="text-sm text-gray-600">{ep.player?.first_name} {ep.player?.last_name}</p>
+      <div className="bg-white rounded-sm shadow-xl w-full max-w-sm p-6 space-y-4">
+        <h2 className="text-lg font-bold text-ink">Edit Handicap</h2>
+        <p className="text-sm text-ink">{ep.player?.first_name} {ep.player?.last_name}</p>
 
         <div>
           <label className="label">Handicap Index</label>
@@ -1256,7 +1254,7 @@ function EditHandicapModal({ ep, course, onClose, onSaved }) {
           <div className="flex items-center justify-between mb-1">
             <label className="label mb-0">Course Handicap</label>
             {course && (
-              <label className="flex items-center gap-1.5 text-xs text-gray-500 cursor-pointer">
+              <label className="flex items-center gap-1.5 text-xs text-ink-muted cursor-pointer">
                 <input type="checkbox" checked={autoCalc} onChange={e => toggleAuto(e.target.checked)} />
                 Auto-calculate
               </label>
@@ -1271,15 +1269,15 @@ function EditHandicapModal({ ep, course, onClose, onSaved }) {
             readOnly={autoCalc}
           />
           {autoCalc && chSlope && (
-            <p className="text-xs text-gray-400 mt-1">
+            <p className="text-xs text-ink-muted mt-1">
               {teeName && <span className="font-medium">{teeName} tee — </span>}
               ({hi} × {chSlope} / 113) + ({chRating} − {chPar})
             </p>
           )}
         </div>
 
-        <div className="border-t border-gray-100 pt-3">
-          <label className="flex items-center gap-1.5 text-xs text-gray-500 cursor-pointer mb-2">
+        <div className="border-t border-surface-border pt-3">
+          <label className="flex items-center gap-1.5 text-xs text-ink-muted cursor-pointer mb-2">
             <input
               type="checkbox"
               checked={sameForMatchPlay}
@@ -1297,7 +1295,7 @@ function EditHandicapModal({ ep, course, onClose, onSaved }) {
                 className="input"
                 placeholder="e.g. 12"
               />
-              <p className="text-xs text-gray-400 mt-1">
+              <p className="text-xs text-ink-muted mt-1">
                 Used only for match play scoring in this event — stroke play keeps the Course Handicap above.
               </p>
             </div>
@@ -1329,161 +1327,202 @@ function TabPostRound({ event, eventPlayers, allScores, course, sideGames, orgNa
   const hasBuyInGames = [...new Set((event?.side_game_options ?? []).map(k => k.replace(/_[ab]$/, '')))]
     .some(k => isBuyInEnabled(event, k))
 
-  return (
-    <div className="space-y-6 max-w-xl">
+  const isComplete = event.status === 'complete'
+  const hasScores = (allScores ?? []).length > 0
 
-      {/* ── Pre-Round ─────────────────────────────────────────── */}
-      <div id="print-assets" className="bg-gray-50 rounded-xl px-4 py-4 space-y-3">
-        <div className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2">Pre-Round</div>
-        <div>
-          <div className="text-sm font-medium text-gray-800 mb-2">Print Assets</div>
-          <div className="flex gap-2 flex-wrap">
-            <Button size="sm" variant="secondary" onClick={() => onPrintAsset('tee_sheet')}>Tee Sheet</Button>
-            <Button size="sm" variant="secondary" onClick={() => onPrintAsset('cart_signs')}>Cart Signs</Button>
-            <Button size="sm" variant="secondary" onClick={() => onPrintAsset('cards')}>Side Game Signs</Button>
-            {hasOptInGames && (
-              <Button size="sm" variant="secondary" onClick={() => onPrintAsset('checkin_qr')}>Check-In QR</Button>
-            )}
-            {hasBuyInGames && (
-              <Button size="sm" variant="secondary" onClick={() => onPrintAsset('opt_in_rosters')}>Opt-In Rosters</Button>
-            )}
-          </div>
-          <div className="text-xs text-gray-400 mt-1.5">Tee sheet, cart signs, and side game cards for the round</div>
-        </div>
-        <div id="export-scorecards" className="flex items-center justify-between border-t border-gray-200 pt-3">
-          <div>
-            <div className="text-sm font-medium text-gray-800">Export Scorecards (PNG)</div>
-            <div className="text-xs text-gray-400 mt-0.5">Printable scorecards with QR codes, one per group</div>
-          </div>
-          <ExportScorecardsButton
-            event={event}
-            eventPlayers={eventPlayers}
-            course={course}
-            orgName={leagueName}
-            orgSlug={orgSlug}
-            orgLogoUrl={logoUrl}
-          />
-        </div>
-        <div className="flex items-center justify-between border-t border-gray-200 pt-3">
-          <div>
-            <div className="text-sm font-medium text-gray-800">Tournament Details Email</div>
-            <div className="text-xs text-gray-400 mt-0.5">Event info, groups, tee times and matchups — copy and paste into Gmail</div>
-          </div>
-          <Button size="sm" variant="secondary" onClick={() => setEmailKind('pre')}>Preview &amp; Copy</Button>
-        </div>
-        {hasMatchPlay && (
-          <div className="flex items-center justify-between border-t border-gray-200 pt-3">
-            <div>
-              <div className="text-sm font-medium text-gray-800">Match Play Cards (PNG)</div>
-              <div className="text-xs text-gray-400 mt-0.5">Blank paper cards to track hole-by-hole match results</div>
-            </div>
-            <ExportMatchPlayCardsButton
+  const preRoundPanel = (
+    <div id="print-assets">
+      <SectionCard eyebrow="Step 1 · Before the round" title="Pre-round" done={isComplete}>
+        <HeroEmailCard
+          stacked={isComplete}
+          title="Tournament details email"
+          description="Event info, groups, tee times and matchups"
+          onPreview={() => setEmailKind('pre')}
+          onCopy={() => setEmailKind('pre')}
+        />
+        <h3 className="mb-1 text-[11px] font-bold uppercase tracking-widest text-ink-muted">Print</h3>
+        <ExportRow
+          stacked={isComplete}
+          title="Tee sheet" tag="PRINT"
+          description="Groups, tee times and starting holes"
+          actions={<ActionButton onClick={() => onPrintAsset('tee_sheet')}>Preview</ActionButton>}
+        />
+        <ExportRow
+          stacked={isComplete}
+          id="export-scorecards"
+          title="Scorecards" tag="PNG"
+          description="Printable scorecards with QR codes, one per group"
+          actions={
+            <ExportScorecardsButton
               event={event}
               eventPlayers={eventPlayers}
               course={course}
+              orgName={leagueName}
+              orgSlug={orgSlug}
+              orgLogoUrl={logoUrl}
             />
-          </div>
-        )}
-      </div>
-
-      {/* ── Scoring ───────────────────────────────────────────── */}
-      <div id="edit-scores" className="bg-gray-50 rounded-xl px-4 py-4 space-y-3">
-        <div className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2">Scoring</div>
-        <div className="flex items-center justify-between">
-          <div>
-            <div className="text-sm font-medium text-gray-800">Edit Scores</div>
-            <div className="text-xs text-gray-400 mt-0.5">Manually enter or correct hole-by-hole scores</div>
-          </div>
-          <Button size="sm" variant="secondary" onClick={() => setScoreEditor(true)}>Edit Scores</Button>
-        </div>
-        <div className="flex items-center justify-between border-t border-gray-200 pt-3">
-          <div>
-            <div className="text-sm font-medium text-gray-800">Scores Export (CSV)</div>
-            <div className="text-xs text-gray-400 mt-0.5">All player scores, net, gross — one row per player per hole</div>
-          </div>
-          <Button size="sm" variant="secondary" onClick={() => exportScoresCSV(event, eventPlayers, allScores, course, sideGames)}>
-            Download
-          </Button>
-        </div>
-        <div className="flex items-center justify-between border-t border-gray-200 pt-3">
-          <div>
-            <div className="text-sm font-medium text-gray-800">Handicap Entry (Excel)</div>
-            <div className="text-xs text-gray-400 mt-0.5">USGA adjusted scores per hole — amber cells indicate capped scores</div>
-          </div>
-          <Button size="sm" variant="secondary" onClick={() => exportHandicapCSV(event, eventPlayers, allScores, course)}>
-            Download
-          </Button>
-        </div>
-      </div>
-
-      {/* ── Results ───────────────────────────────────────────── */}
-      <div id="scores-export" className="bg-gray-50 rounded-xl px-4 py-4 space-y-3">
-        <div className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2">Results</div>
-        <div className="flex items-center justify-between">
-          <div>
-            <div className="text-sm font-medium text-gray-800">Tournament Results (PNG)</div>
-            <div className="text-xs text-gray-400 mt-0.5">Full results card — scoring, skins, long drive, CTP</div>
-          </div>
-          <ExportResultsButton
-            event={event}
-            eventPlayers={eventPlayers}
-            allScores={allScores}
-            course={course}
-            sideGames={sideGames ?? []}
-            orgName={leagueName}
-            orgLogoUrl={logoUrl}
+          }
+        />
+        {hasMatchPlay && (
+          <ExportRow
+          stacked={isComplete}
+            title="Match play cards" tag="PNG"
+            description="Blank paper cards to track hole-by-hole match results"
+            actions={<ExportMatchPlayCardsButton event={event} eventPlayers={eventPlayers} course={course} />}
           />
-        </div>
-        {hasSkins && (
-          <div className="flex items-center justify-between border-t border-gray-200 pt-3">
-            <div>
-              <div className="text-sm font-medium text-gray-800">Scoring Summary (PNG)</div>
-              <div className="text-xs text-gray-400 mt-0.5">Hole-by-hole skins results by flight, sorted by net score</div>
-            </div>
-            <ExportSkinsGridButton
+        )}
+        <ExportRow
+          stacked={isComplete}
+          title="Cart & side game signs" tag="PRINT"
+          description="Cart signs and side game cards for the round"
+          actions={
+            <>
+              <ActionButton onClick={() => onPrintAsset('cart_signs')}>Cart signs</ActionButton>
+              <ActionButton onClick={() => onPrintAsset('cards')}>Side game signs</ActionButton>
+              {hasOptInGames && (
+                <ActionButton onClick={() => onPrintAsset('checkin_qr')}>Check-in QR</ActionButton>
+              )}
+              {hasBuyInGames && (
+                <ActionButton onClick={() => onPrintAsset('opt_in_rosters')}>Opt-in rosters</ActionButton>
+              )}
+            </>
+          }
+        />
+      </SectionCard>
+    </div>
+  )
+
+  const scoringPanel = (
+    <div id="edit-scores">
+      <SectionCard
+        eyebrow={isComplete ? 'Scores & handicaps' : 'Step 2 · During the round'}
+        title="Scoring"
+      >
+        <ActionButton className="mb-4 w-full" onClick={() => setScoreEditor(true)}>
+          {hasScores ? 'Edit scores' : 'Enter scores'}
+        </ActionButton>
+        <ExportRow
+          id="scores-csv"
+          title="Scores export" tag="CSV"
+          description="All player scores, net, gross — one row per player per hole"
+          actions={
+            <ActionButton
+              icon="download" iconOnly label="Download scores export (CSV)"
+              disabled={!hasScores}
+              onClick={() => exportScoresCSV(event, eventPlayers, allScores, course, sideGames)}
+            >
+              Download
+            </ActionButton>
+          }
+        />
+        <ExportRow
+          title="Handicap entry" tag="XLSX"
+          description="USGA adjusted scores per hole — amber cells indicate capped scores"
+          actions={
+            <ActionButton
+              icon="download" iconOnly label="Download handicap entry (XLSX)"
+              disabled={!hasScores}
+              onClick={() => exportHandicapCSV(event, eventPlayers, allScores, course)}
+            >
+              Download
+            </ActionButton>
+          }
+        />
+        {!hasScores && <p className="mt-1 text-xs text-ink-muted">Available once scores are entered</p>}
+      </SectionCard>
+    </div>
+  )
+
+  const resultsPanel = isComplete ? (
+    <div id="scores-export">
+      <SectionCard eyebrow="Share results" title="Results">
+        <HeroEmailCard
+          title="Results email"
+          description="Winners, payouts and match results"
+          onPreview={() => setEmailKind('post')}
+          onCopy={() => setEmailKind('post')}
+        />
+        <ExportRow
+          title="Tournament results" tag="PNG"
+          description="Full results card — scoring, skins, long drive, CTP"
+          actions={
+            <ExportResultsButton
               event={event}
               eventPlayers={eventPlayers}
               allScores={allScores}
               course={course}
+              sideGames={sideGames ?? []}
               orgName={leagueName}
               orgLogoUrl={logoUrl}
             />
-          </div>
+          }
+        />
+        <ExportRow
+          title="Payouts per player" tag="PNG"
+          description="Per-player payout totals with category breakdown"
+          actions={<ActionButton onClick={() => onPrintAsset('payouts_per_player')}>Preview</ActionButton>}
+        />
+        {hasSkins && (
+          <ExportRow
+            title="Skins by flight" tag="PNG"
+            description="Hole-by-hole skins results by flight, sorted by net score"
+            actions={
+              <ExportSkinsGridButton
+                event={event}
+                eventPlayers={eventPlayers}
+                allScores={allScores}
+                course={course}
+                orgName={leagueName}
+                orgLogoUrl={logoUrl}
+              />
+            }
+          />
         )}
         {hasTgl && (
-          <div className="flex items-center justify-between border-t border-gray-200 pt-3">
-            <div>
-              <div className="text-sm font-medium text-gray-800">Team Play Results (PNG)</div>
-              <div className="text-xs text-gray-400 mt-0.5">Team participants and points totals for this event</div>
-            </div>
-            <ExportTeamPlayButton
-              event={event}
-              eventPlayers={eventPlayers}
-              allScores={allScores}
-              course={course}
-              tglTeams={tglTeams}
-              tglMembers={tglMembers}
-              tglSelections={tglSelections}
-              orgName={leagueName}
-              orgLogoUrl={logoUrl}
-            />
-          </div>
+          <ExportRow
+            title="Team play standings" tag="PNG"
+            description="Team participants and points totals for this event"
+            actions={
+              <ExportTeamPlayButton
+                event={event}
+                eventPlayers={eventPlayers}
+                allScores={allScores}
+                course={course}
+                tglTeams={tglTeams}
+                tglMembers={tglMembers}
+                tglSelections={tglSelections}
+                orgName={leagueName}
+                orgLogoUrl={logoUrl}
+              />
+            }
+          />
         )}
-        <div className="flex items-center justify-between border-t border-gray-200 pt-3">
-          <div>
-            <div className="text-sm font-medium text-gray-800">Results Email</div>
-            <div className="text-xs text-gray-400 mt-0.5">Winners, payouts and match results — copy and paste into Gmail</div>
-          </div>
-          <Button size="sm" variant="secondary" onClick={() => setEmailKind('post')}>Preview &amp; Copy</Button>
+      </SectionCard>
+    </div>
+  ) : (
+    <LockedSectionCard
+      eyebrow="Step 3 · After the round"
+      title="Results"
+      note="Unlocks when the event is marked complete"
+      items={[
+        'Results email',
+        'Tournament results',
+        'Payouts per player',
+        ...(hasSkins ? ['Skins by flight'] : []),
+        ...(hasTgl ? ['Team play standings'] : []),
+      ]}
+    />
+  )
+
+  return (
+    <div className="mx-auto w-full max-w-[1240px]">
+      <div className="grid items-start gap-6 min-[900px]:grid-cols-3">
+        <div className="space-y-6 min-[900px]:col-span-2">
+          {isComplete ? resultsPanel : preRoundPanel}
         </div>
-        <div className="flex items-center justify-between border-t border-gray-200 pt-3">
-          <div>
-            <div className="text-sm font-medium text-gray-800">Payouts per Player (PNG)</div>
-            <div className="text-xs text-gray-400 mt-0.5">Per-player payout totals with category breakdown</div>
-          </div>
-          <Button size="sm" variant="secondary" onClick={() => onPrintAsset('payouts_per_player')}>
-            Payouts per Player
-          </Button>
+        <div className="space-y-6">
+          {scoringPanel}
+          {isComplete ? preRoundPanel : resultsPanel}
         </div>
       </div>
 
@@ -1574,32 +1613,29 @@ function EventPhotosManager({ event, onUpdated }) {
     <div className="p-4 space-y-4">
       {/* Toolbar */}
       <div className="flex items-center gap-3 flex-wrap">
-        <label className={`inline-flex items-center gap-2 px-4 py-2 rounded-lg border-2 border-dashed cursor-pointer text-sm font-semibold transition-colors ${uploading ? 'opacity-50 pointer-events-none border-gray-200 text-gray-400' : 'border-fairway-400 text-fairway-700 hover:bg-fairway-50'}`}>
+        <label className={`inline-flex items-center gap-2 px-4 py-2 rounded-sm border-2 border-dashed cursor-pointer text-sm font-semibold transition-colors ${uploading ? 'opacity-50 pointer-events-none border-surface-border text-ink-muted' : 'border-fairway-400 text-fairway-700 hover:bg-fairway-50'}`}>
           <svg width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2M12 12V4m0 0L8 8m4-4l4 4"/></svg>
           {uploading ? 'Uploading…' : 'Upload Photos'}
           <input type="file" accept="image/*" multiple className="hidden" onChange={handleUpload} disabled={uploading} />
         </label>
         {photos.length > 0 && (
-          <button onClick={downloadAll} className="inline-flex items-center gap-2 px-4 py-2 rounded-lg border border-gray-200 text-sm font-semibold text-gray-600 hover:bg-gray-50 transition-colors">
-            <svg width="15" height="15" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2M12 4v12m0 0l-4-4m4 4l4-4"/></svg>
-            Download All ({photos.length})
-          </button>
+          <Button variant="secondary" icon="download" onClick={downloadAll}>Download all ({photos.length})</Button>
         )}
       </div>
-      <p className="text-xs text-gray-400">JPG, PNG, HEIC · Multiple files supported</p>
+      <p className="text-xs text-ink-muted">JPG, PNG, HEIC · Multiple files supported</p>
 
       {/* Photo grid */}
       {photos.length > 0 ? (
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
           {photos.map((photo, i) => (
-            <div key={i} className="relative group rounded-xl overflow-hidden border border-gray-100">
+            <div key={i} className="relative group rounded-sm overflow-hidden border border-surface-border">
               <div className="aspect-square">
                 <img src={photo.url} alt={photo.caption ?? `Event photo ${i + 1}`} className="w-full h-full object-cover" />
               </div>
               {(photo.caption || photo.uploaded_by) && (
                 <div className="px-2 py-1.5 bg-white">
-                  {photo.caption && <p className="text-xs font-semibold text-gray-800 truncate">{photo.caption}</p>}
-                  {photo.uploaded_by && <p className="text-xs text-gray-400 truncate">{photo.uploaded_by}</p>}
+                  {photo.caption && <p className="text-xs font-semibold text-ink truncate">{photo.caption}</p>}
+                  {photo.uploaded_by && <p className="text-xs text-ink-muted truncate">{photo.uploaded_by}</p>}
                 </div>
               )}
               <button
@@ -1611,7 +1647,7 @@ function EventPhotosManager({ event, onUpdated }) {
           ))}
         </div>
       ) : (
-        <p className="text-sm text-gray-400">No photos yet — upload some from the event.</p>
+        <p className="text-sm text-ink-muted">No photos yet — upload some from the event.</p>
       )}
     </div>
   )
@@ -1685,16 +1721,16 @@ function TabFlights({ event, eventPlayers, course, allPlayers, onUpdated }) {
       <div key={ep.id} className="flex flex-col sm:flex-row sm:items-center sm:justify-between px-5 py-3 gap-2">
         {/* Player info */}
         <div className="flex-1 min-w-0">
-          <div className="font-medium text-sm text-gray-900">
+          <div className="font-medium text-sm text-ink">
             {ep.player?.first_name} {ep.player?.last_name}
           </div>
-          <div className="text-xs text-gray-500 flex items-center gap-2 mt-1 flex-wrap">
+          <div className="text-xs text-ink-muted flex items-center gap-2 mt-1 flex-wrap">
             {ep.is_guest
               ? <span className="bg-purple-100 text-purple-700 font-semibold px-2 py-0.5 rounded-full text-xs">Guest – Player Only</span>
               : <>
                   <span>HI: {ep.handicap_index ?? '—'}</span>
                   {ep.adjusted_handicap_index != null && ep.adjusted_handicap_index !== ep.handicap_index && (
-                    <span className="text-orange-600">Adj: {ep.adjusted_handicap_index}</span>
+                    <span className="text-status-upcoming-text">Adj: {ep.adjusted_handicap_index}</span>
                   )}
                   {ep.course_handicap != null && <span>CH: {ep.course_handicap}</span>}
                   {ep.match_play_course_handicap != null && <span className="text-blue-600">MP: {ep.match_play_course_handicap}</span>}
@@ -1740,7 +1776,7 @@ function TabFlights({ event, eventPlayers, course, allPlayers, onUpdated }) {
             <button
               type="button"
               onClick={() => overrideFlight(ep.id, ep.is_guest ? '' : 'guest')}
-              className={`text-xs shrink-0 px-2 py-1 rounded-full font-semibold border ${ep.is_guest ? 'bg-purple-100 text-purple-700 border-purple-300' : 'bg-gray-100 text-gray-500 border-gray-200'}`}
+              className={`text-xs shrink-0 px-2 py-1 rounded-full font-semibold border ${ep.is_guest ? 'bg-purple-100 text-purple-700 border-purple-300' : 'bg-surface-high text-ink-muted border-surface-border'}`}
             >
               Guest
             </button>
@@ -1812,7 +1848,7 @@ function TabFlights({ event, eventPlayers, course, allPlayers, onUpdated }) {
           else setAddModal(true)
         }} variant="secondary">+ Add Player to Event</Button>
         {eventPlayers.length > 0 && (
-          <span className="text-sm text-gray-500">
+          <span className="text-sm text-ink-muted">
             {useFlights
               ? `${nonGuests.length} players · Flight A: ${flightA.length} · Flight B: ${flightB.length}${guests.length > 0 ? ` · ${guests.length} guest${guests.length !== 1 ? 's' : ''}` : ''}`
               : `${nonGuests.length} player${nonGuests.length !== 1 ? 's' : ''}${guests.length > 0 ? ` · ${guests.length} guest${guests.length !== 1 ? 's' : ''}` : ''}`
@@ -1828,30 +1864,30 @@ function TabFlights({ event, eventPlayers, course, allPlayers, onUpdated }) {
 
       {/* Unassigned warning — only relevant when flights are on */}
       {useFlights && unassigned.length > 0 && (
-        <Card className="overflow-hidden p-0 border-yellow-300">
-          <div className="px-5 py-3 border-b border-yellow-200 flex items-center gap-2 bg-yellow-50">
-            <span className="text-sm font-semibold text-yellow-800">⚠ Unassigned — {unassigned.length} player{unassigned.length !== 1 ? 's' : ''} need a flight</span>
+        <Card className="overflow-hidden p-0 border-surface-border">
+          <div className="px-5 py-3 border-b border-surface-border flex items-center gap-2 bg-status-upcoming-bg">
+            <span className="text-sm font-semibold text-status-upcoming-text">⚠ Unassigned — {unassigned.length} player{unassigned.length !== 1 ? 's' : ''} need a flight</span>
           </div>
-          <div className="divide-y divide-gray-100">
+          <div className="divide-y divide-surface-border">
             {unassigned.map(ep => (
               <div key={ep.id} className="flex items-center justify-between px-5 py-3">
                 <div>
-                  <div className="font-medium text-sm text-gray-900">{ep.player?.first_name} {ep.player?.last_name}</div>
-                  <div className="text-xs text-gray-500 flex items-center gap-3 mt-0.5">
+                  <div className="font-medium text-sm text-ink">{ep.player?.first_name} {ep.player?.last_name}</div>
+                  <div className="text-xs text-ink-muted flex items-center gap-3 mt-0.5">
                     <span>HI: {ep.handicap_index}</span>
                     {ep.course_handicap != null && <span>CH: {ep.course_handicap}</span>}
                   {ep.match_play_course_handicap != null && <span className="text-blue-600">MP: {ep.match_play_course_handicap}</span>}
                   </div>
                 </div>
                 <div className="flex items-center gap-2">
-                  <select value="" onChange={e => overrideFlight(ep.id, e.target.value)} className="input py-1 text-xs w-28 border-yellow-400 bg-yellow-50">
+                  <select value="" onChange={e => overrideFlight(ep.id, e.target.value)} className="input py-1 text-xs w-28 border-surface-outline bg-status-upcoming-bg">
                     <option value="">Assign flight…</option>
                     <option value="A">Flight A</option>
                     <option value="B">Flight B</option>
                     <option value="guest">Guest Player</option>
                   </select>
-                  <button onClick={() => setEditingEp(ep)} className="text-xs px-2 py-1 rounded bg-gray-100 hover:bg-fairway-100 text-gray-600 hover:text-fairway-800 font-medium">Edit HI</button>
-                  <button onClick={() => removePlayer(ep.id)} className="text-red-400 hover:text-red-600 text-xs">✕</button>
+                  <button onClick={() => setEditingEp(ep)} className="text-xs px-2 py-1 rounded bg-surface-high hover:bg-fairway-100 text-ink hover:text-fairway-800 font-medium">Edit HI</button>
+                  <Button variant="ghost" size="sm" iconOnly label="Remove player" className="hover:!text-red-600" onClick={() => removePlayer(ep.id)}>✕</Button>
                 </div>
               </div>
             ))}
@@ -1867,11 +1903,11 @@ function TabFlights({ event, eventPlayers, course, allPlayers, onUpdated }) {
             if (list.length === 0 && eventPlayers.length > 0) return null
             return (
               <Card key={flight} className="overflow-hidden p-0">
-                <div className="px-5 py-3 border-b border-gray-100 flex items-center gap-2 bg-gray-50">
+                <div className="px-5 py-3 border-b border-surface-border flex items-center gap-2 bg-surface-container">
                   <FlightBadge flight={flight} />
-                  <span className="text-sm font-semibold text-gray-700">{list.length} players</span>
+                  <span className="text-sm font-semibold text-ink">{list.length} players</span>
                 </div>
-                <div className="divide-y divide-gray-100">
+                <div className="divide-y divide-surface-border">
                   {list.map(ep => renderPlayerRow(ep))}
                 </div>
               </Card>
@@ -1879,11 +1915,11 @@ function TabFlights({ event, eventPlayers, course, allPlayers, onUpdated }) {
           })}
           {guests.length > 0 && (
             <Card className="overflow-hidden p-0">
-              <div className="px-5 py-3 border-b border-gray-100 flex items-center gap-2 bg-purple-50">
+              <div className="px-5 py-3 border-b border-surface-border flex items-center gap-2 bg-purple-50">
                 <span className="bg-purple-100 text-purple-700 font-semibold px-2 py-0.5 rounded-full text-xs">Guests</span>
-                <span className="text-sm font-semibold text-gray-700">{guests.length} player{guests.length !== 1 ? 's' : ''} — playing only, excluded from bets/payouts</span>
+                <span className="text-sm font-semibold text-ink">{guests.length} player{guests.length !== 1 ? 's' : ''} — playing only, excluded from bets/payouts</span>
               </div>
-              <div className="divide-y divide-gray-100">
+              <div className="divide-y divide-surface-border">
                 {guests.map(ep => renderPlayerRow(ep))}
               </div>
             </Card>
@@ -1893,10 +1929,10 @@ function TabFlights({ event, eventPlayers, course, allPlayers, onUpdated }) {
         /* No flights — single flat roster */
         eventPlayers.length > 0 && (
           <Card className="overflow-hidden p-0">
-            <div className="px-5 py-3 border-b border-gray-100 bg-gray-50">
-              <span className="text-sm font-semibold text-gray-700">Players ({eventPlayers.length})</span>
+            <div className="px-5 py-3 border-b border-surface-border bg-surface-container">
+              <span className="text-sm font-semibold text-ink">Players ({eventPlayers.length})</span>
             </div>
-            <div className="divide-y divide-gray-100">
+            <div className="divide-y divide-surface-border">
               {[...eventPlayers].sort(epAlpha).map(ep => renderPlayerRow(ep))}
             </div>
           </Card>
@@ -1905,7 +1941,7 @@ function TabFlights({ event, eventPlayers, course, allPlayers, onUpdated }) {
 
       {eventPlayers.length === 0 && (
         <Card className="text-center py-10">
-          <p className="text-gray-400 text-sm">No players added yet. Add players to this event.</p>
+          <p className="text-ink-muted text-sm">No players added yet. Add players to this event.</p>
         </Card>
       )}
 
@@ -2075,22 +2111,22 @@ function AddPlayerModal({ open, onClose, eventId, available, course, defaultTeeN
     <Modal open={open} onClose={onClose} title="Add Players to Event" maxWidth="max-w-2xl">
       <form onSubmit={handleSave} className="space-y-4">
         <div className="flex items-center justify-between">
-          <p className="text-sm text-gray-500">{available.length} players available · {selected.length} selected</p>
+          <p className="text-sm text-ink-muted">{available.length} players available · {selected.length} selected</p>
           <div className="flex gap-2">
-            <button type="button" onClick={selectAll} className="text-xs text-fairway-700 hover:underline font-medium">Select All</button>
-            <span className="text-gray-300">|</span>
-            <button type="button" onClick={clearAll}  className="text-xs text-gray-500 hover:underline">Clear</button>
+            <Button type="button" variant="ghost" size="sm" onClick={selectAll}>Select All</Button>
+            <span className="text-surface-outline">|</span>
+            <Button type="button" variant="ghost" size="sm" onClick={clearAll}>Clear</Button>
           </div>
         </div>
 
         {available.length === 0 ? (
-          <p className="text-sm text-gray-400 py-4 text-center">All players from the roster are already on this event.</p>
+          <p className="text-sm text-ink-muted py-4 text-center">All players from the roster are already on this event.</p>
         ) : (
-          <div className="border border-gray-200 rounded-xl overflow-hidden">
+          <div className="border border-surface-border rounded-sm overflow-hidden">
             {/* Sticky search */}
-            <div className="sticky top-0 z-10 bg-white border-b border-gray-100 px-3 py-2">
+            <div className="sticky top-0 z-10 bg-white border-b border-surface-border px-3 py-2">
               <div className="relative">
-                <svg className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <svg className="absolute left-2.5 top-1/2 -translate-y-1/2 text-ink-muted" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                   <circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/>
                 </svg>
                 <input
@@ -2102,22 +2138,22 @@ function AddPlayerModal({ open, onClose, eventId, available, course, defaultTeeN
                 />
               </div>
             </div>
-            <div className="max-h-80 overflow-y-auto divide-y divide-gray-100">
+            <div className="max-h-80 overflow-y-auto divide-y divide-surface-border">
             {filtered.length === 0 && (
-              <p className="text-sm text-gray-400 py-4 text-center">No players match "{search}"</p>
+              <p className="text-sm text-ink-muted py-4 text-center">No players match "{search}"</p>
             )}
             {filtered.map(p => {
               const checked = !!bulk[p.id]
               const vals    = bulk[p.id] ?? { hi: '', flight: '' }
               return (
-                <div key={p.id} className={`flex items-center gap-3 px-4 py-2.5 transition-colors ${checked ? 'bg-fairway-50' : 'hover:bg-gray-50'}`}>
+                <div key={p.id} className={`flex items-center gap-3 px-4 py-2.5 transition-colors ${checked ? 'bg-fairway-50' : 'hover:bg-surface-dim'}`}>
                   <input
                     type="checkbox"
                     checked={checked}
                     onChange={() => toggle(p.id)}
                     className="accent-fairway-600 w-4 h-4 shrink-0"
                   />
-                  <span className="text-sm font-medium text-gray-800 flex-1 min-w-0 truncate">
+                  <span className="text-sm font-medium text-ink flex-1 min-w-0 truncate">
                     {p.first_name} {p.last_name}
                   </span>
                   {checked && (
@@ -2141,7 +2177,7 @@ function AddPlayerModal({ open, onClose, eventId, available, course, defaultTeeN
                         <button
                           type="button"
                           onClick={() => setField(p.id, 'flight', vals.flight === 'guest' ? '' : 'guest')}
-                          className={`text-xs shrink-0 px-2 py-1 rounded-full font-semibold border ${vals.flight === 'guest' ? 'bg-purple-100 text-purple-700 border-purple-300' : 'bg-gray-100 text-gray-500 border-gray-200'}`}
+                          className={`text-xs shrink-0 px-2 py-1 rounded-full font-semibold border ${vals.flight === 'guest' ? 'bg-purple-100 text-purple-700 border-purple-300' : 'bg-surface-high text-ink-muted border-surface-border'}`}
                         >
                           Guest
                         </button>
@@ -2159,7 +2195,7 @@ function AddPlayerModal({ open, onClose, eventId, available, course, defaultTeeN
                           />
                           {vals.autoHC ? (
                             <span
-                              className="text-xs text-gray-500 w-16 shrink-0 cursor-pointer hover:text-fairway-700"
+                              className="text-xs text-ink-muted w-16 shrink-0 cursor-pointer hover:text-fairway-700"
                               title="Click to enter manually"
                               onClick={() => setField(p.id, 'autoHC', false)}
                             >
@@ -2178,7 +2214,7 @@ function AddPlayerModal({ open, onClose, eventId, available, course, defaultTeeN
                           <button
                             type="button"
                             onClick={() => setField(p.id, 'autoHC', !vals.autoHC)}
-                            className={`text-xs shrink-0 px-1.5 py-1 rounded font-medium ${vals.autoHC ? 'text-fairway-600 bg-fairway-50' : 'text-orange-600 bg-orange-50'}`}
+                            className={`text-xs shrink-0 px-1.5 py-1 rounded font-medium ${vals.autoHC ? 'text-fairway-600 bg-fairway-50' : 'text-status-upcoming-text bg-status-upcoming-bg'}`}
                             title={vals.autoHC ? 'Auto-calculating CH — click for manual' : 'Manual CH — click for auto'}
                           >
                             {vals.autoHC ? 'Auto' : 'Manual'}
@@ -2369,15 +2405,15 @@ function MatchPairingsManager({ event, eventId, eventPlayers, allScores = [], co
     <div className="space-y-4">
       {/* Ryder Cup team names */}
       {isRyderCup && (
-        <div className="bg-white rounded-xl border border-gray-200 p-4 space-y-3">
-          <h3 className="text-sm font-semibold text-gray-800">Team Names</h3>
+        <div className="bg-white rounded-sm border border-surface-border p-4 space-y-3">
+          <h3 className="text-sm font-semibold text-ink">Team Names</h3>
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="block text-xs font-medium text-gray-500 mb-1">Team A</label>
+              <label className="block text-xs font-medium text-ink-muted mb-1">Team A</label>
               <input className="input w-full" value={teamAName} onChange={e => setTeamAName(e.target.value)} placeholder="e.g. USA" />
             </div>
             <div>
-              <label className="block text-xs font-medium text-gray-500 mb-1">Team B</label>
+              <label className="block text-xs font-medium text-ink-muted mb-1">Team B</label>
               <input className="input w-full" value={teamBName} onChange={e => setTeamBName(e.target.value)} placeholder="e.g. Europe" />
             </div>
           </div>
@@ -2385,7 +2421,7 @@ function MatchPairingsManager({ event, eventId, eventPlayers, allScores = [], co
             type="button"
             onClick={saveTeamNames}
             disabled={savingTeams}
-            className="text-sm font-semibold text-white bg-fairway-700 hover:bg-fairway-800 disabled:opacity-50 px-4 py-1.5 rounded-lg"
+            className="text-sm font-semibold text-white bg-fairway-700 hover:bg-fairway-800 disabled:opacity-50 px-4 py-1.5 rounded-sm"
           >
             {savingTeams ? 'Saving…' : 'Save Team Names'}
           </button>
@@ -2393,27 +2429,27 @@ function MatchPairingsManager({ event, eventId, eventPlayers, allScores = [], co
       )}
 
       {/* Tie rules */}
-      <div className="bg-white rounded-xl border border-gray-200 p-4 space-y-3">
+      <div className="bg-white rounded-sm border border-surface-border p-4 space-y-3">
         <div>
-          <h3 className="text-sm font-semibold text-gray-800">Tie Rules</h3>
-          <p className="text-xs text-gray-400 mt-0.5">What happens when a match is all square after 18 holes.</p>
+          <h3 className="text-sm font-semibold text-ink">Tie Rules</h3>
+          <p className="text-xs text-ink-muted mt-0.5">What happens when a match is all square after 18 holes.</p>
         </div>
-        <label className="flex items-start gap-2 text-sm text-gray-700 cursor-pointer">
+        <label className="flex items-start gap-2 text-sm text-ink cursor-pointer">
           <input type="checkbox" className="mt-0.5" checked={requireWinner} onChange={e => setRequireWinner(e.target.checked)} />
           <span>
             Every match must have a winner
-            <span className="block text-xs text-gray-400">Off: a tied match is halved (½ point each). On: a tie is broken as set below.</span>
+            <span className="block text-xs text-ink-muted">Off: a tied match is halved (½ point each). On: a tie is broken as set below.</span>
           </span>
         </label>
         {requireWinner && (
           <div className="pl-6 space-y-2">
-            <label className="block text-xs font-medium text-gray-600">Tiebreaker</label>
+            <label className="block text-xs font-medium text-ink">Tiebreaker</label>
             <select className="input w-full" value={tiePreset} onChange={e => setTiePreset(e.target.value)}>
               {Object.entries(TIEBREAK_PRESETS).map(([key, p]) => (
                 <option key={key} value={key}>{p.label}</option>
               ))}
             </select>
-            <p className="text-xs text-gray-400">
+            <p className="text-xs text-ink-muted">
               Steps run in the order shown; the first one that separates the two players decides the match. Net scores include the match's handicap strokes.
               {tiePreset === 'putts' && ' Putts only count if putts were entered for both players. A putt-off is played in person, so the match then waits for you to pick the winner.'}
               {' '}You can always pick a winner by hand on any tied match below, which overrides the tiebreaker.
@@ -2423,7 +2459,7 @@ function MatchPairingsManager({ event, eventId, eventPlayers, allScores = [], co
         <div className="flex items-center gap-3">
           <Button size="sm" onClick={saveTieRules} loading={savingRules}>Save Tie Rules</Button>
           {needWinnerCount > 0 && (
-            <span className="text-xs font-semibold text-amber-700 bg-amber-50 border border-amber-200 rounded-full px-2.5 py-1">
+            <span className="text-xs font-semibold text-status-upcoming-text bg-status-upcoming-bg border border-surface-border rounded-full px-2.5 py-1">
               {needWinnerCount} match{needWinnerCount > 1 ? 'es' : ''} need{needWinnerCount > 1 ? '' : 's'} a winner
             </span>
           )}
@@ -2431,24 +2467,22 @@ function MatchPairingsManager({ event, eventId, eventPlayers, allScores = [], co
       </div>
 
       {/* Current pairings — drag to reorder match number */}
-      <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
-        <div className="px-4 py-3 bg-gray-50 border-b border-gray-100 flex items-center justify-between">
+      <div className="bg-white rounded-sm border border-surface-border overflow-hidden">
+        <div className="px-4 py-3 bg-surface-container border-b border-surface-border flex items-center justify-between">
           <div>
-            <h3 className="text-sm font-semibold text-gray-800">Current Match Pairings</h3>
-            {pairings.length > 1 && <p className="text-xs text-gray-400 mt-0.5">Drag to reorder</p>}
+            <h3 className="text-sm font-semibold text-ink">Current Match Pairings</h3>
+            {pairings.length > 1 && <p className="text-xs text-ink-muted mt-0.5">Drag to reorder</p>}
           </div>
           {pairings.length > 0 && (
-            <button type="button" onClick={renumberAll} className="text-xs text-fairway-700 font-semibold hover:underline">
-              Renumber
-            </button>
+            <Button type="button" variant="secondary" size="sm" onClick={renumberAll}>Renumber</Button>
           )}
         </div>
         {pairings.length === 0 ? (
-          <p className="px-4 py-4 text-sm text-gray-400">No pairings assigned yet.</p>
+          <p className="px-4 py-4 text-sm text-ink-muted">No pairings assigned yet.</p>
         ) : (
           <DndContext sensors={dndSensors} collisionDetection={closestCenter} onDragStart={handlePairingDragStart} onDragEnd={handlePairingDragEnd}>
             <SortableContext items={pairings.map(p => p.id)} strategy={verticalListSortingStrategy}>
-              <div className="divide-y divide-gray-100">
+              <div className="divide-y divide-surface-border">
                 {pairings.map(p => {
                   const { relA, relB } = relativeStrokes(p.player_a_id, p.player_b_id)
                   return (
@@ -2463,7 +2497,7 @@ function MatchPairingsManager({ event, eventId, eventPlayers, allScores = [], co
                 if (!p) return null
                 const { relA, relB } = relativeStrokes(p.player_a_id, p.player_b_id)
                 return (
-                  <div className="bg-white border-2 border-fairway-600 rounded-lg px-4 py-3 shadow-xl">
+                  <div className="bg-white border-2 border-fairway-600 rounded-sm px-4 py-3 shadow-xl">
                     <PairingRowLabel pairing={p} relA={relA} relB={relB} />
                   </div>
                 )
@@ -2475,14 +2509,14 @@ function MatchPairingsManager({ event, eventId, eventPlayers, allScores = [], co
 
       {/* Add pairing form */}
       {eventPlayers.length >= 2 && (
-        <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
-          <div className="px-4 py-3 bg-gray-50 border-b border-gray-100">
-            <h3 className="text-sm font-semibold text-gray-800">Add Pairing</h3>
+        <div className="bg-white rounded-sm border border-surface-border overflow-hidden">
+          <div className="px-4 py-3 bg-surface-container border-b border-surface-border">
+            <h3 className="text-sm font-semibold text-ink">Add Pairing</h3>
           </div>
           <div className="p-4 space-y-3">
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <label className="block text-xs font-medium text-gray-600 mb-1">{isRyderCup ? (teamAName || 'Team A') : 'Player A'}</label>
+                <label className="block text-xs font-medium text-ink mb-1">{isRyderCup ? (teamAName || 'Team A') : 'Player A'}</label>
                 <select
                   className="input w-full"
                   value={playerAId}
@@ -2497,7 +2531,7 @@ function MatchPairingsManager({ event, eventId, eventPlayers, allScores = [], co
                 </select>
               </div>
               <div>
-                <label className="block text-xs font-medium text-gray-600 mb-1">{isRyderCup ? (teamBName || 'Team B') : 'Player B'}</label>
+                <label className="block text-xs font-medium text-ink mb-1">{isRyderCup ? (teamBName || 'Team B') : 'Player B'}</label>
                 <select
                   className="input w-full"
                   value={playerBId}
@@ -2521,7 +2555,7 @@ function MatchPairingsManager({ event, eventId, eventPlayers, allScores = [], co
         </div>
       )}
       {unpairedPlayers.length < 2 && pairings.length > 0 && (
-        <p className="text-sm text-gray-400 text-center">All players have been paired.</p>
+        <p className="text-sm text-ink-muted text-center">All players have been paired.</p>
       )}
     </div>
   )
@@ -2529,17 +2563,17 @@ function MatchPairingsManager({ event, eventId, eventPlayers, allScores = [], co
 
 function PairingRowLabel({ pairing: p, relA, relB }) {
   return (
-    <div className="text-sm text-gray-800">
+    <div className="text-sm text-ink">
       <span className="font-semibold text-blue-700">
         {p.playerA?.first_name} {p.playerA?.last_name}{relA > 0 ? ` (${relA})` : ''}
       </span>
       {' '}
-      <span className="text-gray-400">vs</span>
+      <span className="text-ink-muted">vs</span>
       {' '}
       <span className="font-semibold text-purple-700">
         {p.playerB?.first_name} {p.playerB?.last_name}{relB > 0 ? ` (${relB})` : ''}
       </span>
-      <span className="ml-3 text-xs text-gray-400">Match #{p.match_number}</span>
+      <span className="ml-3 text-xs text-ink-muted">Match #{p.match_number}</span>
     </div>
   )
 }
@@ -2562,34 +2596,34 @@ function SortablePairingRow({ pairing, relA, relB, result, onSetWinner, onRemove
     <div ref={setNodeRef} style={style} className="px-4 py-3 bg-white">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3 min-w-0">
-          <span {...attributes} {...listeners} className="cursor-grab text-gray-300 hover:text-gray-500 select-none shrink-0" title="Drag to reorder">⠿</span>
+          <span {...attributes} {...listeners} className="cursor-grab text-surface-outline hover:text-ink-muted select-none shrink-0" title="Drag to reorder">⠿</span>
           <PairingRowLabel pairing={pairing} relA={relA} relB={relB} />
         </div>
         <Button size="sm" variant="danger" onClick={onRemove}>Remove</Button>
       </div>
 
       {tied && (
-        <div className="mt-2 ml-7 rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 space-y-2">
+        <div className="mt-2 ml-7 rounded-sm border border-surface-border bg-surface-container px-3 py-2 space-y-2">
           <div className="text-xs">
             {result.needsWinner && (
-              <span className="font-semibold text-amber-700">
+              <span className="font-semibold text-status-upcoming-text">
                 {result.needsPuttOff
                   ? 'All square after the tiebreakers. Play the putt-off, then pick the winner below.'
                   : 'All square after 18. A winner is needed. Pick one below.'}
               </span>
             )}
             {!result.needsWinner && tb && tb.by === 'manual' && (
-              <span className="font-semibold text-green-700">Winner: {winnerName} (decided by admin)</span>
+              <span className="font-semibold text-status-active-text">Winner: {winnerName} (decided by admin)</span>
             )}
             {!result.needsWinner && tb && tb.by !== 'manual' && (
-              <span className="font-semibold text-green-700">
+              <span className="font-semibold text-status-active-text">
                 Winner: {winnerName} on tiebreak ({tb.label}{tb.unit === 'net' ? ' (net)' : ''}: {result.winner === 'A' ? tb.valueA : tb.valueB} vs {result.winner === 'A' ? tb.valueB : tb.valueA})
               </span>
             )}
-            {!result.needsWinner && !tb && <span className="font-semibold text-gray-600">All square after 18. Halved (½ point each).</span>}
+            {!result.needsWinner && !tb && <span className="font-semibold text-ink">All square after 18. Halved (½ point each).</span>}
           </div>
           <div className="flex flex-wrap items-center gap-2">
-            <label className="text-xs text-gray-500">Winner</label>
+            <label className="text-xs text-ink-muted">Winner</label>
             <select
               className="input text-xs"
               value={pairing.winner_player_id ?? ''}
@@ -2655,49 +2689,49 @@ function TeamMatchSetup({ event, eventPlayers, onUpdated }) {
   return (
     <div className="space-y-4">
       {/* Team names */}
-      <div className="bg-white rounded-xl border border-gray-200 p-4 space-y-3">
-        <h3 className="text-sm font-semibold text-gray-800">Team Names</h3>
+      <div className="bg-white rounded-sm border border-surface-border p-4 space-y-3">
+        <h3 className="text-sm font-semibold text-ink">Team Names</h3>
         <div className="grid grid-cols-2 gap-3">
           <div>
-            <label className="block text-xs font-medium text-gray-500 mb-1">Team A</label>
+            <label className="block text-xs font-medium text-ink-muted mb-1">Team A</label>
             <input className="input w-full" value={teamAName} onChange={e => setTeamAName(e.target.value)} placeholder="e.g. MIGC" />
           </div>
           <div>
-            <label className="block text-xs font-medium text-gray-500 mb-1">Team B</label>
+            <label className="block text-xs font-medium text-ink-muted mb-1">Team B</label>
             <input className="input w-full" value={teamBName} onChange={e => setTeamBName(e.target.value)} placeholder="e.g. Westside Eagles" />
           </div>
         </div>
       </div>
 
       {/* Player assignments */}
-      <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
-        <div className="px-4 py-3 bg-gray-50 border-b border-gray-100">
-          <h3 className="text-sm font-semibold text-gray-800">Assign Players to Teams</h3>
+      <div className="bg-white rounded-sm border border-surface-border overflow-hidden">
+        <div className="px-4 py-3 bg-surface-container border-b border-surface-border">
+          <h3 className="text-sm font-semibold text-ink">Assign Players to Teams</h3>
         </div>
-        <div className="divide-y divide-gray-100">
+        <div className="divide-y divide-surface-border">
           {eventPlayers.map(ep => {
             const side = sides[ep.player_id]
             return (
               <div key={ep.player_id} className="flex items-center justify-between px-4 py-3">
-                <div className="text-sm font-medium text-gray-800">
+                <div className="text-sm font-medium text-ink">
                   {playerName(ep)}
-                  <span className="text-xs text-gray-400 ml-2">CH {matchCH(ep) ?? '—'}</span>
+                  <span className="text-xs text-ink-muted ml-2">CH {matchCH(ep) ?? '—'}</span>
                 </div>
                 <div className="flex gap-2">
                   <button
                     onClick={() => setSide(ep.player_id, 'A')}
-                    className={`text-xs font-bold px-3 py-1.5 rounded-lg border transition-colors ${side === 'A' ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-gray-500 border-gray-200 hover:border-blue-300'}`}
+                    className={`text-xs font-bold px-3 py-1.5 rounded-sm border transition-colors ${side === 'A' ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-ink-muted border-surface-border hover:border-blue-300'}`}
                   >
                     {teamAName || 'Team A'}
                   </button>
                   <button
                     onClick={() => setSide(ep.player_id, 'B')}
-                    className={`text-xs font-bold px-3 py-1.5 rounded-lg border transition-colors ${side === 'B' ? 'bg-purple-600 text-white border-purple-600' : 'bg-white text-gray-500 border-gray-200 hover:border-purple-300'}`}
+                    className={`text-xs font-bold px-3 py-1.5 rounded-sm border transition-colors ${side === 'B' ? 'bg-purple-600 text-white border-purple-600' : 'bg-white text-ink-muted border-surface-border hover:border-purple-300'}`}
                   >
                     {teamBName || 'Team B'}
                   </button>
                   {side && (
-                    <button onClick={() => setSide(ep.player_id, null)} className="text-xs text-gray-400 hover:text-red-500 px-1">✕</button>
+                    <button onClick={() => setSide(ep.player_id, null)} className="text-xs text-ink-muted hover:text-red-500 px-1">✕</button>
                   )}
                 </div>
               </div>
@@ -2707,7 +2741,7 @@ function TeamMatchSetup({ event, eventPlayers, onUpdated }) {
       </div>
 
       {unassigned.length > 0 && (
-        <p className="text-xs text-amber-600 font-medium">⚠ {unassigned.length} player{unassigned.length !== 1 ? 's' : ''} not yet assigned to a team</p>
+        <p className="text-xs text-status-upcoming-text font-medium">⚠ {unassigned.length} player{unassigned.length !== 1 ? 's' : ''} not yet assigned to a team</p>
       )}
 
       <Button onClick={handleSave} loading={saving}>Save Team Setup</Button>
@@ -3026,33 +3060,33 @@ function TabGroups({ event, eventPlayers, onUpdated, orgSlug, allScores, course 
 
       {/* Toolbar */}
       <div className="flex items-center justify-between flex-wrap gap-2">
-        <p className="text-sm text-gray-600">
+        <p className="text-sm text-ink">
           Drag players into groups. {numGroups} group{numGroups !== 1 ? 's' : ''} for {totalPlayers} player{totalPlayers !== 1 ? 's' : ''}.
         </p>
         <div className="flex items-center gap-2 shrink-0">
-          {saving && <span className="text-xs text-gray-400">Saving…</span>}
+          {saving && <span className="text-xs text-ink-muted">Saving…</span>}
           {eventPlayers.some(ep => ep.group_number) && (
             <Button size="sm" variant="ghost" onClick={clearAllGroups}>Clear All</Button>
           )}
-          <Button size="sm" onClick={() => setShowAutoAssign(true)}>⚡ Auto-Assign</Button>
+          <Button size="sm" onClick={() => setShowAutoAssign(true)}>Auto-assign</Button>
         </div>
       </div>
 
       {/* Auto-assign modal */}
       {showAutoAssign && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-6 space-y-5">
+          <div className="bg-white rounded-sm shadow-2xl w-full max-w-md p-6 space-y-5">
             <div>
-              <h2 className="text-lg font-bold text-gray-900">Auto-Assign Groups</h2>
-              <p className="text-sm text-gray-500 mt-1">Groups of 4 ({numGroups} groups). This overwrites current assignments.</p>
+              <h2 className="text-lg font-bold text-ink">Auto-Assign Groups</h2>
+              <p className="text-sm text-ink-muted mt-1">Groups of 4 ({numGroups} groups). This overwrites current assignments.</p>
             </div>
             <div className="space-y-2">
               {AUTO_METHODS.map(m => (
-                <label key={m.key} className={`flex items-start gap-3 rounded-xl border-2 px-4 py-3 cursor-pointer transition-colors ${autoMethod === m.key ? 'border-fairway-600 bg-fairway-50' : 'border-gray-200 hover:border-gray-300'}`}>
+                <label key={m.key} className={`flex items-start gap-3 rounded-sm border-2 px-4 py-3 cursor-pointer transition-colors ${autoMethod === m.key ? 'border-fairway-600 bg-fairway-50' : 'border-surface-border hover:border-surface-highest'}`}>
                   <input type="radio" name="autoMethod" value={m.key} checked={autoMethod === m.key} onChange={() => setAutoMethod(m.key)} className="mt-0.5 accent-fairway-600" />
                   <div>
-                    <div className="text-sm font-semibold text-gray-900">{m.label}</div>
-                    <div className="text-xs text-gray-500 mt-0.5">{m.desc}</div>
+                    <div className="text-sm font-semibold text-ink">{m.label}</div>
+                    <div className="text-xs text-ink-muted mt-0.5">{m.desc}</div>
                   </div>
                 </label>
               ))}
@@ -3148,19 +3182,19 @@ function DroppableGroup({ id, title, subtitle, members, isShotgun, holeAssignmen
   return (
     <div
       ref={setNodeRef}
-      className="rounded-xl border-2 transition-colors"
+      className="rounded-sm border-2 transition-colors"
       style={{ borderColor: isOver ? '#1B4332' : '#e5e7eb', background: isOver ? '#f0fdf4' : '#fff', minHeight: 80 }}
     >
       {/* Header */}
-      <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100">
+      <div className="flex items-center justify-between px-4 py-3 border-b border-surface-border">
         <div>
-          <div className="font-semibold text-gray-900 text-sm">{title}</div>
-          <div className="text-xs text-gray-400">{subtitle}</div>
-          {scored && <div className="text-xs text-green-700 mt-0.5">Scored by: {scored}</div>}
+          <div className="font-semibold text-ink text-sm">{title}</div>
+          <div className="text-xs text-ink-muted">{subtitle}</div>
+          {scored && <div className="text-xs text-status-active-text mt-0.5">Scored by: {scored}</div>}
         </div>
         {isShotgun && groupNum && (
           <div className="flex items-center gap-1.5">
-            <label className="text-xs text-gray-400">Hole</label>
+            <label className="text-xs text-ink-muted">Hole</label>
             <select value={holeAssignments[groupNum] ?? ''} onChange={e => onSetGroupHole(groupNum, e.target.value)} className="input py-0.5 text-xs w-20 bg-white">
               <option value="">—</option>
               {Array.from({ length: 18 }, (_, i) => i + 1).flatMap(h => [
@@ -3191,7 +3225,7 @@ function DroppableGroup({ id, title, subtitle, members, isShotgun, holeAssignmen
             />
           ))}
           {members.length === 0 && (
-            <div className="text-xs text-gray-300 text-center py-4">Drop players here</div>
+            <div className="text-xs text-surface-outline text-center py-4">Drop players here</div>
           )}
         </div>
       </SortableContext>
@@ -3208,13 +3242,13 @@ function SortablePlayerCard({ ep, isNoShow, showNoShow, noShowLoading, onNoShow,
   }
 
   return (
-    <div ref={setNodeRef} style={style} className={`flex items-center justify-between rounded-lg px-3 py-2 border ${isNoShow ? 'opacity-60 bg-gray-50 border-gray-200' : 'bg-white border-gray-100 hover:border-gray-200'}`}>
+    <div ref={setNodeRef} style={style} className={`flex items-center justify-between rounded-sm px-3 py-2 border ${isNoShow ? 'opacity-60 bg-surface-container border-surface-border' : 'bg-white border-surface-border hover:border-surface-border'}`}>
       <div className="flex items-center gap-2 min-w-0">
-        <span {...attributes} {...listeners} className="cursor-grab text-gray-300 hover:text-gray-500 select-none hidden sm:inline" title="Drag to move">
+        <span {...attributes} {...listeners} className="cursor-grab text-surface-outline hover:text-ink-muted select-none hidden sm:inline" title="Drag to move">
           ⠿
         </span>
         <div className="min-w-0">
-          <span className="text-sm font-medium text-gray-900">{ep.player?.first_name} {ep.player?.last_name}</span>
+          <span className="text-sm font-medium text-ink">{ep.player?.first_name} {ep.player?.last_name}</span>
           {isNoShow && <span className="ml-2 text-xs font-semibold px-1.5 py-0.5 rounded-full" style={{ background: '#fef3c7', color: '#92400e' }}>No Show</span>}
           {ep.flight && !isNoShow && <span className="ml-1"><FlightBadge flight={ep.flight} /></span>}
         </div>
@@ -3224,7 +3258,7 @@ function SortablePlayerCard({ ep, isNoShow, showNoShow, noShowLoading, onNoShow,
           <select
             value=""
             onChange={e => { if (e.target.value) onMoveToGroup(ep, currentKey, e.target.value) }}
-            className="input py-0.5 text-xs w-28 bg-white text-gray-500 sm:hidden"
+            className="input py-0.5 text-xs w-28 bg-white text-ink-muted sm:hidden"
           >
             <option value="">Move to…</option>
             {moveOptions.filter(o => o.key !== currentKey).map(o => (
@@ -3234,17 +3268,17 @@ function SortablePlayerCard({ ep, isNoShow, showNoShow, noShowLoading, onNoShow,
         )}
         {showNoShow && (
           isNoShow ? (
-            <button onClick={onClearNoShow} disabled={noShowLoading} className="text-xs px-2 py-1 rounded border border-gray-200 text-gray-500 hover:bg-gray-50 disabled:opacity-40">
+            <button onClick={onClearNoShow} disabled={noShowLoading} className="text-xs px-2 py-1 rounded border border-surface-border text-ink-muted hover:bg-surface-dim disabled:opacity-40">
               {noShowLoading ? '…' : 'Undo'}
             </button>
           ) : (
-            <button onClick={onNoShow} disabled={noShowLoading} className="text-xs px-2 py-1 rounded border border-amber-200 text-amber-600 hover:bg-amber-50 disabled:opacity-40">
+            <button onClick={onNoShow} disabled={noShowLoading} className="text-xs px-2 py-1 rounded border border-surface-border text-status-upcoming-text hover:bg-status-upcoming-bg disabled:opacity-40">
               {noShowLoading ? '…' : 'No Show'}
             </button>
           )
         )}
         {onReturnToPool && (
-          <button onClick={onReturnToPool} title="Return to pool" className="text-gray-300 hover:text-red-400 transition-colors leading-none text-base font-bold px-1">
+          <button onClick={onReturnToPool} title="Return to pool" className="text-surface-outline hover:text-red-400 transition-colors leading-none text-base font-bold px-1">
             ✕
           </button>
         )}
@@ -3414,7 +3448,7 @@ function TabPayoutConfig({ event, eventPlayers, course, onUpdated }) {
   return (
     <div className="space-y-4">
       {/* Summary */}
-      <div className="text-sm text-gray-600 space-y-0.5">
+      <div className="text-sm text-ink space-y-0.5">
         {hasFlights
           ? <p>{flightLetters.map(l => `Flight ${l}: ${flightCounts[l]}`).join(' · ')} · Total: <strong>{totalPlayers} players</strong> · Pot: <strong className="tabular-nums">${totalPot.toFixed(2)}</strong></p>
           : <p>Total: <strong>{totalPlayers} players</strong> · Pot: <strong className="tabular-nums">${totalPot.toFixed(2)}</strong></p>
@@ -3430,16 +3464,16 @@ function TabPayoutConfig({ event, eventPlayers, course, onUpdated }) {
         <div className="flex gap-6 mt-1">
           <label className="flex items-center gap-2 cursor-pointer">
             <input type="radio" checked={payoutBasis === 'per_player'} onChange={() => setPayoutBasis('per_player')} className="accent-fairway-600" />
-            <span className="text-sm text-gray-700">Attendance — entry fee × players (<strong>${(event.entry_fee * totalPlayers).toFixed(2)}</strong>)</span>
+            <span className="text-sm text-ink">Attendance — entry fee × players (<strong>${(event.entry_fee * totalPlayers).toFixed(2)}</strong>)</span>
           </label>
           <label className="flex items-center gap-2 cursor-pointer">
             <input type="radio" checked={payoutBasis === 'fixed'} onChange={() => setPayoutBasis('fixed')} className="accent-fairway-600" />
-            <span className="text-sm text-gray-700">Fixed total</span>
+            <span className="text-sm text-ink">Fixed total</span>
           </label>
         </div>
         {payoutBasis === 'fixed' && (
           <div className="flex items-center gap-2 mt-3">
-            <span className="text-sm text-gray-500">Total pot: $</span>
+            <span className="text-sm text-ink-muted">Total pot: $</span>
             <input
               type="number" min="0" step="1"
               value={fixedTotal}
@@ -3463,25 +3497,25 @@ function TabPayoutConfig({ event, eventPlayers, course, onUpdated }) {
             className="input py-1 text-sm w-24"
           />
           {longDriveHole && !isNaN(parseInt(longDriveHole)) && (
-            <span className="inline-flex items-center gap-1 bg-yellow-100 text-yellow-800 text-xs font-semibold px-2.5 py-1 rounded-full">
+            <span className="inline-flex items-center gap-1 bg-status-upcoming-bg text-status-upcoming-text text-xs font-semibold px-2.5 py-1 rounded-full">
               Hole {longDriveHole}
-              <button onClick={() => setLongDriveHole('')} className="text-yellow-600 hover:text-yellow-900 ml-0.5">×</button>
+              <button onClick={() => setLongDriveHole('')} className="text-status-upcoming-text hover:text-ink ml-0.5">×</button>
             </span>
           )}
         </div>
-        <p className="text-xs text-gray-400 mt-2">This hole will be highlighted on exported scorecards.</p>
+        <p className="text-xs text-ink-muted mt-2">This hole will be highlighted on exported scorecards.</p>
       </Card>}
 
       {hasCtp && <Card>
         <CardHeader title="Closest to Pin Holes" subtitle="Add the specific hole numbers for CTP contests at this course" />
         <div className="flex flex-wrap gap-2 mb-3">
           {ctpHoles.map(h => (
-            <span key={h} className="inline-flex items-center gap-1 bg-green-100 text-green-800 text-xs font-semibold px-2.5 py-1 rounded-full">
+            <span key={h} className="inline-flex items-center gap-1 bg-status-active-bg text-fairway-800 text-xs font-semibold px-2.5 py-1 rounded-full">
               Hole {h}
-              <button onClick={() => removeCtpHole(h)} className="text-green-600 hover:text-green-900 ml-0.5">×</button>
+              <button onClick={() => removeCtpHole(h)} className="text-status-active-text hover:text-fairway-800 ml-0.5">×</button>
             </span>
           ))}
-          {ctpHoles.length === 0 && <p className="text-xs text-gray-400">No CTP holes set. Add holes below.</p>}
+          {ctpHoles.length === 0 && <p className="text-xs text-ink-muted">No CTP holes set. Add holes below.</p>}
         </div>
         <div className="flex items-center gap-2">
           <input
@@ -3512,7 +3546,7 @@ function TabPayoutConfig({ event, eventPlayers, course, onUpdated }) {
         </div>
       </Card>}
 
-      <p className="text-xs text-gray-500">
+      <p className="text-xs text-ink-muted">
         All values are <strong>$ per player</strong> × player count shown in each section.
       </p>
 
@@ -3533,8 +3567,8 @@ function TabPayoutConfig({ event, eventPlayers, course, onUpdated }) {
       {/* Full field — no-flight scoring + CTP + low putts (everyone participates) */}
       {rows.some(r => r.isField) && (
         <Card className="overflow-hidden p-0">
-          <div className="px-4 py-2.5 bg-green-50 border-b border-green-100">
-            <h3 className="text-xs font-semibold text-green-700">
+          <div className="px-4 py-2.5 bg-status-active-bg border-b border-fairway-200">
+            <h3 className="text-xs font-semibold text-status-active-text">
               {hasFlights ? 'Full Field — Scoring & CTP' : 'All Players'} ({totalPlayers} players)
             </h3>
           </div>
@@ -3552,11 +3586,11 @@ function TabPayoutConfig({ event, eventPlayers, course, onUpdated }) {
         const label = OPT_IN_GAME_LABELS[base] ?? base
         return (
           <Card key={base} className="overflow-hidden p-0">
-            <div className="px-4 py-2.5 bg-amber-50 border-b border-amber-100">
-              <h3 className="text-xs font-semibold text-amber-700">
+            <div className="px-4 py-2.5 bg-status-upcoming-bg border-b border-surface-border">
+              <h3 className="text-xs font-semibold text-status-upcoming-text">
                 {label} — Separate Buy-in {perFlightGame ? '(Per Flight)' : '(Whole Group)'}
               </h3>
-              <p className="text-xs text-amber-600/80 mt-0.5">
+              <p className="text-xs text-status-upcoming-text/80 mt-0.5">
                 {perFlightGame
                   ? "Each flight is its own pot, funded only by that flight's opted-in players — money is never mixed between flights, and only entrants in that flight can win it."
                   : "One pot open to every player who opts in, regardless of flight. Count comes from the Side Games tab's opt-in roster, not the full field."}
@@ -3568,7 +3602,7 @@ function TabPayoutConfig({ event, eventPlayers, course, onUpdated }) {
       })}
 
       {/* Save */}
-      <div className="flex items-center justify-between pt-2 border-t border-gray-100">
+      <div className="flex items-center justify-between pt-2 border-t border-surface-border">
         <p className={`text-sm tabular-nums ${overBudget ? 'text-red-600 font-medium' : 'text-fairway-700 font-medium'}`}>
           {overBudget ? `⚠ Over budget by $${(totalAllocated - totalPot).toFixed(2)}` : `$${totalAllocated.toFixed(2)} allocated of $${totalPot.toFixed(2)}`}
         </p>
@@ -3579,26 +3613,26 @@ function TabPayoutConfig({ event, eventPlayers, course, onUpdated }) {
 }
 
 function PayoutTable({ rows, onChange, colLabel, showPerPlayerTotal = true }) {
-  if (rows.length === 0) return <p className="px-4 py-3 text-xs text-gray-400">None</p>
+  if (rows.length === 0) return <p className="px-4 py-3 text-xs text-ink-muted">None</p>
   const totalPerPlayer = rows.reduce((sum, r) => sum + (r.val || 0), 0)
   const totalPot       = rows.reduce((sum, r) => sum + r.total, 0)
   return (
     <table className="w-full text-sm">
       <thead>
-        <tr className="text-left text-xs font-semibold text-gray-400 border-b border-gray-100">
+        <tr className="text-left text-xs font-semibold text-ink-muted border-b border-surface-border">
           <th className="px-4 py-2">Category</th>
           <th className="px-3 py-2 w-36">{colLabel}</th>
           <th className="px-3 py-2 w-24">× Players</th>
           <th className="px-3 py-2 w-24 text-right">Total</th>
         </tr>
       </thead>
-      <tbody className="divide-y divide-gray-50">
+      <tbody className="divide-y divide-surface-border">
         {rows.map(({ key, val, label, mult, total }) => (
           <tr key={key}>
-            <td className="px-4 py-2 text-gray-700 text-xs">{label}</td>
+            <td className="px-4 py-2 text-ink text-xs">{label}</td>
             <td className="px-3 py-2">
               <div className="flex items-center gap-1">
-                <span className="text-gray-400 text-xs">$</span>
+                <span className="text-ink-muted text-xs">$</span>
                 <input
                   type="number"
                   value={val}
@@ -3608,8 +3642,8 @@ function PayoutTable({ rows, onChange, colLabel, showPerPlayerTotal = true }) {
                 />
               </div>
             </td>
-            <td className="px-3 py-2 text-xs text-gray-400 tabular-nums">× {mult}</td>
-            <td className="px-3 py-2 text-xs font-semibold text-gray-800 text-right tabular-nums">${total.toFixed(2)}</td>
+            <td className="px-3 py-2 text-xs text-ink-muted tabular-nums">× {mult}</td>
+            <td className="px-3 py-2 text-xs font-semibold text-ink text-right tabular-nums">${total.toFixed(2)}</td>
           </tr>
         ))}
       </tbody>
@@ -3620,7 +3654,7 @@ function PayoutTable({ rows, onChange, colLabel, showPerPlayerTotal = true }) {
           rows would overstate what any single entrant actually pays. */}
       {showPerPlayerTotal ? (
         <tfoot>
-          <tr className="border-t border-gray-200 bg-gray-50 text-xs font-semibold text-gray-700">
+          <tr className="border-t border-surface-border bg-surface-container text-xs font-semibold text-ink">
             <td className="px-4 py-2">Total</td>
             <td className="px-3 py-2 tabular-nums">${totalPerPlayer.toFixed(2)} / player</td>
             <td className="px-3 py-2" />
@@ -3629,7 +3663,7 @@ function PayoutTable({ rows, onChange, colLabel, showPerPlayerTotal = true }) {
         </tfoot>
       ) : rows.length > 1 ? (
         <tfoot>
-          <tr className="border-t border-gray-200 bg-gray-50 text-xs font-semibold text-gray-700">
+          <tr className="border-t border-surface-border bg-surface-container text-xs font-semibold text-ink">
             <td className="px-4 py-2" colSpan={3}>Combined pot (across flights)</td>
             <td className="px-3 py-2 text-right tabular-nums">${totalPot.toFixed(2)}</td>
           </tr>
@@ -3718,18 +3752,18 @@ function BlindPartnersCard({ event, eventPlayers, optedInIds = [], onUpdated }) 
       <div className="space-y-4">
         {/* Entrant list */}
         <div>
-          <div className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">
+          <div className="text-xs font-semibold text-ink-muted uppercase tracking-wide mb-2">
             Entrants ({drawPool.length})
           </div>
           {drawPool.length === 0 ? (
-            <p className="text-sm text-gray-400 italic">No players have opted in yet.</p>
+            <p className="text-sm text-ink-muted italic">No players have opted in yet.</p>
           ) : (
             <div className="grid grid-cols-2 gap-1 mb-3">
               {drawPool.map(ep => {
                 const p    = ep.player ?? {}
                 const name = [p.first_name, p.last_name].filter(Boolean).join(' ') || '—'
                 return (
-                  <div key={ep.player_id} className="text-sm text-gray-700 flex items-center gap-1.5">
+                  <div key={ep.player_id} className="text-sm text-ink flex items-center gap-1.5">
                     <span className="w-2 h-2 rounded-full bg-fairway-600 inline-block" />
                     {name}
                   </div>
@@ -3741,46 +3775,46 @@ function BlindPartnersCard({ event, eventPlayers, optedInIds = [], onUpdated }) 
             type="button"
             disabled={!canDraw}
             onClick={drawPartners}
-            className="text-sm font-semibold text-white bg-fairway-700 hover:bg-fairway-800 disabled:opacity-50 px-4 py-1.5 rounded-lg"
+            className="text-sm font-semibold text-white bg-fairway-700 hover:bg-fairway-800 disabled:opacity-50 px-4 py-1.5 rounded-sm"
           >
-            🎲 {pairs.length > 0 ? 'Redraw Partners' : 'Draw Partners'}
+            {pairs.length > 0 ? 'Redraw partners' : 'Draw partners'}
           </button>
-          {saving && <span className="ml-3 text-xs text-gray-400">Saving…</span>}
+          {saving && <span className="ml-3 text-xs text-ink-muted">Saving…</span>}
         </div>
 
         {/* Drawn pairs */}
         {pairs.length > 0 && (
           <div>
-            <div className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Drawn Pairs</div>
+            <div className="text-xs font-semibold text-ink-muted uppercase tracking-wide mb-2">Drawn Pairs</div>
             <div className="space-y-1.5">
               {pairs.map((pair, i) => (
-                <div key={i} className="text-sm text-gray-700 bg-gray-50 rounded-lg px-3 py-1.5">
+                <div key={i} className="text-sm text-ink bg-surface-container rounded-sm px-3 py-1.5">
                   <span className="font-medium text-fairway-700">Pair {i + 1}:</span>{' '}
                   {playerName(pair.p1)} &amp; {pair.p2
                     ? playerName(pair.p2)
-                    : <span className="text-amber-600 font-medium italic">odd player out</span>
+                    : <span className="text-status-upcoming-text font-medium italic">odd player out</span>
                   }
                 </div>
               ))}
             </div>
-            <p className="text-xs text-gray-400 mt-2">Combined net scores are ranked on the Blind Partners leaderboard tab.</p>
+            <p className="text-xs text-ink-muted mt-2">Combined net scores are ranked on the Blind Partners leaderboard tab.</p>
           </div>
         )}
 
         {/* Odd player out config — only shown when draw produces an odd pair */}
         {oddPlayer && (
-          <div className="border border-amber-200 bg-amber-50 rounded-xl px-4 py-3 space-y-3">
+          <div className="border border-surface-border bg-status-upcoming-bg rounded-sm px-4 py-3 space-y-3">
             <div>
-              <div className="text-xs font-semibold text-amber-700 uppercase tracking-wide mb-0.5">Odd Player Out</div>
-              <div className="text-sm font-medium text-gray-800">
+              <div className="text-xs font-semibold text-status-upcoming-text uppercase tracking-wide mb-0.5">Odd Player Out</div>
+              <div className="text-sm font-medium text-ink">
                 {(() => { const p = oddPlayer.player ?? {}; return [p.first_name, p.last_name].filter(Boolean).join(' ') || '—' })()}
               </div>
-              <div className="text-xs text-gray-500 mt-0.5">Choose how to assign a partner score for this player.</div>
+              <div className="text-xs text-ink-muted mt-0.5">Choose how to assign a partner score for this player.</div>
             </div>
 
             {/* Type toggle */}
             <div className="flex gap-3">
-              {[{ val: 'ghost', label: '👻 Ghost Score' }, { val: 'blind', label: '🔀 Blind Score' }].map(opt => (
+              {[{ val: 'ghost', label: 'Ghost score' }, { val: 'blind', label: 'Blind score' }].map(opt => (
                 <label key={opt.val} className="flex items-center gap-1.5 text-sm cursor-pointer">
                   <input
                     type="radio"
@@ -3794,7 +3828,7 @@ function BlindPartnersCard({ event, eventPlayers, optedInIds = [], onUpdated }) 
                     }}
                     className="accent-fairway-700"
                   />
-                  <span className="font-medium text-gray-700">{opt.label}</span>
+                  <span className="font-medium text-ink">{opt.label}</span>
                 </label>
               ))}
             </div>
@@ -3802,7 +3836,7 @@ function BlindPartnersCard({ event, eventPlayers, optedInIds = [], onUpdated }) 
             {/* Ghost: preset score in the event's scoring metric */}
             {oddConfig.type === 'ghost' && (
               <div className="flex items-center gap-2">
-                <label className="text-xs text-gray-600 font-medium">
+                <label className="text-xs text-ink font-medium">
                   {isStableford ? 'Preset points:' : 'Preset net score:'}
                 </label>
                 <input
@@ -3815,16 +3849,16 @@ function BlindPartnersCard({ event, eventPlayers, optedInIds = [], onUpdated }) 
                     setOddConfig(next)
                     saveOddConfig(next)
                   }}
-                  className="w-20 border border-gray-200 rounded-lg px-2 py-1 text-sm text-center"
+                  className="w-20 border border-surface-border rounded-sm px-2 py-1 text-sm text-center"
                 />
-                <span className="text-xs text-gray-400">{isStableford ? 'points' : 'net strokes'}</span>
+                <span className="text-xs text-ink-muted">{isStableford ? 'points' : 'net strokes'}</span>
               </div>
             )}
 
             {/* Blind: pick a player from the field */}
             {oddConfig.type === 'blind' && (
               <div className="flex items-center gap-2 flex-wrap">
-                <label className="text-xs text-gray-600 font-medium">Partner's score drawn from:</label>
+                <label className="text-xs text-ink font-medium">Partner's score drawn from:</label>
                 <select
                   value={oddConfig.player_id ?? ''}
                   onChange={e => {
@@ -3832,7 +3866,7 @@ function BlindPartnersCard({ event, eventPlayers, optedInIds = [], onUpdated }) 
                     setOddConfig(next)
                     saveOddConfig(next)
                   }}
-                  className="border border-gray-200 rounded-lg px-2 py-1 text-sm"
+                  className="border border-surface-border rounded-sm px-2 py-1 text-sm"
                 >
                   <option value="">— select player —</option>
                   {drawPool
@@ -3847,12 +3881,12 @@ function BlindPartnersCard({ event, eventPlayers, optedInIds = [], onUpdated }) 
                     })}
                 </select>
                 {oddConfig.player_id && (
-                  <span className="text-xs text-gray-400">Their net score counts as the partner's score.</span>
+                  <span className="text-xs text-ink-muted">Their net score counts as the partner's score.</span>
                 )}
               </div>
             )}
 
-            {savingOdd && <span className="text-xs text-gray-400">Saving…</span>}
+            {savingOdd && <span className="text-xs text-ink-muted">Saving…</span>}
           </div>
         )}
       </div>
@@ -3982,7 +4016,7 @@ function TabSideGamesMain({ event, eventPlayers, course, sideGames, onUpdated, o
 
   if (!hasSideGames) {
     return (
-      <div className="text-sm text-gray-400 py-8 text-center">
+      <div className="text-sm text-ink-muted py-8 text-center">
         No side games configured for this event.<br />
         <span className="text-xs">Add side games via the <strong>Edit Event</strong> button (pencil icon), then come back here.</span>
       </div>
@@ -3996,7 +4030,7 @@ function TabSideGamesMain({ event, eventPlayers, course, sideGames, onUpdated, o
         <Card>
           <CardHeader title="Opt-In Link" subtitle="Share this link (or the printable Check-In QR sign) so players can self-serve join & pay for opt-in games" />
           <div className="flex items-center gap-2 px-4 pb-4">
-            <input readOnly value={optInUrl} className="input text-xs flex-1 bg-gray-50" onFocus={e => e.target.select()} />
+            <input readOnly value={optInUrl} className="input text-xs flex-1 bg-surface-container" onFocus={e => e.target.select()} />
             <Button size="sm" variant="secondary" onClick={() => { navigator.clipboard.writeText(optInUrl); toast.success('Link copied!') }}>
               Copy
             </Button>
@@ -4007,7 +4041,7 @@ function TabSideGamesMain({ event, eventPlayers, course, sideGames, onUpdated, o
       {/* ── Opt-in rosters ───────────────────────────────────────── */}
       {buyInGames.length > 0 && (
         <div>
-          <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-widest mb-3">Opt-in Rosters</h3>
+          <h3 className="text-xs font-semibold text-ink-muted uppercase tracking-widest mb-3">Opt-in Rosters</h3>
           <div className="space-y-4">
             {buyInGames.map(key => {
               const opted      = entries[key] ?? []
@@ -4022,14 +4056,14 @@ function TabSideGamesMain({ event, eventPlayers, course, sideGames, onUpdated, o
                     <CardHeader title={gameLabel(key)} subtitle={amount != null ? `$${amount} per entrant · set in Payouts tab` : 'Set the $ per entrant in the Payouts tab'} />
                     {pot != null && (
                       <div className="text-right">
-                        <div className="text-xs text-gray-400">Pot</div>
-                        <div className="text-lg font-bold text-green-700">${pot.toFixed(2)}</div>
-                        <div className="text-xs text-gray-400">{opted.length} entrant{opted.length !== 1 ? 's' : ''}</div>
+                        <div className="text-xs text-ink-muted">Pot</div>
+                        <div className="text-lg font-bold text-status-active-text">${pot.toFixed(2)}</div>
+                        <div className="text-xs text-ink-muted">{opted.length} entrant{opted.length !== 1 ? 's' : ''}</div>
                         {opted.length > 0 && (
-                          <div className={`text-xs font-medium ${paidCount === opted.length ? 'text-green-600' : 'text-amber-600'}`}>
+                          <div className={`text-xs font-medium ${paidCount === opted.length ? 'text-status-active-text' : 'text-status-upcoming-text'}`}>
                             {paidCount}/{opted.length} paid
                             {(cashCount > 0 || venmoCount > 0) && (
-                              <span className="text-gray-400 font-normal"> ({cashCount} cash · {venmoCount} venmo)</span>
+                              <span className="text-ink-muted font-normal"> ({cashCount} cash · {venmoCount} venmo)</span>
                             )}
                           </div>
                         )}
@@ -4038,7 +4072,7 @@ function TabSideGamesMain({ event, eventPlayers, course, sideGames, onUpdated, o
                   </div>
                   {key === 'super_ctp' && (
                     <div className="mb-3">
-                      <label className="text-xs font-semibold text-gray-500 block mb-1">Designated Hole</label>
+                      <label className="text-xs font-semibold text-ink-muted block mb-1">Designated Hole</label>
                       <select
                         value={superCtpHole}
                         onChange={e => saveCtpHole(e.target.value)}
@@ -4059,7 +4093,7 @@ function TabSideGamesMain({ event, eventPlayers, course, sideGames, onUpdated, o
                       const isOpted = opted.includes(pid)
                       const method  = paidMethodFor(key, pid)
                       return (
-                        <div key={pid} className="flex items-center justify-between gap-1.5 text-sm text-gray-700">
+                        <div key={pid} className="flex items-center justify-between gap-1.5 text-sm text-ink">
                           <label className="flex items-center gap-2 cursor-pointer min-w-0">
                             <input
                               type="checkbox"
@@ -4072,13 +4106,13 @@ function TabSideGamesMain({ event, eventPlayers, course, sideGames, onUpdated, o
                           {isOpted && (
                             <div className="flex items-center gap-1 shrink-0">
                               {method === 'unspecified' && (
-                                <span className="text-xs text-green-600" title="Marked paid before cash/Venmo tracking existed">✓</span>
+                                <span className="text-xs text-status-active-text" title="Marked paid before cash/Venmo tracking existed">✓</span>
                               )}
                               <button
                                 type="button"
                                 onClick={() => setPaidMethod(key, pid, method === 'cash' ? null : 'cash')}
                                 className={`px-1.5 py-0.5 rounded text-xs font-medium border transition-colors ${
-                                  method === 'cash' ? 'bg-green-600 text-white border-green-600' : 'text-gray-400 border-gray-200 hover:border-gray-300'
+                                  method === 'cash' ? 'bg-fairway-700 text-white border-fairway-700' : 'text-ink-muted border-surface-border hover:border-surface-highest'
                                 }`}
                               >
                                 Cash
@@ -4087,7 +4121,7 @@ function TabSideGamesMain({ event, eventPlayers, course, sideGames, onUpdated, o
                                 type="button"
                                 onClick={() => setPaidMethod(key, pid, method === 'venmo' ? null : 'venmo')}
                                 className={`px-1.5 py-0.5 rounded text-xs font-medium border transition-colors ${
-                                  method === 'venmo' ? 'bg-blue-600 text-white border-blue-600' : 'text-gray-400 border-gray-200 hover:border-gray-300'
+                                  method === 'venmo' ? 'bg-blue-600 text-white border-blue-600' : 'text-ink-muted border-surface-border hover:border-surface-highest'
                                 }`}
                               >
                                 Venmo
@@ -4098,7 +4132,7 @@ function TabSideGamesMain({ event, eventPlayers, course, sideGames, onUpdated, o
                       )
                     })}
                   </div>
-                  {(savingEn || savingPd) && <p className="text-xs text-gray-400 mt-2">Saving…</p>}
+                  {(savingEn || savingPd) && <p className="text-xs text-ink-muted mt-2">Saving…</p>}
                 </Card>
               )
             })}
@@ -4109,7 +4143,7 @@ function TabSideGamesMain({ event, eventPlayers, course, sideGames, onUpdated, o
       {/* ── Winner entry ─────────────────────────────────────────── */}
       {hasSideGames && (
         <div>
-          <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-widest mb-3">Winner Entry</h3>
+          <h3 className="text-xs font-semibold text-ink-muted uppercase tracking-widest mb-3">Winner Entry</h3>
           <TabSideGames
             event={event}
             eventPlayers={eventPlayers}
@@ -4191,7 +4225,7 @@ function TabSideGames({ event, eventPlayers, course, sideGames, sideGameEntries 
 
   return (
     <div className="space-y-4">
-      <p className="text-sm text-gray-600">Enter manual side game winners.</p>
+      <p className="text-sm text-ink">Enter manual side game winners.</p>
 
       {/* Long Drive */}
       {(hasLd || hasLdA || hasLdB) && (
@@ -4240,7 +4274,7 @@ function TabSideGames({ event, eventPlayers, course, sideGames, sideGameEntries 
             <div className="space-y-4">
               {par3Holes.map(h => (
                 <div key={h.hole}>
-                  <div className="text-xs font-semibold text-gray-500 mb-2">Hole {h.hole}</div>
+                  <div className="text-xs font-semibold text-ink-muted mb-2">Hole {h.hole}</div>
                   {perFlight ? (
                     <div className="space-y-2">
                       {hasCtpA && (
@@ -4339,7 +4373,7 @@ function TabSideGames({ event, eventPlayers, course, sideGames, sideGameEntries 
       {hasSuperSkins && (
         <Card>
           <CardHeader title="Super Skins" subtitle="Results auto-computed from scoring" />
-          <p className="text-sm text-gray-500 py-2">
+          <p className="text-sm text-ink-muted py-2">
             Super Skins runs on the same scoring data as Skins. Winners are determined automatically once all scores are entered.
             {sides.some(s => /^super_skins_[a-z]$/.test(s))
               && ' Each flight competes in its own separate pot, based on each player\u2019s flight assignment — money is never mixed between flights.'}
@@ -4384,7 +4418,7 @@ function SideGameSelect({ players, value, onChange }) {
 // ─── Tab: Payout Summary ──────────────────────────────────────────
 function TabPayoutSummary({ event, eventPlayers, allScores, sideGames, course }) {
   if (!course || eventPlayers.length === 0) {
-    return <p className="text-sm text-gray-500">No data available yet.</p>
+    return <p className="text-sm text-ink-muted">No data available yet.</p>
   }
 
   const nonGuestEPs   = eventPlayers.filter(ep => !ep.is_guest)
@@ -4410,8 +4444,8 @@ function TabPayoutSummary({ event, eventPlayers, allScores, sideGames, course })
     <div className="space-y-5">
       <div className="flex items-center justify-between">
         <div>
-          <p className="text-lg font-bold text-gray-900">Total Pot: ${totalPot.toFixed(2)}</p>
-          <p className="text-sm text-gray-500">
+          <p className="text-lg font-bold text-ink">Total Pot: ${totalPot.toFixed(2)}</p>
+          <p className="text-sm text-ink-muted">
             {nonGuestEPs.length} players × ${event.entry_fee}
             {buyInPotTotal > 0 && <> + ${buyInPotTotal.toFixed(2)} separate buy-ins</>}
           </p>
@@ -4420,26 +4454,26 @@ function TabPayoutSummary({ event, eventPlayers, allScores, sideGames, course })
 
       {/* By player */}
       <Card className="overflow-hidden p-0">
-        <div className="px-5 py-3 border-b border-gray-100 bg-gray-50">
-          <h3 className="font-semibold text-gray-800 text-sm">Payouts by Player</h3>
+        <div className="px-5 py-3 border-b border-surface-border bg-surface-container">
+          <h3 className="font-semibold text-ink text-sm">Payouts by Player</h3>
         </div>
         {byPlayer.length === 0
-          ? <p className="px-5 py-4 text-sm text-gray-400">No payouts resolved yet.</p>
+          ? <p className="px-5 py-4 text-sm text-ink-muted">No payouts resolved yet.</p>
           : (
-          <div className="divide-y divide-gray-100">
+          <div className="divide-y divide-surface-border">
             {byPlayer.map(({ playerId, total, items }) => {
               const p = playerMap[playerId]
               return (
                 <div key={playerId} className="px-5 py-3">
                   <div className="flex items-center justify-between">
-                    <span className="font-medium text-sm text-gray-900">
+                    <span className="font-medium text-sm text-ink">
                       {p ? `${p.first_name} ${p.last_name}` : playerId}
                     </span>
                     <span className="font-bold text-fairway-700">${total.toFixed(2)}</span>
                   </div>
                   <div className="mt-1 space-y-0.5">
                     {items.map((item, i) => (
-                      <div key={i} className="flex justify-between text-xs text-gray-500">
+                      <div key={i} className="flex justify-between text-xs text-ink-muted">
                         <span>{item.category}</span>
                         <span>${item.amount.toFixed(2)}</span>
                       </div>
@@ -4454,21 +4488,21 @@ function TabPayoutSummary({ event, eventPlayers, allScores, sideGames, course })
 
       {/* By category */}
       <Card className="overflow-hidden p-0">
-        <div className="px-5 py-3 border-b border-gray-100 bg-gray-50">
-          <h3 className="font-semibold text-gray-800 text-sm">Payouts by Category</h3>
+        <div className="px-5 py-3 border-b border-surface-border bg-surface-container">
+          <h3 className="font-semibold text-ink text-sm">Payouts by Category</h3>
         </div>
-        <div className="divide-y divide-gray-100">
+        <div className="divide-y divide-surface-border">
           {byCategory.map(cat => {
             const p = cat.playerId ? playerMap[cat.playerId] : null
             return (
               <div key={cat.key} className="flex items-center justify-between px-5 py-2.5">
                 <div>
-                  <div className="text-sm text-gray-700">{cat.label}</div>
-                  <div className="text-xs text-gray-400">
+                  <div className="text-sm text-ink">{cat.label}</div>
+                  <div className="text-xs text-ink-muted">
                     {p ? `${p.first_name} ${p.last_name}` : '— Unresolved'}
                   </div>
                 </div>
-                <span className="font-semibold text-sm text-gray-900">${cat.amount.toFixed(2)}</span>
+                <span className="font-semibold text-sm text-ink">${cat.amount.toFixed(2)}</span>
               </div>
             )
           })}
@@ -4493,25 +4527,25 @@ function EventStatusControl({ event, onUpdated }) {
 
   if (event.status === 'upcoming') {
     return (
-      <Button onClick={() => setStatus('active', 'Activate this event? Scorekeepers will be able to enter scores.')} loading={saving} variant="primary">
-        ▶ Activate Event
-      </Button>
+      <ActionButton variant="ghost" onClick={() => setStatus('active', 'Activate this event? Scorekeepers will be able to enter scores.')} loading={saving}>
+        Activate event
+      </ActionButton>
     )
   }
 
   if (event.status === 'active') {
     return (
-      <Button onClick={() => setStatus('complete', 'Close this event? Results will be locked.')} loading={saving} variant="danger">
-        ⏹ Close Event
-      </Button>
+      <ActionButton variant="ghost" onClick={() => setStatus('complete', 'Close this event? Results will be locked.')} loading={saving}>
+        Close event
+      </ActionButton>
     )
   }
 
   if (event.status === 'complete') {
     return (
-      <Button onClick={() => setStatus('active', 'Re-open this event? Status will return to Active and scores can be edited.')} loading={saving} variant="secondary">
-        ↩ Re-open Event
-      </Button>
+      <ActionButton variant="ghost" onClick={() => setStatus('active', 'Re-open this event? Status will return to Active and scores can be edited.')} loading={saving}>
+        Re-open event
+      </ActionButton>
     )
   }
 
@@ -4732,15 +4766,15 @@ function EditEventModal({ open, onClose, event, onSaved }) {
           <Input label="Entry Fee ($)" type="number" step="0.01" min="0" value={entryFee} onChange={e => setEntryFee(e.target.value)} required />
           <Input label="Tournament Entry Fee ($)" type="number" step="0.01" min="0" value={tournamentFee} onChange={e => setTournamentFee(e.target.value)} placeholder="Charged at registration" />
         </div>
-        <p className="text-xs text-gray-400 -mt-2">Entry Fee drives payouts. Tournament Entry Fee is what players pay to register.</p>
+        <p className="text-xs text-ink-muted -mt-2">Entry Fee drives payouts. Tournament Entry Fee is what players pay to register.</p>
 
         {/* Payment links */}
-        <div className="space-y-3 bg-gray-50 rounded-xl px-4 py-3">
-          <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Payment Links (shown after registration)</p>
+        <div className="space-y-3 bg-surface-container rounded-sm px-4 py-3">
+          <p className="text-xs font-semibold text-ink-muted uppercase tracking-wide">Payment Links (shown after registration)</p>
           <div>
             <label className="label">Venmo Handle</label>
             <div className="relative">
-              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm font-medium">@</span>
+              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-ink-muted text-sm font-medium">@</span>
               <input
                 type="text"
                 value={venmoHandle}
@@ -4773,10 +4807,10 @@ function EditEventModal({ open, onClose, event, onSaved }) {
         </div>
 
         {/* Schedule of Events */}
-        <div className="space-y-3 bg-gray-50 rounded-xl px-4 py-3">
-          <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Schedule of Events <span className="normal-case text-gray-400 font-normal">(shown on event page and registration)</span></p>
+        <div className="space-y-3 bg-surface-container rounded-sm px-4 py-3">
+          <p className="text-xs font-semibold text-ink-muted uppercase tracking-wide">Schedule of Events <span className="normal-case text-ink-muted font-normal">(shown on event page and registration)</span></p>
           {scheduleItems.map((item, i) => (
-            <div key={i} className="bg-white rounded-lg border border-gray-200 p-3 space-y-2">
+            <div key={i} className="bg-white rounded-sm border border-surface-border p-3 space-y-2">
               <div className="flex items-center gap-2">
                 <input
                   type="time"
@@ -4791,8 +4825,7 @@ function EditEventModal({ open, onClose, event, onSaved }) {
                   placeholder="e.g. Check-in, Tee Time, Awards…"
                   className="input flex-1"
                 />
-                <button type="button" onClick={() => setScheduleItems(prev => prev.filter((_, j) => j !== i))}
-                  className="text-gray-400 hover:text-red-500 text-sm shrink-0">✕</button>
+                <Button type="button" variant="ghost" size="sm" iconOnly label="Remove" className="shrink-0 hover:!text-red-600" onClick={() => setScheduleItems(prev => prev.filter((_, j) => j !== i))}>✕</Button>
               </div>
               <input
                 type="text"
@@ -4813,8 +4846,8 @@ function EditEventModal({ open, onClose, event, onSaved }) {
         </div>
 
         {/* Custom Registration Questions */}
-        <div className="space-y-2 bg-gray-50 rounded-xl px-4 py-3">
-          <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Registration Questions <span className="normal-case text-gray-400 font-normal">(shown on registration form)</span></p>
+        <div className="space-y-2 bg-surface-container rounded-sm px-4 py-3">
+          <p className="text-xs font-semibold text-ink-muted uppercase tracking-wide">Registration Questions <span className="normal-case text-ink-muted font-normal">(shown on registration form)</span></p>
           {customQuestions.map((q, i) => (
             <div key={i} className="flex items-center gap-2">
               <input
@@ -4824,14 +4857,13 @@ function EditEventModal({ open, onClose, event, onSaved }) {
                 placeholder="e.g. Interested in bringing a guest?"
                 className="input flex-1"
               />
-              <label className="flex items-center gap-1 text-xs text-gray-500 shrink-0 cursor-pointer">
+              <label className="flex items-center gap-1 text-xs text-ink-muted shrink-0 cursor-pointer">
                 <input type="checkbox" checked={q.required}
                   onChange={e => setCustomQuestions(prev => prev.map((x, j) => j === i ? { ...x, required: e.target.checked } : x))}
                   className="accent-fairway-600" />
                 Required
               </label>
-              <button type="button" onClick={() => setCustomQuestions(prev => prev.filter((_, j) => j !== i))}
-                className="text-gray-400 hover:text-red-500 text-sm shrink-0">✕</button>
+              <Button type="button" variant="ghost" size="sm" iconOnly label="Remove" className="shrink-0 hover:!text-red-600" onClick={() => setCustomQuestions(prev => prev.filter((_, j) => j !== i))}>✕</Button>
             </div>
           ))}
           <button
@@ -4844,11 +4876,11 @@ function EditEventModal({ open, onClose, event, onSaved }) {
         </div>
 
         {/* Number of Flights */}
-        <div className="bg-gray-50 rounded-xl px-4 py-3">
+        <div className="bg-surface-container rounded-sm px-4 py-3">
           <div className="flex items-center justify-between">
             <div>
-              <div className="text-sm font-medium text-gray-800">Number of Flights</div>
-              <div className="text-xs text-gray-400 mt-0.5">Flight A = highest/best players. "No flights" = single field.</div>
+              <div className="text-sm font-medium text-ink">Number of Flights</div>
+              <div className="text-xs text-ink-muted mt-0.5">Flight A = highest/best players. "No flights" = single field.</div>
             </div>
             <select
               value={numFlights}
@@ -4864,33 +4896,33 @@ function EditEventModal({ open, onClose, event, onSaved }) {
         </div>
 
         {/* Shotgun Start toggle */}
-        <div className="bg-gray-50 rounded-xl px-4 py-3 flex items-center justify-between">
+        <div className="bg-surface-container rounded-sm px-4 py-3 flex items-center justify-between">
           <div>
-            <div className="text-sm font-medium text-gray-800">Shotgun Start?</div>
-            <div className="text-xs text-gray-400 mt-0.5">All groups tee off simultaneously from different holes</div>
+            <div className="text-sm font-medium text-ink">Shotgun Start?</div>
+            <div className="text-xs text-ink-muted mt-0.5">All groups tee off simultaneously from different holes</div>
           </div>
           <button
             type="button"
             onClick={() => setShotgunStart(v => !v)}
-            className={`relative inline-flex h-6 w-11 shrink-0 rounded-full border-2 border-transparent transition-colors focus:outline-none ${shotgunStart ? 'bg-fairway-600' : 'bg-gray-300'}`}
+            className={`relative inline-flex h-6 w-11 shrink-0 rounded-full border-2 border-transparent transition-colors focus:outline-none ${shotgunStart ? 'bg-fairway-600' : 'bg-surface-highest'}`}
           >
             <span className={`inline-block h-5 w-5 rounded-full bg-white shadow transition-transform ${shotgunStart ? 'translate-x-5' : 'translate-x-0'}`} />
           </button>
         </div>
 
         {/* Holes Played toggle */}
-        <div className="bg-gray-50 rounded-xl px-4 py-3 flex items-center justify-between">
+        <div className="bg-surface-container rounded-sm px-4 py-3 flex items-center justify-between">
           <div>
-            <div className="text-sm font-medium text-gray-800">Holes Played</div>
-            <div className="text-xs text-gray-400 mt-0.5">Defaults to 18. Select 9 for a nine-hole event.</div>
+            <div className="text-sm font-medium text-ink">Holes Played</div>
+            <div className="text-xs text-ink-muted mt-0.5">Defaults to 18. Select 9 for a nine-hole event.</div>
           </div>
-          <div className="flex rounded-lg border border-gray-300 overflow-hidden text-sm font-semibold">
+          <div className="flex rounded-sm border border-surface-highest overflow-hidden text-sm font-semibold">
             {[18, 9].map(h => (
               <button
                 key={h}
                 type="button"
                 onClick={() => setHolesPlayed(h)}
-                className={`px-4 py-1.5 transition-colors ${holesPlayed === h ? 'bg-fairway-700 text-white' : 'bg-white text-gray-600 hover:bg-gray-100'}`}
+                className={`px-4 py-1.5 transition-colors ${holesPlayed === h ? 'bg-fairway-700 text-white' : 'bg-white text-ink hover:bg-surface-high'}`}
               >
                 {h}
               </button>
@@ -4899,15 +4931,15 @@ function EditEventModal({ open, onClose, event, onSaved }) {
         </div>
 
         {/* Use Handicaps toggle */}
-        <div className="bg-gray-50 rounded-xl px-4 py-3 flex items-center justify-between">
+        <div className="bg-surface-container rounded-sm px-4 py-3 flex items-center justify-between">
           <div>
-            <div className="text-sm font-medium text-gray-800">Use Handicaps</div>
-            <div className="text-xs text-gray-400 mt-0.5">When off, handicap index is not required when adding players.</div>
+            <div className="text-sm font-medium text-ink">Use Handicaps</div>
+            <div className="text-xs text-ink-muted mt-0.5">When off, handicap index is not required when adding players.</div>
           </div>
           <button
             type="button"
             onClick={() => setUseHandicaps(v => !v)}
-            className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${useHandicaps ? 'bg-fairway-600' : 'bg-gray-300'}`}
+            className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${useHandicaps ? 'bg-fairway-600' : 'bg-surface-highest'}`}
           >
             <span className={`inline-block h-5 w-5 rounded-full bg-white shadow transition-transform ${useHandicaps ? 'translate-x-5' : 'translate-x-0'}`} />
           </button>
@@ -4916,10 +4948,10 @@ function EditEventModal({ open, onClose, event, onSaved }) {
         {/* Scoring Formats */}
         <div>
           <label className="label">Scoring Formats</label>
-          <div className="bg-gray-50 rounded-xl px-4 py-3 space-y-3">
+          <div className="bg-surface-container rounded-sm px-4 py-3 space-y-3">
             {EDIT_FORMAT_OPTIONS.map(group => (
               <div key={group.group}>
-                <div className="text-xs text-gray-400 font-medium uppercase tracking-wide mb-1.5">{group.group}</div>
+                <div className="text-xs text-ink-muted font-medium uppercase tracking-wide mb-1.5">{group.group}</div>
                 <div className="space-y-2">
                   {group.options.map(opt => {
                     const isPerFlightEligible = PER_FLIGHT_FORMAT_KEYS.has(opt.value)
@@ -4929,22 +4961,22 @@ function EditEventModal({ open, onClose, event, onSaved }) {
                       <div key={opt.value}>
                         <div className="flex items-center gap-2.5">
                           <input type="checkbox" checked={formats.has(opt.value)} onChange={() => toggleFormat(opt.value)} className="accent-fairway-600 w-4 h-4 shrink-0 cursor-pointer" />
-                          <span className="text-sm text-gray-800 cursor-pointer" onClick={() => toggleFormat(opt.value)}>{opt.label}</span>
+                          <span className="text-sm text-ink cursor-pointer" onClick={() => toggleFormat(opt.value)}>{opt.label}</span>
                           {opt.tip && (
                             <span className="relative group/tip shrink-0">
-                              <span className="text-gray-400 hover:text-fairway-600 cursor-default text-xs font-bold select-none">ⓘ</span>
-                              <span className="absolute left-5 top-1/2 -translate-y-1/2 z-50 hidden group-hover/tip:block w-64 bg-gray-900 text-white text-xs rounded-lg px-3 py-2 leading-relaxed shadow-xl pointer-events-none">
+                              <span className="text-ink-muted hover:text-fairway-600 cursor-default text-xs font-bold select-none">ⓘ</span>
+                              <span className="absolute left-5 top-1/2 -translate-y-1/2 z-50 hidden group-hover/tip:block w-64 bg-ink text-white text-xs rounded-sm px-3 py-2 leading-relaxed shadow-xl pointer-events-none">
                                 {opt.tip}
                               </span>
                             </span>
                           )}
                           {formats.has(opt.value) && (
                             <div className="ml-auto flex items-center gap-1.5 shrink-0">
-                              <span className="text-xs text-gray-400">Places to pay:</span>
+                              <span className="text-xs text-ink-muted">Places to pay:</span>
                               <select
                                 value={payoutPlaces[opt.value] ?? 1}
                                 onChange={e => setPayoutPlaces(prev => ({ ...prev, [opt.value]: Number(e.target.value) }))}
-                                className="text-xs border border-gray-300 rounded px-1.5 py-0.5 bg-white"
+                                className="text-xs border border-surface-highest rounded px-1.5 py-0.5 bg-white"
                               >
                                 {PLACES_OPTIONS.map(n => <option key={n} value={n}>{n}</option>)}
                               </select>
@@ -4957,13 +4989,13 @@ function EditEventModal({ open, onClose, event, onSaved }) {
                               <input type="radio" checked={fmtScope === 'group'}
                                 onChange={() => setFormatScope(prev => ({ ...prev, [opt.value]: 'group' }))}
                                 className="accent-fairway-600" />
-                              <span className="text-xs text-gray-600">Whole group</span>
+                              <span className="text-xs text-ink">Whole group</span>
                             </label>
                             <label className="flex items-center gap-1.5 cursor-pointer">
                               <input type="radio" checked={fmtScope === 'flight'}
                                 onChange={() => setFormatScope(prev => ({ ...prev, [opt.value]: 'flight' }))}
                                 className="accent-fairway-600" />
-                              <span className="text-xs text-gray-600">Per flight ({flightLetters.join(', ')})</span>
+                              <span className="text-xs text-ink">Per flight ({flightLetters.join(', ')})</span>
                             </label>
                           </div>
                         )}
@@ -4980,7 +5012,7 @@ function EditEventModal({ open, onClose, event, onSaved }) {
         {/* Side Games */}
         <div>
           <label className="label">Side Games / Competitions</label>
-          <div className="space-y-3 bg-gray-50 rounded-xl px-4 py-3">
+          <div className="space-y-3 bg-surface-container rounded-sm px-4 py-3">
             {PER_FLIGHT_GAMES.map(opt => {
               const checked = sideGames.has(opt.key)
               const scope = gameScope[opt.key] ?? 'flight'
@@ -4991,7 +5023,7 @@ function EditEventModal({ open, onClose, event, onSaved }) {
                 <div key={opt.key}>
                   <label className="flex items-center gap-2.5 cursor-pointer">
                     <input type="checkbox" checked={checked} onChange={() => toggleSideGame(opt.key)} className="accent-fairway-600 w-4 h-4" />
-                    <span className="text-sm text-gray-800">{opt.label}</span>
+                    <span className="text-sm text-ink">{opt.label}</span>
                   </label>
                   {checked && isPerFlight && numFlights > 0 && (
                     <div className="ml-6 mt-1.5 flex gap-4">
@@ -4999,13 +5031,13 @@ function EditEventModal({ open, onClose, event, onSaved }) {
                         <input type="radio" checked={scope === 'flight'}
                           onChange={() => setGameScope(prev => ({ ...prev, [opt.key]: 'flight' }))}
                           className="accent-fairway-600" />
-                        <span className="text-xs text-gray-600">Per flight ({flightLetters.join(', ')})</span>
+                        <span className="text-xs text-ink">Per flight ({flightLetters.join(', ')})</span>
                       </label>
                       <label className="flex items-center gap-1.5 cursor-pointer">
                         <input type="radio" checked={scope === 'group'}
                           onChange={() => setGameScope(prev => ({ ...prev, [opt.key]: 'group' }))}
                           className="accent-fairway-600" />
-                        <span className="text-xs text-gray-600">Whole group</span>
+                        <span className="text-xs text-ink">Whole group</span>
                       </label>
                     </div>
                   )}
@@ -5018,9 +5050,9 @@ function EditEventModal({ open, onClose, event, onSaved }) {
                           onChange={() => toggleBuyIn(opt.key)}
                           className="accent-fairway-600 w-4 h-4"
                         />
-                        <span className="text-xs text-gray-600">Separate buy-in</span>
+                        <span className="text-xs text-ink">Separate buy-in</span>
                       </label>
-                      <span className="text-xs text-gray-400 italic">
+                      <span className="text-xs text-ink-muted italic">
                         {buyIn.enabled
                           ? '$ per entrant is set in the Payouts tab'
                           : 'Included in Entry Fee ($)'}
@@ -5042,18 +5074,13 @@ function EditEventModal({ open, onClose, event, onSaved }) {
                     value={name}
                     onChange={e => setCustomCompetitions(prev => prev.map((c, j) => j === i ? e.target.value : c))}
                     placeholder="e.g. Bingo Bango Bongo"
-                    className="flex-1 border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-600"
+                    className="flex-1 border border-surface-highest rounded-sm px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-fairway-500"
                   />
-                  <button type="button" onClick={() => setCustomCompetitions(prev => prev.filter((_, j) => j !== i))}
-                    className="text-gray-400 hover:text-red-500 text-lg leading-none">✕</button>
+                  <Button type="button" variant="ghost" size="sm" iconOnly label="Remove" className="shrink-0 hover:!text-red-600" onClick={() => setCustomCompetitions(prev => prev.filter((_, j) => j !== i))}>✕</Button>
                 </div>
               ))}
             </div>
-            <button type="button"
-              onClick={() => setCustomCompetitions(prev => [...prev, ''])}
-              className="mt-2 text-xs font-semibold text-green-700 hover:text-green-900">
-              + Add Custom Competition
-            </button>
+            <Button type="button" variant="secondary" size="sm" className="mt-2" onClick={() => setCustomCompetitions(prev => [...prev, ''])}>+ Add custom competition</Button>
           </div>
         </div>
 
@@ -5065,11 +5092,11 @@ function EditEventModal({ open, onClose, event, onSaved }) {
           <div className="flex gap-4 mt-1">
             <label className="flex items-center gap-2 cursor-pointer">
               <input type="radio" name="editPayoutBasis" value="per_player" checked={payoutBasis === 'per_player'} onChange={() => setPayoutBasis('per_player')} className="accent-fairway-600" />
-              <span className="text-sm text-gray-700">Attendance (entry fee × players)</span>
+              <span className="text-sm text-ink">Attendance (entry fee × players)</span>
             </label>
             <label className="flex items-center gap-2 cursor-pointer">
               <input type="radio" name="editPayoutBasis" value="fixed" checked={payoutBasis === 'fixed'} onChange={() => setPayoutBasis('fixed')} className="accent-fairway-600" />
-              <span className="text-sm text-gray-700">Fixed total</span>
+              <span className="text-sm text-ink">Fixed total</span>
             </label>
           </div>
           {payoutBasis === 'fixed' && (
@@ -5102,11 +5129,11 @@ function DeleteEventModal({ open, onClose, event }) {
   return (
     <Modal open={open} onClose={onClose} title="Delete Event">
       <div className="space-y-4">
-        <p className="text-sm text-gray-700">
+        <p className="text-sm text-ink">
           Are you sure you want to delete <strong>Event #{event?.event_number}</strong>?
           This will permanently remove all scores, pairings, and side game data for this event.
         </p>
-        <div className="bg-red-50 border border-red-200 rounded-lg px-4 py-3 text-sm text-red-700">
+        <div className="bg-red-50 border border-red-200 rounded-sm px-4 py-3 text-sm text-red-700">
           This cannot be undone.
         </div>
         <div className="flex justify-end gap-3 pt-2">
@@ -5122,8 +5149,8 @@ function DeleteEventModal({ open, onClose, event }) {
 function Row({ label, value }) {
   return (
     <div className="flex justify-between">
-      <dt className="text-gray-500">{label}</dt>
-      <dd className="font-medium text-gray-900">{value}</dd>
+      <dt className="text-ink-muted">{label}</dt>
+      <dd className="font-medium text-ink">{value}</dd>
     </div>
   )
 }
@@ -5172,8 +5199,8 @@ function AccessCodeSection({ event, eventPlayers, onUpdated, orgSlug }) {
   if (groupNums.length === 0) {
     return (
       <div>
-        <p className="text-xs font-semibold text-gray-600 mb-1">Group Codes (no login needed)</p>
-        <p className="text-xs text-gray-400">Assign players to groups first, then set codes here.</p>
+        <p className="text-xs font-semibold text-ink mb-1">Group Codes (no login needed)</p>
+        <p className="text-xs text-ink-muted">Assign players to groups first, then set codes here.</p>
       </div>
     )
   }
@@ -5181,7 +5208,7 @@ function AccessCodeSection({ event, eventPlayers, onUpdated, orgSlug }) {
   return (
     <div>
       <div className="flex items-center justify-between mb-2">
-        <p className="text-xs font-semibold text-gray-600">Group Codes (no login needed)</p>
+        <p className="text-xs font-semibold text-ink">Group Codes (no login needed)</p>
         <div className="flex gap-2">
           <Button size="sm" variant="secondary" onClick={generateAll}>Generate All</Button>
           <Button size="sm" variant="primary" onClick={saveAll} disabled={saving}>Save</Button>
@@ -5197,7 +5224,7 @@ function AccessCodeSection({ event, eventPlayers, onUpdated, orgSlug }) {
             .join(', ')
           return (
             <div key={g} className="flex items-center gap-2">
-              <div className="shrink-0 text-xs font-bold text-gray-500 w-16">Group {g}</div>
+              <div className="shrink-0 text-xs font-bold text-ink-muted w-16">Group {g}</div>
               <input
                 type="text"
                 value={code}
@@ -5206,18 +5233,18 @@ function AccessCodeSection({ event, eventPlayers, onUpdated, orgSlug }) {
                 maxLength={8}
                 className="input text-sm w-28 uppercase tracking-widest font-bold text-center"
               />
-              <div className="text-xs text-gray-400 truncate flex-1" title={players}>{players}</div>
+              <div className="text-xs text-ink-muted truncate flex-1" title={players}>{players}</div>
               <Button size="sm" variant="secondary" onClick={() => setCode(g, makeCode())}>↺</Button>
             </div>
           )
         })}
       </div>
 
-      <p className="text-xs text-gray-500 mb-1.5">
+      <p className="text-xs text-ink-muted mb-1.5">
         Share the scorecard link + each group's code. Players enter their code to access scoring — no account needed.
       </p>
       <div className="flex items-center gap-2">
-        <input readOnly value={scorecardUrl} className="input text-xs flex-1 bg-gray-50" onFocus={e => e.target.select()} />
+        <input readOnly value={scorecardUrl} className="input text-xs flex-1 bg-surface-container" onFocus={e => e.target.select()} />
         <Button size="sm" variant="secondary" onClick={() => { navigator.clipboard.writeText(scorecardUrl); toast.success('Link copied!') }}>
           Copy
         </Button>
@@ -5309,8 +5336,8 @@ function TabRegistrations({ event, onUpdated, orgId }) {
   const cancelled = regs.filter(r => r.status === 'cancelled')
 
   const STATUS_COLORS = {
-    pending:   'bg-amber-100 text-amber-700',
-    confirmed: 'bg-green-100 text-green-700',
+    pending:   'bg-status-upcoming-bg text-status-upcoming-text',
+    confirmed: 'bg-status-active-bg text-status-active-text',
     cancelled: 'bg-red-100 text-red-600',
   }
 
@@ -5322,18 +5349,18 @@ function TabRegistrations({ event, onUpdated, orgId }) {
           <span className={`text-xs px-2 py-0.5 rounded-full font-medium capitalize shrink-0 ${STATUS_COLORS[reg.status]}`}>
             {reg.status}
           </span>
-          <p className="text-sm font-semibold text-gray-900">
+          <p className="text-sm font-semibold text-ink">
             {reg.first_name} {reg.last_name}
-            {reg.flight && <span className="ml-2 text-xs text-gray-400">Flight {reg.flight}</span>}
+            {reg.flight && <span className="ml-2 text-xs text-ink-muted">Flight {reg.flight}</span>}
           </p>
         </div>
-        {reg.email && <p className="text-xs text-gray-500">{reg.email}</p>}
+        {reg.email && <p className="text-xs text-ink-muted">{reg.email}</p>}
         {reg.notes && (
-          <p className="text-xs text-gray-400 italic">
+          <p className="text-xs text-ink-muted italic">
             "{reg.notes}"
           </p>
         )}
-        <p className="text-xs text-gray-400">
+        <p className="text-xs text-ink-muted">
           {new Date(reg.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })}
         </p>
         {/* Actions */}
@@ -5367,13 +5394,13 @@ function TabRegistrations({ event, onUpdated, orgId }) {
       <Card>
         <CardHeader title="Registration Link" subtitle="Share this link with players to register" />
         <div className="flex items-center gap-2 px-4 pb-4">
-          <input readOnly value={regUrl} className="input text-xs flex-1 bg-gray-50" onFocus={e => e.target.select()} />
+          <input readOnly value={regUrl} className="input text-xs flex-1 bg-surface-container" onFocus={e => e.target.select()} />
           <Button size="sm" variant="secondary" onClick={() => { navigator.clipboard.writeText(regUrl); toast.success('Link copied!') }}>
             Copy
           </Button>
         </div>
         {!event.venmo_handle && !event.paypal_link && !event.zelle_handle && (
-          <p className="text-xs text-amber-600 px-4 pb-3">
+          <p className="text-xs text-status-upcoming-text px-4 pb-3">
             ⚠ No payment links set — players won't see a payment button after registering. Add a Venmo handle, Zelle, or PayPal link in Event Settings.
           </p>
         )}
@@ -5381,7 +5408,7 @@ function TabRegistrations({ event, onUpdated, orgId }) {
 
       {/* Pending */}
       {loading ? (
-        <div className="text-sm text-gray-400">Loading…</div>
+        <div className="text-sm text-ink-muted">Loading…</div>
       ) : (
         <>
           <Card>
@@ -5390,8 +5417,8 @@ function TabRegistrations({ event, onUpdated, orgId }) {
               subtitle="Payment not yet confirmed"
             />
             {pending.length === 0
-              ? <p className="text-sm text-gray-400 px-4 pb-4">No pending registrations.</p>
-              : <div className="divide-y divide-gray-100 px-4">{pending.map(r => <RegRow key={r.id} reg={r} />)}</div>
+              ? <p className="text-sm text-ink-muted px-4 pb-4">No pending registrations.</p>
+              : <div className="divide-y divide-surface-border px-4">{pending.map(r => <RegRow key={r.id} reg={r} />)}</div>
             }
           </Card>
 
@@ -5399,13 +5426,13 @@ function TabRegistrations({ event, onUpdated, orgId }) {
             <Card>
               <button
                 onClick={() => setConfirmedExpanded(v => !v)}
-                className="w-full flex items-center justify-between px-4 py-3 text-left hover:bg-gray-50 transition-colors"
+                className="w-full flex items-center justify-between px-4 py-3 text-left hover:bg-surface-dim transition-colors"
               >
-                <span className="text-sm font-semibold text-gray-900">Confirmed ({confirmed.length})</span>
-                <span className="text-gray-400 text-xs">{confirmedExpanded ? '▲ Hide' : '▼ Show'}</span>
+                <span className="text-sm font-semibold text-ink">Confirmed ({confirmed.length})</span>
+                <span className="text-ink-muted text-xs">{confirmedExpanded ? '▲ Hide' : '▼ Show'}</span>
               </button>
               {confirmedExpanded && (
-                <div className="divide-y divide-gray-100 px-4 pb-2">{confirmed.map(r => <RegRow key={r.id} reg={r} />)}</div>
+                <div className="divide-y divide-surface-border px-4 pb-2">{confirmed.map(r => <RegRow key={r.id} reg={r} />)}</div>
               )}
             </Card>
           )}
@@ -5413,7 +5440,7 @@ function TabRegistrations({ event, onUpdated, orgId }) {
           {cancelled.length > 0 && (
             <Card>
               <CardHeader title={`Cancelled (${cancelled.length})`} />
-              <div className="divide-y divide-gray-100 px-4">{cancelled.map(r => <RegRow key={r.id} reg={r} />)}</div>
+              <div className="divide-y divide-surface-border px-4">{cancelled.map(r => <RegRow key={r.id} reg={r} />)}</div>
             </Card>
           )}
 
@@ -5441,27 +5468,27 @@ function TabRegistrations({ event, onUpdated, orgId }) {
                   title={`Notes & Guest Requests (${withNotes.length})`}
                   subtitle="Submitted by registrants"
                 />
-                <div className="divide-y divide-gray-100 px-4 pb-2">
+                <div className="divide-y divide-surface-border px-4 pb-2">
                   {withNotes.map(reg => {
                     const { guest, notes } = parseNotes(reg.notes)
                     const timestamp = new Date(reg.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })
                     return (
                       <div key={reg.id} className="py-3 space-y-2">
                         <div className="flex items-center gap-2 flex-wrap">
-                          <span className="text-sm font-semibold text-gray-900">{reg.first_name} {reg.last_name}</span>
+                          <span className="text-sm font-semibold text-ink">{reg.first_name} {reg.last_name}</span>
                           <span className={`text-xs px-2 py-0.5 rounded-full font-medium capitalize ${STATUS_COLORS[reg.status]}`}>{reg.status}</span>
-                          <span className="text-xs text-gray-400 ml-auto">{timestamp}</span>
+                          <span className="text-xs text-ink-muted ml-auto">{timestamp}</span>
                         </div>
                         {guest && (
-                          <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 space-y-0.5">
-                            <p className="text-xs font-semibold text-amber-800 uppercase tracking-wide">Guest Request</p>
-                            <p className="text-sm font-medium text-gray-900">{guest.name}</p>
-                            {guest.email && <p className="text-xs text-gray-500">{guest.email}</p>}
-                            {guest.ghin && <p className="text-xs text-gray-500">GHIN: {guest.ghin}</p>}
+                          <div className="rounded-sm border border-surface-border bg-status-upcoming-bg px-3 py-2 space-y-0.5">
+                            <p className="text-xs font-semibold text-status-upcoming-text uppercase tracking-wide">Guest Request</p>
+                            <p className="text-sm font-medium text-ink">{guest.name}</p>
+                            {guest.email && <p className="text-xs text-ink-muted">{guest.email}</p>}
+                            {guest.ghin && <p className="text-xs text-ink-muted">GHIN: {guest.ghin}</p>}
                           </div>
                         )}
                         {notes && (
-                          <p className="text-xs text-gray-500 italic">"{notes}"</p>
+                          <p className="text-xs text-ink-muted italic">"{notes}"</p>
                         )}
                       </div>
                     )
@@ -5637,14 +5664,14 @@ function TGLManager({ event, eventPlayers, allScores, course, tglTeams, tglMembe
       <div className="flex items-center justify-between gap-4">
         <div>
           <div className="flex items-center gap-2">
-            <h3 className="text-sm font-semibold text-gray-800">Team Play</h3>
+            <h3 className="text-sm font-semibold text-ink">Team Play</h3>
             {tglLocked && (
-              <span className="text-xs bg-green-100 text-green-700 font-semibold px-2 py-0.5 rounded-full">
-                🔒 Locked
+              <span className="text-xs bg-status-active-bg text-status-active-text font-semibold px-2 py-0.5 rounded-full">
+                Locked
               </span>
             )}
           </div>
-          <p className="text-xs text-gray-500 mt-0.5">
+          <p className="text-xs text-ink-muted mt-0.5">
             {tglLocked
               ? 'Selections are locked. Unlock to make changes.'
               : 'Select 2 players per team for this event, then submit to lock.'}
@@ -5663,7 +5690,7 @@ function TGLManager({ event, eventPlayers, allScores, course, tglTeams, tglMembe
       </div>
 
       {tglTeams.length === 0 && (
-        <p className="text-sm text-gray-400 italic">No teams yet. Create up to 4 teams for this league.</p>
+        <p className="text-sm text-ink-muted italic">No teams yet. Create up to 4 teams for this league.</p>
       )}
 
       {/* Team cards */}
@@ -5675,38 +5702,33 @@ function TGLManager({ event, eventPlayers, allScores, course, tglTeams, tglMembe
           const eventPoints = eventResults?.teamResults?.find(r => r.team.id === team.id)?.teamPoints ?? null
 
           return (
-            <div key={team.id} className="border border-gray-200 rounded-xl overflow-hidden">
+            <div key={team.id} className="border border-surface-border rounded-sm overflow-hidden">
               {/* Team header bar */}
               <div className="flex items-center justify-between px-4 py-3" style={{ backgroundColor: team.color + '22', borderBottom: `3px solid ${team.color}` }}>
                 <div className="flex items-center gap-2">
                   <span className="w-3 h-3 rounded-full inline-block" style={{ backgroundColor: team.color }} />
-                  <span className="font-semibold text-gray-900 text-sm">{team.name}</span>
+                  <span className="font-semibold text-ink text-sm">{team.name}</span>
                 </div>
                 <div className="flex items-center gap-2">
                   {eventPoints !== null && (
-                    <span className="text-xs font-medium text-gray-600 bg-white rounded-full px-2 py-0.5 border">
+                    <span className="text-xs font-medium text-ink bg-white rounded-full px-2 py-0.5 border">
                       {eventPoints % 1 === 0 ? eventPoints : eventPoints.toFixed(1)} pts
                     </span>
                   )}
                   {!tglLocked && (
-                    <button
-                      onClick={() => { setSelectedTeam(team); setShowMemberModal(true) }}
-                      className="text-xs text-blue-600 hover:text-blue-800 font-medium"
-                    >
-                      Roster
-                    </button>
+                    <Button variant="ghost" size="sm" onClick={() => { setSelectedTeam(team); setShowMemberModal(true) }}>Roster</Button>
                   )}
                   {!tglLocked && (
-                    <button onClick={() => deleteTeam(team.id)} className="text-xs text-red-500 hover:text-red-700">✕</button>
+                    <Button variant="ghost" size="sm" iconOnly label="Delete team" className="hover:!text-red-600" onClick={() => deleteTeam(team.id)}>✕</Button>
                   )}
                 </div>
               </div>
 
               {/* Event selections */}
               <div className="p-3">
-                <p className="text-xs font-medium text-gray-500 mb-2">Playing this event ({selected.length}/2):</p>
+                <p className="text-xs font-medium text-ink-muted mb-2">Playing this event ({selected.length}/2):</p>
                 {members.length === 0 ? (
-                  <p className="text-xs text-gray-400 italic">No roster members yet.</p>
+                  <p className="text-xs text-ink-muted italic">No roster members yet.</p>
                 ) : (
                   <div className="space-y-1">
                     {members.map(m => {
@@ -5715,22 +5737,22 @@ function TGLManager({ event, eventPlayers, allScores, course, tglTeams, tglMembe
                       const conflictTeam = conflictSel ? tglTeams.find(t => t.id === conflictSel.team_id) : null
                       const onAnotherTeam = !!conflictSel
                       return (
-                        <div key={m.player_id} className={`flex items-center gap-2 text-sm rounded px-2 py-1 ${onAnotherTeam ? 'bg-amber-50' : 'hover:bg-gray-50'}`}>
+                        <div key={m.player_id} className={`flex items-center gap-2 text-sm rounded px-2 py-1 ${onAnotherTeam ? 'bg-status-upcoming-bg' : 'hover:bg-surface-dim'}`}>
                           <input
                             type="checkbox"
                             checked={isSelected}
                             disabled={tglLocked || (!isSelected && selected.length >= 2 && !onAnotherTeam)}
                             onChange={() => !tglLocked && toggleEventSelection(team.id, m.player_id)}
-                            className="rounded text-green-600 cursor-pointer"
+                            className="rounded text-status-active-text cursor-pointer"
                           />
-                          <span className={isSelected ? 'font-medium text-gray-900' : onAnotherTeam ? 'text-amber-800' : 'text-gray-600'}>
+                          <span className={isSelected ? 'font-medium text-ink' : onAnotherTeam ? 'text-status-upcoming-text' : 'text-ink'}>
                             {m.player?.first_name} {m.player?.last_name}
                           </span>
                           {onAnotherTeam && (
-                            <span className="ml-auto text-xs text-amber-600 font-medium">
+                            <span className="ml-auto text-xs text-status-upcoming-text font-medium">
                               on {conflictTeam?.name ?? 'another team'} —{' '}
                               <button
-                                className="underline hover:text-amber-800"
+                                className="underline hover:text-ink"
                                 onClick={async () => {
                                   await supabase.from('tgl_event_selections').delete().eq('id', conflictSel.id)
                                   onUpdated()
@@ -5743,7 +5765,7 @@ function TGLManager({ event, eventPlayers, allScores, course, tglTeams, tglMembe
                           {isSelected && eventResults && (() => {
                             const pp = eventResults.playerPoints?.[m.player_id]
                             return pp != null ? (
-                              <span className="ml-auto text-xs text-gray-400">
+                              <span className="ml-auto text-xs text-ink-muted">
                                 {pp % 1 === 0 ? pp : pp.toFixed(1)} pts
                               </span>
                             ) : null
@@ -5761,13 +5783,13 @@ function TGLManager({ event, eventPlayers, allScores, course, tglTeams, tglMembe
 
       {/* Event results summary */}
       {eventResults && (
-        <div className="border border-gray-200 rounded-xl overflow-hidden">
-          <div className="bg-gray-50 px-4 py-2 border-b border-gray-200">
-            <span className="text-xs font-semibold text-gray-500 uppercase tracking-widest">Event Team Play Scores</span>
+        <div className="border border-surface-border rounded-sm overflow-hidden">
+          <div className="bg-surface-container px-4 py-2 border-b border-surface-border">
+            <span className="text-xs font-semibold text-ink-muted uppercase tracking-widest">Event Team Play Scores</span>
           </div>
           <table className="w-full text-sm">
             <thead>
-              <tr className="text-xs text-gray-500 border-b border-gray-100">
+              <tr className="text-xs text-ink-muted border-b border-surface-border">
                 <th className="text-left px-4 py-2">Rank</th>
                 <th className="text-left px-4 py-2">Team</th>
                 <th className="text-left px-4 py-2">Players</th>
@@ -5776,18 +5798,18 @@ function TGLManager({ event, eventPlayers, allScores, course, tglTeams, tglMembe
             </thead>
             <tbody>
               {eventResults.teamResults.map(tr => (
-                <tr key={tr.team.id} className="border-b border-gray-50 last:border-0">
-                  <td className="px-4 py-2 font-semibold text-gray-700">#{tr.rank}</td>
+                <tr key={tr.team.id} className="border-b border-surface-border last:border-0">
+                  <td className="px-4 py-2 font-semibold text-ink">#{tr.rank}</td>
                   <td className="px-4 py-2">
                     <div className="flex items-center gap-2">
                       <span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: tr.team.color }} />
                       <span className="font-medium">{tr.team.name}</span>
                     </div>
                   </td>
-                  <td className="px-4 py-2 text-gray-600 text-xs">
+                  <td className="px-4 py-2 text-ink text-xs">
                     {tr.selectedPlayers.map(p => `${p.name} (${p.points % 1 === 0 ? p.points : p.points.toFixed(1)})`).join(', ') || '—'}
                   </td>
-                  <td className="px-4 py-2 text-right font-bold text-gray-900">
+                  <td className="px-4 py-2 text-right font-bold text-ink">
                     {tr.teamPoints % 1 === 0 ? tr.teamPoints : tr.teamPoints.toFixed(1)}
                   </td>
                 </tr>
@@ -5808,12 +5830,12 @@ function TGLManager({ event, eventPlayers, allScores, course, tglTeams, tglMembe
               placeholder="e.g. Just the Tips"
             />
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Team Color</label>
+              <label className="block text-sm font-medium text-ink mb-1">Team Color</label>
               <input
                 type="color"
                 value={newTeamColor}
                 onChange={e => setNewTeamColor(e.target.value)}
-                className="h-10 w-20 rounded cursor-pointer border border-gray-300"
+                className="h-10 w-20 rounded cursor-pointer border border-surface-highest"
               />
             </div>
             <div className="flex justify-end gap-2 pt-2">
@@ -5857,22 +5879,22 @@ function TGLRosterModal({ team, tglMembers, allEventPlayers, onClose, onUpdated 
     <Modal open={true} title={`${team.name} — Roster`} onClose={onClose}>
       <div className="space-y-1 max-h-80 overflow-y-auto">
         {allEventPlayers.length === 0 && (
-          <p className="text-sm text-gray-400 italic">No players registered for this event yet.</p>
+          <p className="text-sm text-ink-muted italic">No players registered for this event yet.</p>
         )}
         {allEventPlayers.map(ep => {
           const isMember = memberIds.has(ep.player_id)
           return (
-            <label key={ep.player_id} className="flex items-center gap-3 py-2 px-2 rounded hover:bg-gray-50 cursor-pointer text-sm">
+            <label key={ep.player_id} className="flex items-center gap-3 py-2 px-2 rounded hover:bg-surface-dim cursor-pointer text-sm">
               <input
                 type="checkbox"
                 checked={isMember}
                 onChange={() => toggleMember(ep.player_id)}
-                className="rounded text-green-600"
+                className="rounded text-status-active-text"
               />
-              <span className={isMember ? 'font-medium text-gray-900' : 'text-gray-600'}>
+              <span className={isMember ? 'font-medium text-ink' : 'text-ink'}>
                 {ep.player?.first_name} {ep.player?.last_name}
               </span>
-              <span className="ml-auto text-xs text-gray-400">{ep.flight ? `Flight ${ep.flight}` : ''}</span>
+              <span className="ml-auto text-xs text-ink-muted">{ep.flight ? `Flight ${ep.flight}` : ''}</span>
             </label>
           )
         })}
