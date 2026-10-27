@@ -48,8 +48,8 @@ export default function CreateEvent() {
   if (loading) {
     return (
       <div className="space-y-4 animate-pulse">
-        <div className="h-8 w-48 rounded-lg" style={{ background: '#eceae5' }} />
-        <div className="h-96 rounded-xl" style={{ background: '#eceae5' }} />
+        <div className="h-8 w-48 rounded-sm bg-surface-high" />
+        <div className="h-96 rounded-sm bg-surface-high" />
       </div>
     )
   }
@@ -157,7 +157,7 @@ function CreateEventForm({ league, orgTier, onDone }) {
   return (
     <div className="max-w-2xl mx-auto space-y-6">
       <div>
-        <button onClick={onDone} className="text-sm text-ink-muted hover:text-ink">← Back</button>
+        <Button variant="ghost" size="sm" onClick={onDone}>← Back</Button>
       </div>
 
       <div className="card p-5 sm:p-6">
@@ -179,14 +179,14 @@ function CreateEventForm({ league, orgTier, onDone }) {
             </select>
           </div>
 
-          <div className={`bg-gray-50 rounded-xl px-4 py-3 ${!canUsePro ? 'opacity-50' : ''}`}>
+          <div className={`bg-surface-container rounded-sm px-4 py-3 ${!canUsePro ? 'opacity-50' : ''}`}>
             <div className="flex items-center justify-between">
               <div>
-                <div className="text-sm font-medium text-gray-800 flex items-center gap-2">
+                <div className="text-sm font-medium text-ink flex items-center gap-2">
                   Number of Flights
-                  {!canUsePro && <span className="text-xs font-semibold px-1.5 py-0.5 rounded-full" style={{ background: '#eff6ff', color: '#1d4ed8' }}>Pro</span>}
+                  {!canUsePro && <span className="text-xs font-semibold px-1.5 py-0.5 rounded-full bg-status-active-bg text-status-active-text">Pro</span>}
                 </div>
-                <div className="text-xs text-gray-400 mt-0.5">Flight A = highest/best players. Leave at "No flights" for a single field.</div>
+                <div className="text-xs text-ink-muted mt-0.5">Flight A = highest/best players. Leave at "No flights" for a single field.</div>
               </div>
               <select
                 value={numFlights}
@@ -202,32 +202,32 @@ function CreateEventForm({ league, orgTier, onDone }) {
             </div>
           </div>
 
-          <div className="bg-gray-50 rounded-xl px-4 py-3 flex items-center justify-between">
+          <div className="bg-surface-container rounded-sm px-4 py-3 flex items-center justify-between">
             <div>
-              <div className="text-sm font-medium text-gray-800">Shotgun Start?</div>
-              <div className="text-xs text-gray-400 mt-0.5">All groups tee off simultaneously from different holes</div>
+              <div className="text-sm font-medium text-ink">Shotgun Start?</div>
+              <div className="text-xs text-ink-muted mt-0.5">All groups tee off simultaneously from different holes</div>
             </div>
             <button
               type="button"
               onClick={() => setShotgunStart(v => !v)}
-              className={`relative inline-flex h-6 w-11 shrink-0 rounded-full border-2 border-transparent transition-colors focus:outline-none ${shotgunStart ? 'bg-fairway-600' : 'bg-gray-300'}`}
+              className={`relative inline-flex h-6 w-11 shrink-0 rounded-full border-2 border-transparent transition-colors focus:outline-none ${shotgunStart ? 'bg-fairway-700' : 'bg-surface-highest'}`}
             >
               <span className={`inline-block h-5 w-5 rounded-full bg-white shadow transition-transform ${shotgunStart ? 'translate-x-5' : 'translate-x-0'}`} />
             </button>
           </div>
 
-          <div className="bg-gray-50 rounded-xl px-4 py-3 flex items-center justify-between">
+          <div className="bg-surface-container rounded-sm px-4 py-3 flex items-center justify-between">
             <div>
-              <div className="text-sm font-medium text-gray-800">Holes Played</div>
-              <div className="text-xs text-gray-400 mt-0.5">Defaults to 18. Select 9 for a nine-hole event.</div>
+              <div className="text-sm font-medium text-ink">Holes Played</div>
+              <div className="text-xs text-ink-muted mt-0.5">Defaults to 18. Select 9 for a nine-hole event.</div>
             </div>
-            <div className="flex rounded-lg border border-gray-300 overflow-hidden text-sm font-semibold">
+            <div className="flex rounded-sm border border-surface-highest overflow-hidden text-sm font-semibold">
               {[18, 9].map(h => (
                 <button
                   key={h}
                   type="button"
                   onClick={() => setHolesPlayed(h)}
-                  className={`px-4 py-1.5 transition-colors ${holesPlayed === h ? 'bg-fairway-700 text-white' : 'bg-white text-gray-600 hover:bg-gray-100'}`}
+                  className={`px-4 py-1.5 transition-colors ${holesPlayed === h ? 'bg-fairway-700 text-white' : 'bg-white text-ink hover:bg-surface-dim'}`}
                 >
                   {h}
                 </button>
@@ -235,15 +235,15 @@ function CreateEventForm({ league, orgTier, onDone }) {
             </div>
           </div>
 
-          <div className="bg-gray-50 rounded-xl px-4 py-3 flex items-center justify-between">
+          <div className="bg-surface-container rounded-sm px-4 py-3 flex items-center justify-between">
             <div>
-              <div className="text-sm font-medium text-gray-800">Use Handicaps</div>
-              <div className="text-xs text-gray-400 mt-0.5">When off, handicap index is not required when adding players.</div>
+              <div className="text-sm font-medium text-ink">Use Handicaps</div>
+              <div className="text-xs text-ink-muted mt-0.5">When off, handicap index is not required when adding players.</div>
             </div>
             <button
               type="button"
               onClick={() => setUseHandicaps(v => !v)}
-              className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${useHandicaps ? 'bg-fairway-600' : 'bg-gray-300'}`}
+              className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${useHandicaps ? 'bg-fairway-700' : 'bg-surface-highest'}`}
             >
               <span className={`inline-block h-5 w-5 rounded-full bg-white shadow transition-transform ${useHandicaps ? 'translate-x-5' : 'translate-x-0'}`} />
             </button>
@@ -251,10 +251,10 @@ function CreateEventForm({ league, orgTier, onDone }) {
 
           <div>
             <label className="label">Scoring Formats</label>
-            <div className="bg-gray-50 rounded-xl px-4 py-3 space-y-3">
+            <div className="bg-surface-container rounded-sm px-4 py-3 space-y-3">
               {FORMAT_OPTIONS.map(group => (
                 <div key={group.group}>
-                  <div className="text-xs text-gray-400 font-medium uppercase tracking-wide mb-1.5">{group.group}</div>
+                  <div className="text-xs text-ink-muted font-medium uppercase tracking-wide mb-1.5">{group.group}</div>
                   <div className="space-y-2">
                     {group.options.map(opt => {
                       const locked = opt.pro && !canUsePro
@@ -267,15 +267,15 @@ function CreateEventForm({ league, orgTier, onDone }) {
                             <input type="checkbox" checked={formats.has(opt.value)}
                               onChange={() => !locked && toggleFormat(opt.value)}
                               disabled={locked} className="accent-fairway-600 w-4 h-4 shrink-0 cursor-pointer" />
-                            <span className={`text-sm text-gray-800 ${locked ? '' : 'cursor-pointer'}`} onClick={() => !locked && toggleFormat(opt.value)}>{opt.label}</span>
-                            {locked && <span className="text-xs font-semibold px-1.5 py-0.5 rounded-full" style={{ background: '#eff6ff', color: '#1d4ed8' }}>Pro</span>}
+                            <span className={`text-sm text-ink ${locked ? '' : 'cursor-pointer'}`} onClick={() => !locked && toggleFormat(opt.value)}>{opt.label}</span>
+                            {locked && <span className="text-xs font-semibold px-1.5 py-0.5 rounded-full bg-status-active-bg text-status-active-text">Pro</span>}
                             {formats.has(opt.value) && !locked && (
                               <div className="ml-auto flex items-center gap-1.5 shrink-0">
-                                <span className="text-xs text-gray-400">Places to pay:</span>
+                                <span className="text-xs text-ink-muted">Places to pay:</span>
                                 <select
                                   value={payoutPlaces[opt.value] ?? 1}
                                   onChange={e => setPayoutPlaces(prev => ({ ...prev, [opt.value]: Number(e.target.value) }))}
-                                  className="text-xs border border-gray-300 rounded px-1.5 py-0.5 bg-white"
+                                  className="text-xs border border-surface-highest rounded px-1.5 py-0.5 bg-white"
                                 >
                                   {PLACES_OPTIONS.map(n => <option key={n} value={n}>{n}</option>)}
                                 </select>
@@ -288,13 +288,13 @@ function CreateEventForm({ league, orgTier, onDone }) {
                                 <input type="radio" checked={fmtScope === 'group'}
                                   onChange={() => setFormatScope(prev => ({ ...prev, [opt.value]: 'group' }))}
                                   className="accent-fairway-600" />
-                                <span className="text-xs text-gray-600">Whole group</span>
+                                <span className="text-xs text-ink">Whole group</span>
                               </label>
                               <label className="flex items-center gap-1.5 cursor-pointer">
                                 <input type="radio" checked={fmtScope === 'flight'}
                                   onChange={() => setFormatScope(prev => ({ ...prev, [opt.value]: 'flight' }))}
                                   className="accent-fairway-600" />
-                                <span className="text-xs text-gray-600">Per flight ({flightLetters.join(', ')})</span>
+                                <span className="text-xs text-ink">Per flight ({flightLetters.join(', ')})</span>
                               </label>
                             </div>
                           )}
@@ -305,12 +305,12 @@ function CreateEventForm({ league, orgTier, onDone }) {
                 </div>
               ))}
             </div>
-            {formats.size === 0 && <p className="text-xs text-red-500 mt-1">Select at least one format.</p>}
+            {formats.size === 0 && <p className="text-xs text-red-600 mt-1">Select at least one format.</p>}
           </div>
 
           <div>
             <label className="label">Side Games / Competitions</label>
-            <div className="space-y-3 bg-gray-50 rounded-xl px-4 py-3">
+            <div className="space-y-3 bg-surface-container rounded-sm px-4 py-3">
               {[...PER_FLIGHT_GAMES, ...GROUP_GAMES].map(opt => {
                 const locked = opt.pro && !canUsePro
                 const checked = sideGames.has(opt.key)
@@ -324,8 +324,8 @@ function CreateEventForm({ league, orgTier, onDone }) {
                       <input type="checkbox" checked={checked}
                         onChange={() => !locked && toggleSideGame(opt.key)}
                         disabled={locked} className="accent-fairway-600 w-4 h-4" />
-                      <span className="text-sm text-gray-800">{opt.label}</span>
-                      {locked && <span className="text-xs font-semibold px-1.5 py-0.5 rounded-full" style={{ background: '#eff6ff', color: '#1d4ed8' }}>Pro</span>}
+                      <span className="text-sm text-ink">{opt.label}</span>
+                      {locked && <span className="text-xs font-semibold px-1.5 py-0.5 rounded-full bg-status-active-bg text-status-active-text">Pro</span>}
                     </label>
                     {checked && isPerFlight && numFlights > 0 && (
                       <div className="ml-6 mt-1.5 flex gap-4">
@@ -333,13 +333,13 @@ function CreateEventForm({ league, orgTier, onDone }) {
                           <input type="radio" checked={scope === 'flight'}
                             onChange={() => setGameScope(prev => ({ ...prev, [opt.key]: 'flight' }))}
                             className="accent-fairway-600" />
-                          <span className="text-xs text-gray-600">Per flight ({flightLetters.join(', ')})</span>
+                          <span className="text-xs text-ink">Per flight ({flightLetters.join(', ')})</span>
                         </label>
                         <label className="flex items-center gap-1.5 cursor-pointer">
                           <input type="radio" checked={scope === 'group'}
                             onChange={() => setGameScope(prev => ({ ...prev, [opt.key]: 'group' }))}
                             className="accent-fairway-600" />
-                          <span className="text-xs text-gray-600">Whole group</span>
+                          <span className="text-xs text-ink">Whole group</span>
                         </label>
                       </div>
                     )}
@@ -347,17 +347,17 @@ function CreateEventForm({ league, orgTier, onDone }) {
                       <div className="ml-6 mt-1.5 flex items-center gap-3">
                         <label className="flex items-center gap-1.5 cursor-pointer">
                           <input type="checkbox" checked={buyIn.enabled ?? false} onChange={() => toggleBuyIn(opt.key)} className="accent-fairway-600 w-4 h-4" />
-                          <span className="text-xs text-gray-600">Separate buy-in</span>
+                          <span className="text-xs text-ink">Separate buy-in</span>
                         </label>
                         {buyIn.enabled && (
                           <div className="flex items-center gap-1">
-                            <span className="text-xs text-gray-400">$</span>
+                            <span className="text-xs text-ink-muted">$</span>
                             <input
                               type="number" min="0" step="1"
                               value={buyIn.amount ?? ''}
                               onChange={e => setBuyInAmount(opt.key, e.target.value)}
                               placeholder="0"
-                              className="w-16 border border-gray-300 rounded px-2 py-0.5 text-xs focus:outline-none focus:ring-1 focus:ring-green-600"
+                              className="w-16 border border-surface-highest rounded px-2 py-0.5 text-xs focus:outline-none focus:ring-1 focus:ring-fairway-500"
                             />
                           </div>
                         )}
@@ -377,18 +377,16 @@ function CreateEventForm({ league, orgTier, onDone }) {
                       value={name}
                       onChange={e => setCustomCompetitions(prev => prev.map((c, j) => j === i ? e.target.value : c))}
                       placeholder="e.g. Bingo Bango Bongo"
-                      className="flex-1 border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-600"
+                      className="flex-1 border border-surface-highest rounded-sm px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-fairway-500"
                     />
-                    <button type="button" onClick={() => setCustomCompetitions(prev => prev.filter((_, j) => j !== i))}
-                      className="text-gray-400 hover:text-red-500 text-lg leading-none">✕</button>
+                    <Button type="button" variant="ghost" size="sm" iconOnly label="Remove" className="shrink-0 hover:!text-red-600" onClick={() => setCustomCompetitions(prev => prev.filter((_, j) => j !== i))}>✕</Button>
                   </div>
                 ))}
               </div>
-              <button type="button"
-                onClick={() => setCustomCompetitions(prev => [...prev, ''])}
-                className="mt-2 text-xs font-semibold text-green-700 hover:text-green-900">
-                + Add Custom Competition
-              </button>
+              <Button type="button" variant="secondary" size="sm" className="mt-2"
+                onClick={() => setCustomCompetitions(prev => [...prev, ''])}>
+                + Add custom competition
+              </Button>
             </div>
           </div>
 
@@ -402,11 +400,11 @@ function CreateEventForm({ league, orgTier, onDone }) {
             <div className="flex gap-4 mt-1">
               <label className="flex items-center gap-2 cursor-pointer">
                 <input type="radio" name="payoutBasis" value="per_player" checked={payoutBasis === 'per_player'} onChange={() => setPayoutBasis('per_player')} className="accent-fairway-600" />
-                <span className="text-sm text-gray-700">Attendance (entry fee × players)</span>
+                <span className="text-sm text-ink">Attendance (entry fee × players)</span>
               </label>
               <label className="flex items-center gap-2 cursor-pointer">
                 <input type="radio" name="payoutBasis" value="fixed" checked={payoutBasis === 'fixed'} onChange={() => setPayoutBasis('fixed')} className="accent-fairway-600" />
-                <span className="text-sm text-gray-700">Fixed total</span>
+                <span className="text-sm text-ink">Fixed total</span>
               </label>
             </div>
             {payoutBasis === 'fixed' && (
@@ -416,11 +414,11 @@ function CreateEventForm({ league, orgTier, onDone }) {
           <Input label="Tournament Entry Fee ($)" type="number" step="0.01" min="0" value={tournamentFee} onChange={e => setTournamentFee(e.target.value)} placeholder="e.g. 25.00 (shown on registration page)" />
 
           <div className="space-y-3">
-            <div className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Payment Links (optional)</div>
+            <div className="text-xs font-semibold text-ink-muted uppercase tracking-wide">Payment Links (optional)</div>
             <div>
               <label className="label">Venmo Handle</label>
-              <div className="flex items-center border border-gray-300 rounded-lg overflow-hidden focus-within:ring-2 focus-within:ring-green-600">
-                <span className="px-3 text-gray-400 text-sm border-r border-gray-300 bg-gray-50 py-2">@</span>
+              <div className="flex items-center border border-surface-highest rounded-sm overflow-hidden focus-within:ring-2 focus-within:ring-fairway-500">
+                <span className="px-3 text-ink-muted text-sm border-r border-surface-highest bg-surface-container py-2">@</span>
                 <input
                   type="text"
                   value={venmoHandle}
@@ -444,10 +442,10 @@ function CreateEventForm({ league, orgTier, onDone }) {
           </div>
 
           {/* Schedule of Events */}
-          <div className="space-y-3 bg-gray-50 rounded-xl px-4 py-3">
-            <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Schedule of Events <span className="normal-case text-gray-400 font-normal">(shown on event page and registration)</span></p>
+          <div className="space-y-3 bg-surface-container rounded-sm px-4 py-3">
+            <p className="text-xs font-semibold text-ink-muted uppercase tracking-wide">Schedule of Events <span className="normal-case text-ink-muted font-normal">(shown on event page and registration)</span></p>
             {scheduleItems.map((item, i) => (
-              <div key={i} className="bg-white rounded-lg border border-gray-200 p-3 space-y-2">
+              <div key={i} className="bg-white rounded-sm border border-surface-border p-3 space-y-2">
                 <div className="flex items-center gap-2">
                   <input
                     type="time"
@@ -462,8 +460,7 @@ function CreateEventForm({ league, orgTier, onDone }) {
                     placeholder="e.g. Check-in, Tee Time, Awards…"
                     className="input flex-1"
                   />
-                  <button type="button" onClick={() => setScheduleItems(prev => prev.filter((_, j) => j !== i))}
-                    className="text-gray-400 hover:text-red-500 text-sm shrink-0">✕</button>
+                  <Button type="button" variant="ghost" size="sm" iconOnly label="Remove" className="shrink-0 hover:!text-red-600" onClick={() => setScheduleItems(prev => prev.filter((_, j) => j !== i))}>✕</Button>
                 </div>
                 <input
                   type="text"
@@ -474,18 +471,14 @@ function CreateEventForm({ league, orgTier, onDone }) {
                 />
               </div>
             ))}
-            <button
-              type="button"
-              onClick={() => setScheduleItems(prev => [...prev, { time: '', label: '', description: '' }])}
-              className="text-xs text-fairway-700 font-semibold hover:underline mt-1"
-            >
+            <Button type="button" variant="secondary" size="sm" className="mt-1" onClick={() => setScheduleItems(prev => [...prev, { time: '', label: '', description: '' }])}>
               + Add item
-            </button>
+            </Button>
           </div>
 
           {/* Custom Registration Questions */}
-          <div className="space-y-2 bg-gray-50 rounded-xl px-4 py-3">
-            <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Registration Questions <span className="normal-case text-gray-400 font-normal">(shown on registration form)</span></p>
+          <div className="space-y-2 bg-surface-container rounded-sm px-4 py-3">
+            <p className="text-xs font-semibold text-ink-muted uppercase tracking-wide">Registration Questions <span className="normal-case text-ink-muted font-normal">(shown on registration form)</span></p>
             {customQuestions.map((q, i) => (
               <div key={i} className="flex items-center gap-2">
                 <input
@@ -495,23 +488,18 @@ function CreateEventForm({ league, orgTier, onDone }) {
                   placeholder="e.g. Interested in bringing a guest?"
                   className="input flex-1"
                 />
-                <label className="flex items-center gap-1 text-xs text-gray-500 shrink-0 cursor-pointer">
+                <label className="flex items-center gap-1 text-xs text-ink-muted shrink-0 cursor-pointer">
                   <input type="checkbox" checked={q.required}
                     onChange={e => setCustomQuestions(prev => prev.map((x, j) => j === i ? { ...x, required: e.target.checked } : x))}
                     className="accent-fairway-600" />
                   Required
                 </label>
-                <button type="button" onClick={() => setCustomQuestions(prev => prev.filter((_, j) => j !== i))}
-                  className="text-gray-400 hover:text-red-500 text-sm shrink-0">✕</button>
+                <Button type="button" variant="ghost" size="sm" iconOnly label="Remove" className="shrink-0 hover:!text-red-600" onClick={() => setCustomQuestions(prev => prev.filter((_, j) => j !== i))}>✕</Button>
               </div>
             ))}
-            <button
-              type="button"
-              onClick={() => setCustomQuestions(prev => [...prev, { label: '', required: false }])}
-              className="text-xs text-fairway-700 font-semibold hover:underline mt-1"
-            >
+            <Button type="button" variant="secondary" size="sm" className="mt-1" onClick={() => setCustomQuestions(prev => [...prev, { label: '', required: false }])}>
               + Add item
-            </button>
+            </Button>
           </div>
 
           <div className="flex justify-end gap-3 pt-2">

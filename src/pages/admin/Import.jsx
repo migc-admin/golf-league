@@ -23,8 +23,8 @@ export default function Import() {
   return (
     <div className="space-y-5 max-w-3xl">
       <div>
-        <h1 className="text-2xl font-bold text-gray-900">Import Data</h1>
-        <p className="text-gray-500 text-sm mt-1">
+        <h1 className="text-2xl font-bold text-ink">Import Data</h1>
+        <p className="text-ink-muted text-sm mt-1">
           Upload CSV files to bulk-load players, courses, and event rosters.
         </p>
       </div>
@@ -79,15 +79,15 @@ function FileDropZone({ onFile, accept = '.csv' }) {
       onDragOver={e => { e.preventDefault(); setDragging(true) }}
       onDragLeave={() => setDragging(false)}
       onDrop={e => { e.preventDefault(); setDragging(false); handleFile(e.dataTransfer.files[0]) }}
-      className={`border-2 border-dashed rounded-xl p-8 text-center transition-colors ${
-        dragging ? 'border-fairway-500 bg-fairway-50' : 'border-gray-300 bg-gray-50 hover:border-gray-400'
+      className={`border-2 border-dashed rounded-sm p-8 text-center transition-colors ${
+        dragging ? 'border-fairway-500 bg-fairway-50' : 'border-surface-highest bg-surface-container hover:border-surface-outline'
       }`}
     >
       <div className="text-3xl mb-2">📂</div>
-      <p className="text-sm font-medium text-gray-700">Drag & drop your CSV here</p>
-      <p className="text-xs text-gray-400 mt-1">or</p>
+      <p className="text-sm font-medium text-ink">Drag & drop your CSV here</p>
+      <p className="text-xs text-ink-muted mt-1">or</p>
       <label className="mt-3 inline-block cursor-pointer">
-        <span className="px-4 py-2 bg-fairway-700 text-white text-sm font-semibold rounded-lg hover:bg-fairway-800 transition-colors">
+        <span className="px-4 py-2 bg-fairway-700 text-white text-sm font-semibold rounded-sm hover:bg-fairway-800 transition-colors">
           Choose File
         </span>
         <input
@@ -106,36 +106,36 @@ function PreviewTable({ headers, rows, statusKey = '_status', messageKey = '_mes
   const displayHeaders = headers.filter(h => h !== statusKey && h !== messageKey)
 
   return (
-    <div className="overflow-x-auto rounded-xl border border-gray-200">
+    <div className="overflow-x-auto rounded-sm border border-surface-border">
       <table className="w-full text-xs">
         <thead>
-          <tr className="bg-gray-50 border-b border-gray-200">
-            <th className="px-3 py-2 text-left font-semibold text-gray-500">Status</th>
+          <tr className="bg-surface-container border-b border-surface-border">
+            <th className="px-3 py-2 text-left font-semibold text-ink-muted">Status</th>
             {displayHeaders.map(h => (
-              <th key={h} className="px-3 py-2 text-left font-semibold text-gray-500 whitespace-nowrap">{h}</th>
+              <th key={h} className="px-3 py-2 text-left font-semibold text-ink-muted whitespace-nowrap">{h}</th>
             ))}
           </tr>
         </thead>
-        <tbody className="divide-y divide-gray-100">
+        <tbody className="divide-y divide-surface-border">
           {rows.map((row, i) => {
             const status  = row[statusKey]
             const message = row[messageKey]
             return (
               <tr key={i} className={
-                status === 'imported' ? 'bg-green-50' :
+                status === 'imported' ? 'bg-status-active-bg' :
                 status === 'matched'  ? 'bg-blue-50'  :
                 status === 'error'    ? 'bg-red-50'   :
-                status === 'skipped'  ? 'bg-yellow-50' : ''
+                status === 'skipped'  ? 'bg-status-upcoming-bg' : ''
               }>
                 <td className="px-3 py-2 font-medium whitespace-nowrap">
-                  {status === 'imported' && <span className="text-green-700">✓ Created</span>}
+                  {status === 'imported' && <span className="text-status-active-text">✓ Created</span>}
                   {status === 'matched'  && <span className="text-blue-700">↗ Matched existing</span>}
                   {status === 'error'    && <span className="text-red-600">✕ {message}</span>}
-                  {status === 'skipped'  && <span className="text-yellow-700">⚠ {message}</span>}
-                  {!status               && <span className="text-gray-400">—</span>}
+                  {status === 'skipped'  && <span className="text-status-upcoming-text">⚠ {message}</span>}
+                  {!status               && <span className="text-ink-muted">—</span>}
                 </td>
                 {displayHeaders.map(h => (
-                  <td key={h} className="px-3 py-2 text-gray-700 whitespace-nowrap">{row[h]}</td>
+                  <td key={h} className="px-3 py-2 text-ink whitespace-nowrap">{row[h]}</td>
                 ))}
               </tr>
             )
@@ -311,14 +311,14 @@ function ImportPlayers() {
             </Button>
           }
         />
-        <div className="bg-gray-900 rounded-lg px-4 py-3 text-xs text-gray-300 font-mono overflow-x-auto">
-          <div className="text-gray-500 mb-1"># players_template.csv</div>
+        <div className="bg-ink rounded-sm px-4 py-3 text-xs text-surface-outline font-mono overflow-x-auto">
+          <div className="text-ink-muted mb-1"># players_template.csv</div>
           <div>first_name,last_name,email,handicap_index,course_handicap,flight,role</div>
-          <div className="text-gray-500">John,Smith,john@example.com,5.2,6,A,player</div>
-          <div className="text-gray-500">Mike,Johnson,mike@example.com,11.1,13,A,admin</div>
-          <div className="text-gray-500">Tom,Williams,tom@example.com,15.3,,B,player</div>
+          <div className="text-ink-muted">John,Smith,john@example.com,5.2,6,A,player</div>
+          <div className="text-ink-muted">Mike,Johnson,mike@example.com,11.1,13,A,admin</div>
+          <div className="text-ink-muted">Tom,Williams,tom@example.com,15.3,,B,player</div>
         </div>
-        <ul className="mt-3 text-xs text-gray-500 space-y-1 list-disc list-inside">
+        <ul className="mt-3 text-xs text-ink-muted space-y-1 list-disc list-inside">
           <li><strong>first_name</strong> and <strong>last_name</strong> are required</li>
           <li><strong>email</strong> is optional — used for matching first, then falls back to first+last name match. No duplicate profiles are created either way.</li>
           <li><strong>handicap_index</strong> — USGA index (e.g. 14.2). Used to auto-calculate course handicap if <code>course_handicap</code> is not provided.</li>
@@ -556,15 +556,15 @@ function ImportCourse() {
             </Button>
           }
         />
-        <div className="bg-gray-900 rounded-lg px-4 py-3 text-xs text-gray-300 font-mono overflow-x-auto">
-          <div className="text-gray-500 mb-1"># course_template.csv — 2 tees × 18 holes = 36 rows</div>
+        <div className="bg-ink rounded-sm px-4 py-3 text-xs text-surface-outline font-mono overflow-x-auto">
+          <div className="text-ink-muted mb-1"># course_template.csv — 2 tees × 18 holes = 36 rows</div>
           <div>course_name,tee,slope,rating,hole,par,yardage,stroke_index</div>
-          <div className="text-gray-500">Torrey Pines South,Back,144,74.6,1,4,452,3</div>
-          <div className="text-gray-500">... (18 Back rows, then 18 Middle rows)</div>
-          <div className="text-gray-500">Torrey Pines South,Middle,130,72.1,1,4,420,3</div>
-          <div className="text-gray-500">...</div>
+          <div className="text-ink-muted">Torrey Pines South,Back,144,74.6,1,4,452,3</div>
+          <div className="text-ink-muted">... (18 Back rows, then 18 Middle rows)</div>
+          <div className="text-ink-muted">Torrey Pines South,Middle,130,72.1,1,4,420,3</div>
+          <div className="text-ink-muted">...</div>
         </div>
-        <ul className="mt-3 text-xs text-gray-500 space-y-1 list-disc list-inside">
+        <ul className="mt-3 text-xs text-ink-muted space-y-1 list-disc list-inside">
           <li><strong>tee</strong> — tee name, e.g. Back, Middle, Forward. Repeat all 18 rows per tee.</li>
           <li><strong>slope</strong> and <strong>rating</strong> are per-tee (repeat the same value for all 18 rows of that tee)</li>
           <li><strong>hole</strong> — 1 through 18</li>
@@ -597,17 +597,17 @@ function ImportCourse() {
             }
           />
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-sm mb-4">
-            <div className="bg-gray-50 rounded-lg p-3">
-              <div className="text-xs text-gray-400 mb-1">Tees</div>
-              <div className="font-bold text-gray-900">{preview.tees.length}</div>
+            <div className="bg-surface-container rounded-sm p-3">
+              <div className="text-xs text-ink-muted mb-1">Tees</div>
+              <div className="font-bold text-ink">{preview.tees.length}</div>
             </div>
-            <div className="bg-gray-50 rounded-lg p-3">
-              <div className="text-xs text-gray-400 mb-1">Total Par</div>
-              <div className="font-bold text-gray-900">{preview.par}</div>
+            <div className="bg-surface-container rounded-sm p-3">
+              <div className="text-xs text-ink-muted mb-1">Total Par</div>
+              <div className="font-bold text-ink">{preview.par}</div>
             </div>
-            <div className="bg-gray-50 rounded-lg p-3 col-span-2">
-              <div className="text-xs text-gray-400 mb-1">Tee Sets</div>
-              <div className="font-bold text-gray-900 text-xs space-y-0.5">
+            <div className="bg-surface-container rounded-sm p-3 col-span-2">
+              <div className="text-xs text-ink-muted mb-1">Tee Sets</div>
+              <div className="font-bold text-ink text-xs space-y-0.5">
                 {preview.tees.map(t => (
                   <div key={t.name}>{t.name}: Slope {t.slope} / Rating {t.rating}</div>
                 ))}
@@ -616,33 +616,33 @@ function ImportCourse() {
           </div>
 
           {/* Hole grid */}
-          <div className="overflow-x-auto rounded-xl border border-gray-200">
+          <div className="overflow-x-auto rounded-sm border border-surface-border">
             <table className="w-full text-xs text-center">
               <thead>
-                <tr className="bg-gray-50 border-b border-gray-200">
-                  <th className="px-2 py-2 text-left text-gray-500 font-semibold">Hole</th>
+                <tr className="bg-surface-container border-b border-surface-border">
+                  <th className="px-2 py-2 text-left text-ink-muted font-semibold">Hole</th>
                   {preview.par_per_hole.map((_, i) => (
-                    <th key={i} className="px-2 py-2 text-gray-500 font-semibold">{i + 1}</th>
+                    <th key={i} className="px-2 py-2 text-ink-muted font-semibold">{i + 1}</th>
                   ))}
                 </tr>
               </thead>
               <tbody>
-                <tr className="border-b border-gray-100">
-                  <td className="px-2 py-2 text-left text-gray-500 font-medium">Par</td>
+                <tr className="border-b border-surface-border">
+                  <td className="px-2 py-2 text-left text-ink-muted font-medium">Par</td>
                   {preview.par_per_hole.map((p, i) => (
-                    <td key={i} className="px-2 py-2 font-bold text-gray-800">{p}</td>
+                    <td key={i} className="px-2 py-2 font-bold text-ink">{p}</td>
                   ))}
                 </tr>
-                <tr className="border-b border-gray-100">
-                  <td className="px-2 py-2 text-left text-gray-500 font-medium">{preview.tees[0]?.name} Yds</td>
+                <tr className="border-b border-surface-border">
+                  <td className="px-2 py-2 text-left text-ink-muted font-medium">{preview.tees[0]?.name} Yds</td>
                   {preview.tees[0]?.yardage.map((y, i) => (
-                    <td key={i} className="px-2 py-2 text-gray-600">{y}</td>
+                    <td key={i} className="px-2 py-2 text-ink">{y}</td>
                   ))}
                 </tr>
                 <tr>
-                  <td className="px-2 py-2 text-left text-gray-500 font-medium">S.I.</td>
+                  <td className="px-2 py-2 text-left text-ink-muted font-medium">S.I.</td>
                   {preview.stroke_index.map((s, i) => (
-                    <td key={i} className="px-2 py-2 text-gray-600">{s}</td>
+                    <td key={i} className="px-2 py-2 text-ink">{s}</td>
                   ))}
                 </tr>
               </tbody>
@@ -652,7 +652,7 @@ function ImportCourse() {
       )}
 
       {done && (
-        <div className="bg-fairway-50 border border-fairway-200 rounded-xl p-4 text-sm text-fairway-800 font-medium">
+        <div className="bg-fairway-50 border border-fairway-200 rounded-sm p-4 text-sm text-fairway-800 font-medium">
           ✓ Course imported. Go to <strong>Courses</strong> in the sidebar to verify, or create an event using this course.
         </div>
       )}
@@ -893,14 +893,14 @@ function ImportRoster() {
             </Button>
           }
         />
-        <div className="bg-gray-900 rounded-lg px-4 py-3 text-xs text-gray-300 font-mono overflow-x-auto">
-          <div className="text-gray-500 mb-1"># roster_template.csv</div>
+        <div className="bg-ink rounded-sm px-4 py-3 text-xs text-surface-outline font-mono overflow-x-auto">
+          <div className="text-ink-muted mb-1"># roster_template.csv</div>
           <div>first_name,last_name,handicap_index,flight,course_handicap</div>
-          <div className="text-gray-500">John,Smith,5.2,A,6</div>
-          <div className="text-gray-500">Mike,Johnson,11.1,A,13</div>
-          <div className="text-gray-500">Tom,Williams,15.3,B,18</div>
+          <div className="text-ink-muted">John,Smith,5.2,A,6</div>
+          <div className="text-ink-muted">Mike,Johnson,11.1,A,13</div>
+          <div className="text-ink-muted">Tom,Williams,15.3,B,18</div>
         </div>
-        <ul className="mt-3 text-xs text-gray-500 space-y-1 list-disc list-inside">
+        <ul className="mt-3 text-xs text-ink-muted space-y-1 list-disc list-inside">
           <li><strong>first_name</strong> and <strong>last_name</strong> are required</li>
           <li><strong>handicap_index</strong> — USGA index. Used to auto-calculate course handicap if not provided.</li>
           <li><strong>course_handicap</strong> — optional. If blank, auto-calculated from slope/rating/par.</li>
@@ -914,7 +914,7 @@ function ImportRoster() {
       <Card>
         <CardHeader title="Step 2 — Select the event" />
         {events.length === 0
-          ? <p className="text-sm text-gray-400">No events found. Create an event first.</p>
+          ? <p className="text-sm text-ink-muted">No events found. Create an event first.</p>
           : (
           <select
             value={eventId}
@@ -961,11 +961,11 @@ function ImportRoster() {
           />
           <div className="space-y-3">
             {conflicts.map(c => (
-              <div key={c.rowIndex} className="rounded-xl border border-amber-200 bg-amber-50 p-4">
+              <div key={c.rowIndex} className="rounded-sm border border-surface-border bg-status-upcoming-bg p-4">
                 <div className="flex items-center justify-between gap-4 flex-wrap">
                   <div>
-                    <p className="text-sm font-semibold text-gray-900">CSV: <span className="text-amber-700">{c.csvName}</span></p>
-                    <p className="text-xs text-gray-500 mt-0.5">Similar name{c.fuzzyMatches.length !== 1 ? 's' : ''} found in roster</p>
+                    <p className="text-sm font-semibold text-ink">CSV: <span className="text-status-upcoming-text">{c.csvName}</span></p>
+                    <p className="text-xs text-ink-muted mt-0.5">Similar name{c.fuzzyMatches.length !== 1 ? 's' : ''} found in roster</p>
                   </div>
                   <select
                     value={c.resolution}
@@ -989,7 +989,7 @@ function ImportRoster() {
 
       {/* No conflicts found */}
       {conflicts !== null && conflicts.length === 0 && !done && (
-        <div className="rounded-xl bg-green-50 border border-green-200 px-4 py-3 text-sm text-green-800 font-medium">
+        <div className="rounded-sm bg-status-active-bg border border-fairway-200 px-4 py-3 text-sm text-fairway-800 font-medium">
           ✓ No duplicate conflicts found.
         </div>
       )}
@@ -1008,14 +1008,14 @@ function ImportRoster() {
             }
           />
           {!eventId && (
-            <p className="mb-3 text-sm text-orange-600">Select an event above before importing.</p>
+            <p className="mb-3 text-sm text-status-upcoming-text">Select an event above before importing.</p>
           )}
           <PreviewTable headers={[...headers, '_status']} rows={rows} />
         </Card>
       )}
 
       {done && (
-        <div className="bg-fairway-50 border border-fairway-200 rounded-xl p-4 text-sm text-fairway-800 font-medium">
+        <div className="bg-fairway-50 border border-fairway-200 rounded-sm p-4 text-sm text-fairway-800 font-medium">
           ✓ Done. Review players in the event's Players &amp; Flights tab to verify handicaps and flights.
         </div>
       )}
@@ -1288,9 +1288,9 @@ function ImportPastResults() {
     <div className="space-y-5">
 
       {/* What this does */}
-      <div className="rounded-xl px-5 py-4 text-sm" style={{ background: '#f0fdf4', border: '1px solid #bbf7d0' }}>
-        <p className="font-semibold text-green-900 mb-1">Import historical tournament results</p>
-        <p className="text-green-800 leading-relaxed">
+      <div className="rounded-sm px-5 py-4 text-sm bg-status-active-bg border border-fairway-200">
+        <p className="font-semibold text-fairway-800 mb-1">Import historical tournament results</p>
+        <p className="text-fairway-800 leading-relaxed">
           Use this to bring in past events managed outside Scorify. Provide front 9 and back 9 gross totals per player —
           hole-by-hole scores are not required. Imported events are marked complete and contribute to TGL standings and season stats.
         </p>
@@ -1308,13 +1308,13 @@ function ImportPastResults() {
             </Button>
           }
         />
-        <div className="bg-gray-900 rounded-lg px-4 py-3 text-xs text-gray-300 font-mono overflow-x-auto">
-          <div className="text-gray-500 mb-1"># past_results_template.csv</div>
+        <div className="bg-ink rounded-sm px-4 py-3 text-xs text-surface-outline font-mono overflow-x-auto">
+          <div className="text-ink-muted mb-1"># past_results_template.csv</div>
           <div>event_name,event_date,course_name,tee,league_name,player_first,player_last,flight,course_handicap,gross_front,gross_back,putts</div>
-          <div className="text-gray-500">Event 1 - Sample Course,2024-04-15,Sample Golf Club,Yellow,,John,Smith,A,10,34,37,31</div>
-          <div className="text-gray-500">Event 1 - Sample Course,2024-04-15,Sample Golf Club,Yellow,,Mike,Johnson,A,15,36,38,32</div>
+          <div className="text-ink-muted">Event 1 - Sample Course,2024-04-15,Sample Golf Club,Yellow,,John,Smith,A,10,34,37,31</div>
+          <div className="text-ink-muted">Event 1 - Sample Course,2024-04-15,Sample Golf Club,Yellow,,Mike,Johnson,A,15,36,38,32</div>
         </div>
-        <ul className="mt-3 text-xs text-gray-500 space-y-1 list-disc list-inside">
+        <ul className="mt-3 text-xs text-ink-muted space-y-1 list-disc list-inside">
           <li><strong>event_name</strong> and <strong>event_date</strong> (YYYY-MM-DD) identify the event. Multiple players with the same event_name+date are grouped into one event.</li>
           <li><strong>course_name</strong> must match a course already in Scorify (use Import → Course to add it first).</li>
           <li><strong>tee</strong> — optional tee name (e.g. Yellow, White) for slope/rating lookup.</li>
@@ -1330,7 +1330,7 @@ function ImportPastResults() {
       <Card>
         <CardHeader title="Step 2 — Select the league" subtitle="Imported events will be added to this league." />
         {leagues.length === 0
-          ? <p className="text-sm text-gray-400">No leagues found. Create a league first.</p>
+          ? <p className="text-sm text-ink-muted">No leagues found. Create a league first.</p>
           : (
             <select value={leagueId} onChange={e => setLeagueId(e.target.value)} className="input bg-white">
               <option value="">Select league…</option>
@@ -1344,7 +1344,7 @@ function ImportPastResults() {
         <CardHeader title="Step 3 — Upload your CSV" />
         <FileDropZone onFile={handleFile} />
         {rows.length > 0 && (
-          <p className="mt-3 text-sm text-gray-500">{rows.length} player rows loaded.</p>
+          <p className="mt-3 text-sm text-ink-muted">{rows.length} player rows loaded.</p>
         )}
       </Card>
 
@@ -1361,7 +1361,7 @@ function ImportPastResults() {
             }
           />
           {!leagueId && (
-            <p className="mb-3 text-sm text-orange-600">Select a league above before importing.</p>
+            <p className="mb-3 text-sm text-status-upcoming-text">Select a league above before importing.</p>
           )}
           <PreviewTable headers={headers} rows={rows} />
         </Card>
@@ -1371,22 +1371,22 @@ function ImportPastResults() {
       {done && results.length > 0 && (
         <Card>
           <CardHeader title="Import complete" />
-          <div className="divide-y divide-gray-100">
+          <div className="divide-y divide-surface-border">
             {results.map((r, i) => (
               <div key={i} className="flex items-start justify-between gap-4 py-3">
                 <div>
-                  <p className="text-sm font-medium text-gray-900">{r.event}</p>
-                  {r.date && <p className="text-xs text-gray-400">{formatDate(r.date)}</p>}
+                  <p className="text-sm font-medium text-ink">{r.event}</p>
+                  {r.date && <p className="text-xs text-ink-muted">{formatDate(r.date)}</p>}
                 </div>
                 <div className="text-right shrink-0">
-                  {r.status === 'imported' && <span className="text-xs font-medium text-green-700">✓ {r.message}</span>}
-                  {r.status === 'partial'  && <span className="text-xs font-medium text-amber-600">⚠ {r.message}</span>}
+                  {r.status === 'imported' && <span className="text-xs font-medium text-status-active-text">✓ {r.message}</span>}
+                  {r.status === 'partial'  && <span className="text-xs font-medium text-status-upcoming-text">⚠ {r.message}</span>}
                   {r.status === 'error'    && <span className="text-xs font-medium text-red-600">✕ {r.message}</span>}
                 </div>
               </div>
             ))}
           </div>
-          <p className="mt-4 text-xs text-gray-400">
+          <p className="mt-4 text-xs text-ink-muted">
             Imported events appear in Admin → Leagues as completed events. Go to Team Play → lock each event to include in TGL standings.
           </p>
         </Card>

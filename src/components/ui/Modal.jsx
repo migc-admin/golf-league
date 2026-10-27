@@ -27,15 +27,15 @@ export default function Modal({ open, onClose, title, children, maxWidth = 'max-
         role="dialog"
         aria-modal="true"
         aria-labelledby="modal-title"
-        className={`relative w-full ${maxWidth} bg-white rounded-t-2xl sm:rounded-2xl shadow-2xl overflow-hidden max-h-[90vh] flex flex-col`}
+        className={`relative w-full ${maxWidth} bg-white rounded-t-sm sm:rounded-sm shadow-2xl overflow-hidden max-h-[90vh] flex flex-col`}
       >
         {/* Header */}
-        <div className="flex items-center justify-between px-5 py-4 border-b border-gray-200 shrink-0">
-          <h2 id="modal-title" className="text-lg font-bold text-gray-900">{title}</h2>
+        <div className="flex items-center justify-between px-5 py-4 border-b border-surface-border shrink-0">
+          <h2 id="modal-title" className="text-lg font-bold text-ink">{title}</h2>
           <button
             onClick={onClose}
             aria-label="Close"
-            className="text-gray-400 hover:text-gray-600 transition-colors p-2 rounded-lg hover:bg-gray-100"
+            className="text-ink-muted hover:text-ink transition-colors p-2 rounded-sm hover:bg-surface-dim"
           >
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />

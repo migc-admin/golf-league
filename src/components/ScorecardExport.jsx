@@ -14,6 +14,7 @@ import { computePayouts } from '../lib/engines/payouts'
 import { computeTGLEventResults, assignTGLPoints } from '../lib/engines/tgl'
 import { computeMatchPoints, computeTeamMatchPoints, buildPairings, matchCH } from '../lib/engines/matchPoints'
 import { supabase } from '../lib/supabase'
+import { ActionButton } from './ui/Button'
 
 // ─── Mobile-safe PNG download ─────────────────────────────────────
 // iOS Safari ignores <a download> — open in new tab instead so user can long-press save
@@ -160,37 +161,9 @@ export function ExportScorecardsButton({ event, eventPlayers, course, orgName, o
 
   return (
     <>
-      <button
-        onClick={handleExport}
-        disabled={exporting || groupNums.length === 0}
-        style={{
-          display: 'inline-flex', alignItems: 'center', gap: 6,
-          padding: '6px 14px', borderRadius: 8,
-          border: '1px solid #d1d5db',
-          background: exporting ? '#f3f4f6' : '#ffffff',
-          color: '#374151', fontSize: 13, fontWeight: 600,
-          cursor: (exporting || groupNums.length === 0) ? 'not-allowed' : 'pointer',
-          opacity: groupNums.length === 0 ? 0.5 : 1,
-        }}
-      >
-        {exporting ? (
-          <>
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ animation: 'spin 1s linear infinite' }}>
-              <path d="M21 12a9 9 0 1 1-6.219-8.56" />
-            </svg>
-            Exporting…
-          </>
-        ) : (
-          <>
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <polyline points="6 9 6 2 18 2 18 9" />
-              <path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2" />
-              <rect x="6" y="14" width="12" height="8" />
-            </svg>
-            Export Scorecards
-          </>
-        )}
-      </button>
+      <ActionButton icon="download" onClick={handleExport} loading={exporting} disabled={groupNums.length === 0}>
+        {exporting ? 'Exporting…' : 'Download'}
+      </ActionButton>
       {exportError && (
         <p style={{ marginTop: 6, fontSize: 12, color: '#dc2626' }}>{exportError}</p>
       )}
@@ -843,36 +816,9 @@ export function ExportMatchPlayCardsButton({ event, eventPlayers, course }) {
 
   return (
     <>
-      <button
-        onClick={handleExport}
-        disabled={exporting}
-        style={{
-          display: 'inline-flex', alignItems: 'center', gap: 6,
-          padding: '6px 14px', borderRadius: 8,
-          border: '1px solid #d1d5db',
-          background: exporting ? '#f3f4f6' : '#ffffff',
-          color: '#374151', fontSize: 13, fontWeight: 600,
-          cursor: exporting ? 'not-allowed' : 'pointer',
-        }}
-      >
-        {exporting ? (
-          <>
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ animation: 'spin 1s linear infinite' }}>
-              <path d="M21 12a9 9 0 1 1-6.219-8.56" />
-            </svg>
-            Exporting…
-          </>
-        ) : (
-          <>
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <polyline points="6 9 6 2 18 2 18 9" />
-              <path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2" />
-              <rect x="6" y="14" width="12" height="8" />
-            </svg>
-            Export Match Play Cards
-          </>
-        )}
-      </button>
+      <ActionButton icon="download" onClick={handleExport} loading={exporting}>
+        {exporting ? 'Exporting…' : 'Download'}
+      </ActionButton>
       {exportError && (
         <p style={{ marginTop: 6, fontSize: 12, color: '#dc2626' }}>{exportError}</p>
       )}
@@ -1274,20 +1220,9 @@ export function ExportSkinsGridButton({ event, eventPlayers, allScores, course, 
 
   return (
     <>
-      <button
-        onClick={handleExport}
-        disabled={exporting}
-        style={{
-          display: 'inline-flex', alignItems: 'center', gap: 6,
-          padding: '6px 14px', borderRadius: 8,
-          border: '1px solid #d1d5db',
-          background: exporting ? '#f3f4f6' : '#ffffff',
-          color: '#374151', fontSize: 13, fontWeight: 600,
-          cursor: exporting ? 'not-allowed' : 'pointer',
-        }}
-      >
-        {exporting ? 'Exporting…' : '📊 Scoring Summary'}
-      </button>
+      <ActionButton icon="download" onClick={handleExport} loading={exporting}>
+        {exporting ? 'Exporting…' : 'Download'}
+      </ActionButton>
       {exportError && <p style={{ marginTop: 6, fontSize: 12, color: '#dc2626' }}>{exportError}</p>}
       <div ref={containerRef} style={{ position: 'fixed', top: -99999, left: -99999, pointerEvents: 'none', zIndex: -1 }} />
     </>
@@ -1651,20 +1586,9 @@ export function ExportResultsButton({ event, eventPlayers, allScores, course, si
 
   return (
     <>
-      <button
-        onClick={handleExport}
-        disabled={exporting}
-        style={{
-          display: 'inline-flex', alignItems: 'center', gap: 6,
-          padding: '6px 14px', borderRadius: 8,
-          border: '1px solid #d1d5db',
-          background: exporting ? '#f3f4f6' : '#ffffff',
-          color: '#374151', fontSize: 13, fontWeight: 600,
-          cursor: exporting ? 'not-allowed' : 'pointer',
-        }}
-      >
-        {exporting ? 'Exporting…' : '🏆 Export Results'}
-      </button>
+      <ActionButton icon="download" onClick={handleExport} loading={exporting}>
+        {exporting ? 'Exporting…' : 'Download'}
+      </ActionButton>
       {exportError && <p style={{ marginTop: 6, fontSize: 12, color: '#dc2626' }}>{exportError}</p>}
       <div ref={containerRef} style={{ position: 'fixed', top: -99999, left: -99999, pointerEvents: 'none', zIndex: -1 }} />
     </>
@@ -2685,20 +2609,9 @@ export function ExportTeamPlayButton({ event, eventPlayers, allScores, course, t
 
   return (
     <>
-      <button
-        onClick={handleExport}
-        disabled={exporting}
-        style={{
-          display: 'inline-flex', alignItems: 'center', gap: 6,
-          padding: '6px 14px', borderRadius: 8,
-          border: '1px solid #d1d5db',
-          background: exporting ? '#f3f4f6' : '#ffffff',
-          color: '#111827', fontSize: 13, fontWeight: 600,
-          cursor: exporting ? 'not-allowed' : 'pointer',
-        }}
-      >
-        {exporting ? 'Exporting…' : '🏌 Team Play'}
-      </button>
+      <ActionButton icon="download" onClick={handleExport} loading={exporting}>
+        {exporting ? 'Exporting…' : 'Download'}
+      </ActionButton>
       {exportError && <p style={{ marginTop: 6, fontSize: 12, color: '#dc2626' }}>{exportError}</p>}
       <div ref={containerRef} style={{ position: 'fixed', top: -99999, left: -99999, pointerEvents: 'none', zIndex: -1 }} />
     </>
@@ -2921,20 +2834,9 @@ export function ExportHandicapButton({ event, eventPlayers, allScores, course, o
 
   return (
     <>
-      <button
-        onClick={handleExport}
-        disabled={exporting}
-        style={{
-          display: 'inline-flex', alignItems: 'center', gap: 6,
-          padding: '6px 14px', borderRadius: 8,
-          border: '1px solid #d1d5db',
-          background: exporting ? '#f3f4f6' : '#ffffff',
-          color: '#111827', fontSize: 13, fontWeight: 600,
-          cursor: exporting ? 'not-allowed' : 'pointer',
-        }}
-      >
-        {exporting ? 'Exporting…' : '📋 Handicap Entry'}
-      </button>
+      <ActionButton icon="download" onClick={handleExport} loading={exporting}>
+        {exporting ? 'Exporting…' : 'Download'}
+      </ActionButton>
       {exportError && <p style={{ marginTop: 6, fontSize: 12, color: '#dc2626' }}>{exportError}</p>}
       <div ref={containerRef} style={{ position: 'fixed', top: -99999, left: -99999, pointerEvents: 'none', zIndex: -1 }} />
     </>

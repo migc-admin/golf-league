@@ -434,7 +434,7 @@ export default function AdminLayout({ children }) {
           </span>
         </header>
 
-        <main className="flex-1 px-6 py-6 max-w-[1200px] w-full mx-auto">
+        <main className="admin-shell flex-1 px-6 py-6 max-w-[1200px] w-full mx-auto">
           {children}
         </main>
       </div>

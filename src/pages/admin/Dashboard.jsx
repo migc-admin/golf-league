@@ -3,6 +3,7 @@ import { Link, useSearchParams } from 'react-router-dom'
 import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../hooks/useAuth'
 import Card from '../../components/ui/Card'
+import Button from '../../components/ui/Button'
 import { StatusBadge } from '../../components/ui/Badge'
 import { useOrg } from '../../lib/OrgContext'
 import TierBadge from '../../components/ui/TierBadge'
@@ -83,28 +84,28 @@ export default function Dashboard() {
   return (
     <div className="space-y-6">
       {showUpgradeBanner && (
-        <div className="flex items-center justify-between gap-4 bg-green-50 border border-green-200 rounded-xl px-5 py-4">
+        <div className="flex items-center justify-between gap-4 bg-fairway-50 border border-fairway-200 rounded-sm px-5 py-4">
           <div className="flex items-center gap-3">
-            <span className="text-green-600 text-xl">🎉</span>
+            <span className="text-fairway-700 text-xl">🎉</span>
             <div>
-              <p className="font-semibold text-green-800">
+              <p className="font-semibold text-fairway-800">
                 You're now on the {org?.tier ? org.tier.charAt(0).toUpperCase() + org.tier.slice(1) : ''} plan!
               </p>
-              <p className="text-sm text-green-700">Your account has been upgraded. All features for your plan are now active.</p>
+              <p className="text-sm text-fairway-700">Your account has been upgraded. All features for your plan are now active.</p>
             </div>
           </div>
-          <button onClick={() => setSearchParams({})} className="text-green-500 hover:text-green-700 text-lg leading-none">×</button>
+          <Button variant="ghost" size="sm" iconOnly label="Dismiss" onClick={() => setSearchParams({})}>×</Button>
         </div>
       )}
 
       {/* Header */}
-      <div className="flex items-start justify-between gap-4">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between sm:gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Home</h1>
-          <p className="text-gray-500 text-sm mt-1">League administration overview</p>
+          <h1 className="text-2xl font-bold text-ink" style={{ letterSpacing: '-0.03em' }}>Home</h1>
+          <p className="text-ink-muted text-sm mt-1">League administration overview</p>
         </div>
         {org && (
-          <div className="flex items-center gap-2 text-sm text-gray-500">
+          <div className="flex items-center gap-2 text-sm text-ink-muted">
             <span>Plan:</span>
             <TierBadge tier={org.tier ?? 'free'} />
           </div>
@@ -113,7 +114,7 @@ export default function Dashboard() {
 
       {/* Stats strip */}
       {stats && (
-        <div className="bg-white rounded-xl border border-gray-200 shadow-[0_4px_20px_rgba(15,61,46,0.05)] grid grid-cols-3 divide-x divide-gray-100 overflow-hidden">
+        <div className="bg-white rounded-sm border border-surface-border shadow-card grid grid-cols-3 divide-x divide-surface-border overflow-hidden">
           <StatStrip label="Players" value={stats.players} to="/admin/players" />
           <StatStrip label="Events" value={stats.events} />
           <StatStrip label="Leagues" value={stats.leagues} to="/admin/leagues" />
@@ -123,7 +124,7 @@ export default function Dashboard() {
       {/* Leagues + events */}
       {leagues.length === 0 ? (
         <Card>
-          <p className="text-sm text-gray-400 text-center py-4">No leagues yet. <Link to="/admin/leagues" className="text-fairway-700 font-semibold hover:underline">Create your first league →</Link></p>
+          <p className="text-sm text-ink-muted text-center py-4">No leagues yet. <Link to="/admin/leagues" className="text-fairway-700 font-semibold hover:underline">Create your first league →</Link></p>
         </Card>
       ) : (
         <div className="space-y-6">
@@ -146,9 +147,9 @@ function LeagueSection({ league, orgSlug }) {
       {/* League header */}
       <div className="flex items-center justify-between mb-3">
         <div className="flex items-center gap-3">
-          <h2 className="text-base font-bold text-gray-900">{league.name}</h2>
+          <h2 className="text-base font-bold text-ink">{league.name}</h2>
           {league.season_year && (
-            <span className="text-xs text-gray-400 font-medium">{league.season_year}</span>
+            <span className="text-xs text-ink-muted font-medium">{league.season_year}</span>
           )}
         </div>
         <Link
@@ -160,11 +161,11 @@ function LeagueSection({ league, orgSlug }) {
       </div>
 
       {league.events.length === 0 ? (
-        <div className="bg-white rounded-xl border border-gray-200 px-5 py-6 text-center">
-          <p className="text-sm text-gray-400">No events yet for this league.</p>
+        <div className="bg-white rounded-sm border border-surface-border px-5 py-6 text-center">
+          <p className="text-sm text-ink-muted">No events yet for this league.</p>
         </div>
       ) : (
-        <div className="bg-white rounded-xl border border-gray-200 shadow-[0_2px_12px_rgba(15,61,46,0.04)] overflow-hidden">
+        <div className="bg-white rounded-sm border border-surface-border shadow-card-sm overflow-hidden">
           {/* Active events — highlighted */}
           {active.map(ev => (
             <EventRow key={ev.id} event={ev} orgSlug={orgSlug} leagueSlug={league.slug} highlight />
@@ -190,16 +191,15 @@ function EventRow({ event: ev, orgSlug, leagueSlug, highlight }) {
   return (
     <Link
       to={`/admin/${orgSlug}/${leagueSlug}/${ev.slug}`}
-      className="flex items-center justify-between px-5 py-3.5 hover:bg-gray-50 transition-colors border-b border-gray-100 last:border-b-0 group"
-      style={highlight ? { borderLeft: '3px solid #D4AF37' } : {}}
+      className={`flex items-center justify-between px-5 py-3.5 hover:bg-surface-dim transition-colors border-b border-surface-border last:border-b-0 group ${highlight ? 'border-l-[3px] border-l-fairway-700' : ''}`}
     >
       <div className="flex items-center gap-3 min-w-0">
         {highlight && (
-          <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse shrink-0" />
+          <span className="w-2 h-2 rounded-full bg-fairway-500 animate-pulse shrink-0" />
         )}
         <div className="min-w-0">
-          <div className="font-semibold text-sm text-gray-900 truncate">{eventName}</div>
-          <div className="text-xs text-gray-400 mt-0.5">
+          <div className="font-semibold text-sm text-ink truncate">{eventName}</div>
+          <div className="text-xs text-ink-muted mt-0.5">
             {formatDate(ev.event_date)}{ev.course?.name ? ` · ${ev.course.name}` : ''}
             {playerCount > 0 ? ` · ${playerCount} players` : ''}
           </div>
@@ -207,7 +207,7 @@ function EventRow({ event: ev, orgSlug, leagueSlug, highlight }) {
       </div>
       <div className="flex items-center gap-3 shrink-0">
         <StatusBadge status={ev.status} />
-        <svg width="14" height="14" viewBox="0 0 16 16" fill="none" className="text-gray-300 group-hover:text-gray-400 transition-colors">
+        <svg width="14" height="14" viewBox="0 0 16 16" fill="none" className="text-surface-outline group-hover:text-ink-muted transition-colors">
           <path d="M6 3l5 5-5 5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
         </svg>
       </div>
@@ -219,7 +219,7 @@ function StatStrip({ label, value, to }) {
   const inner = (
     <div className={`px-5 py-4 text-center transition-colors ${to ? 'hover:bg-fairway-50 cursor-pointer' : ''}`}>
       <div className="text-2xl font-bold tabular-nums text-augusta-600">{value ?? 0}</div>
-      <div className="text-xs text-gray-500 font-medium mt-0.5">{label}</div>
+      <div className="text-xs text-ink-muted font-medium mt-0.5">{label}</div>
     </div>
   )
   return to ? <Link to={to}>{inner}</Link> : <div>{inner}</div>
@@ -228,10 +228,10 @@ function StatStrip({ label, value, to }) {
 function DashboardSkeleton() {
   return (
     <div className="space-y-6 animate-pulse">
-      <div className="h-8 w-48 bg-gray-200 rounded" />
-      <div className="h-16 bg-gray-200 rounded-xl" />
-      <div className="h-40 bg-gray-200 rounded-xl" />
-      <div className="h-40 bg-gray-200 rounded-xl" />
+      <div className="h-8 w-48 bg-surface-high rounded" />
+      <div className="h-16 bg-surface-high rounded-sm" />
+      <div className="h-40 bg-surface-high rounded-sm" />
+      <div className="h-40 bg-surface-high rounded-sm" />
     </div>
   )
 }
