@@ -295,3 +295,7 @@ export function wagerExportFilename(event, date = new Date()) {
   const slug = (event.name ?? 'event').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '')
   return `wagers-${slug}-${date.toISOString().slice(0, 10)}.xlsx`
 }
+
+export function wagerPngFilename(event, date = new Date()) {
+  return wagerExportFilename(event, date).replace(/\.xlsx$/, '.png').replace(/^wagers-/, 'wager-results-')
+}

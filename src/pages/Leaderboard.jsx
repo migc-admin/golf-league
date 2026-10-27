@@ -1286,8 +1286,10 @@ function MatchPointsBoard({ matchData, event }) {
     return next
   })
   const teamNames = event?.ryder_cup_teams ?? {}
-  const teamALabel = teamNames.a?.trim() || 'Flight A'
-  const teamBLabel = teamNames.b?.trim() || 'Flight B'
+  // Optional labels set by the admin (Match Pairings → Team Names). Blank means no label —
+  // never default to "Flight A/B", since a match side is not the same as a scoring flight.
+  const teamALabel = teamNames.a?.trim() || null
+  const teamBLabel = teamNames.b?.trim() || null
 
   if (!pairings.length) return (
     <div className="text-center py-12 text-ink-muted">
@@ -1297,7 +1299,7 @@ function MatchPointsBoard({ matchData, event }) {
     </div>
   )
 
-  const teamLeader = teamPoints.A > teamPoints.B ? `${teamALabel} leads` : teamPoints.B > teamPoints.A ? `${teamBLabel} leads` : 'All Square'
+  const teamLeader = teamPoints.A > teamPoints.B ? `${teamALabel ?? 'Team A'} leads` : teamPoints.B > teamPoints.A ? `${teamBLabel ?? 'Team B'} leads` : 'All Square'
   // Keyed off every individual pairing being decided (winner set), not event.status —
   // the round can still be "Live" while every match has already closed out.
   const isComplete = pairings.every(p => p.winner != null)
@@ -1312,13 +1314,13 @@ function MatchPointsBoard({ matchData, event }) {
           </div>
           <div className="flex">
             <div className="flex-1 text-center py-4 bg-blue-50">
-              <div className="text-xs font-bold text-blue-600 mb-1">{teamALabel}</div>
+              <div className="text-xs font-bold text-blue-600 mb-1">{teamALabel ?? 'Team A'}</div>
               <div className="text-4xl font-black text-blue-700">{teamPoints.A}</div>
               {isComplete && <div className="text-xs text-blue-400 mt-0.5">matches won</div>}
             </div>
             <div className="w-px bg-surface-high" />
             <div className="flex-1 text-center py-4 bg-red-50">
-              <div className="text-xs font-bold text-red-600 mb-1">{teamBLabel}</div>
+              <div className="text-xs font-bold text-red-600 mb-1">{teamBLabel ?? 'Team B'}</div>
               <div className="text-4xl font-black text-red-700">{teamPoints.B}</div>
               {isComplete && <div className="text-xs text-red-400 mt-0.5">matches won</div>}
             </div>
@@ -1346,9 +1348,9 @@ function MatchPointsBoard({ matchData, event }) {
           ? (pair.winner === 'A' ? stylesA.status.win : pair.winner === 'B' ? stylesB.status.win : 'bg-surface-high text-ink')
           : (leaderSide === 'A' ? stylesA.status.lead : leaderSide === 'B' ? stylesB.status.lead : 'bg-surface-high text-ink')
 
-        // playerA is always Team A, playerB always Team B — show team name if set
-        const labelA = teamALabel || null
-        const labelB = teamBLabel || null
+        // playerA is always side A, playerB always side B — show the team name only if one was set
+        const labelA = teamALabel
+        const labelB = teamBLabel
         const isOpen = expandedIds.has(idx)
         const middleLabel = pair.holesPlayed === 0 ? 'VS' : isFinished ? 'F' : `Thru ${pair.holesPlayed}`
         const leftEdge = edgeStatus('A', pair)

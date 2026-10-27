@@ -2403,10 +2403,12 @@ function MatchPairingsManager({ event, eventId, eventPlayers, allScores = [], co
 
   return (
     <div className="space-y-4">
-      {/* Ryder Cup team names */}
-      {isRyderCup && (
-        <div className="bg-white rounded-sm border border-surface-border p-4 space-y-3">
-          <h3 className="text-sm font-semibold text-ink">Team Names</h3>
+      {/* Optional match play team names — blank shows no team label anywhere */}
+      <div className="bg-white rounded-sm border border-surface-border p-4 space-y-3">
+          <div>
+            <h3 className="text-sm font-semibold text-ink">Team Names <span className="font-normal text-ink-muted">(optional)</span></h3>
+            <p className="text-xs text-ink-muted mt-0.5">Labels the two sides of each match on the leaderboard and results. Leave blank to show no team label.</p>
+          </div>
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="block text-xs font-medium text-ink-muted mb-1">Team A</label>
@@ -2417,16 +2419,10 @@ function MatchPairingsManager({ event, eventId, eventPlayers, allScores = [], co
               <input className="input w-full" value={teamBName} onChange={e => setTeamBName(e.target.value)} placeholder="e.g. Europe" />
             </div>
           </div>
-          <button
-            type="button"
-            onClick={saveTeamNames}
-            disabled={savingTeams}
-            className="text-sm font-semibold text-white bg-fairway-700 hover:bg-fairway-800 disabled:opacity-50 px-4 py-1.5 rounded-sm"
-          >
-            {savingTeams ? 'Saving…' : 'Save Team Names'}
-          </button>
-        </div>
-      )}
+          <Button type="button" size="sm" onClick={saveTeamNames} loading={savingTeams}>
+            {savingTeams ? 'Saving…' : 'Save team names'}
+          </Button>
+      </div>
 
       {/* Tie rules */}
       <div className="bg-white rounded-sm border border-surface-border p-4 space-y-3">

@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import ExcelJS from 'exceljs'
 import { computeWagerSettlement, wagerOutcomes } from './wagerSettlement'
-import { buildWagerWorkbook, wagerExportFilename } from './wagerExport'
+import { buildWagerWorkbook, wagerExportFilename, wagerPngFilename } from './wagerExport'
 
 const course = { stroke_index: Array.from({ length: 18 }, (_, i) => i + 1), par_per_hole: Array.from({ length: 18 }, () => 4) }
 const ep = id => ({ player_id: id, course_handicap: 0, tee: null, flight: 'A', group_number: 1, player: { first_name: id, last_name: '' } })
@@ -103,5 +103,12 @@ describe('wager Excel export', () => {
 
   it('builds a readable filename', () => {
     expect(wagerExportFilename(event, new Date('2026-10-22T12:00:00Z'))).toBe('wagers-playoffs-round-1-2026-10-22.xlsx')
+  })
+})
+
+describe('wagerPngFilename', () => {
+  it('names the share image after the event and date', () => {
+    expect(wagerPngFilename({ name: 'Playoffs – Round 1' }, new Date('2026-10-25T12:00:00Z')))
+      .toBe('wager-results-playoffs-round-1-2026-10-25.png')
   })
 })

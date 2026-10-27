@@ -1989,12 +1989,12 @@ function buildResultsCard({ event, eventPlayers, allScores, course, sideGames, o
     const sec = buildSection('Match Points', GREEN, GOLD)
     const body = sec._body
     const teamNames = event.ryder_cup_teams ?? {}
-    const teamALabel = teamNames.a?.trim() || 'Flight A'
-    const teamBLabel = teamNames.b?.trim() || 'Flight B'
+    const teamALabel = teamNames.a?.trim() || null
+    const teamBLabel = teamNames.b?.trim() || null
 
     if (matchData.hasTeams && (matchData.teamPoints.A + matchData.teamPoints.B) > 0) {
       const teamRow = el('div', { display: 'flex', borderBottom: R_DIV })
-      ;[[teamALabel, matchData.teamPoints.A], [teamBLabel, matchData.teamPoints.B]].forEach(([label, pts], i) => {
+      ;[[teamALabel ?? 'Team A', matchData.teamPoints.A], [teamBLabel ?? 'Team B', matchData.teamPoints.B]].forEach(([label, pts], i) => {
         const cell = el('div', { flex: '1', textAlign: 'center', padding: '10px 14px', background: i === 0 ? '#eef4fb' : '#fdecec', borderRight: i === 0 ? R_DIV : 'none' })
         cell.appendChild(txt(label, { display: 'block', fontSize: R_LABEL, fontWeight: '800', color: '#374151', textTransform: 'uppercase', letterSpacing: '0.05em' }))
         cell.appendChild(txt(String(pts), { display: 'block', fontSize: '20px', fontWeight: '900', color: GREEN, marginTop: '2px' }))
@@ -2010,17 +2010,17 @@ function buildResultsCard({ event, eventPlayers, allScores, course, sideGames, o
       // playerB → Team B — set explicitly per-pairing in Match Pairings), NOT
       // by each player's stroke-play scoring flight. A player's net-scoring
       // flight and their Ryder Cup team side are independent and can differ.
-      const teamA = teamALabel
-      const teamB = teamBLabel
+      const tagA = teamALabel ? ` (${teamALabel})` : ''
+      const tagB = teamBLabel ? ` (${teamBLabel})` : ''
       const status = pair.holesPlayed === 0 ? 'Not started' : pair.matchStatus
 
       // Once a match is decided, lead with the winner ("X def. Y") instead of
       // the neutral "X vs. Y" — matches how completed match play is reported.
       let line
-      if (pair.winner === 'A')      line = `${nameA} (${teamA}) def. ${nameB} (${teamB})`
-      else if (pair.winner === 'B') line = `${nameB} (${teamB}) def. ${nameA} (${teamA})`
-      else if (pair.winner === 'halve') line = `${nameA} (${teamA}) halved with ${nameB} (${teamB})`
-      else line = `${nameA} (${teamA}) vs. ${nameB} (${teamB})`
+      if (pair.winner === 'A')      line = `${nameA}${tagA} def. ${nameB}${tagB}`
+      else if (pair.winner === 'B') line = `${nameB}${tagB} def. ${nameA}${tagA}`
+      else if (pair.winner === 'halve') line = `${nameA}${tagA} halved with ${nameB}${tagB}`
+      else line = `${nameA}${tagA} vs. ${nameB}${tagB}`
 
       const row = el('div', { padding: R_PAD, background: idx % 2 === 0 ? R_ODD : R_EVEN, borderBottom: R_DIV, display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '10px' })
       const nameEl = txt(line, { fontSize: R_FS, fontWeight: '700', color: '#111', whiteSpace: 'nowrap' })

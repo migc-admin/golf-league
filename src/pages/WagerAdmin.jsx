@@ -3,11 +3,12 @@
  * Route: /wager/:eventId/board
  */
 
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../hooks/useAuth'
 import { computeWagerSettlement, wagerOutcomes } from '../lib/wagerSettlement'
+import WagerShareCard, { WAGER_CARD_WIDTH } from '../components/WagerShareCard'
 
 const MIGC_ORG = import.meta.env.VITE_MIGC_ORG_ID
 const GREEN    = '#1B4332'
@@ -46,6 +47,8 @@ export default function WagerAdmin() {
   const [showDeleted, setShowDeleted] = useState(false)
   const [toggling,    setToggling]    = useState(false)
   const [exporting,   setExporting]   = useState(false)
+  const [exportingPng, setExportingPng] = useState(false)
+  const shareRef = useRef(null)
   const [extraNames,  setExtraNames]  = useState({}) // id -> name, for picked players no longer in the event
 
   async function loadData() {
@@ -196,6 +199,35 @@ export default function WagerAdmin() {
       alert('Could not create the Excel file: ' + (err?.message ?? err))
     } finally {
       setExporting(false)
+    }
+  }
+
+  // PNG of the board (pools, results with payouts, live odds) to share with the group.
+  async function exportPng() {
+    if (!shareRef.current) return
+    setExportingPng(true)
+    try {
+      const [{ toPng }, { wagerPngFilename }] = await Promise.all([
+        import('html-to-image'),
+        import('../lib/wagerExport'),
+      ])
+      if (document.fonts?.ready) await document.fonts.ready
+      await new Promise(r => setTimeout(r, 80))
+      const dataUrl = await toPng(shareRef.current, {
+        pixelRatio: 2,
+        cacheBust: true,
+        backgroundColor: '#fbfaf8',
+        width: WAGER_CARD_WIDTH,
+      })
+      const link = document.createElement('a')
+      link.download = wagerPngFilename(event)
+      link.href = dataUrl
+      link.click()
+    } catch (err) {
+      console.error('Wager PNG export failed:', err)
+      alert('Could not create the image: ' + (err?.message ?? err))
+    } finally {
+      setExportingPng(false)
     }
   }
 
@@ -608,10 +640,16 @@ export default function WagerAdmin() {
           <div style={{ background: GREEN, padding: '10px 16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <span style={{ color: GOLD, fontWeight: 700, fontSize: 13 }}>Active Bets</span>
             <div style={{ display: 'flex', gap: 8 }}>
+              {active.length > 0 && (
+                <button onClick={exportPng} disabled={exportingPng}
+                  style={{ fontSize: 11, fontWeight: 700, color: GOLD, background: 'transparent', border: `1px solid ${GOLD}`, borderRadius: 6, padding: '4px 10px', cursor: exportingPng ? 'not-allowed' : 'pointer', opacity: exportingPng ? 0.6 : 1 }}>
+                  {exportingPng ? 'Creating…' : 'Export PNG'}
+                </button>
+              )}
               {wagers.length > 0 && (
                 <button onClick={exportExcel} disabled={exporting}
                   style={{ fontSize: 11, fontWeight: 700, color: GOLD, background: 'transparent', border: `1px solid ${GOLD}`, borderRadius: 6, padding: '4px 10px', cursor: exporting ? 'not-allowed' : 'pointer', opacity: exporting ? 0.6 : 1 }}>
-                  {exporting ? 'Exporting…' : '⬇ Export Excel'}
+                  {exporting ? 'Exporting…' : 'Export Excel'}
                 </button>
               )}
               {active.length > 0 && (
@@ -652,6 +690,21 @@ export default function WagerAdmin() {
         <p style={{ fontSize: 10, color: '#9ca3af', textAlign: 'center' }}>
           Full pool paid to winner(s). If no one picks the winner, funds roll to the club. Halved matches refund stakes.
         </p>
+      </div>
+
+      {/* Off-screen copy of the board, captured as a PNG by "Export PNG" */}
+      <div style={{ position: 'fixed', top: -99999, left: -99999, pointerEvents: 'none', zIndex: -1 }} aria-hidden="true">
+        <div ref={shareRef}>
+          <WagerShareCard
+            event={event}
+            eventDate={eventDate}
+            settlement={settlement}
+            playerName={playerName}
+            showResults={showResults}
+            hasScores={scores.length > 0}
+            activeCount={active.length}
+          />
+        </div>
       </div>
     </div>
   )
