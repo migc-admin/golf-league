@@ -261,7 +261,7 @@ export function buildWagerWorkbook(ExcelJS, d) {
     : `1st place net ${winResults.net}: nobody bet on ${winResults.topPlayers.map(nameOf).join(', ')}, so the pool rolls to the club${prov}`
   const placeNote = !placeResults ? 'No scores yet'
     : !placeResults.matched ? `Nobody bet on ${placeResults.topPlayers.map(nameOf).join(', ')}, so the pool rolls to the club${prov}`
-    : `1st net ${placeResults.net}${placeResults.twoWayTie ? ' (tied for 1st)' : `, 2nd net ${placeResults.net2}`}${placeResults.halfRollsToClub ? '; half of the profit rolls to the club' : ''}${prov}`
+    : `1st net ${placeResults.net}${placeResults.twoWayTie ? ' (tied for 1st)' : `, 2nd net ${placeResults.net2}`}${placeResults.allProfitToOneGroup ? '; nobody bet on the other place, so all of the profit goes to the winning bettors' : ''}${prov}`
   poolRow('WIN', 'WIN', null, r => r.type === 'WIN', winNote)
   poolRow('PLACE', 'PLACE', null, r => r.type === 'PLACE', placeNote)
   for (const c of matchCards) {

@@ -9,6 +9,8 @@ import { supabase } from '../lib/supabase'
 import { useAuth } from '../hooks/useAuth'
 import { computeWagerSettlement, wagerOutcomes } from '../lib/wagerSettlement'
 import WagerShareCard, { WAGER_CARD_WIDTH } from '../components/WagerShareCard'
+import { buildManualWagerRow } from '../lib/wagerManual'
+import { buildResultsModel } from '../lib/wagerResultsView'
 
 const MIGC_ORG = import.meta.env.VITE_MIGC_ORG_ID
 const GREEN    = '#1B4332'
@@ -32,6 +34,117 @@ function isTeeTimePast(event) {
   return Date.now() >= teeTime.getTime() - 10 * 60 * 1000
 }
 
+const fieldStyle = { width: '100%', fontSize: 14, padding: '9px 10px', borderRadius: 8, border: '1px solid #d6d4cf', background: '#fff', fontFamily: "'Manrope', sans-serif", boxSizing: 'border-box' }
+const labelStyle = { display: 'block', fontSize: 11, fontWeight: 700, color: '#6b7280', marginBottom: 4 }
+
+/** Admin-only form for a bet taken in person. Always available, even after betting has closed. */
+function ManualBetCard({ players, pairings, playerName, bettorNames, onAdd }) {
+  const [open,      setOpen]      = useState(false)
+  const [bettor,    setBettor]    = useState('')
+  const [kind,      setKind]      = useState('win')
+  const [playerId,  setPlayerId]  = useState('')
+  const [matchId,   setMatchId]   = useState('')
+  const [matchPick, setMatchPick] = useState('')
+  const [amount,    setAmount]    = useState('')
+  const [method,    setMethod]    = useState('')
+  const [saving,    setSaving]    = useState(false)
+
+  const sortedPlayers = [...players].sort((a, b) => playerName(a.player_id).localeCompare(playerName(b.player_id)))
+  const match = pairings.find(m => m.id === matchId)
+
+  async function submit(e) {
+    e.preventDefault()
+    setSaving(true)
+    const saved = await onAdd({ bettor, kind, playerId, matchId, matchPick, amount, method })
+    setSaving(false)
+    if (saved) { setPlayerId(''); setMatchId(''); setMatchPick(''); setAmount('') } // keep name + type for the next bet
+  }
+
+  const kindBtn = k => ({
+    flex: 1, fontSize: 12, fontWeight: 700, padding: '9px 0', cursor: 'pointer',
+    border: '1px solid #d6d4cf', background: kind === k ? GREEN : '#fff', color: kind === k ? '#fff' : '#374151',
+  })
+
+  return (
+    <div style={{ background: '#fff', borderRadius: 14, border: '1px solid #e5e7eb', overflow: 'hidden' }}>
+      <button type="button" onClick={() => setOpen(o => !o)} aria-expanded={open}
+        style={{ width: '100%', background: GREEN, padding: '10px 16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', border: 'none', cursor: 'pointer' }}>
+        <span style={{ color: GOLD, fontWeight: 700, fontSize: 13 }}>Add a bet manually</span>
+        <span style={{ color: 'rgba(255,255,255,0.7)', fontSize: 12 }}>{open ? 'Hide' : 'Show'}</span>
+      </button>
+      {open && (
+        <form onSubmit={submit} style={{ padding: '14px 16px', display: 'flex', flexDirection: 'column', gap: 12 }}>
+          <p style={{ fontSize: 12, color: '#6b7280', margin: 0 }}>
+            For bets taken in person. They appear on the board, the Excel export and the PNG right away, and can be added any time, even after betting has closed.
+          </p>
+
+          <div>
+            <label style={labelStyle} htmlFor="mb-name">Bettor name</label>
+            <input id="mb-name" list="mb-names" style={fieldStyle} value={bettor} onChange={e => setBettor(e.target.value)} placeholder="First Last" autoComplete="off" />
+            <datalist id="mb-names">{bettorNames.map(n => <option key={n} value={n} />)}</datalist>
+          </div>
+
+          <div role="group" aria-label="Bet type" style={{ display: 'flex' }}>
+            <button type="button" aria-pressed={kind === 'win'}   onClick={() => setKind('win')}   style={{ ...kindBtn('win'),   borderRadius: '8px 0 0 8px' }}>WIN (1st)</button>
+            <button type="button" aria-pressed={kind === 'place'} onClick={() => setKind('place')} style={{ ...kindBtn('place'), borderLeft: 'none' }}>PLACE (1st or 2nd)</button>
+            <button type="button" aria-pressed={kind === 'match'} onClick={() => setKind('match')} style={{ ...kindBtn('match'), borderLeft: 'none', borderRadius: '0 8px 8px 0' }}>MATCH</button>
+          </div>
+
+          {kind !== 'match' ? (
+            <div>
+              <label style={labelStyle} htmlFor="mb-player">Player</label>
+              <select id="mb-player" style={fieldStyle} value={playerId} onChange={e => setPlayerId(e.target.value)}>
+                <option value="">Select player</option>
+                {sortedPlayers.map(p => <option key={p.player_id} value={p.player_id}>{playerName(p.player_id)}</option>)}
+              </select>
+            </div>
+          ) : (
+            <>
+              <div>
+                <label style={labelStyle} htmlFor="mb-match">Match</label>
+                <select id="mb-match" style={fieldStyle} value={matchId} onChange={e => { setMatchId(e.target.value); setMatchPick('') }}>
+                  <option value="">Select match</option>
+                  {pairings.map(m => <option key={m.id} value={m.id}>Match {m.match_number}: {playerName(m.player_a_id)} vs {playerName(m.player_b_id)}</option>)}
+                </select>
+              </div>
+              {match && (
+                <div>
+                  <label style={labelStyle} htmlFor="mb-pick">Picked to win</label>
+                  <select id="mb-pick" style={fieldStyle} value={matchPick} onChange={e => setMatchPick(e.target.value)}>
+                    <option value="">Select winner</option>
+                    <option value={match.player_a_id}>{playerName(match.player_a_id)}</option>
+                    <option value={match.player_b_id}>{playerName(match.player_b_id)}</option>
+                  </select>
+                </div>
+              )}
+            </>
+          )}
+
+          <div style={{ display: 'flex', gap: 10 }}>
+            <div style={{ flex: 1 }}>
+              <label style={labelStyle} htmlFor="mb-amount">Amount ($)</label>
+              <input id="mb-amount" type="number" min="0" step="0.01" inputMode="decimal" style={fieldStyle} value={amount} onChange={e => setAmount(e.target.value)} placeholder="5" />
+            </div>
+            <div style={{ flex: 1 }}>
+              <label style={labelStyle} htmlFor="mb-method">Paid by</label>
+              <select id="mb-method" style={fieldStyle} value={method} onChange={e => setMethod(e.target.value)}>
+                <option value="">Not set</option>
+                <option value="cash">Cash</option>
+                <option value="venmo">Venmo</option>
+              </select>
+            </div>
+          </div>
+
+          <button type="submit" disabled={saving}
+            style={{ alignSelf: 'flex-end', minHeight: 44, fontSize: 13, fontWeight: 700, padding: '0 18px', borderRadius: 8, border: 'none', background: GREEN, color: '#fff', cursor: saving ? 'not-allowed' : 'pointer', opacity: saving ? 0.6 : 1 }}>
+            {saving ? 'Adding…' : 'Add bet'}
+          </button>
+        </form>
+      )}
+    </div>
+  )
+}
+
 export default function WagerAdmin() {
   const { eventId } = useParams()
   const { isAdmin, loading: authLoading } = useAuth()
@@ -50,11 +163,12 @@ export default function WagerAdmin() {
   const [exportingPng, setExportingPng] = useState(false)
   const shareRef = useRef(null)
   const [extraNames,  setExtraNames]  = useState({}) // id -> name, for picked players no longer in the event
+  const [memberNames, setMemberNames] = useState([]) // org members, to show bettors' proper names in the PNG
 
   async function loadData() {
     const { data: ev } = await supabase
       .from('events')
-      .select('*, course:courses(*), league:leagues(name, org_id)')
+      .select('*, course:courses(*), league:leagues(name, logo_url, org_id)')
       .eq('id', eventId).single()
 
     if (!ev || ev.league?.org_id !== MIGC_ORG) {
@@ -69,6 +183,9 @@ export default function WagerAdmin() {
       .select('*, player:players(first_name, last_name)')
       .eq('event_id', eventId)
     setPlayers(eps ?? [])
+
+    const { data: orgPlayers } = await supabase.from('players').select('first_name, last_name').eq('org_id', ev.league.org_id)
+    setMemberNames((orgPlayers ?? []).map(p => `${p.first_name ?? ''} ${p.last_name ?? ''}`.trim()).filter(Boolean))
 
     const wagerRows = await fetchWagers(eventId)
     setWagers(wagerRows)
@@ -117,6 +234,21 @@ export default function WagerAdmin() {
     const ep = players.find(p => p.player_id === pid)
     if (!ep) return extraNames[pid] ? `${extraNames[pid]} (not in event)` : '—'
     return `${ep.player.first_name} ${ep.player.last_name}`
+  }
+
+  // A bet taken in person: same row shape the public page inserts. Works whether betting is open or closed.
+  async function addManualBet(fields) {
+    const { row, error: invalid } = buildManualWagerRow({ eventId, ...fields })
+    if (invalid) { alert(invalid); return false }
+    let { error: insErr } = await supabase.from('wagers').insert(row)
+    // If the payment_method column isn't in the database yet, save the bet without it.
+    if (insErr && /payment_method/i.test(insErr.message ?? '')) {
+      const { payment_method, ...withoutMethod } = row
+      ;({ error: insErr } = await supabase.from('wagers').insert(withoutMethod))
+    }
+    if (insErr) { alert('Could not save the bet: ' + insErr.message); return false }
+    setWagers(await fetchWagers(eventId))
+    return true
   }
 
   async function toggleBettingClosed() {
@@ -216,7 +348,7 @@ export default function WagerAdmin() {
       const dataUrl = await toPng(shareRef.current, {
         pixelRatio: 2,
         cacheBust: true,
-        backgroundColor: '#fbfaf8',
+        backgroundColor: '#F5F4F0',
         width: WAGER_CARD_WIDTH,
       })
       const link = document.createElement('a')
@@ -348,9 +480,14 @@ export default function WagerAdmin() {
           <div style={{ color: 'rgba(255,255,255,0.85)', fontSize: 13, marginTop: 2 }}>{event.name} · Wager Board — Admin</div>
           <div style={{ color: 'rgba(255,255,255,0.55)', fontSize: 11, marginTop: 2 }}>{eventDate}</div>
         </div>
-        <Link to={`/wager/${eventId}`} style={{ fontSize: 12, fontWeight: 600, color: GOLD, textDecoration: 'none', border: `1px solid ${GOLD}`, borderRadius: 8, padding: '5px 10px' }}>
-          Public Page ↗
-        </Link>
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+          <Link to={`/wager/${eventId}/results`} style={{ fontSize: 12, fontWeight: 600, color: GOLD, textDecoration: 'none', border: `1px solid ${GOLD}`, borderRadius: 8, padding: '5px 10px' }}>
+            Results ↗
+          </Link>
+          <Link to={`/wager/${eventId}`} style={{ fontSize: 12, fontWeight: 600, color: GOLD, textDecoration: 'none', border: `1px solid ${GOLD}`, borderRadius: 8, padding: '5px 10px' }}>
+            Public Page ↗
+          </Link>
+        </div>
       </div>
 
       <div style={{ maxWidth: 700, margin: '0 auto', padding: '20px 16px', display: 'flex', flexDirection: 'column', gap: 16 }}>
@@ -541,7 +678,7 @@ export default function WagerAdmin() {
                     <div style={{ fontSize: 11, fontWeight: 700, color, marginBottom: 2 }}>
                       PLACE Pool · {placeResults.twoWayTie ? `Tied for 1st — net ${placeResults.net}` : `1st net ${placeResults.net} · 2nd net ${placeResults.net2}`}
                     </div>
-                    <div style={{ fontSize: 10, color, marginBottom: 8 }}>Pool split 50/50 between 1st-place and 2nd-place bettors · Each bettor gets stake back + proportional share of profit</div>
+                    <div style={{ fontSize: 10, color, marginBottom: 8 }}>Pool split 50/50 between 1st-place and 2nd-place bettors (all of it goes to one side if nobody bet the other) · Each bettor gets stake back + proportional share of profit</div>
 
                     {/* Group 1 — 1st place */}
                     {placeResults.g1.hasMatch ? (
@@ -553,7 +690,7 @@ export default function WagerAdmin() {
                       </>
                     ) : (
                       <div style={{ fontSize: 12, color: '#9ca3af', margin: '6px 0' }}>
-                        1st place ({placeResults.g1.players.map(id => playerName(id)).join(', ')}) — no PLACE bets · half pool rolls to club.
+                        1st place ({placeResults.g1.players.map(id => playerName(id)).join(', ')}) — no PLACE bets, so all of the profit goes to the other place's bettors.
                       </div>
                     )}
 
@@ -568,7 +705,7 @@ export default function WagerAdmin() {
                         </>
                       ) : (
                         <div style={{ fontSize: 12, color: '#9ca3af', margin: '6px 0' }}>
-                          2nd place ({placeResults.g2.players.map(id => playerName(id)).join(', ')}) — no PLACE bets · half pool rolls to club.
+                          2nd place ({placeResults.g2.players.map(id => playerName(id)).join(', ')}) — no PLACE bets, so all of the profit goes to the other place's bettors.
                         </div>
                       )
                     )}
@@ -635,6 +772,14 @@ export default function WagerAdmin() {
           </div>
         )}
 
+        <ManualBetCard
+          players={players}
+          pairings={pairings}
+          playerName={playerName}
+          bettorNames={[...new Set(active.map(w => w.bettor_name.trim()))].sort((a, b) => a.localeCompare(b))}
+          onAdd={addManualBet}
+        />
+
         {/* Active Bets */}
         <div style={{ background: '#fff', borderRadius: 14, border: '1px solid #e5e7eb', overflow: 'hidden' }}>
           <div style={{ background: GREEN, padding: '10px 16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -698,11 +843,8 @@ export default function WagerAdmin() {
           <WagerShareCard
             event={event}
             eventDate={eventDate}
-            settlement={settlement}
-            playerName={playerName}
-            showResults={showResults}
-            hasScores={scores.length > 0}
-            activeCount={active.length}
+            logoUrl={event.league?.logo_url ?? '/logo.png'}
+            model={buildResultsModel({ event, settlement, active, nameOf: playerName, memberNames })}
           />
         </div>
       </div>
