@@ -52,15 +52,20 @@ export default function ImageUpload({ bucket = 'media', path, currentUrl, onUplo
         onDragOver={e => e.preventDefault()}
         onDrop={e => { e.preventDefault(); handleFile(e.dataTransfer.files[0]) }}
         className={`relative cursor-pointer overflow-hidden border-2 border-dashed border-surface-highest hover:border-fairway-500 transition-colors bg-surface-container flex items-center justify-center ${
-          isCircle ? 'w-24 h-24 rounded-full' : 'w-full h-32 rounded-xl'
+          isCircle ? 'w-24 h-24 rounded-full' : 'w-full h-32 rounded-sm'
         }`}
       >
         {preview ? (
           <img src={preview} alt="upload preview" className={`w-full h-full object-cover ${isCircle ? 'rounded-full' : ''}`} />
         ) : (
           <div className="text-center text-ink-muted text-xs px-2">
-            <div className="text-2xl mb-1">📷</div>
-            <div>{uploading ? 'Uploading…' : 'Click or drop'}</div>
+            <svg className="mx-auto mb-1.5" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+              strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <rect x="3" y="5" width="18" height="14" rx="2" />
+              <circle cx="9" cy="10.5" r="1.5" />
+              <path d="M21 16l-5-5-8 8" />
+            </svg>
+            <div>{uploading ? 'Uploading…' : 'Click or drop an image'}</div>
           </div>
         )}
         {uploading && (
