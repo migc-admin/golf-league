@@ -37,7 +37,11 @@ const EVENT_TABS = [
     { label: 'Flights & tees',   anchor: 'flights-tees'   },
     { label: 'Roster',           anchor: 'roster'         },
   ]},
-  { key: 'Groups',         label: 'Groups',          icon: GroupIcon,     sub: [] },
+  { key: 'Groups',         label: 'Groups',          icon: GroupIcon,     sub: [
+    { label: 'Groups & tee times', anchor: 'groups-tee-times' },
+    { label: 'Match pairings',     anchor: 'match-pairings'   },
+    { label: 'Match settings',     anchor: 'match-settings'   },
+  ]},
   { key: 'Side Games',     label: 'Side Games',      icon: StarIcon,      sub: [
     { label: 'Opt-Ins',         anchor: 'opt-ins'        },
     { label: 'Blind Partners',  anchor: 'blind-partners' },
@@ -209,7 +213,7 @@ function GlobalSidebar({ org, user, profile, tier, isOwner, onSignOut, onClose }
 }
 
 // ─── Event context sidebar ────────────────────────────────────────────────────
-function EventSidebar({ org, eventName, eventStatus, sideGameOptions = [], basePath, onClose, onSignOut, user, profile }) {
+function EventSidebar({ org, eventName, eventStatus, hasMatchPlay = false, sideGameOptions = [], basePath, onClose, onSignOut, user, profile }) {
   const [searchParams, setSearchParams] = useSearchParams()
   const activeTab = searchParams.get('tab') ?? 'Overview'
   const location  = useLocation()
@@ -276,7 +280,9 @@ function EventSidebar({ org, eventName, eventStatus, sideGameOptions = [], baseP
               })
             : key === 'Overview'
               ? sub.filter(({ anchor }) => anchor !== 'readiness' || eventStatus === 'upcoming')
-              : sub
+              : key === 'Groups'
+                ? sub.filter(({ anchor }) => anchor === 'groups-tee-times' || hasMatchPlay)
+                : sub
 
           return (
             <div key={key}>
@@ -367,11 +373,11 @@ export default function AdminLayout({ children }) {
     if (!isEventRoute || !eventSlug) { setEventMeta(null); return }
     supabase
       .from('events')
-      .select('name, event_number, status, side_game_options')
+      .select('name, event_number, status, side_game_options, formats, format')
       .eq('slug', eventSlug)
       .single()
       .then(({ data }) => {
-        if (data) setEventMeta({ name: data.name ?? `Event #${data.event_number}`, status: data.status, sideGameOptions: data.side_game_options ?? [] })
+        if (data) setEventMeta({ name: data.name ?? `Event #${data.event_number}`, status: data.status, sideGameOptions: data.side_game_options ?? [], hasMatchPlay: [...(data.formats ?? (data.format ? [data.format] : []))].some(f => f === 'match_points' || f === 'ryder_cup') })
       })
   }, [isEventRoute, eventSlug])
 
@@ -386,11 +392,11 @@ export default function AdminLayout({ children }) {
   const sharedProps = { org, user, profile, onSignOut: handleSignOut }
 
   const sidebarContent = isEventRoute
-    ? <EventSidebar {...sharedProps} eventName={eventMeta?.name ?? '…'} eventStatus={eventMeta?.status} sideGameOptions={eventMeta?.sideGameOptions ?? []} basePath={basePath} onClose={() => setDrawerOpen(false)} />
+    ? <EventSidebar {...sharedProps} eventName={eventMeta?.name ?? '…'} eventStatus={eventMeta?.status} hasMatchPlay={eventMeta?.hasMatchPlay ?? false} sideGameOptions={eventMeta?.sideGameOptions ?? []} basePath={basePath} onClose={() => setDrawerOpen(false)} />
     : <GlobalSidebar {...sharedProps} tier={tier} isOwner={isOwner} onClose={() => setDrawerOpen(false)} />
 
   const sidebarDesktop = isEventRoute
-    ? <EventSidebar {...sharedProps} eventName={eventMeta?.name ?? '…'} eventStatus={eventMeta?.status} sideGameOptions={eventMeta?.sideGameOptions ?? []} basePath={basePath} />
+    ? <EventSidebar {...sharedProps} eventName={eventMeta?.name ?? '…'} eventStatus={eventMeta?.status} hasMatchPlay={eventMeta?.hasMatchPlay ?? false} sideGameOptions={eventMeta?.sideGameOptions ?? []} basePath={basePath} />
     : <GlobalSidebar {...sharedProps} tier={tier} isOwner={isOwner} />
 
   return (

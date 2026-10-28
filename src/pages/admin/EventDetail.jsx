@@ -39,11 +39,25 @@ import StatTiles, { playerTiles } from '../../components/ui/StatTiles'
 import RegistrationCard from '../../components/ui/RegistrationCard'
 import FlightsTeesCard from '../../components/ui/FlightsTeesCard'
 import RosterCard from '../../components/ui/RosterCard'
+import {
+  noShowScoreRows, isGroupsLocked, scorerNamesByGroup, scorerIds, scorersFirst, playersWithoutMatch,
+  withoutMatchSummary, pairingGroups, tiebreakBox, groupOptionLabel,
+} from '../../lib/groupsView'
+import { teeInfo } from '../../lib/playerProfile'
+import GroupCard from '../../components/ui/GroupCard'
+import MatchPairingsCard from '../../components/ui/MatchPairingsCard'
+import MatchSettingsCard from '../../components/ui/MatchSettingsCard'
+import LockedBanner from '../../components/ui/LockedBanner'
 import PhotosCard from '../../components/ui/PhotosCard'
 import { atLimit, getLimit, nextTier, TIER_LABELS } from '../../lib/features'
 import { BUY_IN_ELIGIBLE_KEYS, OPT_IN_GAME_LABELS, optInAmount, isBuyInEnabled, baseSideGameKey, isPerFlight } from '../../lib/sideGames'
 
 // Collapsed from 7 → 4 tabs: Players = Registrations + Players & Flights; Payout = Config + Side Games + Summary
+// The H1 on every event tab is the tab's name; the event name lives in the meta line.
+const TAB_TITLES = {
+  'Overview': 'Overview', 'Players': 'Players', 'Groups': 'Groups & pairings', 'Side Games': 'Side games',
+  'Payout': 'Payout', 'Pre/Post Round': 'Print & share', 'Team Play': 'Team play',
+}
 const ALL_ADMIN_TABS = ['Overview', 'Players', 'Groups', 'Side Games', 'Payout', 'Pre/Post Round', 'Team Play']
 
 // ─── Side game helpers (shared between EditEventModal and elsewhere) ──────────
@@ -144,6 +158,7 @@ export default function EventDetail() {
   const activeTab = searchParams.get('tab') ?? 'Overview'
   const setActiveTab = (tab) => setSearchParams({ tab })
   const onPlayersTab = activeTab === 'Players'
+  const onGroupsTab  = activeTab === 'Groups'
 
   // Same check the old in-tab button made: at the plan's player limit, show the upgrade prompt.
   function handleAddPlayer() {
@@ -265,18 +280,23 @@ export default function EventDetail() {
       {/* Header */}
       <EventAdminHeader
         clubName={event.league?.name}
-        title={onPlayersTab ? 'Players' : (event.name ? event.name : `Event #${event.event_number}`)}
+        title={TAB_TITLES[activeTab] ?? activeTab}
         statusBadge={<StatusBadge status={event.status} />}
-        meta={onPlayersTab
-          ? [event.name ?? `Event #${event.event_number}`, event.course?.name, formatDate(event.event_date), event.tournament_fee > 0 ? `Entry fee ${formatMoney(event.tournament_fee)}` : null].filter(Boolean).join(' · ')
-          : [event.course?.name, formatDate(event.event_date), event.start_time ? `${formatTime(event.start_time)} start` : null].filter(Boolean).join(' · ')}
+        meta={[
+          event.name ?? `Event #${event.event_number}`,
+          event.course?.name,
+          formatDate(event.event_date),
+          onPlayersTab
+            ? (event.tournament_fee > 0 ? `Entry fee ${formatMoney(event.tournament_fee)}` : null)
+            : (event.start_time ? `${formatTime(event.start_time)} start` : null),
+        ].filter(Boolean).join(' · ')}
         links={[
           { href: `/${orgSlug}/${event.league?.slug}/${event.slug}/event`, label: 'Event page' },
           ...(!onPlayersTab && event.league?.org_id === import.meta.env.VITE_MIGC_ORG_ID
             ? [{ href: `/wager/${event.id}/board`, label: 'Wager board' }]
             : []),
         ]}
-        actions={onPlayersTab ? (
+        actions={onGroupsTab ? null : onPlayersTab ? (
           <Button icon="plus" onClick={handleAddPlayer}>Add player</Button>
         ) : (
           <>
@@ -343,22 +363,15 @@ export default function EventDetail() {
       )}
 
       {activeTab === 'Groups' && (
-        <div className="space-y-6">
-          <TabGroups event={event} eventPlayers={eventPlayers} onUpdated={load} orgSlug={orgSlug} allScores={allScores} course={course} />
-          {((event.formats ?? (event.format ? [event.format] : [])).includes('match_points') ||
-            (event.formats ?? (event.format ? [event.format] : [])).includes('ryder_cup')) && (
-            <div className="border-t border-surface-border pt-6">
-              <h3 className="text-xs font-semibold text-ink-muted uppercase tracking-widest mb-3">Match Play Pairings</h3>
-              <MatchPairingsManager event={event} eventId={event.id} eventPlayers={eventPlayers} allScores={allScores} course={course} onUpdated={load} />
-            </div>
-          )}
-          {(event.formats ?? (event.format ? [event.format] : [])).includes('team_match_play') && (
-            <div className="border-t border-surface-border pt-6">
-              <h3 className="text-xs font-semibold text-ink-muted uppercase tracking-widest mb-3">Team Match Setup</h3>
-              <TeamMatchSetup event={event} eventPlayers={eventPlayers} onUpdated={load} />
-            </div>
-          )}
-        </div>
+        <GroupsPage
+          event={event}
+          eventPlayers={eventPlayers}
+          onUpdated={load}
+          orgSlug={orgSlug}
+          allScores={allScores}
+          course={course}
+          onGoToTab={setActiveTab}
+        />
       )}
 
       {activeTab === 'Side Games' && (
@@ -2105,16 +2118,23 @@ function AddPlayerModal({ open, onClose, eventId, available, course, defaultTeeN
 
 // ─── Tab: Groups ──────────────────────────────────────────────────
 // ─── Match Pairings Manager ───────────────────────────────────────
-function MatchPairingsManager({ event, eventId, eventPlayers, allScores = [], course = null, onUpdated }) {
-  const [pairings,    setPairings]    = useState([])
-  const [playerAId,   setPlayerAId]   = useState('')
-  const [playerBId,   setPlayerBId]   = useState('')
-  const [matchNumber, setMatchNumber] = useState(1)
+// Groups and pairings are locked once the event is complete. Every function that changes them
+// calls this first; it re-reads the status from the database (not the page's copy) so an old
+// open tab can't sneak a change through. Tiebreak winner picks are the one allowed exception.
+async function assertGroupsEditable(eventId) {
+  const { data } = await supabase.from('events').select('status').eq('id', eventId).single()
+  if (isGroupsLocked(data)) {
+    toast.error('This event is complete. Re-open it to change groups and pairings.')
+    return false
+  }
+  return true
+}
+
+function MatchPairingsManager({ event, eventId, eventPlayers, allScores = [], course = null, onUpdated, pairings, loadPairings, locked = false }) {
   const [saving,      setSaving]      = useState(false)
   const [teamAName,   setTeamAName]   = useState(event?.ryder_cup_teams?.a ?? '')
   const [teamBName,   setTeamBName]   = useState(event?.ryder_cup_teams?.b ?? '')
   const [savingTeams, setSavingTeams] = useState(false)
-  const isRyderCup = (event?.formats ?? []).includes('ryder_cup')
 
   // Tie rules: when on, a match that is all square after 18 holes must get a winner
   // (decided by the tiebreakers below, or by an admin's manual pick on that match).
@@ -2127,6 +2147,7 @@ function MatchPairingsManager({ event, eventId, eventPlayers, allScores = [], co
   }, [event?.match_rules])
 
   async function saveTieRules() {
+    if (!(await assertGroupsEditable(eventId))) return
     setSavingRules(true)
     const rules = requireWinner ? { requireWinner: true, preset: tiePreset } : null
     const { error } = await supabase.from('events').update({ match_rules: rules }).eq('id', eventId)
@@ -2136,37 +2157,32 @@ function MatchPairingsManager({ event, eventId, eventPlayers, allScores = [], co
     onUpdated?.()
   }
 
-  // Drag-and-drop reordering of the Current Match Pairings list — dragging a
-  // row updates match_number (order) for all pairings, not player selection.
-  const dndSensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 5 } }))
-  const [activeDragPairingId, setActiveDragPairingId] = useState(null)
+  async function saveTeamNames() {
+    if (!(await assertGroupsEditable(eventId))) return
+    setSavingTeams(true)
+    await supabase.from('events').update({
+      ryder_cup_teams: { a: teamAName.trim(), b: teamBName.trim() }
+    }).eq('id', eventId)
+    setSavingTeams(false)
+    toast.success('Team names saved')
+  }
 
-  function handlePairingDragStart({ active }) { setActiveDragPairingId(active.id) }
+  // One button saves both groups of settings, using the two existing save functions.
+  async function saveMatchSettings() {
+    await saveTeamNames()
+    await saveTieRules()
+  }
 
-  async function handlePairingDragEnd({ active, over }) {
-    setActiveDragPairingId(null)
-    if (!over || active.id === over.id) return
-    const oldIndex = pairings.findIndex(p => p.id === active.id)
-    const newIndex = pairings.findIndex(p => p.id === over.id)
-    if (oldIndex === -1 || newIndex === -1) return
-    const reordered = arrayMove(pairings, oldIndex, newIndex)
-    setPairings(reordered)
+  // The new order of the match list — dragging a row and the phone ▲/▼ buttons both end here.
+  async function reorderPairings(orderedIds) {
+    if (!(await assertGroupsEditable(eventId))) { await loadPairings(); return }
+    const byId = Object.fromEntries(pairings.map(p => [p.id, p]))
+    const reordered = orderedIds.map(id => byId[id]).filter(Boolean)
     await Promise.all(reordered.map((p, i) =>
       supabase.from('match_pairings').update({ match_number: i + 1 }).eq('id', p.id)
     ))
     await loadPairings()
   }
-
-  async function loadPairings() {
-    const { data } = await supabase
-      .from('match_pairings')
-      .select('*, playerA:players!player_a_id(first_name,last_name), playerB:players!player_b_id(first_name,last_name)')
-      .eq('event_id', eventId)
-      .order('match_number')
-    setPairings(data ?? [])
-  }
-
-  useEffect(() => { loadPairings() }, [eventId])
 
   // Live result per pairing, using the event's tie rules (and any manual winners)
   const resultsById = useMemo(() => {
@@ -2176,6 +2192,7 @@ function MatchPairingsManager({ event, eventId, eventPlayers, allScores = [], co
   }, [eventPlayers, allScores, course, pairings, event?.match_rules])
   const needWinnerCount = Object.values(resultsById).filter(r => r.needsWinner).length
 
+  // The tiebreak Winner pick stays allowed even when the event is complete.
   async function setManualWinner(pairingId, playerId, note) {
     const { error } = await supabase.from('match_pairings')
       .update({ winner_player_id: playerId || null, winner_note: playerId ? (note || null) : null })
@@ -2185,19 +2202,7 @@ function MatchPairingsManager({ event, eventId, eventPlayers, allScores = [], co
     toast.success(playerId ? 'Winner saved' : 'Manual winner cleared')
   }
 
-  async function saveTeamNames() {
-    setSavingTeams(true)
-    await supabase.from('events').update({
-      ryder_cup_teams: { a: teamAName.trim(), b: teamBName.trim() }
-    }).eq('id', eventId)
-    setSavingTeams(false)
-    toast.success('Team names saved')
-  }
-
-  // Players already paired (either as A or B)
-  const pairedIds = new Set(pairings.flatMap(p => [p.player_a_id, p.player_b_id]))
-
-  const unpairedPlayers = eventPlayers.filter(ep => !pairedIds.has(ep.player_id))
+  const unpairedPlayers = playersWithoutMatch(eventPlayers, pairings)
 
   // Alphabetical (first name, then last name) rather than handicap order — easier to scan in the dropdowns
   const sortedUnpaired = [...unpairedPlayers].sort((a, b) => {
@@ -2215,11 +2220,12 @@ function MatchPairingsManager({ event, eventId, eventPlayers, allScores = [], co
     return { relA: Math.max(0, chA - baseline), relB: Math.max(0, chB - baseline) }
   }
 
-  async function addPairing() {
+  async function addPairing(playerAId, playerBId) {
     if (!playerAId || !playerBId || playerAId === playerBId) {
       toast.error('Select two different players')
-      return
+      return false
     }
+    if (!(await assertGroupsEditable(eventId))) return false
     setSaving(true)
     const { error } = await supabase.from('match_pairings').insert({
       event_id:     eventId,
@@ -2228,13 +2234,13 @@ function MatchPairingsManager({ event, eventId, eventPlayers, allScores = [], co
       match_number: pairings.length + 1,
     })
     setSaving(false)
-    if (error) { toast.error(error.message); return }
-    setPlayerAId('')
-    setPlayerBId('')
+    if (error) { toast.error(error.message); return false }
     await loadPairings()
+    return true
   }
 
   async function deletePairing(id) {
+    if (!(await assertGroupsEditable(eventId))) return
     const { error } = await supabase.from('match_pairings').delete().eq('id', id)
     if (error) {
       // 23503 = foreign key violation: wagers still reference this match
@@ -2252,6 +2258,7 @@ function MatchPairingsManager({ event, eventId, eventPlayers, allScores = [], co
   }
 
   async function renumberAll() {
+    if (!(await assertGroupsEditable(eventId))) return
     await Promise.all(pairings.map((p, i) =>
       supabase.from('match_pairings').update({ match_number: i + 1 }).eq('id', p.id)
     ))
@@ -2263,247 +2270,50 @@ function MatchPairingsManager({ event, eventId, eventPlayers, allScores = [], co
     return `${ep.player?.first_name ?? ''} ${ep.player?.last_name ?? ''} (CH: ${matchCH(ep) ?? '—'})`
   }
 
+  const rows = pairings.map(p => {
+    const { relA, relB } = relativeStrokes(p.player_a_id, p.player_b_id)
+    const nameA = `${p.playerA?.first_name ?? ''} ${p.playerA?.last_name ?? ''}`.trim()
+    const nameB = `${p.playerB?.first_name ?? ''} ${p.playerB?.last_name ?? ''}`.trim()
+    return {
+      id: p.id, number: p.match_number, nameA, nameB, strokesA: relA, strokesB: relB,
+      group: pairingGroups(p, epByPlayerId),
+      box: tiebreakBox(resultsById[p.id], nameA, nameB),
+      playerAId: p.player_a_id, playerBId: p.player_b_id,
+      winnerId: p.winner_player_id ?? null, note: p.winner_note ?? null,
+    }
+  })
+
   return (
-    <div className="space-y-4">
-      {/* Optional match play team names — blank shows no team label anywhere */}
-      <div className="bg-white rounded-sm border border-surface-border p-4 space-y-3">
-          <div>
-            <h3 className="text-sm font-semibold text-ink">Team Names <span className="font-normal text-ink-muted">(optional)</span></h3>
-            <p className="text-xs text-ink-muted mt-0.5">Labels the two sides of each match on the leaderboard and results. Leave blank to show no team label.</p>
-          </div>
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="block text-xs font-medium text-ink-muted mb-1">Team A</label>
-              <input className="input w-full" value={teamAName} onChange={e => setTeamAName(e.target.value)} placeholder="e.g. USA" />
-            </div>
-            <div>
-              <label className="block text-xs font-medium text-ink-muted mb-1">Team B</label>
-              <input className="input w-full" value={teamBName} onChange={e => setTeamBName(e.target.value)} placeholder="e.g. Europe" />
-            </div>
-          </div>
-          <Button type="button" size="sm" onClick={saveTeamNames} loading={savingTeams}>
-            {savingTeams ? 'Saving…' : 'Save team names'}
-          </Button>
-      </div>
-
-      {/* Tie rules */}
-      <div className="bg-white rounded-sm border border-surface-border p-4 space-y-3">
-        <div>
-          <h3 className="text-sm font-semibold text-ink">Tie Rules</h3>
-          <p className="text-xs text-ink-muted mt-0.5">What happens when a match is all square after 18 holes.</p>
-        </div>
-        <label className="flex items-start gap-2 text-sm text-ink cursor-pointer">
-          <input type="checkbox" className="mt-0.5" checked={requireWinner} onChange={e => setRequireWinner(e.target.checked)} />
-          <span>
-            Every match must have a winner
-            <span className="block text-xs text-ink-muted">Off: a tied match is halved (½ point each). On: a tie is broken as set below.</span>
-          </span>
-        </label>
-        {requireWinner && (
-          <div className="pl-6 space-y-2">
-            <label className="block text-xs font-medium text-ink">Tiebreaker</label>
-            <select className="input w-full" value={tiePreset} onChange={e => setTiePreset(e.target.value)}>
-              {Object.entries(TIEBREAK_PRESETS).map(([key, p]) => (
-                <option key={key} value={key}>{p.label}</option>
-              ))}
-            </select>
-            <p className="text-xs text-ink-muted">
-              Steps run in the order shown; the first one that separates the two players decides the match. Net scores include the match's handicap strokes.
-              {tiePreset === 'putts' && ' Putts only count if putts were entered for both players. A putt-off is played in person, so the match then waits for you to pick the winner.'}
-              {' '}You can always pick a winner by hand on any tied match below, which overrides the tiebreaker.
-            </p>
-          </div>
-        )}
-        <div className="flex items-center gap-3">
-          <Button size="sm" onClick={saveTieRules} loading={savingRules}>Save Tie Rules</Button>
-          {needWinnerCount > 0 && (
-            <span className="text-xs font-semibold text-status-upcoming-text bg-status-upcoming-bg border border-surface-border rounded-full px-2.5 py-1">
-              {needWinnerCount} match{needWinnerCount > 1 ? 'es' : ''} need{needWinnerCount > 1 ? '' : 's'} a winner
-            </span>
-          )}
-        </div>
-      </div>
-
-      {/* Current pairings — drag to reorder match number */}
-      <div className="bg-white rounded-sm border border-surface-border overflow-hidden">
-        <div className="px-4 py-3 bg-surface-container border-b border-surface-border flex items-center justify-between">
-          <div>
-            <h3 className="text-sm font-semibold text-ink">Current Match Pairings</h3>
-            {pairings.length > 1 && <p className="text-xs text-ink-muted mt-0.5">Drag to reorder</p>}
-          </div>
-          {pairings.length > 0 && (
-            <Button type="button" variant="secondary" size="sm" onClick={renumberAll}>Renumber</Button>
-          )}
-        </div>
-        {pairings.length === 0 ? (
-          <p className="px-4 py-4 text-sm text-ink-muted">No pairings assigned yet.</p>
-        ) : (
-          <DndContext sensors={dndSensors} collisionDetection={closestCenter} onDragStart={handlePairingDragStart} onDragEnd={handlePairingDragEnd}>
-            <SortableContext items={pairings.map(p => p.id)} strategy={verticalListSortingStrategy}>
-              <div className="divide-y divide-surface-border">
-                {pairings.map(p => {
-                  const { relA, relB } = relativeStrokes(p.player_a_id, p.player_b_id)
-                  return (
-                    <SortablePairingRow key={p.id} pairing={p} relA={relA} relB={relB} result={resultsById[p.id]} onSetWinner={setManualWinner} onRemove={() => deletePairing(p.id)} />
-                  )
-                })}
-              </div>
-            </SortableContext>
-            <DragOverlay>
-              {activeDragPairingId ? (() => {
-                const p = pairings.find(pp => pp.id === activeDragPairingId)
-                if (!p) return null
-                const { relA, relB } = relativeStrokes(p.player_a_id, p.player_b_id)
-                return (
-                  <div className="bg-white border-2 border-fairway-600 rounded-sm px-4 py-3 shadow-xl">
-                    <PairingRowLabel pairing={p} relA={relA} relB={relB} />
-                  </div>
-                )
-              })() : null}
-            </DragOverlay>
-          </DndContext>
-        )}
-      </div>
-
-      {/* Add pairing form */}
-      {eventPlayers.length >= 2 && (
-        <div className="bg-white rounded-sm border border-surface-border overflow-hidden">
-          <div className="px-4 py-3 bg-surface-container border-b border-surface-border">
-            <h3 className="text-sm font-semibold text-ink">Add Pairing</h3>
-          </div>
-          <div className="p-4 space-y-3">
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label className="block text-xs font-medium text-ink mb-1">{isRyderCup ? (teamAName || 'Team A') : 'Player A'}</label>
-                <select
-                  className="input w-full"
-                  value={playerAId}
-                  onChange={e => setPlayerAId(e.target.value)}
-                >
-                  <option value="">Select player…</option>
-                  {sortedUnpaired
-                    .filter(ep => ep.player_id !== playerBId)
-                    .map(ep => (
-                      <option key={ep.player_id} value={ep.player_id}>{playerName(ep)}</option>
-                    ))}
-                </select>
-              </div>
-              <div>
-                <label className="block text-xs font-medium text-ink mb-1">{isRyderCup ? (teamBName || 'Team B') : 'Player B'}</label>
-                <select
-                  className="input w-full"
-                  value={playerBId}
-                  onChange={e => setPlayerBId(e.target.value)}
-                >
-                  <option value="">Select player…</option>
-                  {sortedUnpaired
-                    .filter(ep => ep.player_id !== playerAId)
-                    .map(ep => (
-                      <option key={ep.player_id} value={ep.player_id}>{playerName(ep)}</option>
-                    ))}
-                </select>
-              </div>
-            </div>
-            <div className="flex items-center gap-3">
-              <Button onClick={addPairing} loading={saving} disabled={!playerAId || !playerBId}>
-                Add Pairing
-              </Button>
-            </div>
-          </div>
-        </div>
-      )}
-      {unpairedPlayers.length < 2 && pairings.length > 0 && (
-        <p className="text-sm text-ink-muted text-center">All players have been paired.</p>
-      )}
-    </div>
-  )
-}
-
-function PairingRowLabel({ pairing: p, relA, relB }) {
-  return (
-    <div className="text-sm text-ink">
-      <span className="font-semibold text-blue-700">
-        {p.playerA?.first_name} {p.playerA?.last_name}{relA > 0 ? ` (${relA})` : ''}
-      </span>
-      {' '}
-      <span className="text-ink-muted">vs</span>
-      {' '}
-      <span className="font-semibold text-purple-700">
-        {p.playerB?.first_name} {p.playerB?.last_name}{relB > 0 ? ` (${relB})` : ''}
-      </span>
-      <span className="ml-3 text-xs text-ink-muted">Match #{p.match_number}</span>
-    </div>
-  )
-}
-
-function SortablePairingRow({ pairing, relA, relB, result, onSetWinner, onRemove }) {
-  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: pairing.id })
-  const [note, setNote] = useState(pairing.winner_note ?? '')
-  useEffect(() => { setNote(pairing.winner_note ?? '') }, [pairing.winner_note])
-  const style = {
-    transform: CSS.Transform.toString(transform),
-    transition,
-    opacity: isDragging ? 0.4 : 1,
-  }
-  const nameA = `${pairing.playerA?.first_name ?? ''} ${pairing.playerA?.last_name ?? ''}`.trim()
-  const nameB = `${pairing.playerB?.first_name ?? ''} ${pairing.playerB?.last_name ?? ''}`.trim()
-  const tied = result?.tiedAfter18
-  const tb = result?.tiebreak
-  const winnerName = result?.winner === 'A' ? nameA : result?.winner === 'B' ? nameB : null
-  return (
-    <div ref={setNodeRef} style={style} className="px-4 py-3 bg-white">
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-3 min-w-0">
-          <span {...attributes} {...listeners} className="cursor-grab text-surface-outline hover:text-ink-muted select-none shrink-0" title="Drag to reorder">⠿</span>
-          <PairingRowLabel pairing={pairing} relA={relA} relB={relB} />
-        </div>
-        <Button size="sm" variant="danger" onClick={onRemove}>Remove</Button>
-      </div>
-
-      {tied && (
-        <div className="mt-2 ml-7 rounded-sm border border-surface-border bg-surface-container px-3 py-2 space-y-2">
-          <div className="text-xs">
-            {result.needsWinner && (
-              <span className="font-semibold text-status-upcoming-text">
-                {result.needsPuttOff
-                  ? 'All square after the tiebreakers. Play the putt-off, then pick the winner below.'
-                  : 'All square after 18. A winner is needed. Pick one below.'}
-              </span>
-            )}
-            {!result.needsWinner && tb && tb.by === 'manual' && (
-              <span className="font-semibold text-status-active-text">Winner: {winnerName} (decided by admin)</span>
-            )}
-            {!result.needsWinner && tb && tb.by !== 'manual' && (
-              <span className="font-semibold text-status-active-text">
-                Winner: {winnerName} on tiebreak ({tb.label}{tb.unit === 'net' ? ' (net)' : ''}: {result.winner === 'A' ? tb.valueA : tb.valueB} vs {result.winner === 'A' ? tb.valueB : tb.valueA})
-              </span>
-            )}
-            {!result.needsWinner && !tb && <span className="font-semibold text-ink">All square after 18. Halved (½ point each).</span>}
-          </div>
-          <div className="flex flex-wrap items-center gap-2">
-            <label className="text-xs text-ink-muted">Winner</label>
-            <select
-              className="input text-xs"
-              value={pairing.winner_player_id ?? ''}
-              onChange={e => onSetWinner(pairing.id, e.target.value, note)}
-            >
-              <option value="">Use tiebreaker rules</option>
-              <option value={pairing.player_a_id}>{nameA}</option>
-              <option value={pairing.player_b_id}>{nameB}</option>
-            </select>
-            {pairing.winner_player_id && (
-              <input
-                className="input text-xs flex-1 min-w-[160px]"
-                placeholder="Reason (optional)"
-                value={note}
-                onChange={e => setNote(e.target.value)}
-                onBlur={() => note !== (pairing.winner_note ?? '') && onSetWinner(pairing.id, pairing.winner_player_id, note)}
-              />
-            )}
-          </div>
-        </div>
-      )}
-    </div>
+    <>
+      <MatchPairingsCard
+        rows={rows}
+        locked={locked}
+        teamAName={teamAName.trim() || undefined}
+        teamBName={teamBName.trim() || undefined}
+        withoutMatch={unpairedPlayers.length > 0 ? { count: unpairedPlayers.length, text: withoutMatchSummary(unpairedPlayers) } : null}
+        needWinnerCount={needWinnerCount}
+        unpaired={sortedUnpaired.map(ep => ({ value: ep.player_id, label: playerName(ep) }))}
+        onReorder={reorderPairings}
+        onRemove={deletePairing}
+        onRenumber={renumberAll}
+        onSetWinner={setManualWinner}
+        onAdd={addPairing}
+      />
+      <MatchSettingsCard
+        locked={locked}
+        teamAName={teamAName}
+        teamBName={teamBName}
+        onTeamAName={setTeamAName}
+        onTeamBName={setTeamBName}
+        requireWinner={requireWinner}
+        onRequireWinner={setRequireWinner}
+        tiePreset={tiePreset}
+        onTiePreset={setTiePreset}
+        presets={Object.entries(TIEBREAK_PRESETS).map(([key, p]) => ({ key, label: p.label }))}
+        onSave={saveMatchSettings}
+        saving={savingTeams || savingRules}
+      />
+    </>
   )
 }
 
@@ -2615,20 +2425,20 @@ function isPlayerNoShow(playerId, allScores) {
   return playerScores.length > 0 && playerScores.every(s => s.entered_by === NO_SHOW_TAG)
 }
 
+// A no-show stays in the field (bets, team play) with par + 5 gross on every hole, and is taken
+// out of their group so nobody has to enter scores for them.
 async function markNoShow(playerId, eventId, course) {
-  const pars = course?.par_per_hole ?? Array(18).fill(4)
-  const rows = pars.map((par, i) => ({
-    event_id: eventId,
-    player_id: playerId,
-    hole_number: i + 1,
-    gross_score: par + 2,
-    putts: null,
-    entered_by: NO_SHOW_TAG,
-  }))
+  const rows = noShowScoreRows({ eventId, playerId, pars: course?.par_per_hole })
   const { error } = await supabase
     .from('scores')
     .upsert(rows, { onConflict: 'event_id,player_id,hole_number' })
-  return error
+  if (error) return error
+  const { error: groupError } = await supabase
+    .from('event_players')
+    .update({ group_number: null, group_order: null })
+    .eq('event_id', eventId)
+    .eq('player_id', playerId)
+  return groupError
 }
 
 async function clearNoShow(playerId, eventId) {
@@ -2641,12 +2451,65 @@ async function clearNoShow(playerId, eventId) {
   return error
 }
 
+// ─── Groups & pairings page ─────────────────────────────────────────
+// Holds what the stat tiles, the "without a match" banner and the pairings card all need
+// (the match list), and the one `locked` flag (event complete) that drives the whole page.
+function GroupsPage({ event, eventPlayers, onUpdated, orgSlug, allScores, course, onGoToTab }) {
+  const formats = event.formats ?? (event.format ? [event.format] : [])
+  const hasMatchPlay = formats.includes('match_points') || formats.includes('ryder_cup')
+  const hasTeamMatch = formats.includes('team_match_play')
+  const locked = isGroupsLocked(event)
+
+  const [pairings, setPairings] = useState([])
+  const loadPairings = useCallback(async () => {
+    const { data } = await supabase
+      .from('match_pairings')
+      .select('*, playerA:players!player_a_id(first_name,last_name), playerB:players!player_b_id(first_name,last_name)')
+      .eq('event_id', event.id)
+      .order('match_number')
+    setPairings(data ?? [])
+  }, [event.id])
+  useEffect(() => { if (hasMatchPlay) loadPairings() }, [hasMatchPlay, loadPairings])
+
+  const groupCount = new Set(eventPlayers.map(ep => ep.group_number).filter(Boolean)).size
+  const withoutMatch = hasMatchPlay ? playersWithoutMatch(eventPlayers, pairings).length : 0
+  const tiles = [
+    { label: 'Players', value: eventPlayers.length },
+    { label: 'Groups', value: groupCount },
+    ...(hasMatchPlay ? [
+      { label: 'Matches', value: pairings.length },
+      { label: 'Without a match', value: withoutMatch, tone: withoutMatch > 0 ? 'warn' : 'neutral' },
+    ] : []),
+  ]
+
+  return (
+    <div className="space-y-4">
+      <StatTiles tiles={tiles} />
+      {locked && <LockedBanner onReopen={() => onGoToTab?.('Overview')} />}
+      <TabGroups event={event} eventPlayers={eventPlayers} onUpdated={onUpdated} orgSlug={orgSlug} allScores={allScores} course={course} />
+      {hasMatchPlay && (
+        <MatchPairingsManager
+          event={event} eventId={event.id} eventPlayers={eventPlayers} allScores={allScores} course={course}
+          onUpdated={onUpdated} pairings={pairings} loadPairings={loadPairings} locked={locked}
+        />
+      )}
+      {hasTeamMatch && (
+        <div className="border-t border-surface-border pt-6">
+          <h3 className="text-xs font-semibold text-ink-muted uppercase tracking-widest mb-3">Team Match Setup</h3>
+          <TeamMatchSetup event={event} eventPlayers={eventPlayers} onUpdated={onUpdated} />
+        </div>
+      )}
+    </div>
+  )
+}
+
 function TabGroups({ event, eventPlayers, onUpdated, orgSlug, allScores, course }) {
   const isShotgun    = event?.shotgun_start ?? false
+  const locked       = isGroupsLocked(event)
   const [noShowLoading, setNoShowLoading] = useState(null)
 
   async function handleNoShow(ep) {
-    if (!window.confirm(`Mark ${ep.player?.first_name} ${ep.player?.last_name} as a no-show? This will record par+2 for all 18 holes.`)) return
+    if (!window.confirm(`Mark ${ep.player?.first_name} ${ep.player?.last_name} as a no-show? They will be removed from their group and scored 5 over par on every hole, and stay in the field for bets and team play.`)) return
     setNoShowLoading(ep.player_id)
     const error = await markNoShow(ep.player_id, event.id, course)
     setNoShowLoading(null)
@@ -2669,6 +2532,7 @@ function TabGroups({ event, eventPlayers, onUpdated, orgSlug, allScores, course 
   const [holeAssignments, setHoleAssignments] = useState(event?.group_hole_assignments ?? {})
 
   async function setGroupHole(groupNum, hole) {
+    if (!(await assertGroupsEditable(event.id))) return
     // Store as string e.g. "4A" or "4B" to support two groups per hole
     const next = { ...holeAssignments, [groupNum]: hole || null }
     Object.keys(next).forEach(k => { if (!next[k]) delete next[k] })
@@ -2752,7 +2616,7 @@ function TabGroups({ event, eventPlayers, onUpdated, orgSlug, allScores, course 
     // Reorder within same container
     if (fromKey === toKey) {
       setContainers(prev => {
-        const members = [...(prev[fromKey] ?? [])]
+        const members = scorersFirst(prev[fromKey] ?? [], scorerSetFor(fromKey, prev[fromKey] ?? []))
         const from = members.findIndex(ep => ep.id === active.id)
         const to   = members.findIndex(ep => ep.id === over.id)
         if (from === -1 || to === -1 || from === to) return prev
@@ -2781,6 +2645,7 @@ function TabGroups({ event, eventPlayers, onUpdated, orgSlug, allScores, course 
   }
 
   async function persistContainers(snap) {
+    if (!(await assertGroupsEditable(event.id))) { onUpdated(); return }
     const source = snap ?? containers
     setSaving(true)
     try {
@@ -2819,6 +2684,7 @@ function TabGroups({ event, eventPlayers, onUpdated, orgSlug, allScores, course 
   const [autoLoading,    setAutoLoading]    = useState(false)
 
   async function runAutoAssign() {
+    if (!(await assertGroupsEditable(event.id))) { setShowAutoAssign(false); return }
     setAutoLoading(true)
     try {
       let players = [...eventPlayers]
@@ -2873,6 +2739,8 @@ function TabGroups({ event, eventPlayers, onUpdated, orgSlug, allScores, course 
   }
 
   async function clearAllGroups() {
+    if (!window.confirm('Clear every group assignment? Players stay on the roster and can be grouped again.')) return
+    if (!(await assertGroupsEditable(event.id))) return
     await Promise.all(
       eventPlayers.map(ep =>
         supabase.from('event_players').update({ group_number: null, group_order: null }).eq('id', ep.id)
@@ -2892,20 +2760,44 @@ function TabGroups({ event, eventPlayers, onUpdated, orgSlug, allScores, course 
     { key: 'alpha',             label: 'Alphabetical',         desc: 'Assign A–Z by first name, filling groups sequentially' },
   ]
 
-  const scorerByGroup = (() => {
-    const groupMap = Object.fromEntries(eventPlayers.map(ep => [ep.player_id, ep.group_number]))
-    const map = {}
-    for (const s of (allScores ?? [])) {
-      if (!s.entered_by) continue
-      const g = groupMap[s.player_id]
-      if (!g) continue
-      if (!map[g]) map[g] = new Set()
-      map[g].add(s.entered_by)
-    }
-    return map
-  })()
+  // Scorers per group — names only, never the "no_show" marker. Scorers are shown first.
+  const scorerNames = scorerNamesByGroup(eventPlayers, allScores)
+  function groupNumberOf(key) { return key === 'ungrouped' ? null : parseInt(key.replace('group-', ''), 10) + 1 }
+  function scorerSetFor(key, members) { return scorerIds(members, scorerNames[groupNumberOf(key)]) }
+  function displayMembers(key) {
+    const members = containers[key] ?? []
+    return scorersFirst(members, scorerSetFor(key, members))
+  }
 
   const activeEp = activeId ? eventPlayers.find(ep => ep.id === activeId) : null
+
+  const teeFor = g => teeInfo(event, g)
+  const groupOptions = [
+    { key: 'ungrouped', label: 'Unassigned' },
+    ...groupKeys.map(key => {
+      const g = groupNumberOf(key)
+      return { key, label: groupOptionLabel({ groupNumber: g, teeTime: teeFor(g).time, count: (containers[key] ?? []).length }) }
+    }),
+  ]
+  const noShowControls = {
+    show: event.status === 'active',
+    isNoShow: ep => isPlayerNoShow(ep.player_id, allScores),
+    loadingId: noShowLoading,
+    onMark: handleNoShow,
+    onClear: handleClearNoShow,
+  }
+  function returnToPool(key) {
+    return ep => {
+      setContainers(prev => {
+        const next = {}
+        for (const k of Object.keys(prev)) next[k] = [...prev[k]]
+        next[key] = next[key].filter(m => m.id !== ep.id)
+        next['ungrouped'] = [...next['ungrouped'], ep].sort(epAlpha)
+        persistContainers(next)
+        return next
+      })
+    }
+  }
 
   return (
     <div className="space-y-4">
@@ -2916,231 +2808,129 @@ function TabGroups({ event, eventPlayers, onUpdated, orgSlug, allScores, course 
         </Card>
       )}
 
-      {/* Toolbar */}
-      <div className="flex items-center justify-between flex-wrap gap-2">
-        <p className="text-sm text-ink">
-          Drag players into groups. {numGroups} group{numGroups !== 1 ? 's' : ''} for {totalPlayers} player{totalPlayers !== 1 ? 's' : ''}.
-        </p>
-        <div className="flex items-center gap-2 shrink-0">
-          {saving && <span className="text-xs text-ink-muted">Saving…</span>}
-          {eventPlayers.some(ep => ep.group_number) && (
-            <Button size="sm" variant="ghost" onClick={clearAllGroups}>Clear All</Button>
+      <section id="groups-tee-times" className="rounded-sm border border-surface-border bg-white p-5 sm:p-6">
+        <header className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+          <div>
+            <h2 className="text-lg font-bold text-ink">Groups &amp; tee times</h2>
+            <p className="mt-0.5 text-sm text-ink-muted">
+              {locked ? 'Locked because the event is complete.' : (
+                <>
+                  <span className="md:hidden">Use the Group menu to move players.</span>
+                  <span className="hidden md:inline">Drag players between groups. The scorer enters scores for the group.</span>
+                </>
+              )}
+            </p>
+          </div>
+          {!locked && (
+            <div className="flex shrink-0 flex-wrap items-center gap-2">
+              {saving && <span className="text-xs text-ink-muted">Saving…</span>}
+              {eventPlayers.some(ep => ep.group_number) && (
+                <Button variant="ghost" onClick={clearAllGroups}>Clear all</Button>
+              )}
+              <Button onClick={() => setShowAutoAssign(true)}>Auto-assign groups</Button>
+            </div>
           )}
-          <Button size="sm" onClick={() => setShowAutoAssign(true)}>Auto-assign</Button>
-        </div>
-      </div>
+        </header>
 
-      {/* Auto-assign modal */}
-      {showAutoAssign && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
-          <div className="bg-white rounded-sm shadow-2xl w-full max-w-md p-6 space-y-5">
-            <div>
-              <h2 className="text-lg font-bold text-ink">Auto-Assign Groups</h2>
-              <p className="text-sm text-ink-muted mt-1">Groups of 4 ({numGroups} groups). This overwrites current assignments.</p>
-            </div>
-            <div className="space-y-2">
-              {AUTO_METHODS.map(m => (
-                <label key={m.key} className={`flex items-start gap-3 rounded-sm border-2 px-4 py-3 cursor-pointer transition-colors ${autoMethod === m.key ? 'border-fairway-600 bg-fairway-50' : 'border-surface-border hover:border-surface-highest'}`}>
-                  <input type="radio" name="autoMethod" value={m.key} checked={autoMethod === m.key} onChange={() => setAutoMethod(m.key)} className="mt-0.5 accent-fairway-600" />
-                  <div>
-                    <div className="text-sm font-semibold text-ink">{m.label}</div>
-                    <div className="text-xs text-ink-muted mt-0.5">{m.desc}</div>
-                  </div>
-                </label>
-              ))}
-            </div>
-            <div className="flex gap-3 pt-1">
-              <Button variant="secondary" className="flex-1" onClick={() => setShowAutoAssign(false)}>Cancel</Button>
-              <Button className="flex-1" loading={autoLoading} onClick={runAutoAssign}>Assign Groups</Button>
+        {/* Auto-assign modal */}
+        {showAutoAssign && !locked && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
+            <div className="bg-white rounded-sm shadow-2xl w-full max-w-md p-6 space-y-5">
+              <div>
+                <h2 className="text-lg font-bold text-ink">Auto-Assign Groups</h2>
+                <p className="text-sm text-ink-muted mt-1">Groups of 4 ({numGroups} groups). This overwrites current assignments.</p>
+              </div>
+              <div className="space-y-2">
+                {AUTO_METHODS.map(m => (
+                  <label key={m.key} className={`flex items-start gap-3 rounded-sm border-2 px-4 py-3 cursor-pointer transition-colors ${autoMethod === m.key ? 'border-fairway-600 bg-fairway-50' : 'border-surface-border hover:border-surface-highest'}`}>
+                    <input type="radio" name="autoMethod" value={m.key} checked={autoMethod === m.key} onChange={() => setAutoMethod(m.key)} className="mt-0.5 accent-fairway-600" />
+                    <div>
+                      <div className="text-sm font-semibold text-ink">{m.label}</div>
+                      <div className="text-xs text-ink-muted mt-0.5">{m.desc}</div>
+                    </div>
+                  </label>
+                ))}
+              </div>
+              <div className="flex gap-3 pt-1">
+                <Button variant="secondary" className="flex-1" onClick={() => setShowAutoAssign(false)}>Cancel</Button>
+                <Button className="flex-1" loading={autoLoading} onClick={runAutoAssign}>Assign Groups</Button>
+              </div>
             </div>
           </div>
-        </div>
-      )}
-
-      <DndContext
-        sensors={sensors}
-        collisionDetection={closestCenter}
-        onDragStart={handleDragStart}
-        onDragOver={handleDragOver}
-        onDragEnd={handleDragEnd}
-      >
-        {/* Ungrouped pool */}
-        {ungrouped.length > 0 && (
-          <DroppableGroup
-            id="ungrouped"
-            title="Unassigned Players"
-            subtitle="Drag into a group below, or use Move to on mobile"
-            members={ungrouped}
-            holeAssignments={holeAssignments}
-            isShotgun={false}
-            scorerByGroup={{}}
-            allScores={allScores}
-            showNoShow={event.status === 'active'}
-            noShowLoading={noShowLoading}
-            onNoShow={handleNoShow}
-            onClearNoShow={handleClearNoShow}
-            moveOptions={moveOptions}
-            onMoveToGroup={moveToContainer}
-          />
         )}
 
-        {/* Group columns */}
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {groupKeys.map(key => {
-            const i = parseInt(key.replace('group-', ''), 10)
-            const g = i + 1
-            const members = containers[key] ?? []
-            return (
-              <DroppableGroup
-                key={key}
-                id={key}
-                title={`Group ${g}`}
-                subtitle={`${members.length} player${members.length !== 1 ? 's' : ''}`}
-                members={members}
-                holeAssignments={holeAssignments}
-                isShotgun={isShotgun}
-                scorerByGroup={scorerByGroup}
-                groupNum={g}
-                onSetGroupHole={setGroupHole}
-                allScores={allScores}
-                showNoShow={event.status === 'active'}
-                noShowLoading={noShowLoading}
-                onNoShow={handleNoShow}
-                onClearNoShow={handleClearNoShow}
-                moveOptions={moveOptions}
-                onMoveToGroup={moveToContainer}
-                onReturnToPool={ep => {
-                  setContainers(prev => {
-                    const next = {}
-                    for (const k of Object.keys(prev)) next[k] = [...prev[k]]
-                    next[key] = next[key].filter(m => m.id !== ep.id)
-                    next['ungrouped'] = [...next['ungrouped'], ep].sort(epAlpha)
-                    persistContainers(next)
-                    return next
-                  })
-                }}
+        <DndContext
+          sensors={sensors}
+          collisionDetection={closestCenter}
+          onDragStart={locked ? undefined : handleDragStart}
+          onDragOver={locked ? undefined : handleDragOver}
+          onDragEnd={locked ? undefined : handleDragEnd}
+        >
+          <div className="grid grid-cols-[repeat(auto-fill,minmax(17.5rem,1fr))] gap-4">
+            {ungrouped.length > 0 && (
+              <GroupCard
+                id="ungrouped"
+                title="Unassigned players"
+                subtitle={`${ungrouped.length} player${ungrouped.length !== 1 ? 's' : ''}`}
+                members={ungrouped}
+                locked={locked}
+                showOpenSpot={false}
+                moveOptions={groupOptions}
+                onMove={moveToContainer}
+                noShow={noShowControls}
               />
-            )
-          })}
-        </div>
-
-        <DragOverlay>
-          {activeEp ? <DragCard ep={activeEp} /> : null}
-        </DragOverlay>
-      </DndContext>
-    </div>
-  )
-}
-
-function DroppableGroup({ id, title, subtitle, members, isShotgun, holeAssignments, scorerByGroup, groupNum, onSetGroupHole, allScores, showNoShow, noShowLoading, onNoShow, onClearNoShow, onReturnToPool, moveOptions, onMoveToGroup }) {
-  const { setNodeRef, isOver } = useDroppable({ id })
-
-  const scored = groupNum && scorerByGroup[groupNum] ? [...scorerByGroup[groupNum]].join(', ') : null
-
-  return (
-    <div
-      ref={setNodeRef}
-      className="rounded-sm border-2 transition-colors"
-      style={{ borderColor: isOver ? '#1B4332' : '#e5e7eb', background: isOver ? '#f0fdf4' : '#fff', minHeight: 80 }}
-    >
-      {/* Header */}
-      <div className="flex items-center justify-between px-4 py-3 border-b border-surface-border">
-        <div>
-          <div className="font-semibold text-ink text-sm">{title}</div>
-          <div className="text-xs text-ink-muted">{subtitle}</div>
-          {scored && <div className="text-xs text-status-active-text mt-0.5">Scored by: {scored}</div>}
-        </div>
-        {isShotgun && groupNum && (
-          <div className="flex items-center gap-1.5">
-            <label className="text-xs text-ink-muted">Hole</label>
-            <select value={holeAssignments[groupNum] ?? ''} onChange={e => onSetGroupHole(groupNum, e.target.value)} className="input py-0.5 text-xs w-20 bg-white">
-              <option value="">—</option>
-              {Array.from({ length: 18 }, (_, i) => i + 1).flatMap(h => [
-                <option key={`${h}A`} value={`${h}A`}>Hole {h}A</option>,
-                <option key={`${h}B`} value={`${h}B`}>Hole {h}B</option>,
-              ])}
-            </select>
+            )}
+            {groupKeys.map(key => {
+              const g = groupNumberOf(key)
+              const members = displayMembers(key)
+              const tee = teeFor(g)
+              return (
+                <GroupCard
+                  key={key}
+                  id={key}
+                  title={`Group ${g}`}
+                  subtitle={`${members.length} player${members.length !== 1 ? 's' : ''}`}
+                  teeTime={tee.time}
+                  headerExtra={isShotgun ? (
+                    <div className="flex shrink-0 items-center gap-1.5">
+                      {tee.time && <span className="text-sm font-semibold tabular-nums text-ink">{tee.time}</span>}
+                      <label className="text-xs text-ink-muted" htmlFor={`hole-${g}`}>Hole</label>
+                      <select
+                        id={`hole-${g}`}
+                        value={holeAssignments[g] ?? ''}
+                        onChange={e => setGroupHole(g, e.target.value)}
+                        disabled={locked}
+                        className="input h-9 w-24 bg-white py-0 text-xs"
+                      >
+                        <option value="">—</option>
+                        {Array.from({ length: 18 }, (_, i) => i + 1).flatMap(h => [
+                          <option key={`${h}A`} value={`${h}A`}>Hole {h}A</option>,
+                          <option key={`${h}B`} value={`${h}B`}>Hole {h}B</option>,
+                        ])}
+                      </select>
+                    </div>
+                  ) : null}
+                  members={members}
+                  scorerIdSet={scorerSetFor(key, members)}
+                  locked={locked}
+                  moveOptions={groupOptions}
+                  onMove={moveToContainer}
+                  onReturnToPool={returnToPool(key)}
+                  noShow={noShowControls}
+                />
+              )
+            })}
           </div>
-        )}
-      </div>
 
-      {/* Sortable members */}
-      <SortableContext items={members.map(ep => ep.id)} strategy={verticalListSortingStrategy}>
-        <div className="p-2 space-y-1">
-          {members.map(ep => (
-            <SortablePlayerCard
-              key={ep.id}
-              ep={ep}
-              isNoShow={isPlayerNoShow(ep.player_id, allScores)}
-              showNoShow={showNoShow}
-              noShowLoading={noShowLoading === ep.player_id}
-              onNoShow={() => onNoShow(ep)}
-              onClearNoShow={() => onClearNoShow(ep)}
-              onReturnToPool={onReturnToPool ? () => onReturnToPool(ep) : null}
-              moveOptions={moveOptions}
-              currentKey={id}
-              onMoveToGroup={onMoveToGroup}
-            />
-          ))}
-          {members.length === 0 && (
-            <div className="text-xs text-surface-outline text-center py-4">Drop players here</div>
-          )}
-        </div>
-      </SortableContext>
-    </div>
-  )
-}
+          <DragOverlay>
+            {activeEp ? <DragCard ep={activeEp} /> : null}
+          </DragOverlay>
+        </DndContext>
 
-function SortablePlayerCard({ ep, isNoShow, showNoShow, noShowLoading, onNoShow, onClearNoShow, onReturnToPool, moveOptions, currentKey, onMoveToGroup }) {
-  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: ep.id })
-  const style = {
-    transform: CSS.Transform.toString(transform),
-    transition,
-    opacity: isDragging ? 0.4 : 1,
-  }
-
-  return (
-    <div ref={setNodeRef} style={style} className={`flex items-center justify-between rounded-sm px-3 py-2 border ${isNoShow ? 'opacity-60 bg-surface-container border-surface-border' : 'bg-white border-surface-border hover:border-surface-border'}`}>
-      <div className="flex items-center gap-2 min-w-0">
-        <span {...attributes} {...listeners} className="cursor-grab text-surface-outline hover:text-ink-muted select-none hidden sm:inline" title="Drag to move">
-          ⠿
-        </span>
-        <div className="min-w-0">
-          <span className="text-sm font-medium text-ink">{ep.player?.first_name} {ep.player?.last_name}</span>
-          {isNoShow && <span className="ml-2 text-xs font-semibold px-1.5 py-0.5 rounded-full" style={{ background: '#fef3c7', color: '#92400e' }}>No Show</span>}
-          {ep.flight && !isNoShow && <span className="ml-1"><FlightBadge flight={ep.flight} /></span>}
-        </div>
-      </div>
-      <div className="flex items-center gap-1.5 shrink-0">
-        {moveOptions && onMoveToGroup && (
-          <select
-            value=""
-            onChange={e => { if (e.target.value) onMoveToGroup(ep, currentKey, e.target.value) }}
-            className="input py-0.5 text-xs w-28 bg-white text-ink-muted sm:hidden"
-          >
-            <option value="">Move to…</option>
-            {moveOptions.filter(o => o.key !== currentKey).map(o => (
-              <option key={o.key} value={o.key}>{o.label}</option>
-            ))}
-          </select>
-        )}
-        {showNoShow && (
-          isNoShow ? (
-            <button onClick={onClearNoShow} disabled={noShowLoading} className="text-xs px-2 py-1 rounded border border-surface-border text-ink-muted hover:bg-surface-dim disabled:opacity-40">
-              {noShowLoading ? '…' : 'Undo'}
-            </button>
-          ) : (
-            <button onClick={onNoShow} disabled={noShowLoading} className="text-xs px-2 py-1 rounded border border-surface-border text-status-upcoming-text hover:bg-status-upcoming-bg disabled:opacity-40">
-              {noShowLoading ? '…' : 'No Show'}
-            </button>
-          )
-        )}
-        {onReturnToPool && (
-          <button onClick={onReturnToPool} title="Return to pool" className="text-surface-outline hover:text-red-400 transition-colors leading-none text-base font-bold px-1">
-            ✕
-          </button>
-        )}
-      </div>
+        <p className="mt-4 text-xs text-ink-muted">
+          Flight tags: <strong className="text-ink">A</strong> = Flight A, <strong className="text-ink">B</strong> = Flight B.
+        </p>
+      </section>
     </div>
   )
 }
