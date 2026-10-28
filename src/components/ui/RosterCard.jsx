@@ -18,6 +18,7 @@
 
 import { useId, useState } from 'react'
 import { ActionButton } from './Button'
+import AmberBanner from './AmberBanner'
 
 export function formatHi(ep) {
   const n = Number(ep?.handicap_index)
@@ -49,16 +50,6 @@ export function filterPlayers(players, query) {
 
 function nameOf(ep) {
   return `${ep.player?.first_name ?? ''} ${ep.player?.last_name ?? ''}`.trim()
-}
-
-function WarnIcon() {
-  return (
-    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"
-      strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" className="shrink-0">
-      <path d="M10.3 3.9L1.8 18a2 2 0 001.7 3h17a2 2 0 001.7-3L13.7 3.9a2 2 0 00-3.4 0z" />
-      <path d="M12 9v4M12 17h.01" />
-    </svg>
-  )
 }
 
 function FlightToggle({ ep, name, useFlights, onSetFlight }) {
@@ -160,10 +151,7 @@ export default function RosterCard({
       </header>
 
       {missing > 0 && (
-        <div role="status" className="mb-4 flex items-center gap-2 rounded-sm border border-surface-border bg-status-upcoming-bg px-4 py-3 text-sm font-semibold text-status-upcoming-text">
-          <WarnIcon />
-          {missing} player{missing !== 1 ? 's' : ''} still need{missing === 1 ? 's' : ''} a flight
-        </div>
+        <AmberBanner className="mb-4 font-semibold" title={`${missing} player${missing !== 1 ? 's' : ''} still need${missing === 1 ? 's' : ''} a flight`} />
       )}
 
       {players.length === 0 ? (
