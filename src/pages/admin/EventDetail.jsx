@@ -33,6 +33,13 @@ import ExportRow from '../../components/ui/ExportRow'
 import SectionCard, { LockedSectionCard } from '../../components/ui/SectionCard'
 import HeroEmailCard from '../../components/ui/HeroEmailCard'
 import EventAdminHeader from '../../components/ui/EventAdminHeader'
+import ReadinessCard, { buildReadiness } from '../../components/ui/ReadinessCard'
+import { EventDetailsCard, ParticipantsCard, formatMoney } from '../../components/ui/OverviewCards'
+import StatTiles, { playerTiles } from '../../components/ui/StatTiles'
+import RegistrationCard from '../../components/ui/RegistrationCard'
+import FlightsTeesCard from '../../components/ui/FlightsTeesCard'
+import RosterCard from '../../components/ui/RosterCard'
+import PhotosCard from '../../components/ui/PhotosCard'
 import { atLimit, getLimit, nextTier, TIER_LABELS } from '../../lib/features'
 import { BUY_IN_ELIGIBLE_KEYS, OPT_IN_GAME_LABELS, optInAmount, isBuyInEnabled, baseSideGameKey, isPerFlight } from '../../lib/sideGames'
 
@@ -130,10 +137,19 @@ export default function EventDetail() {
   const [tglLocked,      setTglLocked]      = useState(false)
   const [loading,        setLoading]        = useState(true)
   const [headerEditOpen, setHeaderEditOpen] = useState(false)
+  const [addPlayerOpen,   setAddPlayerOpen]   = useState(false)
+  const [playerLimitOpen, setPlayerLimitOpen] = useState(false)
   const [printAsset,     setPrintAsset]     = useState(null) // 'cards' | 'tee_sheet' | 'cart_signs'
   const [searchParams,   setSearchParams]   = useSearchParams()
   const activeTab = searchParams.get('tab') ?? 'Overview'
   const setActiveTab = (tab) => setSearchParams({ tab })
+  const onPlayersTab = activeTab === 'Players'
+
+  // Same check the old in-tab button made: at the plan's player limit, show the upgrade prompt.
+  function handleAddPlayer() {
+    if (atLimit(org?.tier ?? 'free', 'players', eventPlayers.length)) setPlayerLimitOpen(true)
+    else setAddPlayerOpen(true)
+  }
 
   const load = useCallback(async () => {
     const { data: league } = await supabase.from('leagues').select('id').eq('slug', leagueSlug).single()
@@ -249,22 +265,28 @@ export default function EventDetail() {
       {/* Header */}
       <EventAdminHeader
         clubName={event.league?.name}
-        title={event.name ? event.name : `Event #${event.event_number}`}
+        title={onPlayersTab ? 'Players' : (event.name ? event.name : `Event #${event.event_number}`)}
         statusBadge={<StatusBadge status={event.status} />}
-        meta={`${event.course?.name} · ${formatDate(event.event_date)} · Entry fee $${event.entry_fee}`}
+        meta={onPlayersTab
+          ? [event.name ?? `Event #${event.event_number}`, event.course?.name, formatDate(event.event_date), event.tournament_fee > 0 ? `Entry fee ${formatMoney(event.tournament_fee)}` : null].filter(Boolean).join(' · ')
+          : [event.course?.name, formatDate(event.event_date), event.start_time ? `${formatTime(event.start_time)} start` : null].filter(Boolean).join(' · ')}
         links={[
           { href: `/${orgSlug}/${event.league?.slug}/${event.slug}/event`, label: 'Event page' },
-          ...(event.league?.org_id === import.meta.env.VITE_MIGC_ORG_ID
+          ...(!onPlayersTab && event.league?.org_id === import.meta.env.VITE_MIGC_ORG_ID
             ? [{ href: `/wager/${event.id}/board`, label: 'Wager board' }]
             : []),
         ]}
-        quietActions={
+        actions={onPlayersTab ? (
+          <Button icon="plus" onClick={handleAddPlayer}>Add player</Button>
+        ) : (
           <>
-            <ActionButton variant="ghost" onClick={() => setHeaderEditOpen(true)}>Edit event</ActionButton>
-            <ActionButton variant="ghost" onClick={handleClone}>Clone event</ActionButton>
+            {activeTab !== 'Overview' && (
+              <ActionButton variant="ghost" onClick={() => setHeaderEditOpen(true)}>Edit event</ActionButton>
+            )}
+            <ActionButton variant="ghost" onClick={handleClone}>Clone</ActionButton>
             <EventStatusControl event={event} onUpdated={load} />
           </>
-        }
+        )}
       />
       <EditEventModal open={headerEditOpen} onClose={() => setHeaderEditOpen(false)} event={event} onSaved={load} />
 
@@ -282,7 +304,7 @@ export default function EventDetail() {
                 activeTab === tab ? 'tab-active' : 'tab-inactive'
               }`}
             >
-              {tab}
+              {tab === 'Pre/Post Round' ? 'Print & share' : tab}
             </button>
           ))}
         </nav>
@@ -290,16 +312,22 @@ export default function EventDetail() {
 
       {/* Tab content */}
       {activeTab === 'Overview' && (
-        <TabOverview event={event} eventPlayers={eventPlayers} allScores={allScores} sideGames={sideGames} course={course} conflicts={conflicts} onUpdated={load} leagues={leagues} orgName={org?.name} orgSlug={orgSlug} onPrintAsset={setPrintAsset} />
+        <TabOverview event={event} eventPlayers={eventPlayers} allScores={allScores} sideGames={sideGames} course={course} conflicts={conflicts} onUpdated={load} leagues={leagues} orgName={org?.name} orgSlug={orgSlug} onPrintAsset={setPrintAsset} onGoToTab={setActiveTab} />
       )}
 
       {activeTab === 'Players' && (
-        <div className="space-y-6">
-          {hasFeature('registration') ? (
-            <div id="registrations">
-              <h3 className="text-xs font-semibold text-ink-muted uppercase tracking-widest mb-3">Registrations</h3>
-              <TabRegistrations event={event} onUpdated={load} orgId={org?.id} />
-            </div>
+        <TabFlights
+          event={event}
+          eventPlayers={eventPlayers}
+          course={course}
+          allPlayers={allPlayers}
+          onUpdated={load}
+          addModal={addPlayerOpen}
+          setAddModal={setAddPlayerOpen}
+          upgradePrompt={playerLimitOpen}
+          setUpgradePrompt={setPlayerLimitOpen}
+          registrationSlot={hasFeature('registration') ? (
+            <TabRegistrations event={event} onUpdated={load} orgId={org?.id} />
           ) : (
             <div className="flex items-center gap-3 px-4 py-3 rounded-sm text-sm" style={{ background: '#eff6ff', border: '1px solid #bfdbfe' }}>
               <svg width="16" height="16" fill="none" stroke="#1d4ed8" strokeWidth="2" viewBox="0 0 24 24" style={{ flexShrink: 0 }}>
@@ -311,11 +339,7 @@ export default function EventDetail() {
               </span>
             </div>
           )}
-          <div id="roster" className="border-t border-surface-border pt-6">
-            <h3 className="text-xs font-semibold text-ink-muted uppercase tracking-widest mb-3">Players &amp; Flights</h3>
-            <TabFlights event={event} eventPlayers={eventPlayers} course={course} allPlayers={allPlayers} onUpdated={load} />
-          </div>
-        </div>
+        />
       )}
 
       {activeTab === 'Groups' && (
@@ -649,7 +673,7 @@ function exportHandicapCSV(event, eventPlayers, allScores, course) {
 }
 
 // ─── Tab: Overview ────────────────────────────────────────────────
-function TabOverview({ event, eventPlayers, allScores, sideGames, course, conflicts, onUpdated, orgName, orgSlug, onPrintAsset }) {
+function TabOverview({ event, eventPlayers, allScores, sideGames, course, conflicts, onUpdated, orgName, orgSlug, onPrintAsset, onGoToTab }) {
   const [editModal,   setEditModal]   = useState(false)
   const [deleteModal, setDeleteModal] = useState(false)
 
@@ -664,71 +688,64 @@ function TabOverview({ event, eventPlayers, allScores, sideGames, course, confli
   return (
     <div className="space-y-4">
 
-      <Card id="event-details">
-        <CardHeader
-          title="Event Details"
-          action={
-            <div className="flex gap-2 flex-wrap">
-              <Button size="sm" variant="secondary" onClick={() => setEditModal(true)}>Edit</Button>
-              {event.status !== 'complete' && (
-                <Button size="sm" variant="danger" onClick={() => setDeleteModal(true)}>Delete</Button>
-              )}
-            </div>
-          }
-        />
-        <dl className="space-y-2 text-sm">
-          <Row label="Date"         value={formatDate(event.event_date)} />
-          <Row label="Course"       value={event.course?.name} />
-          <Row label="League"       value={event.league?.name} />
-          <Row label="Format"       value={FORMAT_LABELS[event.format] ?? event.format ?? 'Net Stroke Play'} />
-          <Row label="Holes"        value={`${event.holes_played ?? 18} holes`} />
-          <Row label="Start Time"   value={event.start_time ? formatTime(event.start_time) : '—'} />
-          {!event.shotgun_start && <Row label="Tee Interval" value={`${event.tee_time_interval_mins ?? 10} min`} />}
-          <Row label="Entry Fee"    value={`$${event.entry_fee}`} />
-          {event.tournament_fee > 0 && <Row label="Tournament Entry Fee" value={`$${Number(event.tournament_fee).toFixed(2)}`} />}
-          <Row label="Status"       value={<StatusBadge status={event.status} />} />
-        </dl>
-      </Card>
+      <EventDetailsCard
+        onEdit={() => setEditModal(true)}
+        fields={[
+          ...(event.tournament_fee > 0 ? [{ label: 'Entry fee', value: formatMoney(event.tournament_fee), helper: 'Paid by each player' }] : []),
+          { label: 'Pot contribution', value: formatMoney(event.entry_fee), helper: 'Per player, toward winnings' },
+          { label: 'Format', value: FORMAT_LABELS[event.format] ?? event.format ?? 'Net Stroke Play' },
+          { label: 'Holes', value: (event.holes_played ?? 18) === 18 ? '18 (full)' : `${event.holes_played} holes` },
+          ...(!event.shotgun_start ? [{ label: 'Tee interval', value: `${event.tee_time_interval_mins ?? 10} min` }] : []),
+          { label: 'Start time', value: event.start_time ? formatTime(event.start_time) : '—' },
+        ]}
+      />
 
-      <Card id="players-summary">
-        <CardHeader title="Participants" />
-        <dl className="space-y-2 text-sm">
-          <Row label="Total Players"  value={`${nonGuests.length}${nonGuests.length !== eventPlayers.length ? ` + ${eventPlayers.length - nonGuests.length} guest${eventPlayers.length - nonGuests.length !== 1 ? 's' : ''}` : ''}`} />
-          {(event.use_flights ?? false) && <Row label="Flight A" value={flightA} />}
-          {(event.use_flights ?? false) && <Row label="Flight B" value={flightB} />}
-          <Row label="Scores Entered" value={`${holesEntered} hole entries`} />
-          <Row label="Total Pot"      value={`$${(event.entry_fee * nonGuests.length).toFixed(2)}`} />
-        </dl>
-      </Card>
+      {event.status === 'upcoming' && (
+        <ReadinessCard
+          items={buildReadiness({ event, eventPlayers })}
+          onAction={key => {
+            if (key === 'players' || key === 'flights') onGoToTab?.('Players')
+            else scrollToId({ cover: 'cover-photo', description: 'description-field', spots: 'spots-field' }[key] ?? 'public-event')
+          }}
+        />
+      )}
+
+      <ParticipantsCard
+        onViewPlayers={() => onGoToTab?.('Players')}
+        stats={[
+          { label: 'Players', value: nonGuests.length, helper: nonGuests.length !== eventPlayers.length ? `+ ${eventPlayers.length - nonGuests.length} guest${eventPlayers.length - nonGuests.length !== 1 ? 's' : ''}` : undefined },
+          { label: 'Total pot', value: formatMoney(event.entry_fee * nonGuests.length), helper: `${nonGuests.length} × ${formatMoney(event.entry_fee)} contribution` },
+          ...((event.use_flights ?? false) ? [{ label: 'Flight A', value: flightA }, { label: 'Flight B', value: flightB }] : []),
+          ...(event.status !== 'upcoming' ? [{ label: 'Scores entered', value: holesEntered, helper: 'hole entries' }] : []),
+        ]}
+      />
 
       <Card id="public-event">
-        <CardHeader title="Public Event Page" subtitle="Additional details shown to players" />
+        <CardHeader title="Public event page" subtitle="What players see when they open the event link." />
         <EventPublicFields event={event} onUpdated={onUpdated} />
       </Card>
 
-      <Card id="cover-photo">
-        <CardHeader title="Event Cover Photo" subtitle="Shown on the public event page" />
-        <ImageUpload
-          bucket="media"
-          path={`events/${event.id}/cover`}
-          currentUrl={event.cover_image_url ?? null}
-          shape="rect"
-          label="Recommended: 1200 × 800px JPG"
-          onUploaded={async (url) => {
-            await supabase.from('events').update({ cover_image_url: url }).eq('id', event.id)
-            onUpdated()
-          }}
-          onRemoved={async () => {
-            await supabase.from('events').update({ cover_image_url: null }).eq('id', event.id)
-            onUpdated()
-          }}
-        />
-      </Card>
-
-      <Card id="event-photos">
-        <CardHeader title="Event Photos" subtitle="Upload photos from the event — shown in a gallery on the public page" />
-        <EventPhotosManager event={event} onUpdated={onUpdated} />
-      </Card>
+      <PhotosCard
+        galleryNote={event.status === 'upcoming' ? 'Add photos after the round.' : null}
+        cover={
+          <ImageUpload
+            bucket="media"
+            path={`events/${event.id}/cover`}
+            currentUrl={event.cover_image_url ?? null}
+            shape="rect"
+            label="Recommended: 1200 × 800px JPG"
+            onUploaded={async (url) => {
+              await supabase.from('events').update({ cover_image_url: url }).eq('id', event.id)
+              onUpdated()
+            }}
+            onRemoved={async () => {
+              await supabase.from('events').update({ cover_image_url: null }).eq('id', event.id)
+              onUpdated()
+            }}
+          />
+        }
+        gallery={<EventPhotosManager event={event} onUpdated={onUpdated} />}
+      />
 
       {/* Score conflicts */}
       {conflicts.length > 0 && (
@@ -753,8 +770,20 @@ function TabOverview({ event, eventPlayers, allScores, sideGames, course, confli
               </div>
             ))}
           </div>
-          <p className="text-xs text-red-500 mt-2">Use Edit Scores in the Pre/Post Round tab to review and correct the final values.</p>
+          <p className="text-xs text-red-500 mt-2">Use Edit Scores in the Print & share tab to review and correct the final values.</p>
         </Card>
+      )}
+
+      {event.status !== 'complete' && (
+        <section id="delete-event" className="flex flex-col gap-3 rounded-sm border border-red-200 bg-white p-5 sm:flex-row sm:items-center sm:justify-between sm:p-6">
+          <div>
+            <h2 className="text-base font-bold text-ink">Delete event</h2>
+            <p className="mt-0.5 text-sm text-ink-muted">Removes the event, players and scores. This can't be undone.</p>
+          </div>
+          <Button variant="secondary" className="shrink-0 !border-red-200 !text-red-600 hover:!bg-red-50" onClick={() => setDeleteModal(true)}>
+            Delete event
+          </Button>
+        </section>
       )}
 
       <EditEventModal open={editModal} onClose={() => setEditModal(false)} event={event} onSaved={onUpdated} />
@@ -788,11 +817,10 @@ function DescriptionEditor({ value, onChange, rows = 5, placeholder = 'Describe 
       <div className="flex gap-1 px-2 py-1.5 bg-surface-container border-b border-surface-border">
         <button type="button" onMouseDown={e => { e.preventDefault(); wrap('**') }}
           className="px-2 py-0.5 text-sm font-bold text-ink hover:bg-surface-high rounded"
-          title="Bold (**text**)">B</button>
+          aria-label="Bold" title="Bold (**text**)">B</button>
         <button type="button" onMouseDown={e => { e.preventDefault(); wrap('*') }}
           className="px-2 py-0.5 text-sm italic text-ink hover:bg-surface-high rounded"
-          title="Italic (*text*)">I</button>
-        <span className="text-xs text-ink-muted ml-2 self-center">Select text then click B or I</span>
+          aria-label="Italic" title="Italic (*text*)">I</button>
       </div>
       <textarea
         ref={ref}
@@ -864,82 +892,91 @@ function EventPublicFields({ event, onUpdated }) {
   }
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-5">
       {/* Description */}
-      <div>
-        <label className="label">Tournament Description</label>
+      <div id="description-field">
+        <label className="label">Tournament description</label>
         <DescriptionEditor value={description} onChange={setDescription} />
       </div>
 
       {/* Local rules */}
       <div>
-        <label className="label">Local Rules</label>
+        <label className="label">Local rules <span className="font-normal text-ink-muted">(optional)</span></label>
+        <p className="text-xs text-ink-muted mb-1.5">
+          Players get a reminder in the scoring app, plus a Local Rules section on the event page. Leave blank for none.
+        </p>
         <DescriptionEditor
           value={localRules}
           onChange={setLocalRules}
           rows={4}
           placeholder="e.g. Drops from the cart path are free within one club length. Ground under repair is marked with white lines."
         />
-        <p className="text-xs text-ink-muted mt-1">
-          Players see a warning in the scoring app with a button to read these, plus a Local Rules section on the event page. Leave blank for none.
-        </p>
       </div>
 
-      {/* Registration spots */}
-      <div className="w-40">
-        <Input
-          label="Total Registration Spots"
-          type="number"
-          min="1"
-          placeholder="e.g. 40"
-          value={spots}
-          onChange={e => setSpots(e.target.value)}
-        />
-      </div>
-
-      {/* Sponsors */}
-      <div>
-        <label className="label">Sponsors</label>
-        <div className="space-y-2 mb-3">
-          {sponsors.map((s, idx) => (
-            <div key={idx} className="bg-surface-container rounded-sm px-3 py-2 border border-surface-border space-y-2">
-              <div className="flex items-center gap-3">
-                {s.logo_url ? (
-                  <img src={s.logo_url} alt={s.name} style={{ height: 32, maxWidth: 80, objectFit: 'contain' }} />
-                ) : (
-                  <div className="text-xs text-ink-muted w-20 text-center">No logo</div>
-                )}
-                <span className="text-sm font-semibold flex-1">{s.name}</span>
-                <label className="text-xs text-fairway-600 cursor-pointer underline">
-                  {uploading ? 'Uploading…' : 'Upload logo'}
-                  <input type="file" accept="image/*" className="hidden"
-                    onChange={e => uploadSponsorLogo(e.target.files[0], idx)} />
-                </label>
-                <Button type="button" variant="ghost" size="sm" iconOnly label="Remove sponsor" className="hover:!text-red-600" onClick={() => removeSponsor(idx)}>✕</Button>
-              </div>
-              <input
-                type="url"
-                value={s.url ?? ''}
-                onChange={e => updateSponsorUrl(idx, e.target.value)}
-                placeholder="https://sponsor-website.com (optional)"
-                className="input text-xs w-full"
-              />
-            </div>
-          ))}
-        </div>
-        <div className="flex gap-2">
-          <input
-            className="input flex-1"
-            placeholder="Sponsor name…"
-            value={sponsorName}
-            onChange={e => setSponsorName(e.target.value)}
-            onKeyDown={e => e.key === 'Enter' && (e.preventDefault(), addSponsor())}
+      {/* Registration spots + Sponsors */}
+      <div className="grid gap-5 sm:grid-cols-[1fr_2fr]">
+        <div id="spots-field">
+          <Input
+            label="Registration spots"
+            type="number"
+            min="1"
+            placeholder="e.g. 40"
+            value={spots}
+            onChange={e => setSpots(e.target.value)}
           />
-          <Button size="sm" variant="secondary" onClick={addSponsor} type="button">Add</Button>
+        </div>
+
+        <div>
+          <label className="label">Sponsors</label>
+          <div className="flex gap-2">
+            <input
+              className="input flex-1"
+              placeholder="Sponsor name"
+              value={sponsorName}
+              onChange={e => setSponsorName(e.target.value)}
+              onKeyDown={e => e.key === 'Enter' && (e.preventDefault(), addSponsor())}
+            />
+            <Button variant="secondary" onClick={addSponsor} type="button">Add</Button>
+          </div>
+          {sponsors.length === 0 ? (
+            <p className="mt-1.5 text-xs text-ink-muted">No sponsors added yet.</p>
+          ) : (
+            <div className="mt-3 space-y-2">
+              {sponsors.map((s, idx) => (
+                <div key={idx} className="bg-surface-container rounded-sm px-3 py-2 border border-surface-border space-y-2">
+                  <div className="flex items-center gap-3">
+                    {s.logo_url ? (
+                      <img src={s.logo_url} alt={s.name} style={{ height: 32, maxWidth: 80, objectFit: 'contain' }} />
+                    ) : (
+                      <div className="text-xs text-ink-muted w-20 text-center">No logo</div>
+                    )}
+                    <span className="text-sm font-semibold flex-1">{s.name}</span>
+                    <label className="text-xs text-fairway-600 cursor-pointer underline">
+                      {uploading ? 'Uploading…' : 'Upload logo'}
+                      <input type="file" accept="image/*" className="hidden"
+                        onChange={e => uploadSponsorLogo(e.target.files[0], idx)} />
+                    </label>
+                    <Button type="button" variant="ghost" size="sm" iconOnly label="Remove sponsor" className="hover:!text-red-600" onClick={() => removeSponsor(idx)}>✕</Button>
+                  </div>
+                  <input
+                    type="url"
+                    value={s.url ?? ''}
+                    onChange={e => updateSponsorUrl(idx, e.target.value)}
+                    placeholder="https://sponsor-website.com (optional)"
+                    className="input text-xs w-full"
+                  />
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       </div>
 
-      <Button onClick={save} disabled={saving}>{saving ? 'Saving…' : 'Save'}</Button>
+      {/* Footer */}
+      <div className="flex flex-col gap-2 border-t border-surface-border pt-4 sm:flex-row sm:items-center sm:justify-end sm:gap-4">
+        <span className="text-xs text-ink-muted">Changes save to the public page</span>
+        <Button onClick={save} disabled={saving}>{saving ? 'Saving…' : 'Save public page'}</Button>
+      </div>
     </div>
   )
 }
@@ -1610,19 +1647,19 @@ function EventPhotosManager({ event, onUpdated }) {
   }
 
   return (
-    <div className="p-4 space-y-4">
+    <div className="space-y-3">
       {/* Toolbar */}
       <div className="flex items-center gap-3 flex-wrap">
-        <label className={`inline-flex items-center gap-2 px-4 py-2 rounded-sm border-2 border-dashed cursor-pointer text-sm font-semibold transition-colors ${uploading ? 'opacity-50 pointer-events-none border-surface-border text-ink-muted' : 'border-fairway-400 text-fairway-700 hover:bg-fairway-50'}`}>
+        <label className={`inline-flex min-h-[44px] items-center gap-2 px-4 rounded-sm border border-surface-highest bg-white cursor-pointer text-sm font-semibold text-ink transition-colors hover:bg-surface-dim ${uploading ? 'opacity-50 pointer-events-none' : ''}`}>
           <svg width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2M12 12V4m0 0L8 8m4-4l4 4"/></svg>
-          {uploading ? 'Uploading…' : 'Upload Photos'}
+          {uploading ? 'Uploading…' : 'Upload photos'}
           <input type="file" accept="image/*" multiple className="hidden" onChange={handleUpload} disabled={uploading} />
         </label>
         {photos.length > 0 && (
           <Button variant="secondary" icon="download" onClick={downloadAll}>Download all ({photos.length})</Button>
         )}
       </div>
-      <p className="text-xs text-ink-muted">JPG, PNG, HEIC · Multiple files supported</p>
+      <p className="text-xs text-ink-muted">JPG, PNG, HEIC · multiple files</p>
 
       {/* Photo grid */}
       {photos.length > 0 ? (
@@ -1654,9 +1691,7 @@ function EventPhotosManager({ event, onUpdated }) {
 }
 
 // ─── Tab: Players & Flights ────────────────────────────────────────
-function TabFlights({ event, eventPlayers, course, allPlayers, onUpdated }) {
-  const [addModal,      setAddModal]      = useState(false)
-  const [upgradePrompt, setUpgradePrompt] = useState(false)
+function TabFlights({ event, eventPlayers, course, allPlayers, onUpdated, registrationSlot = null, addModal, setAddModal, upgradePrompt, setUpgradePrompt }) {
   const [editingEp, setEditingEp] = useState(null) // ep being edited
   const org     = useOrg()
   const orgTier = org?.tier ?? 'free'
@@ -1686,11 +1721,9 @@ function TabFlights({ event, eventPlayers, course, allPlayers, onUpdated }) {
     else { toast.success('Player removed'); onUpdated() }
   }
 
-  const guests   = eventPlayers.filter(e => e.is_guest).sort(epAlpha)
   const nonGuests = eventPlayers.filter(e => !e.is_guest).sort(epAlpha)
   const flightA = nonGuests.filter(e => e.flight === 'A')
   const flightB = nonGuests.filter(e => e.flight === 'B')
-  const unassigned = nonGuests.filter(e => !e.flight)
 
   const courseTees = course?.tees ?? []
 
@@ -1715,81 +1748,27 @@ function TabFlights({ event, eventPlayers, course, allPlayers, onUpdated }) {
 
   const useFlights = event.use_flights ?? false
 
-  // Shared player row renderer — called as renderPlayerRow(ep), NOT as <PlayerRow>
-  function renderPlayerRow(ep) {
-    return (
-      <div key={ep.id} className="flex flex-col sm:flex-row sm:items-center sm:justify-between px-5 py-3 gap-2">
-        {/* Player info */}
-        <div className="flex-1 min-w-0">
-          <div className="font-medium text-sm text-ink">
-            {ep.player?.first_name} {ep.player?.last_name}
-          </div>
-          <div className="text-xs text-ink-muted flex items-center gap-2 mt-1 flex-wrap">
-            {ep.is_guest
-              ? <span className="bg-purple-100 text-purple-700 font-semibold px-2 py-0.5 rounded-full text-xs">Guest – Player Only</span>
-              : <>
-                  <span>HI: {ep.handicap_index ?? '—'}</span>
-                  {ep.adjusted_handicap_index != null && ep.adjusted_handicap_index !== ep.handicap_index && (
-                    <span className="text-status-upcoming-text">Adj: {ep.adjusted_handicap_index}</span>
-                  )}
-                  {ep.course_handicap != null && <span>CH: {ep.course_handicap}</span>}
-                  {ep.match_play_course_handicap != null && <span className="text-blue-600">MP: {ep.match_play_course_handicap}</span>}
-                </>
-            }
-            {ep.tournament_wins_prior > 0 && (
-              <span className="text-fairway-700 font-medium">{ep.tournament_wins_prior} win{ep.tournament_wins_prior !== 1 ? 's' : ''}</span>
-            )}
-          </div>
-        </div>
-        {/* Controls */}
-        <div className="flex items-center gap-2 flex-wrap">
-          <button
-            onClick={() => setEditingEp(ep)}
-            style={{ background: '#e5e7eb', color: '#374151', border: 'none', borderRadius: 4, padding: '4px 10px', fontSize: 11, cursor: 'pointer', fontWeight: 600 }}
-          >Edit</button>
-          {courseTees.length > 0 && (
-            <select
-              value={ep.tee ?? ''}
-              onChange={e => overrideTee(ep.id, e.target.value)}
-              className="input py-1 text-xs w-28"
-              title="Tee override"
-            >
-              <option value="">— Tee —</option>
-              {courseTees.map(t => (
-                <option key={t.name} value={t.name}>{t.name}</option>
-              ))}
-            </select>
-          )}
-          {useFlights && (
-            <select
-              value={ep.is_guest ? 'guest' : (ep.flight ?? '')}
-              onChange={e => overrideFlight(ep.id, e.target.value)}
-              className="input py-1 text-xs w-28"
-            >
-              <option value="">—</option>
-              <option value="A">Flight A</option>
-              <option value="B">Flight B</option>
-              <option value="guest">Guest Player</option>
-            </select>
-          )}
-          {!useFlights && (
-            <button
-              type="button"
-              onClick={() => overrideFlight(ep.id, ep.is_guest ? '' : 'guest')}
-              className={`text-xs shrink-0 px-2 py-1 rounded-full font-semibold border ${ep.is_guest ? 'bg-purple-100 text-purple-700 border-purple-300' : 'bg-surface-high text-ink-muted border-surface-border'}`}
-            >
-              Guest
-            </button>
-          )}
-          <button
-            onClick={() => removePlayer(ep.id)}
-            aria-label="Remove player"
-            className="text-red-400 hover:text-red-600 p-1"
-          >✕</button>
-        </div>
-      </div>
-    )
-  }
+  const sortedRoster = [...eventPlayers].sort(epAlpha)
+  const atPlayerLimit = atLimit(orgTier, 'players', eventPlayers.length)
+  const tiles = useFlights ? playerTiles(eventPlayers) : playerTiles(eventPlayers).slice(0, 1)
+  const teePanels = useFlights
+    ? ['A', 'B'].map(flight => {
+        const field = `tee_flight_${flight.toLowerCase()}`
+        return {
+          key: flight,
+          title: `Flight ${flight}`,
+          count: (flight === 'A' ? flightA : flightB).length,
+          value: event[field] ?? '',
+          onChange: v => saveTeeAssignment(field, v, flight),
+        }
+      })
+    : [{
+        key: 'all',
+        title: 'All players',
+        count: eventPlayers.length,
+        value: event.tee_flight_a ?? '',
+        onChange: v => saveTeeAssignment('tee_flight_a', v, null),
+      }]
 
   return (
     <div className="space-y-4">
@@ -1801,149 +1780,32 @@ function TabFlights({ event, eventPlayers, course, allPlayers, onUpdated }) {
           onSaved={() => { setEditingEp(null); onUpdated() }}
         />
       )}
-      {/* Tee Assignment — per flight when flights on, single tee when off */}
-      {courseTees.length > 0 && (
-        <Card>
-          <CardHeader
-            title="Tee Assignment"
-            subtitle={useFlights ? 'Which tees each flight plays from' : 'Which tees players play from'}
-          />
-          <div className={`grid gap-4 mt-1 ${useFlights ? 'sm:grid-cols-2' : 'max-w-xs'}`}>
-            {useFlights ? ['A', 'B'].map(flight => {
-              const field = `tee_flight_${flight.toLowerCase()}`
-              const current = event[field] ?? ''
-              return (
-                <div key={flight}>
-                  <label className="label">Flight {flight} Tee</label>
-                  <select value={current} onChange={e => saveTeeAssignment(field, e.target.value, flight)} className="input bg-white">
-                    <option value="">— Not assigned —</option>
-                    {courseTees.map(t => (
-                      <option key={t.name} value={t.name}>{t.name}{t.color ? ` (${t.color})` : ''} — Slope {t.slope} / Rating {t.rating}</option>
-                    ))}
-                  </select>
-                </div>
-              )
-            }) : (
-              <div>
-                <label className="label">Tee</label>
-                <select
-                  value={event.tee_flight_a ?? ''}
-                  onChange={e => saveTeeAssignment('tee_flight_a', e.target.value, null)}
-                  className="input bg-white"
-                >
-                  <option value="">— Not assigned —</option>
-                  {courseTees.map(t => (
-                    <option key={t.name} value={t.name}>{t.name}{t.color ? ` (${t.color})` : ''} — Slope {t.slope} / Rating {t.rating}</option>
-                  ))}
-                </select>
-              </div>
-            )}
-          </div>
-        </Card>
-      )}
 
-      <div className="flex items-center gap-3 flex-wrap">
-        <Button onClick={() => {
-          if (atLimit(orgTier, 'players', eventPlayers.length)) setUpgradePrompt(true)
-          else setAddModal(true)
-        }} variant="secondary">+ Add Player to Event</Button>
-        {eventPlayers.length > 0 && (
-          <span className="text-sm text-ink-muted">
-            {useFlights
-              ? `${nonGuests.length} players · Flight A: ${flightA.length} · Flight B: ${flightB.length}${guests.length > 0 ? ` · ${guests.length} guest${guests.length !== 1 ? 's' : ''}` : ''}`
-              : `${nonGuests.length} player${nonGuests.length !== 1 ? 's' : ''}${guests.length > 0 ? ` · ${guests.length} guest${guests.length !== 1 ? 's' : ''}` : ''}`
-            }
-          </span>
-        )}
-        {atLimit(orgTier, 'players', eventPlayers.length) && (
-          <span className="text-xs font-medium px-2.5 py-1 rounded-full" style={{ background: '#fef9c3', color: '#854d0e' }}>
+      {atPlayerLimit && (
+        <div className="flex justify-end">
+          <span className="text-xs font-medium px-2.5 py-1 rounded-full bg-status-upcoming-bg text-status-upcoming-text">
             {eventPlayers.length} / {getLimit(orgTier, 'players')} players — {TIER_LABELS[nextTier(orgTier)]} plan required
           </span>
-        )}
-      </div>
-
-      {/* Unassigned warning — only relevant when flights are on */}
-      {useFlights && unassigned.length > 0 && (
-        <Card className="overflow-hidden p-0 border-surface-border">
-          <div className="px-5 py-3 border-b border-surface-border flex items-center gap-2 bg-status-upcoming-bg">
-            <span className="text-sm font-semibold text-status-upcoming-text">⚠ Unassigned — {unassigned.length} player{unassigned.length !== 1 ? 's' : ''} need a flight</span>
-          </div>
-          <div className="divide-y divide-surface-border">
-            {unassigned.map(ep => (
-              <div key={ep.id} className="flex items-center justify-between px-5 py-3">
-                <div>
-                  <div className="font-medium text-sm text-ink">{ep.player?.first_name} {ep.player?.last_name}</div>
-                  <div className="text-xs text-ink-muted flex items-center gap-3 mt-0.5">
-                    <span>HI: {ep.handicap_index}</span>
-                    {ep.course_handicap != null && <span>CH: {ep.course_handicap}</span>}
-                  {ep.match_play_course_handicap != null && <span className="text-blue-600">MP: {ep.match_play_course_handicap}</span>}
-                  </div>
-                </div>
-                <div className="flex items-center gap-2">
-                  <select value="" onChange={e => overrideFlight(ep.id, e.target.value)} className="input py-1 text-xs w-28 border-surface-outline bg-status-upcoming-bg">
-                    <option value="">Assign flight…</option>
-                    <option value="A">Flight A</option>
-                    <option value="B">Flight B</option>
-                    <option value="guest">Guest Player</option>
-                  </select>
-                  <button onClick={() => setEditingEp(ep)} className="text-xs px-2 py-1 rounded bg-surface-high hover:bg-fairway-100 text-ink hover:text-fairway-800 font-medium">Edit HI</button>
-                  <Button variant="ghost" size="sm" iconOnly label="Remove player" className="hover:!text-red-600" onClick={() => removePlayer(ep.id)}>✕</Button>
-                </div>
-              </div>
-            ))}
-          </div>
-        </Card>
+        </div>
       )}
 
-      {/* Flight-based roster — only when flights on */}
-      {useFlights ? (
-        <>
-          {['A', 'B'].map(flight => {
-            const list = flight === 'A' ? flightA : flightB
-            if (list.length === 0 && eventPlayers.length > 0) return null
-            return (
-              <Card key={flight} className="overflow-hidden p-0">
-                <div className="px-5 py-3 border-b border-surface-border flex items-center gap-2 bg-surface-container">
-                  <FlightBadge flight={flight} />
-                  <span className="text-sm font-semibold text-ink">{list.length} players</span>
-                </div>
-                <div className="divide-y divide-surface-border">
-                  {list.map(ep => renderPlayerRow(ep))}
-                </div>
-              </Card>
-            )
-          })}
-          {guests.length > 0 && (
-            <Card className="overflow-hidden p-0">
-              <div className="px-5 py-3 border-b border-surface-border flex items-center gap-2 bg-purple-50">
-                <span className="bg-purple-100 text-purple-700 font-semibold px-2 py-0.5 rounded-full text-xs">Guests</span>
-                <span className="text-sm font-semibold text-ink">{guests.length} player{guests.length !== 1 ? 's' : ''} — playing only, excluded from bets/payouts</span>
-              </div>
-              <div className="divide-y divide-surface-border">
-                {guests.map(ep => renderPlayerRow(ep))}
-              </div>
-            </Card>
-          )}
-        </>
-      ) : (
-        /* No flights — single flat roster */
-        eventPlayers.length > 0 && (
-          <Card className="overflow-hidden p-0">
-            <div className="px-5 py-3 border-b border-surface-border bg-surface-container">
-              <span className="text-sm font-semibold text-ink">Players ({eventPlayers.length})</span>
-            </div>
-            <div className="divide-y divide-surface-border">
-              {[...eventPlayers].sort(epAlpha).map(ep => renderPlayerRow(ep))}
-            </div>
-          </Card>
-        )
+      <StatTiles tiles={tiles} />
+
+      {registrationSlot}
+
+      {courseTees.length > 0 && (
+        <FlightsTeesCard panels={teePanels} tees={courseTees} useFlights={useFlights} />
       )}
 
-      {eventPlayers.length === 0 && (
-        <Card className="text-center py-10">
-          <p className="text-ink-muted text-sm">No players added yet. Add players to this event.</p>
-        </Card>
-      )}
+      <RosterCard
+        players={sortedRoster}
+        tees={courseTees}
+        useFlights={useFlights}
+        onSetFlight={(ep, value) => overrideFlight(ep.id, value)}
+        onSetTee={(ep, value) => overrideTee(ep.id, value)}
+        onEditHi={ep => setEditingEp(ep)}
+        onRemove={ep => removePlayer(ep.id)}
+      />
 
       <AddPlayerModal
         open={addModal}
@@ -3460,7 +3322,7 @@ function TabPayoutConfig({ event, eventPlayers, course, onUpdated }) {
         <div className="flex gap-6 mt-1">
           <label className="flex items-center gap-2 cursor-pointer">
             <input type="radio" checked={payoutBasis === 'per_player'} onChange={() => setPayoutBasis('per_player')} className="accent-fairway-600" />
-            <span className="text-sm text-ink">Attendance — entry fee × players (<strong>${(event.entry_fee * totalPlayers).toFixed(2)}</strong>)</span>
+            <span className="text-sm text-ink">Attendance — pot contribution × players (<strong>${(event.entry_fee * totalPlayers).toFixed(2)}</strong>)</span>
           </label>
           <label className="flex items-center gap-2 cursor-pointer">
             <input type="radio" checked={payoutBasis === 'fixed'} onChange={() => setPayoutBasis('fixed')} className="accent-fairway-600" />
@@ -4759,10 +4621,10 @@ function EditEventModal({ open, onClose, event, onSaved }) {
           <Input label="Event #" type="number" min="1" value={eventNumber} onChange={e => setEventNumber(e.target.value)} required />
         </div>
         <div className="grid grid-cols-2 gap-4">
-          <Input label="Entry Fee ($)" type="number" step="0.01" min="0" value={entryFee} onChange={e => setEntryFee(e.target.value)} required />
-          <Input label="Tournament Entry Fee ($)" type="number" step="0.01" min="0" value={tournamentFee} onChange={e => setTournamentFee(e.target.value)} placeholder="Charged at registration" />
+          <Input label="Pot contribution ($)" type="number" step="0.01" min="0" value={entryFee} onChange={e => setEntryFee(e.target.value)} required />
+          <Input label="Entry fee ($)" type="number" step="0.01" min="0" value={tournamentFee} onChange={e => setTournamentFee(e.target.value)} placeholder="Charged at registration" />
         </div>
-        <p className="text-xs text-ink-muted -mt-2">Entry Fee drives payouts. Tournament Entry Fee is what players pay to register.</p>
+        <p className="text-xs text-ink-muted -mt-2">Pot contribution is per player, toward winnings, and drives payouts. Entry fee is what each player pays to register.</p>
 
         {/* Payment links */}
         <div className="space-y-3 bg-surface-container rounded-sm px-4 py-3">
@@ -5051,7 +4913,7 @@ function EditEventModal({ open, onClose, event, onSaved }) {
                       <span className="text-xs text-ink-muted italic">
                         {buyIn.enabled
                           ? '$ per entrant is set in the Payouts tab'
-                          : 'Included in Entry Fee ($)'}
+                          : 'Included in pot contribution ($)'}
                       </span>
                     </div>
                   )}
@@ -5088,7 +4950,7 @@ function EditEventModal({ open, onClose, event, onSaved }) {
           <div className="flex gap-4 mt-1">
             <label className="flex items-center gap-2 cursor-pointer">
               <input type="radio" name="editPayoutBasis" value="per_player" checked={payoutBasis === 'per_player'} onChange={() => setPayoutBasis('per_player')} className="accent-fairway-600" />
-              <span className="text-sm text-ink">Attendance (entry fee × players)</span>
+              <span className="text-sm text-ink">Attendance (pot contribution × players)</span>
             </label>
             <label className="flex items-center gap-2 cursor-pointer">
               <input type="radio" name="editPayoutBasis" value="fixed" checked={payoutBasis === 'fixed'} onChange={() => setPayoutBasis('fixed')} className="accent-fairway-600" />
@@ -5363,7 +5225,7 @@ function TabRegistrations({ event, onUpdated, orgId }) {
         <div className="flex items-center gap-2 flex-wrap">
           {reg.status === 'pending' && (
             <>
-              <Button size="sm" variant="primary" onClick={() => addToRoster(reg)}>
+              <Button size="sm" variant="secondary" onClick={() => addToRoster(reg)}>
                 Confirm + Add
               </Button>
               <Button size="sm" variant="ghost" onClick={() => setStatus(reg.id, 'cancelled')}>
@@ -5386,38 +5248,19 @@ function TabRegistrations({ event, onUpdated, orgId }) {
 
   return (
     <div className="space-y-4">
-      {/* Registration link */}
-      <Card>
-        <CardHeader title="Registration Link" subtitle="Share this link with players to register" />
-        <div className="flex items-center gap-2 px-4 pb-4">
-          <input readOnly value={regUrl} className="input text-xs flex-1 bg-surface-container" onFocus={e => e.target.select()} />
-          <Button size="sm" variant="secondary" onClick={() => { navigator.clipboard.writeText(regUrl); toast.success('Link copied!') }}>
-            Copy
-          </Button>
-        </div>
-        {!event.venmo_handle && !event.paypal_link && !event.zelle_handle && (
-          <p className="text-xs text-status-upcoming-text px-4 pb-3">
-            ⚠ No payment links set — players won't see a payment button after registering. Add a Venmo handle, Zelle, or PayPal link in Event Settings.
-          </p>
-        )}
-      </Card>
+      <RegistrationCard
+        url={regUrl}
+        onCopy={() => { navigator.clipboard.writeText(regUrl); toast.success('Link copied!') }}
+        pendingCount={loading ? null : pending.length}
+        notice={!event.venmo_handle && !event.paypal_link && !event.zelle_handle
+          ? "No payment links set — players won't see a payment button after registering. Add a Venmo handle, Zelle, or PayPal link in Event Settings."
+          : null}
+      >
+        <div className="divide-y divide-surface-border">{pending.map(r => <RegRow key={r.id} reg={r} />)}</div>
+      </RegistrationCard>
 
-      {/* Pending */}
-      {loading ? (
-        <div className="text-sm text-ink-muted">Loading…</div>
-      ) : (
+      {!loading && (
         <>
-          <Card>
-            <CardHeader
-              title={`Pending (${pending.length})`}
-              subtitle="Payment not yet confirmed"
-            />
-            {pending.length === 0
-              ? <p className="text-sm text-ink-muted px-4 pb-4">No pending registrations.</p>
-              : <div className="divide-y divide-surface-border px-4">{pending.map(r => <RegRow key={r.id} reg={r} />)}</div>
-            }
-          </Card>
-
           {confirmed.length > 0 && (
             <Card>
               <button
@@ -5506,6 +5349,10 @@ function groupBy(arr, key) {
     ;(acc[k] = acc[k] ?? []).push(item)
     return acc
   }, {})
+}
+
+function scrollToId(id) {
+  document.getElementById(id)?.scrollIntoView({ behavior: 'smooth', block: 'start' })
 }
 
 function formatDate(d) {

@@ -394,13 +394,13 @@ function CreateEventForm({ league, orgTier, onDone }) {
             <Input label="Start Time" type="time" value={startTime} onChange={e => setStartTime(e.target.value)} />
             <Input label="Tee Interval (min)" type="number" min="1" max="60" value={interval} onChange={e => setInterval(e.target.value)} />
           </div>
-          <Input label="Side Games / Competitions Entry Fee ($)" type="number" step="0.01" min="0" value={entryFee} onChange={e => setEntryFee(e.target.value)} required />
+          <Input label="Pot contribution ($)" type="number" step="0.01" min="0" value={entryFee} onChange={e => setEntryFee(e.target.value)} required />
           <div>
             <label className="label">Payout Pot Based On</label>
             <div className="flex gap-4 mt-1">
               <label className="flex items-center gap-2 cursor-pointer">
                 <input type="radio" name="payoutBasis" value="per_player" checked={payoutBasis === 'per_player'} onChange={() => setPayoutBasis('per_player')} className="accent-fairway-600" />
-                <span className="text-sm text-ink">Attendance (entry fee × players)</span>
+                <span className="text-sm text-ink">Attendance (pot contribution × players)</span>
               </label>
               <label className="flex items-center gap-2 cursor-pointer">
                 <input type="radio" name="payoutBasis" value="fixed" checked={payoutBasis === 'fixed'} onChange={() => setPayoutBasis('fixed')} className="accent-fairway-600" />
@@ -411,7 +411,7 @@ function CreateEventForm({ league, orgTier, onDone }) {
               <Input className="mt-2" label="Fixed Pot Total ($)" type="number" step="0.01" min="0" value={payoutFixed} onChange={e => setPayoutFixed(e.target.value)} placeholder="e.g. 500" />
             )}
           </div>
-          <Input label="Tournament Entry Fee ($)" type="number" step="0.01" min="0" value={tournamentFee} onChange={e => setTournamentFee(e.target.value)} placeholder="e.g. 25.00 (shown on registration page)" />
+          <Input label="Entry fee ($)" type="number" step="0.01" min="0" value={tournamentFee} onChange={e => setTournamentFee(e.target.value)} placeholder="e.g. 25.00 (shown on registration page)" />
 
           <div className="space-y-3">
             <div className="text-xs font-semibold text-ink-muted uppercase tracking-wide">Payment Links (optional)</div>

@@ -213,7 +213,7 @@ export default function EventPage() {
               <div className="reg-cta" style={{ marginBottom: 20, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16 }}>
                 {event.tournament_fee > 0 && (
                   <div style={{ fontSize: 22, fontWeight: 900, color: '#111827', letterSpacing: '-0.02em' }}>
-                    ${Number(event.tournament_fee).toFixed(0)}<span style={{ fontSize: 13, fontWeight: 500, color: '#6b7280' }}>/player</span>
+                    ${Number(event.tournament_fee).toFixed(0)}<span style={{ fontSize: 13, fontWeight: 500, color: '#6b7280' }}> entry fee per player</span>
                   </div>
                 )}
                 {spotsLeft !== null && spotsLeft <= 0 ? (

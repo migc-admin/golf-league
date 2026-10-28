@@ -4,6 +4,7 @@ import { useAuth } from '../hooks/useAuth'
 import { useOrg } from '../lib/OrgContext'
 import { supabase } from '../lib/supabase'
 import { TIER_LABELS } from '../lib/features'
+import { StatusBadge } from './ui/Badge'
 
 const GREEN = '#1B4332'
 const GOLD  = '#D4AF37'
@@ -25,15 +26,16 @@ const NAV_MAIN = [
 
 const EVENT_TABS = [
   { key: 'Overview',       label: 'Overview',       icon: GridIcon,      sub: [
-    { label: 'Event Details',    anchor: 'event-details'  },
+    { label: 'Readiness',        anchor: 'readiness'      },
+    { label: 'Event details',    anchor: 'event-details'  },
     { label: 'Participants',     anchor: 'players-summary' },
-    { label: 'Public Event Page',anchor: 'public-event'   },
-    { label: 'Cover Photo',      anchor: 'cover-photo'    },
+    { label: 'Public event page',anchor: 'public-event'   },
     { label: 'Photos',           anchor: 'event-photos'   },
   ]},
   { key: 'Players',        label: 'Players',         icon: UsersIcon,     sub: [
-    { label: 'Registrations',    anchor: 'registrations'  },
-    { label: 'Players & Flights',anchor: 'roster'         },
+    { label: 'Registration',     anchor: 'registration'   },
+    { label: 'Flights & tees',   anchor: 'flights-tees'   },
+    { label: 'Roster',           anchor: 'roster'         },
   ]},
   { key: 'Groups',         label: 'Groups',          icon: GroupIcon,     sub: [] },
   { key: 'Side Games',     label: 'Side Games',      icon: StarIcon,      sub: [
@@ -47,7 +49,7 @@ const EVENT_TABS = [
     { label: 'Side Games',       anchor: 'side-games'     },
     { label: 'Summary',          anchor: 'payout-summary' },
   ]},
-  { key: 'Pre/Post Round', label: 'Pre/Post Round',  icon: ClipboardIcon, sub: [
+  { key: 'Pre/Post Round', label: 'Print & share',   icon: ClipboardIcon, sub: [
     { label: 'Print Assets',     anchor: 'print-assets'   },
     { label: 'Export Scorecards',anchor: 'export-scorecards' },
     { label: 'Edit Scores',      anchor: 'edit-scores'    },
@@ -186,15 +188,18 @@ function GlobalSidebar({ org, user, profile, tier, isOwner, onSignOut, onClose }
         )}
         {/* User row */}
         <div className="flex items-center gap-3 px-3 pt-3 mt-1 border-t" style={{ borderColor: '#ebe9e4' }}>
-          <span className="w-7 h-7 rounded-full flex items-center justify-center text-xs font-semibold shrink-0"
-            style={{ background: '#eceae5', color: '#1d1d1f' }}>
-            {initials}
-          </span>
-          <div className="min-w-0 flex-1">
-            <div className="text-ink text-xs font-semibold truncate">{profile?.full_name ?? user?.email}</div>
-            <div className="text-ink-muted text-xs truncate">{user?.email}</div>
-          </div>
-          <button onClick={onSignOut} title="Sign out" className="text-ink-muted hover:text-ink transition-colors shrink-0">
+          <Link to="/admin/settings" onClick={onClose} aria-label="Account settings"
+            className="-mx-2 flex min-h-[44px] min-w-0 flex-1 items-center gap-3 rounded-sm px-2 transition-colors hover:bg-surface-dim">
+            <span className="w-7 h-7 rounded-full flex items-center justify-center text-xs font-semibold shrink-0"
+              style={{ background: '#eceae5', color: '#1d1d1f' }}>
+              {initials}
+            </span>
+            <div className="min-w-0 flex-1">
+              <div className="text-ink text-xs font-semibold truncate">{profile?.full_name ?? user?.email}</div>
+              <div className="text-ink-muted text-xs truncate">{user?.email}</div>
+            </div>
+          </Link>
+          <button onClick={onSignOut} title="Sign out" aria-label="Sign out" className="flex h-11 w-11 items-center justify-center rounded-sm text-ink-muted hover:text-ink hover:bg-surface-dim transition-colors shrink-0">
             <SignOutIcon className="w-4 h-4" />
           </button>
         </div>
@@ -217,8 +222,8 @@ function EventSidebar({ org, eventName, eventStatus, sideGameOptions = [], baseP
   }))
 
   function tabClass(key) {
-    return `flex items-center gap-2.5 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${
-      activeTab === key ? 'text-ink bg-ink/[0.05] font-semibold' : 'text-ink-muted hover:text-ink hover:bg-ink/[0.04]'
+    return `flex min-h-[44px] items-center gap-2.5 px-3 rounded-sm text-sm font-medium transition-colors ${
+      activeTab === key ? 'text-status-active-text bg-status-active-bg font-semibold' : 'text-ink-muted hover:text-ink hover:bg-surface-dim'
     }`
   }
 
@@ -237,7 +242,7 @@ function EventSidebar({ org, eventName, eventStatus, sideGameOptions = [], baseP
         <div className="text-ink font-semibold text-sm leading-snug truncate">{eventName}</div>
         {eventStatus && (
           <div className="mt-1">
-            <StatusDot status={eventStatus} />
+            <StatusBadge status={eventStatus} />
           </div>
         )}
         {onClose && (
@@ -269,7 +274,9 @@ function EventSidebar({ org, eventName, eventStatus, sideGameOptions = [], baseP
                 if (gameKey === undefined) return true
                 return activeSideGameKeys.has(gameKey)
               })
-            : sub
+            : key === 'Overview'
+              ? sub.filter(({ anchor }) => anchor !== 'readiness' || eventStatus === 'upcoming')
+              : sub
 
           return (
             <div key={key}>
@@ -289,7 +296,7 @@ function EventSidebar({ org, eventName, eventStatus, sideGameOptions = [], baseP
                       key={anchor}
                       href={`#${anchor}`}
                       onClick={onClose}
-                      className="flex items-center gap-2 pl-3 pr-3 py-1.5 rounded-md text-xs font-medium text-ink-muted hover:text-ink hover:bg-ink/[0.04] transition-colors"
+                      className="flex min-h-[44px] items-center gap-2 pl-3 pr-3 rounded-sm text-xs font-medium text-ink-muted hover:text-ink hover:bg-surface-dim transition-colors"
                     >
                       {subLabel}
                     </a>
@@ -304,40 +311,27 @@ function EventSidebar({ org, eventName, eventStatus, sideGameOptions = [], baseP
       {/* Bottom */}
       <div className="px-3 pb-4 border-t pt-3" style={{ borderColor: '#ebe9e4' }}>
         <Link to="/home" onClick={onClose}
-          className="flex items-center gap-2.5 px-3 py-2.5 rounded-lg text-sm font-medium text-ink-muted hover:text-ink hover:bg-ink/[0.04] transition-colors">
+          className="flex min-h-[44px] items-center gap-2.5 px-3 rounded-sm text-sm font-medium text-ink-muted hover:text-ink hover:bg-surface-dim transition-colors">
           <ExternalIcon className="w-4 h-4 shrink-0" />
           View Site
         </Link>
         <div className="flex items-center gap-3 px-3 pt-3 mt-1 border-t" style={{ borderColor: '#ebe9e4' }}>
-          <span className="w-7 h-7 rounded-full flex items-center justify-center text-xs font-semibold shrink-0"
-            style={{ background: '#eceae5', color: '#1d1d1f' }}>
-            {initials}
-          </span>
-          <div className="min-w-0 flex-1">
-            <div className="text-ink text-xs font-semibold truncate">{profile?.full_name ?? user?.email}</div>
-          </div>
-          <button onClick={onSignOut} title="Sign out" className="text-ink-muted hover:text-ink transition-colors shrink-0">
+          <Link to="/admin/settings" onClick={onClose} aria-label="Account settings"
+            className="-mx-2 flex min-h-[44px] min-w-0 flex-1 items-center gap-3 rounded-sm px-2 transition-colors hover:bg-surface-dim">
+            <span className="w-7 h-7 rounded-full flex items-center justify-center text-xs font-semibold shrink-0"
+              style={{ background: '#eceae5', color: '#1d1d1f' }}>
+              {initials}
+            </span>
+            <div className="min-w-0 flex-1">
+              <div className="text-ink text-xs font-semibold truncate">{profile?.full_name ?? user?.email}</div>
+            </div>
+          </Link>
+          <button onClick={onSignOut} title="Sign out" aria-label="Sign out" className="flex h-11 w-11 items-center justify-center rounded-sm text-ink-muted hover:text-ink hover:bg-surface-dim transition-colors shrink-0">
             <SignOutIcon className="w-4 h-4" />
           </button>
         </div>
       </div>
     </div>
-  )
-}
-
-function StatusDot({ status }) {
-  const map = {
-    active:   { color: '#16a34a', label: 'Active' },
-    upcoming: { color: '#b45309', label: 'Upcoming' },
-    complete: { color: '#6b7280', label: 'Complete' },
-    draft:    { color: '#6b7280', label: 'Draft' },
-  }
-  const s = map[status] ?? map.upcoming
-  return (
-    <span className="flex items-center gap-1.5 text-xs font-semibold" style={{ color: s.color }}>
-      <span className="w-1.5 h-1.5 rounded-full inline-block" style={{ background: s.color }} />
-      {s.label}
-    </span>
   )
 }
 

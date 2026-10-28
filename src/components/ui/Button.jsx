@@ -8,7 +8,7 @@
  * Renders a real <button>, or a real <a> when `href` is given. Icon-only buttons
  * (`iconOnly`) must pass `label`, which becomes the aria-label.
  * Pass `as={Link} to="..."` to render a react-router link with button styling.
- * `icon` is 'download' | 'external', shown before the label (after it with `iconAfter`).
+ * `icon` is 'download' | 'external' | 'copy' | 'plus', shown before the label (after it with `iconAfter`).
  *
  * `ActionButton` is the same component defaulting to the secondary variant; it is what
  * rows and cards on the Event Admin page use.
@@ -39,7 +39,26 @@ export function ExternalIcon({ className = '' }) {
   )
 }
 
-const ICONS = { download: DownloadIcon, external: ExternalIcon }
+export function CopyIcon({ className = '' }) {
+  return (
+    <svg className={className} width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <rect x="9" y="9" width="11" height="11" rx="2" />
+      <path d="M5 15V6a2 2 0 012-2h9" />
+    </svg>
+  )
+}
+
+export function PlusIcon({ className = '' }) {
+  return (
+    <svg className={className} width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M12 5v14M5 12h14" />
+    </svg>
+  )
+}
+
+const ICONS = { download: DownloadIcon, external: ExternalIcon, copy: CopyIcon, plus: PlusIcon }
 
 const BASE =
   'inline-flex items-center justify-center gap-2 rounded-sm border text-sm font-semibold ' +

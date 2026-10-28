@@ -179,7 +179,7 @@ Ties are resolved by fewest putts on the back nine, then front nine.`,
 
 Scorify runs skins automatically from net scores. Carried-over skins are tracked hole by hole and the final skin payouts are calculated after all scores are in.
 
-Skins can be run as a standalone game or alongside any primary scoring format. Entry fee and per-skin value are configured in the Payout tab.`,
+Skins can be run as a standalone game or alongside any primary scoring format. Pot contribution and per-skin value are configured in the Payout tab.`,
       },
       {
         q: 'Team Play (Ryder Cup / League Format)',

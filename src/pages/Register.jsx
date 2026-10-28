@@ -264,7 +264,7 @@ export default function Register() {
             <div>
               {event.tournament_fee > 0 && (
                 <div className="bg-gray-50 rounded-xl px-4 py-3 text-sm mb-2">
-                  <div className="flex justify-between font-bold text-gray-900"><span>Event Fee</span><span>${Number(event.tournament_fee).toFixed(2)}</span></div>
+                  <div className="flex justify-between font-bold text-gray-900"><span>Entry fee</span><span>${Number(event.tournament_fee).toFixed(2)}</span></div>
                 </div>
               )}
             </div>
