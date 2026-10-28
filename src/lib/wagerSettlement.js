@@ -7,7 +7,9 @@
  *   WIN   — pays bettors who picked the 1st-place (lowest net) finisher
  *   PLACE — North American pari-mutuel: pick must finish 1st OR 2nd; the pool is
  *           split 50/50 between the 1st- and 2nd-place groups; each winner gets
- *           their stake back plus a pro-rata share of their group's half of the profit
+ *           their stake back plus a pro-rata share of their group's half of the profit.
+ *           If only one of the two places has bettors, those bettors get ALL of the profit
+ *           (the whole pool is paid out). It rolls to the club only when nobody hit.
  *   MATCH — each match is its own two-way pool; winners split it pro rata, a
  *           halved match refunds every stake, no backers on the winner rolls to the club.
  *           When the event requires a winner, a tied match is decided by the tiebreakers
@@ -82,6 +84,7 @@ export function computeWagerSettlement({ active, players, scores, pairings, cour
         winResults = {
           net: net1,
           matched: true,
+          topPlayers: place1Players, // everyone tied for the lowest net (display only; no math uses it)
           bettors: winBettors.map(w => ({
             id:     w.id,
             name:   w.bettor_name,
@@ -127,8 +130,10 @@ export function computeWagerSettlement({ active, players, scores, pairings, cour
         // Profit = pool minus stakes returned to both groups
         const stakesReturned = (hasG1 ? s1 : 0) + (hasG2 ? s2 : 0)
         const profit = placePool - stakesReturned
-        // Each group gets half the profit (if the other group has no bettors, their half rolls to club)
-        const halfProfit = profit / 2
+        // Both places have bettors: each group gets half the profit. Only one place has bettors:
+        // they get all of it, so the whole pool is paid out. (Nobody hit → handled above, rolls to the club.)
+        const bothGroups = hasG1 && hasG2
+        const groupProfit = bothGroups ? profit / 2 : profit
 
         function placePayouts(bettors, groupStake, groupHalfProfit) {
           return bettors.map(w => {
@@ -149,9 +154,9 @@ export function computeWagerSettlement({ active, players, scores, pairings, cour
           net2: twoWayTieForFirst ? net1 : net2,
           twoWayTie: twoWayTieForFirst,
           matched: true,
-          g1: { players: g1Players, bettors: hasG1 ? placePayouts(g1Bettors, s1, halfProfit) : [], hasMatch: hasG1 },
-          g2: { players: g2Players, bettors: hasG2 ? placePayouts(g2Bettors, s2, halfProfit) : [], hasMatch: hasG2 },
-          halfRollsToClub: (!hasG1 || !hasG2),
+          g1: { players: g1Players, bettors: hasG1 ? placePayouts(g1Bettors, s1, groupProfit) : [], hasMatch: hasG1 },
+          g2: { players: g2Players, bettors: hasG2 ? placePayouts(g2Bettors, s2, groupProfit) : [], hasMatch: hasG2 },
+          allProfitToOneGroup: !bothGroups,
         }
       }
     }

@@ -48,6 +48,39 @@ describe('PLACE pool', () => {
   })
 })
 
+describe('PLACE pool when only one of the two places has bettors', () => {
+  // p1 finishes 1st; p2 and p3 tie for 2nd; p4 is last. Nobody bets on the 2nd-place players.
+  it('pays the whole pool: all of the profit goes to the bettors who hit, nothing rolls to the club', () => {
+    const active = [
+      bet('a', 5, { pick_2nd: 'p1' }),
+      bet('b', 5, { pick_2nd: 'p1' }),
+      bet('c', 10, { pick_2nd: 'p4' }),   // loses
+      bet('d', 5, { pick_2nd: 'p4' }),    // loses
+    ]
+    const s = settle({ active, players, scores })
+    expect(s.placePool).toBe(25)
+    expect(s.placeResults.allProfitToOneGroup).toBe(true)
+    // stakes back $10, profit $15 split by stake: $7.50 each, so each bettor is paid $12.50
+    const paid = [...s.placeResults.g1.bettors, ...s.placeResults.g2.bettors]
+    expect(paid.map(b => [b.id, b.payout])).toEqual([['a', 12.5], ['b', 12.5]])
+    expect(paid.reduce((t, b) => t + b.payout, 0)).toBe(25)
+  })
+
+  it('works the same when the only winners backed the 2nd-place finisher', () => {
+    const active = [bet('a', 10, { pick_2nd: 'p2' }), bet('c', 10, { pick_2nd: 'p4' })]
+    const s = settle({ active, players, scores })
+    expect(s.placeResults.g1.hasMatch).toBe(false)
+    expect(s.placeResults.g2.bettors.map(b => [b.id, b.payout])).toEqual([['a', 20]])
+  })
+
+  it('still splits 50/50 when both places have bettors, and rolls to the club only when nobody hit', () => {
+    const both = settle({ active: [bet('a', 10, { pick_2nd: 'p1' }), bet('b', 10, { pick_2nd: 'p2' }), bet('c', 20, { pick_2nd: 'p4' })], players, scores })
+    expect(both.placeResults.allProfitToOneGroup).toBe(false)
+    const none = settle({ active: [bet('c', 20, { pick_2nd: 'p4' })], players, scores })
+    expect(none.placeResults.matched).toBe(false)
+  })
+})
+
 describe('MATCH pools', () => {
   const pairings = [
     { id: 'm1', match_number: 1, player_a_id: 'p1', player_b_id: 'p4' }, // p1 wins comfortably
