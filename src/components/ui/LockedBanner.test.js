@@ -27,6 +27,13 @@ describe('LockedBanner', () => {
     expect(out).toMatch(/<button type="button"/)
   })
 
+  it('takes its own title and text for other pages (Payout setup)', () => {
+    const custom = html(h(LockedBanner, { onReopen: () => {}, title: 'Payout setup is locked', text: 'The event is complete, so these amounts produced the results.' }))
+    expect(custom).toContain('Payout setup is locked')
+    expect(custom).toContain('these amounts produced the results')
+    expect(custom).not.toContain('Groups and pairings')
+  })
+
   it('only calls the handler it was given (the page makes it a plain navigation)', () => {
     const calls = []
     const el = LockedBanner({ onReopen: () => calls.push('go') })

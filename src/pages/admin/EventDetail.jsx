@@ -44,6 +44,16 @@ import {
   withoutMatchSummary, pairingGroups, tiebreakBox, groupOptionLabel,
 } from '../../lib/groupsView'
 import { teeInfo } from '../../lib/playerProfile'
+import {
+  buildFlightTable, fullFieldKeys, sameAmounts, mirrorFlights, allocationSegments, allocation, parseKey,
+  tiedPrizeCount, paidSummary, money as payMoney,
+} from '../../lib/payoutView'
+import TabList from '../../components/ui/TabList'
+import PayoutResultsCard from '../../components/payout/PayoutResultsCard'
+import PotAndHolesCard from '../../components/payout/PotAndHolesCard'
+import FlightPrizesCard from '../../components/payout/FlightPrizesCard'
+import FullFieldPrizesCard from '../../components/payout/FullFieldPrizesCard'
+import AllocationBar from '../../components/payout/AllocationBar'
 import GroupCard from '../../components/ui/GroupCard'
 import MatchPairingsCard from '../../components/ui/MatchPairingsCard'
 import MatchSettingsCard from '../../components/ui/MatchSettingsCard'
@@ -163,6 +173,7 @@ export default function EventDetail() {
   const setActiveTab = (tab) => setSearchParams({ tab })
   const onPlayersTab = activeTab === 'Players'
   const onGroupsTab  = activeTab === 'Groups'
+  const onPayoutTab  = activeTab === 'Payout'
 
   // Same check the old in-tab button made: at the plan's player limit, show the upgrade prompt.
   function handleAddPlayer() {
@@ -302,7 +313,7 @@ export default function EventDetail() {
             ? [{ href: `/wager/${event.id}/board`, label: 'Wager board' }]
             : []),
         ]}
-        actions={onGroupsTab ? null : onPlayersTab ? (
+        actions={(onGroupsTab || onPayoutTab) ? null : onPlayersTab ? (
           <Button icon="plus" onClick={handleAddPlayer}>Add player</Button>
         ) : (
           <>
@@ -394,16 +405,17 @@ export default function EventDetail() {
       )}
 
       {activeTab === 'Payout' && (
-        <div className="space-y-6">
-          <div id="payout-config">
-            <h3 className="text-xs font-semibold text-ink-muted uppercase tracking-widest mb-3">Payout Config</h3>
-            <TabPayoutConfig event={event} eventPlayers={eventPlayers} course={course} onUpdated={load} />
-          </div>
-          <div id="payout-summary" className="border-t border-surface-border pt-6">
-            <h3 className="text-xs font-semibold text-ink-muted uppercase tracking-widest mb-3">Payout Summary</h3>
-            <TabPayoutSummary event={event} eventPlayers={eventPlayers} allScores={allScores} sideGames={sideGames} course={course} />
-          </div>
-        </div>
+        <PayoutPage
+          event={event}
+          eventPlayers={eventPlayers}
+          allScores={allScores}
+          sideGames={sideGames}
+          course={course}
+          onUpdated={load}
+          view={searchParams.get('view')}
+          onView={v => setSearchParams({ tab: 'Payout', view: v })}
+          onGoToOverview={() => setActiveTab('Overview')}
+        />
       )}
 
       {activeTab === 'Pre/Post Round' && (
@@ -2128,14 +2140,15 @@ function AddPlayerModal({ open, onClose, eventId, available, course, defaultTeeN
 // Groups and pairings are locked once the event is complete. Every function that changes them
 // calls this first; it re-reads the status from the database (not the page's copy) so an old
 // open tab can't sneak a change through. Tiebreak winner picks are the one allowed exception.
-async function assertGroupsEditable(eventId) {
+async function assertEventEditable(eventId, what = 'groups and pairings') {
   const { data } = await supabase.from('events').select('status').eq('id', eventId).single()
   if (isGroupsLocked(data)) {
-    toast.error('This event is complete. Re-open it to change groups and pairings.')
+    toast.error(`This event is complete. Re-open it to change ${what}.`)
     return false
   }
   return true
 }
+const assertGroupsEditable = eventId => assertEventEditable(eventId)
 
 function MatchPairingsManager({ event, eventId, eventPlayers, allScores = [], course = null, onUpdated, pairings, loadPairings, locked = false }) {
   const [saving,      setSaving]      = useState(false)
@@ -2953,7 +2966,8 @@ function DragCard({ ep }) {
 }
 
 // ─── Tab: Payout Config ───────────────────────────────────────────
-function TabPayoutConfig({ event, eventPlayers, course, onUpdated }) {
+function TabPayoutConfig({ event, eventPlayers, course, onUpdated, onGoToOverview }) {
+  const locked = isGroupsLocked(event)
   const [config,         setConfig]         = useState({})
   const [saving,         setSaving]         = useState(false)
   const [ctpHoles,       setCtpHoles]       = useState([])
@@ -2961,6 +2975,7 @@ function TabPayoutConfig({ event, eventPlayers, course, onUpdated }) {
   const [longDriveHole,  setLongDriveHole]  = useState(event.long_drive_hole ?? '')
   const [payoutBasis,    setPayoutBasis]    = useState(event.payout_basis ?? 'per_player')
   const [fixedTotal,     setFixedTotal]     = useState(event.payout_fixed_total ?? '')
+  const [different,      setDifferent]      = useState(false) // true when the flights need different amounts
 
   const nonGuestPlayers = eventPlayers.filter(e => !e.is_guest)
   const totalPlayers = nonGuestPlayers.length
@@ -3008,6 +3023,12 @@ function TabPayoutConfig({ event, eventPlayers, course, onUpdated }) {
       next[`ctp_${h}`] = existingConfig[`ctp_${h}`] ?? 0
     }
     setConfig(next)
+    // Start on "same amounts" unless the saved amounts already differ between flights.
+    const flightKeys = Object.keys(next).filter(k => {
+      const base = baseSideGameKey(k)
+      return hasFlights && flightLetterOf(k) && !(base && isBuyInEnabled(event, base))
+    })
+    setDifferent(!sameAmounts(next, buildFlightTable(flightKeys, flightLetters)))
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [eventConfigKey])
 
@@ -3031,6 +3052,7 @@ function TabPayoutConfig({ event, eventPlayers, course, onUpdated }) {
   }
 
   async function handleSave() {
+    if (!(await assertEventEditable(event.id, 'the payout setup'))) return
     setSaving(true)
     const ldHole = parseInt(longDriveHole, 10)
     const updates = {
@@ -3100,169 +3122,92 @@ function TabPayoutConfig({ event, eventPlayers, course, onUpdated }) {
     optInGamesByBase[base].push(r)
   }
 
+  // The single flight table: per-flight prizes that are not separate buy-in pots.
+  const flightRowKeys = rows.filter(r => r.flLetter && !r.isOptIn).map(r => r.key)
+  const flightTable = hasFlights ? buildFlightTable(flightRowKeys, flightLetters) : []
+  const fieldKeys = fullFieldKeys(rows.filter(r => r.isField).map(r => r.key))
+
+  function setMany(keys, v) { keys.forEach(k => setVal(k, v)) }
+  function toggleDifferent(on) {
+    setDifferent(on)
+    if (!on) setConfig(c => mirrorFlights(c, flightTable, 'A')) // back to one set of amounts: Flight A's
+  }
+
+  function addAllPar3s() {
+    const par3s = course.par_per_hole
+      .map((p, i) => ({ hole: i + 1, par: p }))
+      .filter(h => h.par === 3 && !ctpHoles.includes(h.hole))
+    par3s.forEach(h => {
+      setCtpHoles(prev => [...prev, h.hole].sort((a, b) => a - b))
+      setConfig(c => ({ ...c, [`ctp_${h.hole}`]: c[`ctp_${h.hole}`] ?? 0 }))
+    })
+  }
+
   return (
     <div className="space-y-4">
-      {/* Summary */}
-      <div className="text-sm text-ink space-y-0.5">
-        {hasFlights
-          ? <p>{flightLetters.map(l => `Flight ${l}: ${flightCounts[l]}`).join(' · ')} · Total: <strong>{totalPlayers} players</strong> · Pot: <strong className="tabular-nums">${totalPot.toFixed(2)}</strong></p>
-          : <p>Total: <strong>{totalPlayers} players</strong> · Pot: <strong className="tabular-nums">${totalPot.toFixed(2)}</strong></p>
-        }
-        <p className={`tabular-nums ${overBudget ? 'text-red-600 font-medium' : 'text-fairway-700 font-medium'}`}>
-          Allocated: ${totalAllocated.toFixed(2)}{overBudget ? ' — exceeds pot!' : ` of $${totalPot.toFixed(2)}`}
-        </p>
-      </div>
-
-      {/* Payout basis */}
-      <Card>
-        <CardHeader title="Payout Pot" subtitle="How the total prize pool is calculated" />
-        <div className="flex gap-6 mt-1">
-          <label className="flex items-center gap-2 cursor-pointer">
-            <input type="radio" checked={payoutBasis === 'per_player'} onChange={() => setPayoutBasis('per_player')} className="accent-fairway-600" />
-            <span className="text-sm text-ink">Attendance — pot contribution × players (<strong>${(event.entry_fee * totalPlayers).toFixed(2)}</strong>)</span>
-          </label>
-          <label className="flex items-center gap-2 cursor-pointer">
-            <input type="radio" checked={payoutBasis === 'fixed'} onChange={() => setPayoutBasis('fixed')} className="accent-fairway-600" />
-            <span className="text-sm text-ink">Fixed total</span>
-          </label>
-        </div>
-        {payoutBasis === 'fixed' && (
-          <div className="flex items-center gap-2 mt-3">
-            <span className="text-sm text-ink-muted">Total pot: $</span>
-            <input
-              type="number" min="0" step="1"
-              value={fixedTotal}
-              onChange={e => setFixedTotal(e.target.value)}
-              className="input py-1 text-sm w-32"
-              placeholder="e.g. 500"
-            />
-          </div>
-        )}
-      </Card>
-
-      {/* Long Drive hole */}
-      {hasLongDrive && <Card>
-        <CardHeader title="Long Drive Hole" subtitle="Designate which hole the Long Drive contest is on" />
-        <div className="flex items-center gap-3">
-          <input
-            type="number" min="1" max="18"
-            value={longDriveHole}
-            onChange={e => setLongDriveHole(e.target.value)}
-            placeholder="Hole #"
-            className="input py-1 text-sm w-24"
-          />
-          {longDriveHole && !isNaN(parseInt(longDriveHole)) && (
-            <span className="inline-flex items-center gap-1 bg-status-upcoming-bg text-status-upcoming-text text-xs font-semibold px-2.5 py-1 rounded-full">
-              Hole {longDriveHole}
-              <button onClick={() => setLongDriveHole('')} className="text-status-upcoming-text hover:text-ink ml-0.5">×</button>
-            </span>
-          )}
-        </div>
-        <p className="text-xs text-ink-muted mt-2">This hole will be highlighted on exported scorecards.</p>
-      </Card>}
-
-      {hasCtp && <Card>
-        <CardHeader title="Closest to Pin Holes" subtitle="Add the specific hole numbers for CTP contests at this course" />
-        <div className="flex flex-wrap gap-2 mb-3">
-          {ctpHoles.map(h => (
-            <span key={h} className="inline-flex items-center gap-1 bg-status-active-bg text-fairway-800 text-xs font-semibold px-2.5 py-1 rounded-full">
-              Hole {h}
-              <button onClick={() => removeCtpHole(h)} className="text-status-active-text hover:text-fairway-800 ml-0.5">×</button>
-            </span>
-          ))}
-          {ctpHoles.length === 0 && <p className="text-xs text-ink-muted">No CTP holes set. Add holes below.</p>}
-        </div>
-        <div className="flex items-center gap-2">
-          <input
-            type="number" min="1" max="18"
-            value={ctpInput}
-            onChange={e => setCtpInput(e.target.value)}
-            onKeyDown={e => e.key === 'Enter' && (e.preventDefault(), addCtpHole())}
-            placeholder="Hole #"
-            className="input py-1 text-sm w-24"
-          />
-          <Button size="sm" variant="secondary" onClick={addCtpHole}>+ Add Hole</Button>
-          {course?.par_per_hole && (
-            <button
-              className="text-xs text-fairway-600 hover:underline ml-2"
-              onClick={() => {
-                const par3s = course.par_per_hole
-                  .map((p, i) => ({ hole: i+1, par: p }))
-                  .filter(h => h.par === 3 && !ctpHoles.includes(h.hole))
-                par3s.forEach(h => {
-                  setCtpHoles(prev => [...prev, h.hole].sort((a,b) => a-b))
-                  setConfig(c => ({ ...c, [`ctp_${h.hole}`]: c[`ctp_${h.hole}`] ?? 0 }))
-                })
-              }}
-            >
-              Auto-add par-3s
-            </button>
-          )}
-        </div>
-      </Card>}
-
-      <p className="text-xs text-ink-muted">
-        All values are <strong>$ per player</strong> × player count shown in each section.
-      </p>
-
-      {/* Per-flight scoring & side games — one card per flight */}
-      {hasFlights && flightLetters.map(fl => {
-        const flRows = rows.filter(r => r.flLetter === fl && !r.isOptIn)
-        if (flRows.length === 0) return null
-        return (
-          <Card key={fl} className="overflow-hidden p-0">
-            <div className="px-4 py-2.5 bg-blue-50 border-b border-blue-100">
-              <h3 className="text-xs font-semibold text-blue-700">Flight {fl} ({flightCounts[fl] ?? 0} players)</h3>
-            </div>
-            <PayoutTable rows={flRows} onChange={setVal} colLabel={`$ per player (Flt ${fl})`} />
-          </Card>
-        )
-      })}
-
-      {/* Full field — no-flight scoring + CTP + low putts (everyone participates) */}
-      {rows.some(r => r.isField) && (
-        <Card className="overflow-hidden p-0">
-          <div className="px-4 py-2.5 bg-status-active-bg border-b border-fairway-200">
-            <h3 className="text-xs font-semibold text-status-active-text">
-              {hasFlights ? 'Full Field — Scoring & CTP' : 'All Players'} ({totalPlayers} players)
-            </h3>
-          </div>
-          <PayoutTable rows={rows.filter(r => r.isField)} onChange={setVal} colLabel="$ per player (All)" />
-        </Card>
+      {locked && (
+        <LockedBanner
+          title="Payout setup is locked"
+          text="The event is complete, so these amounts produced the results. Re-open the event to change them."
+          onReopen={onGoToOverview}
+        />
       )}
 
-      {/* Separate Buy-in games — one table per game, since a player never
-          contributes to more than one game (or more than one flight's pot
-          within a game), so each table's own total pot is the only figure
-          that means anything. */}
+      <PotAndHolesCard
+        locked={locked}
+        basis={payoutBasis} onBasis={setPayoutBasis}
+        fixedTotal={fixedTotal} onFixedTotal={setFixedTotal}
+        attendancePot={event.entry_fee * totalPlayers} potContribution={event.entry_fee} playerCount={totalPlayers}
+        hasLongDrive={hasLongDrive} longDriveHole={longDriveHole} onLongDriveHole={setLongDriveHole}
+        hasCtp={hasCtp} ctpHoles={ctpHoles} onRemoveHole={removeCtpHole}
+        ctpInput={ctpInput} onCtpInput={setCtpInput} onAddHole={addCtpHole}
+        canAddPar3s={!!course?.par_per_hole} onAddAllPar3s={addAllPar3s}
+      />
+
+      {hasFlights && (
+        <FlightPrizesCard
+          table={flightTable} flightLetters={flightLetters} flightCounts={flightCounts}
+          config={config} multiplierOf={getMultiplier} onSet={setMany}
+          different={different} onToggleDifferent={toggleDifferent} locked={locked}
+        />
+      )}
+
+      <FullFieldPrizesCard
+        keys={fieldKeys} config={config} multiplierOf={getMultiplier} totalPlayers={totalPlayers}
+        onSet={setMany} locked={locked}
+        title={hasFlights ? 'Side game prizes' : 'Prizes'} subtotalLabel={hasFlights ? 'Side games' : 'All players'}
+      />
+
+      {/* Separate Buy-in games — one table per game, since a player never contributes to more than one
+          game (or more than one flight's pot within a game), so each table's own total is the only
+          figure that means anything. */}
       {optInGameOrder.map(base => {
-        const gameRows     = optInGamesByBase[base]
+        const gameRows      = optInGamesByBase[base]
         const perFlightGame = gameRows.some(r => r.flLetter)
         const label = OPT_IN_GAME_LABELS[base] ?? base
         return (
-          <Card key={base} className="overflow-hidden p-0">
-            <div className="px-4 py-2.5 bg-status-upcoming-bg border-b border-surface-border">
-              <h3 className="text-xs font-semibold text-status-upcoming-text">
-                {label} — Separate Buy-in {perFlightGame ? '(Per Flight)' : '(Whole Group)'}
-              </h3>
-              <p className="text-xs text-status-upcoming-text/80 mt-0.5">
-                {perFlightGame
-                  ? "Each flight is its own pot, funded only by that flight's opted-in players — money is never mixed between flights, and only entrants in that flight can win it."
-                  : "One pot open to every player who opts in, regardless of flight. Count comes from the Side Games tab's opt-in roster, not the full field."}
-              </p>
+          <SectionCard
+            key={base}
+            title={`${label} · separate buy-in`}
+            subtitle={perFlightGame
+              ? "Each flight is its own pot, funded only by that flight's opted-in players. Money is never mixed between flights."
+              : "One pot open to every player who opts in, regardless of flight. The count comes from the Side Games opt-in roster."}
+          >
+            <div className="-mx-5 -mb-5 overflow-hidden border-t border-surface-border sm:-mx-6 sm:-mb-6">
+              <PayoutTable rows={gameRows} onChange={locked ? () => {} : setVal} colLabel="$ per entrant" showPerPlayerTotal={false} />
             </div>
-            <PayoutTable rows={gameRows} onChange={setVal} colLabel="$ per entrant" showPerPlayerTotal={false} />
-          </Card>
+          </SectionCard>
         )
       })}
 
-      {/* Save */}
-      <div className="flex items-center justify-between pt-2 border-t border-surface-border">
-        <p className={`text-sm tabular-nums ${overBudget ? 'text-red-600 font-medium' : 'text-fairway-700 font-medium'}`}>
-          {overBudget ? `⚠ Over budget by $${(totalAllocated - totalPot).toFixed(2)}` : `$${totalAllocated.toFixed(2)} allocated of $${totalPot.toFixed(2)}`}
-        </p>
-        <Button onClick={handleSave} loading={saving}>Save Config</Button>
-      </div>
+      <AllocationBar
+        allocated={totalAllocated}
+        pot={totalPot}
+        segments={allocationSegments(config, getMultiplier)}
+        onSave={handleSave}
+        saving={saving}
+        locked={locked}
+      />
     </div>
   )
 }
@@ -3982,98 +3927,93 @@ function TabSideGames({ event, eventPlayers, course, sideGames, sideGameEntries 
 }
 
 // ─── Tab: Payout Summary ──────────────────────────────────────────
-function TabPayoutSummary({ event, eventPlayers, allScores, sideGames, course }) {
-  if (!course || eventPlayers.length === 0) {
-    return <p className="text-sm text-ink-muted">No data available yet.</p>
-  }
-
-  const nonGuestEPs   = eventPlayers.filter(ep => !ep.is_guest)
-  const flightCounts  = {}
+// The payout results, worked out exactly as the old summary did (same engine, same inputs).
+function computePayoutResults({ event, eventPlayers, allScores, sideGames, course }) {
+  if (!course || eventPlayers.length === 0) return null
+  const nonGuestEPs  = eventPlayers.filter(ep => !ep.is_guest)
+  const flightCounts = {}
   nonGuestEPs.forEach(ep => { if (ep.flight) flightCounts[ep.flight] = (flightCounts[ep.flight] ?? 0) + 1 })
-  const leaderboards  = computeLeaderboards(nonGuestEPs, allScores, course)
-  const skinsResults  = computeAllSkins(nonGuestEPs, allScores, course)
-  const stablefordData = computeStableford(nonGuestEPs, allScores, course)
+  const leaderboards        = computeLeaderboards(nonGuestEPs, allScores, course)
+  const skinsResults        = computeAllSkins(nonGuestEPs, allScores, course)
+  const stablefordData      = computeStableford(nonGuestEPs, allScores, course)
   const stablefordGrossData = computeStableford(nonGuestEPs, allScores, course, true)
-  const blindPartnersData = computeBlindPartners(event, nonGuestEPs, allScores, course)
-  const superSkinsResult  = computeSuperSkins(event, nonGuestEPs, allScores, course)
-  const { totalPot, buyInPotTotal, byCategory, byPlayer, totalAllocated } = computePayouts(
+  const blindPartnersData   = computeBlindPartners(event, nonGuestEPs, allScores, course)
+  const superSkinsResult    = computeSuperSkins(event, nonGuestEPs, allScores, course)
+  const result = computePayouts(
     event, nonGuestEPs.length, leaderboards, sideGames, skinsResults, flightCounts, {
       stablefordData, blindPartnersData, superSkinsResult, stablefordGrossData, eventPlayers: nonGuestEPs,
     }
   )
+  return { ...result, nonGuestEPs }
+}
 
-  const playerMap = Object.fromEntries(
-    eventPlayers.map(ep => [ep.player_id, ep.player])
+// ─── Payout page: tiles, then Results | Setup ─────────────────────
+function PayoutPage({ event, eventPlayers, allScores, sideGames, course, onUpdated, view, onView, onGoToOverview }) {
+  const locked = isGroupsLocked(event)
+  const results = useMemo(
+    () => computePayoutResults({ event, eventPlayers, allScores, sideGames, course }),
+    [event, eventPlayers, allScores, sideGames, course]
   )
+  const nonGuest = eventPlayers.filter(ep => !ep.is_guest)
+  const byPlayer = results?.byPlayer ?? []
+  const byCategory = results?.byCategory ?? []
+  const totalPot = results?.totalPot ?? 0
+  const alloc = allocation(totalPot, results?.totalAllocated ?? 0)
+  const paid = paidSummary(byPlayer, nonGuest)
+
+  // Results when the event is complete or there are results; otherwise start on Setup.
+  const current = view === 'setup' || view === 'results' ? view : (locked || byPlayer.length > 0 ? 'results' : 'setup')
+
+  const nameMap = Object.fromEntries(eventPlayers.map(ep => [ep.player_id, `${ep.player?.first_name ?? ''} ${ep.player?.last_name ?? ''}`.trim()]))
+  const paidIds = new Set(byPlayer.map(p => p.playerId))
+  const noPayout = nonGuest.filter(ep => !paidIds.has(ep.player_id)).map(ep => nameMap[ep.player_id]).sort((a, b) => a.localeCompare(b))
+
+  // The lowest place paid in each ranked contest, so "2nd + 3rd combined" is worded correctly.
+  const maxRank = {}
+  for (const k of Object.keys(event.payout_config ?? {})) {
+    const p = parseKey(k)
+    if (p.rank) maxRank[p.family] = Math.max(maxRank[p.family] ?? 0, p.rank)
+  }
+
+  const tiles = [
+    { label: 'Total pot', value: payMoney(totalPot), helper: `${nonGuest.length} players × ${payMoney(event.entry_fee)}${(results?.buyInPotTotal ?? 0) > 0 ? ` + ${payMoney(results.buyInPotTotal)} buy-ins` : ''}` },
+    { label: 'Allocated', value: `${alloc.percent}%`, helper: alloc.status === 'balanced' ? `Balanced · ${payMoney(totalPot)}` : alloc.text, tone: alloc.status === 'balanced' ? 'good' : 'warn' },
+    { label: 'Players paid', value: `${paid.paid} of ${nonGuest.length}`, helper: Object.entries(paid.perFlight).map(([f, n]) => `Flight ${f} ${n}`).join(' · ') || ' ' },
+    { label: 'Ties split', value: tiedPrizeCount(byCategory), helper: 'Prizes shared equally' },
+  ]
 
   return (
-    <div className="space-y-5">
-      <div className="flex items-center justify-between">
-        <div>
-          <p className="text-lg font-bold text-ink">Total Pot: ${totalPot.toFixed(2)}</p>
-          <p className="text-sm text-ink-muted">
-            {nonGuestEPs.length} players × ${event.entry_fee}
-            {buyInPotTotal > 0 && <> + ${buyInPotTotal.toFixed(2)} separate buy-ins</>}
-          </p>
-        </div>
-      </div>
+    <div className="space-y-4">
+      <StatTiles tiles={tiles} />
 
-      {/* By player */}
-      <Card className="overflow-hidden p-0">
-        <div className="px-5 py-3 border-b border-surface-border bg-surface-container">
-          <h3 className="font-semibold text-ink text-sm">Payouts by Player</h3>
-        </div>
-        {byPlayer.length === 0
-          ? <p className="px-5 py-4 text-sm text-ink-muted">No payouts resolved yet.</p>
-          : (
-          <div className="divide-y divide-surface-border">
-            {byPlayer.map(({ playerId, total, items }) => {
-              const p = playerMap[playerId]
-              return (
-                <div key={playerId} className="px-5 py-3">
-                  <div className="flex items-center justify-between">
-                    <span className="font-medium text-sm text-ink">
-                      {p ? `${p.first_name} ${p.last_name}` : playerId}
-                    </span>
-                    <span className="font-bold text-fairway-700">${total.toFixed(2)}</span>
-                  </div>
-                  <div className="mt-1 space-y-0.5">
-                    {items.map((item, i) => (
-                      <div key={i} className="flex justify-between text-xs text-ink-muted">
-                        <span>{item.category}</span>
-                        <span>${item.amount.toFixed(2)}</span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )
-            })}
-          </div>
+      <TabList
+        label="Payout views"
+        panelId="payout-panel"
+        value={current}
+        onChange={onView}
+        lockedTabs={locked ? ['setup'] : []}
+        tabs={[{ value: 'setup', label: 'Setup' }, { value: 'results', label: 'Results' }]}
+      />
+
+      <div id="payout-panel" role="tabpanel" aria-labelledby={`tab-${current}`} className="space-y-4">
+        {current === 'results' ? (
+          results ? (
+            <PayoutResultsCard
+              byPlayer={byPlayer}
+              byCategory={byCategory}
+              nameOf={id => nameMap[id] ?? id}
+              flightOf={id => eventPlayers.find(ep => ep.player_id === id)?.flight ?? null}
+              noPayout={noPayout}
+              maxRank={maxRank}
+              longDriveHole={event.long_drive_hole ?? null}
+            />
+          ) : (
+            <p className="rounded-sm border border-surface-border bg-white p-6 text-sm text-ink-muted">No data available yet.</p>
+          )
+        ) : (
+          <TabPayoutConfig event={event} eventPlayers={eventPlayers} course={course} onUpdated={onUpdated} onGoToOverview={onGoToOverview} />
         )}
-      </Card>
-
-      {/* By category */}
-      <Card className="overflow-hidden p-0">
-        <div className="px-5 py-3 border-b border-surface-border bg-surface-container">
-          <h3 className="font-semibold text-ink text-sm">Payouts by Category</h3>
-        </div>
-        <div className="divide-y divide-surface-border">
-          {byCategory.map(cat => {
-            const p = cat.playerId ? playerMap[cat.playerId] : null
-            return (
-              <div key={cat.key} className="flex items-center justify-between px-5 py-2.5">
-                <div>
-                  <div className="text-sm text-ink">{cat.label}</div>
-                  <div className="text-xs text-ink-muted">
-                    {p ? `${p.first_name} ${p.last_name}` : '— Unresolved'}
-                  </div>
-                </div>
-                <span className="font-semibold text-sm text-ink">${cat.amount.toFixed(2)}</span>
-              </div>
-            )
-          })}
-        </div>
-      </Card>
+      </div>
     </div>
   )
 }

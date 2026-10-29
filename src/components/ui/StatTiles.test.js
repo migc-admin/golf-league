@@ -49,3 +49,16 @@ describe('StatTiles', () => {
     expect(out).not.toMatch(/\p{Extended_Pictographic}/u)
   })
 })
+
+describe('StatTiles helper text and green tone', () => {
+  it('shows a helper line under the number and a green tile for "good"', () => {
+    const out = renderToStaticMarkup(h(StatTiles, { tiles: [
+      { label: 'Total pot', value: '$798.00', helper: '19 players × $42' },
+      { label: 'Allocated', value: '100%', helper: 'Balanced · $798.00', tone: 'good' },
+    ] }))
+    expect(out).toContain('19 players × $42')
+    expect(out).toContain('Balanced · $798.00')
+    expect(out.match(/bg-status-active-bg/g)).toHaveLength(1)
+    expect(out).not.toContain('bg-status-upcoming-bg')
+  })
+})

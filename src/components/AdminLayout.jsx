@@ -49,9 +49,8 @@ const EVENT_TABS = [
     { label: 'Super Skins',     anchor: 'super-skins'    },
   ]},
   { key: 'Payout',         label: 'Payout',          icon: DollarIcon,    sub: [
-    { label: 'Config',           anchor: 'payout-config'  },
-    { label: 'Side Games',       anchor: 'side-games'     },
-    { label: 'Summary',          anchor: 'payout-summary' },
+    { label: 'Setup',            view: 'setup'          },
+    { label: 'Results',          view: 'results'        },
   ]},
   { key: 'Pre/Post Round', label: 'Print & share',   icon: ClipboardIcon, sub: [
     { label: 'Print Assets',     anchor: 'print-assets'   },
@@ -297,15 +296,28 @@ function EventSidebar({ org, eventName, eventStatus, hasMatchPlay = false, sideG
               {activeTab === key && filteredSub?.length > 0 && (
                 <div className="ml-7 mt-0.5 space-y-0.5 relative">
                   <div className="absolute top-0 bottom-0 left-[3px] border-l border-ink/[0.06]" />
-                  {filteredSub.map(({ label: subLabel, anchor }) => (
-                    <a
-                      key={anchor}
-                      href={`#${anchor}`}
-                      onClick={onClose}
-                      className="flex min-h-[44px] items-center gap-2 pl-3 pr-3 rounded-sm text-xs font-medium text-ink-muted hover:text-ink hover:bg-surface-dim transition-colors"
-                    >
-                      {subLabel}
-                    </a>
+                  {filteredSub.map(({ label: subLabel, anchor, view }) => (
+                    view ? (
+                      <button
+                        key={view}
+                        type="button"
+                        onClick={() => { setSearchParams({ tab: key, view }); onClose?.() }}
+                        className={`flex min-h-[44px] w-full items-center gap-2 rounded-sm pl-3 pr-3 text-left text-xs font-medium transition-colors ${
+                          searchParams.get('view') === view ? 'bg-status-active-bg text-status-active-text' : 'text-ink-muted hover:bg-surface-dim hover:text-ink'
+                        }`}
+                      >
+                        {subLabel}
+                      </button>
+                    ) : (
+                      <a
+                        key={anchor}
+                        href={`#${anchor}`}
+                        onClick={onClose}
+                        className="flex min-h-[44px] items-center gap-2 pl-3 pr-3 rounded-sm text-xs font-medium text-ink-muted hover:text-ink hover:bg-surface-dim transition-colors"
+                      >
+                        {subLabel}
+                      </a>
+                    )
                   ))}
                 </div>
               )}
