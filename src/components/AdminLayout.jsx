@@ -58,7 +58,10 @@ const EVENT_TABS = [
     { label: 'Edit Scores',      anchor: 'edit-scores'    },
     { label: 'Scores Export',    anchor: 'scores-export'  },
   ]},
-  { key: 'Team Play',      label: 'Team Play',       icon: ShieldIcon,    sub: [] },
+  { key: 'Team Play',      label: 'Team play',       icon: ShieldIcon,    sub: [
+    { label: 'Standings',        anchor: 'standings'        },
+    { label: 'Team selections',  anchor: 'team-selections'  },
+  ]},
 ]
 
 // Detect if we're on an event detail route: /admin/:org/:league/:event

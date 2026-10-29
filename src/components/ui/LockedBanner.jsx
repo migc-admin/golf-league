@@ -25,7 +25,7 @@ function LockIcon() {
 const DEFAULT_TITLE = 'Groups and pairings are locked'
 const DEFAULT_TEXT = 'The event is complete. Re-open it to make changes. Tiebreak winners can still be set.'
 
-export default function LockedBanner({ onReopen, title = DEFAULT_TITLE, text = DEFAULT_TEXT, className = '' }) {
+export default function LockedBanner({ onReopen, title = DEFAULT_TITLE, text = DEFAULT_TEXT, buttonLabel = 'Re-open on Overview', className = '' }) {
   return (
     <div
       role="status"
@@ -38,7 +38,7 @@ export default function LockedBanner({ onReopen, title = DEFAULT_TITLE, text = D
           <p className="text-xs">{text}</p>
         </div>
       </div>
-      <ActionButton className="shrink-0 !text-ink" onClick={onReopen}>Re-open on Overview</ActionButton>
+      <ActionButton className="shrink-0 !text-ink" onClick={onReopen}>{buttonLabel}</ActionButton>
     </div>
   )
 }

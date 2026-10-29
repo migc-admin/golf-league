@@ -54,6 +54,10 @@ import PotAndHolesCard from '../../components/payout/PotAndHolesCard'
 import FlightPrizesCard from '../../components/payout/FlightPrizesCard'
 import FullFieldPrizesCard from '../../components/payout/FullFieldPrizesCard'
 import AllocationBar from '../../components/payout/AllocationBar'
+import { computeEventTglResults } from '../../lib/engines/tglEvent'
+import { lockState, standingsRows, teamTiles, teamSelection, selectionBlock, TEAM_SIZE } from '../../lib/teamPlayView'
+import StandingsCard from '../../components/team-play/StandingsCard'
+import TeamSelectionsCard from '../../components/team-play/TeamSelectionsCard'
 import GroupCard from '../../components/ui/GroupCard'
 import MatchPairingsCard from '../../components/ui/MatchPairingsCard'
 import MatchSettingsCard from '../../components/ui/MatchSettingsCard'
@@ -174,6 +178,7 @@ export default function EventDetail() {
   const onPlayersTab = activeTab === 'Players'
   const onGroupsTab  = activeTab === 'Groups'
   const onPayoutTab  = activeTab === 'Payout'
+  const onTeamTab    = activeTab === 'Team Play'
 
   // Same check the old in-tab button made: at the plan's player limit, show the upgrade prompt.
   function handleAddPlayer() {
@@ -313,7 +318,7 @@ export default function EventDetail() {
             ? [{ href: `/wager/${event.id}/board`, label: 'Wager board' }]
             : []),
         ]}
-        actions={(onGroupsTab || onPayoutTab) ? null : onPlayersTab ? (
+        actions={(onGroupsTab || onPayoutTab || onTeamTab) ? null : onPlayersTab ? (
           <Button icon="plus" onClick={handleAddPlayer}>Add player</Button>
         ) : (
           <>
@@ -449,6 +454,7 @@ export default function EventDetail() {
           tglSelections={tglSelections}
           tglLocked={tglLocked}
           onUpdated={load}
+          onGoToOverview={() => setActiveTab('Overview')}
         />
       )}
 
@@ -5055,7 +5061,7 @@ const FORMAT_LABELS = {
 // ─── TGL Manager ─────────────────────────────────────────────────────────────
 // Manage TGL teams for this league and select 2 players per team for this event.
 
-function TGLManager({ event, eventPlayers, allScores, course, tglTeams, tglMembers, tglSelections, tglLocked, onUpdated }) {
+function TGLManager({ event, eventPlayers, allScores, course, tglTeams, tglMembers, tglSelections, tglLocked, onUpdated, onGoToOverview }) {
   const [showTeamModal,  setShowTeamModal]  = useState(false)
   const [showMemberModal,setShowMemberModal]= useState(false)
   const [selectedTeam,   setSelectedTeam]   = useState(null)
@@ -5063,48 +5069,37 @@ function TGLManager({ event, eventPlayers, allScores, course, tglTeams, tglMembe
   const [newTeamColor,   setNewTeamColor]   = useState('#16a34a')
   const [saving,         setSaving]         = useState(false)
 
+  // Selections can't change once the event is complete or the pre-round lock is on. Every function that
+  // changes them re-reads both from the database first, so an old open tab can't sneak a change through.
+  async function selectionsEditable({ allowWhenLocked = false } = {}) {
+    const [{ data: ev }, { data: lock }] = await Promise.all([
+      supabase.from('events').select('status').eq('id', event.id).single(),
+      supabase.from('tgl_event_locks').select('event_id').eq('event_id', event.id).maybeSingle(),
+    ])
+    const state = lockState(ev, !!lock)
+    if (state.reason === 'complete' || (state.locked && !allowWhenLocked)) {
+      toast.error(selectionBlock({ lock: state }))
+      return false
+    }
+    return true
+  }
+
   async function lockSelections() {
+    if (!(await selectionsEditable())) return
     await supabase.from('tgl_event_locks').insert({ event_id: event.id })
     onUpdated()
-    toast.success('TGL selections locked for this event')
+    toast.success('Team selections locked for this event')
   }
 
   async function unlockSelections() {
+    if (!(await selectionsEditable({ allowWhenLocked: true }))) return // refused when the event is complete
     await supabase.from('tgl_event_locks').delete().eq('event_id', event.id)
     onUpdated()
-    toast.success('TGL selections unlocked')
+    toast.success('Team selections unlocked')
   }
 
-  // Compute event results if scores exist
-  const eventResults = (() => {
-    if (!course || !allScores.length || !tglTeams.length) return null
-    try {
-      const lb = computeLeaderboards(eventPlayers, allScores, course)
-      const epMap = Object.fromEntries(eventPlayers.map(ep => [ep.player_id, ep]))
-
-      const attachPlayer = r => ({ ...r, player: epMap[r.player_id]?.player ?? null })
-
-      // Score TGL points per-flight so Flight A competes within Flight A, etc.
-      const rankedA = (lb.full?.A ?? []).map(attachPlayer)
-      const rankedB = (lb.full?.B ?? []).map(attachPlayer)
-
-      // Field size = enrolled players per flight, so missing/unassigned players
-      // don't shrink the denominator and deflate everyone else's points.
-      const hasFlights = eventPlayers.some(ep => ep.flight === 'A' || ep.flight === 'B')
-      const enrolledA = hasFlights ? eventPlayers.filter(ep => ep.flight === 'A').length : eventPlayers.length
-      const enrolledB = eventPlayers.filter(ep => ep.flight === 'B').length
-      const pointsA = rankedA.length ? assignTGLPoints(rankedA, Math.max(rankedA.length, enrolledA)) : {}
-      const pointsB = rankedB.length ? assignTGLPoints(rankedB, Math.max(rankedB.length, enrolledB)) : {}
-      const combinedPoints = { ...pointsA, ...pointsB }
-
-      const allRanked = [...rankedA, ...rankedB]
-      if (!allRanked.length) return null
-
-      return computeTGLEventResults(allRanked, tglSelections, tglTeams, tglMembers, combinedPoints)
-    } catch {
-      return null
-    }
-  })()
+  // Compute event results if scores exist (the same calculation the season view reuses)
+  const eventResults = computeEventTglResults({ eventPlayers, allScores, course, tglSelections, tglTeams, tglMembers })
 
   async function createTeam() {
     if (!newTeamName.trim()) return
@@ -5129,14 +5124,16 @@ function TGLManager({ event, eventPlayers, allScores, course, tglTeams, tglMembe
 
   // Select / deselect a player for an event slot on a team
   async function toggleEventSelection(teamId, playerId) {
+    if (!(await selectionsEditable())) return
     const existing = tglSelections.find(s => s.team_id === teamId && s.player_id === playerId)
     if (existing) {
       await supabase.from('tgl_event_selections').delete().eq('id', existing.id)
     } else {
+      if (!eventPlayers.some(ep => ep.player_id === playerId && !ep.is_guest)) { toast.error(selectionBlock({ lock: { locked: false }, registered: false })); return }
       // Check limit: max 2 per team per event (only count members on the team roster)
       const teamMemberIds = new Set(tglMembers.filter(m => m.team_id === teamId).map(m => m.player_id))
       const teamCount = tglSelections.filter(s => s.team_id === teamId && teamMemberIds.has(s.player_id)).length
-      if (teamCount >= 2) { toast.error('Max 2 players per team per event'); return }
+      if (teamCount >= TEAM_SIZE) { toast.error('Max 2 players per team per event'); return }
       // Check player not already on another team for this event
       const conflict = tglSelections.find(s => s.player_id === playerId && s.team_id !== teamId)
       if (conflict) { toast.error('Player already selected for another team this event'); return }
@@ -5149,166 +5146,60 @@ function TGLManager({ event, eventPlayers, allScores, course, tglTeams, tglMembe
     onUpdated()
   }
 
+  async function removeOtherSelection(selectionId) {
+    if (!(await selectionsEditable())) return
+    await supabase.from('tgl_event_selections').delete().eq('id', selectionId)
+    onUpdated()
+  }
+
+  const lock = lockState(event, tglLocked)
+  const registeredIds = new Set(eventPlayers.filter(ep => !ep.is_guest).map(ep => ep.player_id))
+  const rows = standingsRows({ eventResults, tglTeams })
+  const cards = rows.map(r => ({
+    team: r.team,
+    rank: r.rank,
+    points: r.points,
+    sel: teamSelection({
+      team: r.team,
+      members: tglMembers.filter(m => m.team_id === r.team.id),
+      selections: tglSelections, allSelections: tglSelections, teams: tglTeams,
+      registeredIds, pointsByPlayer: eventResults?.playerPoints, lock,
+    }),
+  }))
+  const selectedCount = cards.reduce((n, c) => n + c.sel.count, 0)
+  const tiles = teamTiles({ rows, selectedCount, final: event.status === 'complete' })
+
   return (
-    <div className="space-y-6">
-      {/* Teams header */}
-      <div className="flex items-center justify-between gap-4">
-        <div>
-          <div className="flex items-center gap-2">
-            <h3 className="text-sm font-semibold text-ink">Team Play</h3>
-            {tglLocked && (
-              <span className="text-xs bg-status-active-bg text-status-active-text font-semibold px-2 py-0.5 rounded-full">
-                Locked
-              </span>
-            )}
-          </div>
-          <p className="text-xs text-ink-muted mt-0.5">
-            {tglLocked
-              ? 'Selections are locked. Unlock to make changes.'
-              : 'Select 2 players per team for this event, then submit to lock.'}
-          </p>
-        </div>
-        <div className="flex gap-2 shrink-0">
-          {!tglLocked && <Button size="sm" variant="secondary" onClick={() => setShowTeamModal(true)}>+ New Team</Button>}
-          {tglLocked ? (
-            <Button size="sm" variant="secondary" onClick={unlockSelections}>Unlock</Button>
-          ) : (
-            <Button size="sm" onClick={lockSelections} disabled={tglSelections.length === 0}>
-              Submit Selections
-            </Button>
-          )}
-        </div>
-      </div>
+    <div className="space-y-4">
+      <StatTiles tiles={tiles} />
 
-      {tglTeams.length === 0 && (
-        <p className="text-sm text-ink-muted italic">No teams yet. Create up to 4 teams for this league.</p>
+      <StandingsCard rows={rows} />
+
+      {lock.locked && (
+        <LockedBanner
+          title="Team selections are locked"
+          text={lock.reason === 'complete'
+            ? 'The event is complete. Re-open it to change who played for each team.'
+            : 'Unlock to change who plays for each team.'}
+          buttonLabel={lock.reason === 'complete' ? 'Re-open on Overview' : 'Unlock selections'}
+          onReopen={lock.reason === 'complete' ? onGoToOverview : unlockSelections}
+        />
       )}
 
-      {/* Team cards */}
-      <div className="grid gap-4 sm:grid-cols-2">
-        {tglTeams.map(team => {
-          const members = tglMembers.filter(m => m.team_id === team.id)
-          const memberIds = new Set(members.map(m => m.player_id))
-          const selected = tglSelections.filter(s => s.team_id === team.id && memberIds.has(s.player_id))
-          const eventPoints = eventResults?.teamResults?.find(r => r.team.id === team.id)?.teamPoints ?? null
-
-          return (
-            <div key={team.id} className="border border-surface-border rounded-sm overflow-hidden">
-              {/* Team header bar */}
-              <div className="flex items-center justify-between px-4 py-3" style={{ backgroundColor: team.color + '22', borderBottom: `3px solid ${team.color}` }}>
-                <div className="flex items-center gap-2">
-                  <span className="w-3 h-3 rounded-full inline-block" style={{ backgroundColor: team.color }} />
-                  <span className="font-semibold text-ink text-sm">{team.name}</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  {eventPoints !== null && (
-                    <span className="text-xs font-medium text-ink bg-white rounded-full px-2 py-0.5 border">
-                      {eventPoints % 1 === 0 ? eventPoints : eventPoints.toFixed(1)} pts
-                    </span>
-                  )}
-                  {!tglLocked && (
-                    <Button variant="ghost" size="sm" onClick={() => { setSelectedTeam(team); setShowMemberModal(true) }}>Roster</Button>
-                  )}
-                  {!tglLocked && (
-                    <Button variant="ghost" size="sm" iconOnly label="Delete team" className="hover:!text-red-600" onClick={() => deleteTeam(team.id)}>✕</Button>
-                  )}
-                </div>
-              </div>
-
-              {/* Event selections */}
-              <div className="p-3">
-                <p className="text-xs font-medium text-ink-muted mb-2">Playing this event ({selected.length}/2):</p>
-                {members.length === 0 ? (
-                  <p className="text-xs text-ink-muted italic">No roster members yet.</p>
-                ) : (
-                  <div className="space-y-1">
-                    {members.map(m => {
-                      const isSelected = selected.some(s => s.player_id === m.player_id)
-                      const conflictSel = !isSelected ? tglSelections.find(s => s.player_id === m.player_id && s.team_id !== team.id) : null
-                      const conflictTeam = conflictSel ? tglTeams.find(t => t.id === conflictSel.team_id) : null
-                      const onAnotherTeam = !!conflictSel
-                      return (
-                        <div key={m.player_id} className={`flex items-center gap-2 text-sm rounded px-2 py-1 ${onAnotherTeam ? 'bg-status-upcoming-bg' : 'hover:bg-surface-dim'}`}>
-                          <input
-                            type="checkbox"
-                            checked={isSelected}
-                            disabled={tglLocked || (!isSelected && selected.length >= 2 && !onAnotherTeam)}
-                            onChange={() => !tglLocked && toggleEventSelection(team.id, m.player_id)}
-                            className="rounded text-status-active-text cursor-pointer"
-                          />
-                          <span className={isSelected ? 'font-medium text-ink' : onAnotherTeam ? 'text-status-upcoming-text' : 'text-ink'}>
-                            {m.player?.first_name} {m.player?.last_name}
-                          </span>
-                          {onAnotherTeam && (
-                            <span className="ml-auto text-xs text-status-upcoming-text font-medium">
-                              on {conflictTeam?.name ?? 'another team'} —{' '}
-                              <button
-                                className="underline hover:text-ink"
-                                onClick={async () => {
-                                  await supabase.from('tgl_event_selections').delete().eq('id', conflictSel.id)
-                                  onUpdated()
-                                }}
-                              >
-                                remove
-                              </button>
-                            </span>
-                          )}
-                          {isSelected && eventResults && (() => {
-                            const pp = eventResults.playerPoints?.[m.player_id]
-                            return pp != null ? (
-                              <span className="ml-auto text-xs text-ink-muted">
-                                {pp % 1 === 0 ? pp : pp.toFixed(1)} pts
-                              </span>
-                            ) : null
-                          })()}
-                        </div>
-                      )
-                    })}
-                  </div>
-                )}
-              </div>
-            </div>
-          )
-        })}
-      </div>
-
-      {/* Event results summary */}
-      {eventResults && (
-        <div className="border border-surface-border rounded-sm overflow-hidden">
-          <div className="bg-surface-container px-4 py-2 border-b border-surface-border">
-            <span className="text-xs font-semibold text-ink-muted uppercase tracking-widest">Event Team Play Scores</span>
+      <TeamSelectionsCard
+        cards={cards}
+        locked={lock.locked}
+        headerAction={(
+          <div className="flex flex-wrap gap-2">
+            <Button variant="secondary" onClick={() => setShowTeamModal(true)}>New team</Button>
+            <Button onClick={lockSelections} disabled={tglSelections.length === 0}>Lock selections</Button>
           </div>
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="text-xs text-ink-muted border-b border-surface-border">
-                <th className="text-left px-4 py-2">Rank</th>
-                <th className="text-left px-4 py-2">Team</th>
-                <th className="text-left px-4 py-2">Players</th>
-                <th className="text-right px-4 py-2">Pts</th>
-              </tr>
-            </thead>
-            <tbody>
-              {eventResults.teamResults.map(tr => (
-                <tr key={tr.team.id} className="border-b border-surface-border last:border-0">
-                  <td className="px-4 py-2 font-semibold text-ink">#{tr.rank}</td>
-                  <td className="px-4 py-2">
-                    <div className="flex items-center gap-2">
-                      <span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: tr.team.color }} />
-                      <span className="font-medium">{tr.team.name}</span>
-                    </div>
-                  </td>
-                  <td className="px-4 py-2 text-ink text-xs">
-                    {tr.selectedPlayers.map(p => `${p.name} (${p.points % 1 === 0 ? p.points : p.points.toFixed(1)})`).join(', ') || '—'}
-                  </td>
-                  <td className="px-4 py-2 text-right font-bold text-ink">
-                    {tr.teamPoints % 1 === 0 ? tr.teamPoints : tr.teamPoints.toFixed(1)}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
+        )}
+        onToggle={toggleEventSelection}
+        onRemoveOther={removeOtherSelection}
+        onRoster={team => { setSelectedTeam(team); setShowMemberModal(true) }}
+        onDeleteTeam={team => deleteTeam(team.id)}
+      />
 
       {/* New Team Modal */}
       {showTeamModal && (
