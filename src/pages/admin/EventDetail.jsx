@@ -48,6 +48,10 @@ import GroupCard from '../../components/ui/GroupCard'
 import MatchPairingsCard from '../../components/ui/MatchPairingsCard'
 import MatchSettingsCard from '../../components/ui/MatchSettingsCard'
 import LockedBanner from '../../components/ui/LockedBanner'
+import WinnerField from '../../components/side-games/WinnerField'
+import LongDriveCard from '../../components/side-games/LongDriveCard'
+import ClosestToPinCard from '../../components/side-games/ClosestToPinCard'
+import { buildSideGamesPlan, withOverrides, eligiblePlayers, winnerValue } from '../../lib/sideGamesView'
 import PhotosCard from '../../components/ui/PhotosCard'
 import { atLimit, getLimit, nextTier, TIER_LABELS } from '../../lib/features'
 import { BUY_IN_ELIGIBLE_KEYS, OPT_IN_GAME_LABELS, optInAmount, isBuyInEnabled, baseSideGameKey, isPerFlight } from '../../lib/sideGames'
@@ -274,7 +278,9 @@ export default function EventDetail() {
         <span>/</span>
         <Link to="/admin/leagues" className="hover:text-ink">Leagues</Link>
         <span>/</span>
-        <span className="text-ink font-medium">{event.name ?? `Event #${event.event_number}`}</span>
+        <button type="button" onClick={() => setActiveTab('Overview')} className="hover:text-ink">{event.name ?? `Event #${event.event_number}`}</button>
+        <span>/</span>
+        <span className="text-ink font-medium">{TAB_TITLES[activeTab] ?? activeTab}</span>
       </nav>
 
       {/* Header */}
@@ -383,6 +389,7 @@ export default function EventDetail() {
           onUpdated={load}
           orgSlug={orgSlug}
           leagueSlug={leagueSlug}
+          onGoToTab={setActiveTab}
         />
       )}
 
@@ -3543,7 +3550,7 @@ function BlindPartnersCard({ event, eventPlayers, optedInIds = [], onUpdated }) 
 }
 
 // ─── Tab: Side Games (opt-ins + draw + winner entry) ─────────────────────────
-function TabSideGamesMain({ event, eventPlayers, course, sideGames, onUpdated, orgSlug, leagueSlug }) {
+function TabSideGamesMain({ event, eventPlayers, course, sideGames, onUpdated, orgSlug, leagueSlug, onGoToTab }) {
   const sides   = event.side_game_options ?? []
   const hasSideGames = sides.length > 0 || (event.custom_competitions ?? []).some(c => c?.trim())
   const optInUrl = `${window.location.origin}/${orgSlug}/${event.league?.slug ?? leagueSlug}/${event.slug}/opt-in`
@@ -3791,7 +3798,6 @@ function TabSideGamesMain({ event, eventPlayers, course, sideGames, onUpdated, o
       {/* ── Winner entry ─────────────────────────────────────────── */}
       {hasSideGames && (
         <div>
-          <h3 className="text-xs font-semibold text-ink-muted uppercase tracking-widest mb-3">Winner Entry</h3>
           <TabSideGames
             event={event}
             eventPlayers={eventPlayers}
@@ -3799,6 +3805,7 @@ function TabSideGamesMain({ event, eventPlayers, course, sideGames, onUpdated, o
             sideGames={sideGames}
             sideGameEntries={entries}
             onUpdated={onUpdated}
+            onGoToTab={onGoToTab}
           />
         </div>
       )}
@@ -3806,260 +3813,171 @@ function TabSideGamesMain({ event, eventPlayers, course, sideGames, onUpdated, o
   )
 }
 
-function TabSideGames({ event, eventPlayers, course, sideGames, sideGameEntries = {}, onUpdated }) {
-  // Only show CTP holes that were explicitly configured in Payout Config
-  const ctpConfigHoles = Object.keys(event.payout_config ?? {})
-    .filter(k => k.startsWith('ctp_'))
-    .map(k => parseInt(k.replace('ctp_', ''), 10))
-    .sort((a, b) => a - b)
-
-  const par3Holes = ctpConfigHoles.map(h => ({ hole: h }))
-
-  // Super CTP: all par 3s available to select from; admin designates one hole
-  const allPar3s = (course?.par_per_hole ?? [])
-    .map((p, i) => ({ hole: i + 1, par: p }))
-    .filter(h => h.par === 3)
+function TabSideGames({ event, eventPlayers, course, sideGames, sideGameEntries = {}, onUpdated, onGoToTab }) {
+  const sides = event.side_game_options ?? []
+  const hasSuperCtp = sides.some(s => s === 'super_ctp' || s.startsWith('super_ctp_'))
+  const hasBlindPartners = sides.some(s => s === 'blind_partners' || s.startsWith('blind_partners_'))
+  const hasSuperSkins = sides.some(s => s === 'super_skins' || s.startsWith('super_skins_'))
+  const customCompetitions = (event.custom_competitions ?? []).filter(c => c?.trim())
   const superCtpDesignatedHole = event.super_ctp_hole ?? null
 
-  const flightA = eventPlayers.filter(ep => ep.flight === 'A')
-  const flightB = eventPlayers.filter(ep => ep.flight === 'B')
-
-  async function setWinner(gameType, holeNumber, playerId, flight) {
-    const resolvedId = playerId === 'NO_WINNER' ? null : (playerId || null)
-    playerId = resolvedId
+  // Saved winners are stored exactly as before (one side_games row per field). Returns an error or null.
+  async function persistWinner(gameType, holeNumber, value, flight) {
     const existing = sideGames.find(
       g => g.game_type === gameType
         && g.hole_number === (holeNumber ?? null)
         && (flight ? g.flight === flight : true)
     )
-    if (existing) {
-      const { error } = await supabase.from('side_games')
-        .update({ winner_player_id: playerId || null })
-        .eq('id', existing.id)
-      if (error) toast.error(error.message)
-      else onUpdated()
-    } else {
-      const { error } = await supabase.from('side_games').insert({
-        event_id:         event.id,
-        game_type:        gameType,
-        hole_number:      holeNumber ?? null,
-        winner_player_id: playerId || null,
-        flight:           flight ?? 'overall',
-      })
-      if (error) toast.error(error.message)
-      else onUpdated()
+    // The empty "Select winner" choice clears the field: the saved row is removed.
+    if (value === '') {
+      if (!existing) return null
+      const { error } = await supabase.from('side_games').delete().eq('id', existing.id)
+      return error ?? null
     }
+    // "No winner" is a real entry: a row with no winner.
+    const playerId = value === 'NO_WINNER' ? null : value
+    if (existing) {
+      const { error } = await supabase.from('side_games').update({ winner_player_id: playerId }).eq('id', existing.id)
+      return error ?? null
+    }
+    const { error } = await supabase.from('side_games').insert({
+      event_id:         event.id,
+      game_type:        gameType,
+      hole_number:      holeNumber ?? null,
+      winner_player_id: playerId,
+      flight:           flight ?? 'overall',
+    })
+    return error ?? null
   }
 
-  function getWinner(gameType, holeNumber, flight) {
-    const record = sideGames.find(g =>
-      g.game_type === gameType
-      && g.hole_number === (holeNumber ?? null)
-      && (flight ? g.flight === flight : true)
-    )
-    if (!record) return ''
-    return record.winner_player_id ?? 'NO_WINNER'
+  // What each dropdown shows right now, and the line under it ("Saving…", "Saved", or an error).
+  const [overrides, setOverrides] = useState({})
+  const [statuses,  setStatuses]  = useState({})
+  const timers = useRef({})
+  useEffect(() => () => Object.values(timers.current).forEach(clearTimeout), [])
+
+  function drop(setter, key) { setter(prev => { const { [key]: _gone, ...rest } = prev; return rest }) }
+
+  async function saveField(f, value) {
+    setOverrides(o => ({ ...o, [f.key]: value }))
+    setStatuses(s => ({ ...s, [f.key]: { status: 'saving' } }))
+    clearTimeout(timers.current[f.key])
+    const error = await persistWinner(f.gameType, f.hole, value, f.flight)
+    if (error) {
+      drop(setOverrides, f.key)
+      setStatuses(s => ({ ...s, [f.key]: { status: 'error', error: error.message } }))
+      return
+    }
+    await onUpdated()
+    setStatuses(s => ({ ...s, [f.key]: { status: 'saved' } }))
+    timers.current[f.key] = setTimeout(() => { drop(setOverrides, f.key); drop(setStatuses, f.key) }, 2000)
+  }
+  const statusOf = f => statuses[f.key] ?? { status: 'idle' }
+
+  const plan = withOverrides(buildSideGamesPlan({ event, eventPlayers, sideGames, course }), overrides)
+  const people = eligiblePlayers(eventPlayers)
+
+  // Super CTP and custom competitions keep their own rules; they now use the same field and card look.
+  const superCtpLetters = [...new Set([...sides.map(s => s.match(/^super_ctp_([a-z])$/)?.[1]).filter(Boolean).map(l => l.toUpperCase())])]
+  const optedInIds = sideGameEntries.super_ctp ?? []
+  const ctpPool = people.filter(ep => optedInIds.includes(ep.player_id))
+  const fieldFor = (key, gameType, hole, flight, list) => {
+    const value = key in overrides ? overrides[key] : winnerValue(sideGames, gameType, hole, flight)
+    return { key, gameType, hole, flight, players: list, value }
   }
 
-  const sides      = event.side_game_options ?? []
-  const useFlights = event.use_flights ?? false
-  const hasLdA     = sides.includes('long_drive_a')
-  const hasLdB     = sides.includes('long_drive_b')
-  const hasLd      = sides.includes('long_drive')
-  const hasCtp      = sides.some(s => s === 'ctp' || s.startsWith('ctp_'))
-  const hasSuperCtp = sides.some(s => s === 'super_ctp' || s.startsWith('super_ctp_'))
-  const hasBlindPartners = sides.some(s => s === 'blind_partners' || s.startsWith('blind_partners_'))
-  const hasSuperSkins    = sides.some(s => s === 'super_skins' || s.startsWith('super_skins_'))
+  // If the roster has people but none can win, say why instead of "no players".
+  const guestsOnly = plan.rosterCount > 0 && plan.eligibleCount === 0
+  const emptyNote = guestsOnly ? 'Everyone in this event is marked as a guest, and guests can\u2019t win side games' : undefined
+
+  const noGames = !plan.longDrive && !plan.ctp && !hasSuperCtp && !hasBlindPartners && !hasSuperSkins && customCompetitions.length === 0
 
   return (
     <div className="space-y-4">
-      <p className="text-sm text-ink">Enter manual side game winners.</p>
-
-      {/* Long Drive */}
-      {(hasLd || hasLdA || hasLdB) && (
-        <Card>
-          <CardHeader title="Long Drive" />
-          <div className="space-y-3">
-            {hasLd && (
-              <SideGameSelect
-                players={eventPlayers}
-                value={getWinner('long_drive', null, 'overall')}
-                onChange={v => setWinner('long_drive', null, v, 'overall')}
-              />
-            )}
-            {hasLdA && (
-              <div className="flex items-center gap-4">
-                <span className="text-xs font-semibold text-blue-600 w-16">Flight A</span>
-                <SideGameSelect
-                  players={flightA.length ? flightA : eventPlayers}
-                  value={getWinner('long_drive', null, 'A')}
-                  onChange={v => setWinner('long_drive', null, v, 'A')}
-                />
-              </div>
-            )}
-            {hasLdB && (
-              <div className="flex items-center gap-4">
-                <span className="text-xs font-semibold text-purple-600 w-16">Flight B</span>
-                <SideGameSelect
-                  players={flightB.length ? flightB : eventPlayers}
-                  value={getWinner('long_drive', null, 'B')}
-                  onChange={v => setWinner('long_drive', null, v, 'B')}
-                />
-              </div>
-            )}
-          </div>
-        </Card>
+      {plan.total > 0 && (
+        <StatTiles tiles={[
+          { label: 'Winners entered', value: `${plan.entered} of ${plan.total}` },
+          { label: 'Long Drive', value: plan.longDrive ? `${plan.longDrive.fields.filter(f => f.value !== '').length} of ${plan.longDrive.fields.length}` : '—' },
+          { label: 'Closest to Pin', value: plan.ctp ? `${plan.ctp.holes.flatMap(h => h.fields).filter(f => f.value !== '').length} of ${plan.ctp.holes.flatMap(h => h.fields).length}` : '—' },
+          { label: 'No flight assigned', value: plan.noFlight, tone: plan.noFlight > 0 ? 'warn' : 'neutral' },
+        ]} />
       )}
+      <p className="text-sm text-ink-muted">Enter manual side game winners. Winners appear on the Wager Board once saved.</p>
 
-      {/* CTP per par-3 */}
-      {hasCtp && par3Holes.length > 0 && (() => {
-        const hasCtpA = sides.includes('ctp_a')
-        const hasCtpB = sides.includes('ctp_b')
-        const perFlight = hasCtpA || hasCtpB
-        return (
-          <Card>
-            <CardHeader title="Closest to Pin" subtitle="One winner per par-3 hole" />
-            <div className="space-y-4">
-              {par3Holes.map(h => (
-                <div key={h.hole}>
-                  <div className="text-xs font-semibold text-ink-muted mb-2">Hole {h.hole}</div>
-                  {perFlight ? (
-                    <div className="space-y-2">
-                      {hasCtpA && (
-                        <div className="flex items-center gap-4">
-                          <span className="text-xs font-semibold text-blue-600 w-16">Flight A</span>
-                          <SideGameSelect
-                            players={flightA.length ? flightA : eventPlayers}
-                            value={getWinner('ctp', h.hole, 'A')}
-                            onChange={v => setWinner('ctp', h.hole, v, 'A')}
-                          />
-                        </div>
-                      )}
-                      {hasCtpB && (
-                        <div className="flex items-center gap-4">
-                          <span className="text-xs font-semibold text-purple-600 w-16">Flight B</span>
-                          <SideGameSelect
-                            players={flightB.length ? flightB : eventPlayers}
-                            value={getWinner('ctp', h.hole, 'B')}
-                            onChange={v => setWinner('ctp', h.hole, v, 'B')}
-                          />
-                        </div>
-                      )}
-                    </div>
-                  ) : (
-                    <SideGameSelect
-                      players={eventPlayers}
-                      value={getWinner('ctp', h.hole, 'overall')}
-                      onChange={v => setWinner('ctp', h.hole, v, 'overall')}
-                    />
-                  )}
-                </div>
-              ))}
-            </div>
-          </Card>
-        )
-      })()}
-
-      {/* Super CTP — single designated hole */}
-      {hasSuperCtp && (() => {
-        const hasSuperCtpA = sides.includes('super_ctp_a')
-        const hasSuperCtpB = sides.includes('super_ctp_b')
-        const perFlight = hasSuperCtpA || hasSuperCtpB
-        const holeLabel = superCtpDesignatedHole ? `Hole ${superCtpDesignatedHole}` : 'No hole designated'
-        const optedInIds = sideGameEntries.super_ctp ?? []
-        const ctpPool = eventPlayers.filter(ep => optedInIds.includes(ep.player_id))
-        return (
-          <Card>
-            <CardHeader title="Super CTP" subtitle={holeLabel} />
-            <div className="space-y-3">
-              {perFlight ? (
-                <div className="space-y-2">
-                  {hasSuperCtpA && (
-                    <div className="flex items-center gap-4">
-                      <span className="text-xs font-semibold text-blue-600 w-16">Flight A</span>
-                      <SideGameSelect
-                        players={ctpPool.filter(ep => !ep.flight || ep.flight === 'A')}
-                        value={getWinner('super_ctp', superCtpDesignatedHole, 'A')}
-                        onChange={v => setWinner('super_ctp', superCtpDesignatedHole, v, 'A')}
-                      />
-                    </div>
-                  )}
-                  {hasSuperCtpB && (
-                    <div className="flex items-center gap-4">
-                      <span className="text-xs font-semibold text-purple-600 w-16">Flight B</span>
-                      <SideGameSelect
-                        players={ctpPool.filter(ep => !ep.flight || ep.flight === 'B')}
-                        value={getWinner('super_ctp', superCtpDesignatedHole, 'B')}
-                        onChange={v => setWinner('super_ctp', superCtpDesignatedHole, v, 'B')}
-                      />
-                    </div>
-                  )}
-                </div>
-              ) : (
-                <SideGameSelect
-                  players={ctpPool}
-                  value={getWinner('super_ctp', superCtpDesignatedHole, 'overall')}
-                  onChange={v => setWinner('super_ctp', superCtpDesignatedHole, v, 'overall')}
-                />
-              )}
-            </div>
-          </Card>
-        )
-      })()}
-
-      {/* Blind Partners */}
-      {hasBlindPartners && (
-        <BlindPartnersCard
-          event={event}
-          eventPlayers={eventPlayers}
-          optedInIds={sideGameEntries.blind_partners ?? []}
-          onUpdated={onUpdated}
-        />
-      )}
-
-      {/* Super Skins */}
-      {hasSuperSkins && (
-        <Card>
-          <CardHeader title="Super Skins" subtitle="Results auto-computed from scoring" />
-          <p className="text-sm text-ink-muted py-2">
-            Super Skins runs on the same scoring data as Skins. Winners are determined automatically once all scores are entered.
-            {sides.some(s => /^super_skins_[a-z]$/.test(s))
-              && ' Each flight competes in its own separate pot, based on each player\u2019s flight assignment — money is never mixed between flights.'}
-          </p>
-        </Card>
-      )}
-
-      {/* Custom competitions */}
-      {(event.custom_competitions ?? []).filter(c => c?.trim()).map((name, i) => (
-        <Card key={i}>
-          <CardHeader title={name} />
-          <SideGameSelect
-            players={eventPlayers}
-            value={getWinner(`custom_${i}`, null, 'overall')}
-            onChange={v => setWinner(`custom_${i}`, null, v, 'overall')}
+      <div className="grid grid-cols-[repeat(auto-fit,minmax(min(100%,460px),1fr))] items-start gap-4">
+        {plan.longDrive && (
+          <LongDriveCard
+            fields={plan.longDrive.fields}
+            noFlight={plan.noFlight}
+            onFixFlights={onGoToTab ? () => onGoToTab('Players') : undefined}
+            statusOf={statusOf}
+            onChange={saveField}
+            emptyNote={emptyNote}
           />
-        </Card>
-      ))}
-    </div>
-  )
-}
+        )}
 
-function SideGameSelect({ players, value, onChange }) {
-  return (
-    <select
-      value={value}
-      onChange={e => onChange(e.target.value)}
-      className="input bg-white max-w-xs"
-    >
-      <option value="">— Select winner —</option>
-      <option value="NO_WINNER">No Winner</option>
-      {players.map(ep => (
-        <option key={ep.player_id} value={ep.player_id}>
-          {ep.player?.first_name} {ep.player?.last_name}
-          {ep.flight ? ` (Flight ${ep.flight})` : ''}
-        </option>
-      ))}
-    </select>
+        {plan.ctp && <ClosestToPinCard holes={plan.ctp.holes} statusOf={statusOf} onChange={saveField} emptyNote={emptyNote} />}
+
+        {/* Super CTP — single designated hole, only players who opted in */}
+        {hasSuperCtp && (
+          <SectionCard title="Super CTP" subtitle={superCtpDesignatedHole ? `Hole ${superCtpDesignatedHole}` : 'No hole designated'}>
+            <div className="space-y-5">
+              {(superCtpLetters.length > 0
+                ? superCtpLetters.map(l => ({ label: `Flight ${l}`, flight: l, list: ctpPool.filter(ep => !ep.flight || ep.flight === l) }))
+                : [{ label: 'Overall', flight: 'overall', list: ctpPool }]
+              ).map(row => {
+                const f = fieldFor(`sctp-${row.flight}`, 'super_ctp', superCtpDesignatedHole, row.flight, row.list)
+                return (
+                  <WinnerField
+                    key={f.key} label={row.label} players={f.players} value={f.value}
+                    disabled={f.players.length === 0} disabledNote={emptyNote ?? "No players have opted in"}
+                    onChange={v => saveField(f, v)} {...statusOf(f)}
+                  />
+                )
+              })}
+            </div>
+          </SectionCard>
+        )}
+
+        {/* Blind Partners — has its own draw and results */}
+        {hasBlindPartners && (
+          <BlindPartnersCard
+            event={event}
+            eventPlayers={eventPlayers}
+            optedInIds={sideGameEntries.blind_partners ?? []}
+            onUpdated={onUpdated}
+          />
+        )}
+
+        {/* Super Skins */}
+        {hasSuperSkins && (
+          <SectionCard title="Super Skins" subtitle="Results auto-computed from scoring">
+            <p className="text-sm text-ink-muted">
+              Super Skins runs on the same scoring data as Skins. Winners are determined automatically once all scores are entered.
+              {sides.some(s => /^super_skins_[a-z]$/.test(s))
+                && ' Each flight competes in its own separate pot, based on each player\u2019s flight assignment — money is never mixed between flights.'}
+            </p>
+          </SectionCard>
+        )}
+
+        {/* Custom competitions */}
+        {customCompetitions.map((name, i) => {
+          const f = fieldFor(`custom-${i}`, `custom_${i}`, null, 'overall', people)
+          return (
+            <SectionCard key={i} title={name} subtitle="One winner">
+              <div>
+                <WinnerField
+                  label="Winner" players={f.players} value={f.value}
+                  onChange={v => saveField(f, v)} {...statusOf(f)}
+                />
+              </div>
+            </SectionCard>
+          )
+        })}
+      </div>
+
+      {noGames && <p className="text-sm text-ink-muted">No side games with manual winners are set up for this event.</p>}
+    </div>
   )
 }
 

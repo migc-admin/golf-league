@@ -5,6 +5,7 @@
  *   Pre-round                                  (Done)
  *   ...children (hero card, rows)
  *
+ * `subtitle` is a muted line under the title; `aside` is a short note on the right (e.g. "0 of 2").
  * `done` shows a small green "Done" pill beside the title. `headerAction` is one quiet
  * button on the right of the header (e.g. "Download print packet").
  *
@@ -16,7 +17,7 @@ function Eyebrow({ children }) {
   return <p className="text-[11px] font-bold uppercase tracking-widest text-ink-muted">{children}</p>
 }
 
-export default function SectionCard({ eyebrow, title, done = false, headerAction = null, children, className = '' }) {
+export default function SectionCard({ eyebrow, title, subtitle, aside, done = false, headerAction = null, children, className = '' }) {
   return (
     <section className={`rounded-sm border border-surface-border bg-white p-5 sm:p-6 ${className}`.trim()}>
       <header className="mb-4 flex flex-wrap items-start justify-between gap-3">
@@ -30,7 +31,9 @@ export default function SectionCard({ eyebrow, title, done = false, headerAction
               </span>
             )}
           </div>
+          {subtitle && <p className="mt-0.5 text-sm text-ink-muted">{subtitle}</p>}
         </div>
+        {aside && <span className="shrink-0 text-sm font-semibold text-ink-muted">{aside}</span>}
         {headerAction}
       </header>
       {children}
