@@ -1,28 +1,30 @@
 /**
- * Public Event Page — redesigned with split hero, cover photo, registration CTA,
- * tournament description, sponsor scroll bar, mobile optimized.
+ * Public Event Page — status-driven hero (registration / countdown / results), sticky tabs,
+ * and body cards. Presentation lives in src/components/event-page; page logic in lib/eventPageView.
  */
 
 import { useEffect, useState } from 'react'
-import { FORMAT_LABELS, SIDE_GAME_LABELS } from '../lib/eventLabels'
-import { markdownToHtml } from '../lib/simpleMarkdown'
-import { useParams, useSearchParams, Link } from 'react-router-dom'
-import DOMPurify from 'dompurify'
+import { useParams, useSearchParams } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { useSubdomainOrg } from '../lib/SubdomainContext'
-import Countdown from '../components/Countdown'
-import Marquee from '../components/ui/Marquee'
-import { isBuyInEnabled } from '../lib/sideGames'
+import EventHero from '../components/event-page/EventHero'
+import EventActionCard from '../components/event-page/EventActionCard'
+import EventCoverImage from '../components/event-page/EventCoverImage'
+import useScrolledPast from '../components/event-page/useScrolledPast'
+import EventTabBar from '../components/event-page/EventTabBar'
+import AboutCard from '../components/event-page/AboutCard'
+import MatchupsCard from '../components/event-page/MatchupsCard'
+import CompetitionsCard from '../components/event-page/CompetitionsCard'
+import ScheduleCard from '../components/event-page/ScheduleCard'
+import GettingThereCard from '../components/event-page/GettingThereCard'
+import LocalRulesCard from '../components/event-page/LocalRulesCard'
+import SponsorsCard from '../components/event-page/SponsorsCard'
+import {
+  registrationState, feeLabel, eventTabs, competitionGroups, scheduleEntries, matchupRows,
+} from '../lib/eventPageView'
 
 const GREEN    = '#1B4332'
-const GOLD     = '#D4AF37'
 const MIGC_ORG = import.meta.env.VITE_MIGC_ORG_ID
-
-const BASE_TABS = [
-  { key: 'overview',  label: 'Overview'  },
-  { key: 'pairings',  label: 'Pairings'  },
-  { key: 'photos',    label: 'Photos'    },
-]
 
 export default function EventPage() {
   const subdomainOrg = useSubdomainOrg()
@@ -89,6 +91,9 @@ export default function EventPage() {
     load()
   }, [directEventId, leagueSlug, eventSlug])
 
+  // The tab bar's Register button only appears once the hero's Register button has scrolled out of view.
+  const heroRegisterPassed = useScrolledPast('hero-register', loading)
+
   if (loading) return <Skeleton />
   if (!event) return (
     <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#f9f8f5' }}>
@@ -128,12 +133,6 @@ export default function EventPage() {
     ? new Date(`${event.event_date}T${(event.start_time ?? '00:00:00').slice(0, 8)}`)
     : null
 
-  // "Matchups" tab (Match Play / Ryder Cup pairings) only shows once pairings
-  // have actually been posted — inserted right after Overview.
-  const tabs = pairings.length > 0
-    ? [BASE_TABS[0], { key: 'matchups', label: 'Matchups' }, ...BASE_TABS.slice(1)]
-    : BASE_TABS
-
   // Wager link: always for live events. For upcoming events, only once groups
   // are set and — when the event has match play — the matchups are posted too.
   const hasMatchFormat = formats.includes('match_points') || formats.includes('ryder_cup')
@@ -141,144 +140,51 @@ export default function EventPage() {
   const matchupsSet    = !hasMatchFormat || pairings.length > 0
   const showBetLink    = event.status === 'active' || (event.status === 'upcoming' && groupsSet && matchupsSet)
 
+  const reg        = registrationState({ status: event.status, regUrl, spotsLeft })
+  const fee        = feeLabel(event.tournament_fee)
+  const { tabs, registerLabel } = eventTabs({ hasMatchups: pairings.length > 0, canRegister: reg.canRegister, fee })
+  const countdownTarget = event.status === 'complete' ? null : eventDateTime
+
   return (
-    <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column', background: '#f9f8f5', fontFamily: 'system-ui, -apple-system, sans-serif' }}>
+    <div className="flex min-h-screen flex-col bg-surface-dim">
 
-      {/* ── Hero ──────────────────────────────────────────────────────────────── */}
-      <div style={{ background: '#fff', borderBottom: '1px solid #e5e7eb' }}>
+      <EventHero
+        clubName={event.league?.name}
+        logoUrl={event.league?.logo_url}
+        pill={{ kind: reg.kind, label: reg.pill }}
+        title={eventName}
+        dateLabel={event.event_date ? longDate(event.event_date) : null}
+        timeLabel={startLabel}
+        courseName={event.course?.name}
+        courseAddress={courseAddress}
+        media={coverImage ? <EventCoverImage src={coverImage} alt={eventName} /> : null}
+      >
+        <EventActionCard
+          kind={reg.kind}
+          targetDate={countdownTarget}
+          fee={fee}
+          regUrl={regUrl}
+          leaderboardUrl={leaderboardUrl}
+          onPhotos={() => setActiveTab('photos')}
+        />
+      </EventHero>
 
-        <div className="event-hero-grid" style={{
-          maxWidth: 1100, margin: '0 auto', width: '100%',
-          display: 'grid',
-          gridTemplateColumns: coverImage ? 'minmax(0,1fr) min(460px,46%)' : '1fr',
-        }}>
+      <EventTabBar
+        tabs={tabs}
+        value={activeTab}
+        onChange={setActiveTab}
+        leaderboardUrl={leaderboardUrl}
+        registerLabel={heroRegisterPassed ? registerLabel : null}
+        registerHref={regUrl}
+      />
 
-          {/* Left panel */}
-          <div style={{ padding: 'clamp(20px,4vw,44px) clamp(16px,4vw,44px) 0', display: 'flex', flexDirection: 'column', minHeight: coverImage ? 360 : 'auto' }}>
-
-            {/* League identity */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 18 }}>
-              {event.league?.logo_url ? (
-                <img src={event.league.logo_url} alt="" style={{ width: 34, height: 34, borderRadius: 8, objectFit: 'cover', border: '1px solid #e5e7eb', flexShrink: 0 }} />
-              ) : (
-                <div style={{ width: 34, height: 34, borderRadius: 8, background: GREEN, display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 900, fontSize: 12, color: '#fff', flexShrink: 0 }}>
-                  {(event.league?.name ?? '').slice(0, 2).toUpperCase()}
-                </div>
-              )}
-              <span style={{ color: '#6b7280', fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em' }}>
-                {event.league?.name}
-              </span>
-            </div>
-
-            {/* Title */}
-            <h1 style={{ fontSize: 'clamp(22px, 4vw, 40px)', fontWeight: 900, color: '#111827', letterSpacing: '-0.03em', lineHeight: 1.1, marginBottom: 8 }}>
-              {eventName}
-            </h1>
-            <div style={{ width: 44, height: 4, background: GOLD, borderRadius: 2, marginBottom: 20 }} />
-
-            {/* Date + Course */}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 20 }}>
-              <MetaRow icon={
-                <svg width="15" height="15" fill="none" stroke="#374151" strokeWidth="2" viewBox="0 0 24 24">
-                  <rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/>
-                </svg>
-              }>
-                <div style={{ fontSize: 14, fontWeight: 700, color: '#111827' }}>{longDate(event.event_date)}</div>
-                {startLabel && <div style={{ fontSize: 12, color: '#6b7280' }}>{startLabel}</div>}
-              </MetaRow>
-
-              <MetaRow icon={
-                <svg width="15" height="15" fill="none" stroke="#374151" strokeWidth="2" viewBox="0 0 24 24">
-                  <path d="M21 10c0 7-9 13-9 13S3 17 3 10a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/>
-                </svg>
-              }>
-                <div>
-                  <div style={{ fontSize: 14, fontWeight: 700, color: '#111827' }}>{event.course?.name ?? 'TBD'}</div>
-                  {courseAddress && (
-                    <div style={{ fontSize: 12, marginTop: 2 }}>
-                      <a href={mapsUrl} target="_blank" rel="noopener noreferrer" style={{ color: '#6b7280', textDecoration: 'underline' }}>{courseAddress}</a>
-                    </div>
-                  )}
-                </div>
-              </MetaRow>
-            </div>
-
-            {/* Countdown clock — shown while event is upcoming */}
-            {eventDateTime && event.status !== 'complete' && (
-              <Countdown targetDate={eventDateTime} />
-            )}
-
-            {/* Registration CTA — show whenever reg is available (upcoming or active) */}
-            {regUrl && event.status !== 'complete' && (
-              <div className="reg-cta" style={{ marginBottom: 20, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16 }}>
-                {event.tournament_fee > 0 && (
-                  <div style={{ fontSize: 22, fontWeight: 900, color: '#111827', letterSpacing: '-0.02em' }}>
-                    ${Number(event.tournament_fee).toFixed(0)}<span style={{ fontSize: 13, fontWeight: 500, color: '#6b7280' }}> entry fee per player</span>
-                  </div>
-                )}
-                {spotsLeft !== null && spotsLeft <= 0 ? (
-                  <span style={{ fontSize: 13, fontWeight: 700, color: '#dc2626' }}>Registration Closed</span>
-                ) : (
-                  <Link to={regUrl}
-                    style={{ flexShrink: 0, display: 'inline-block', background: GREEN, color: '#fff', fontWeight: 800, fontSize: 14, padding: '13px 28px', borderRadius: 10, textDecoration: 'none' }}>
-                    Register →
-                  </Link>
-                )}
-              </div>
-            )}
-
-            {/* Spacer */}
-            <div style={{ flex: 1 }} />
-
-            {/* Tab bar */}
-            <div className="event-tab-bar" style={{ borderTop: '1px solid #e5e7eb', marginLeft: 'clamp(-16px,-4vw,-44px)', marginRight: 'clamp(-16px,-4vw,-44px)' }}>
-              {tabs.map(tab => (
-                <button key={tab.key} onClick={() => setActiveTab(tab.key)}
-                  style={{
-                    padding: '13px 24px',
-                    fontSize: 13, fontWeight: 700,
-                    border: 'none', cursor: 'pointer',
-                    background: 'transparent',
-                    color: activeTab === tab.key ? GREEN : '#9ca3af',
-                    borderBottom: activeTab === tab.key ? `3px solid ${GREEN}` : '3px solid transparent',
-                    transition: 'all 0.15s',
-                    whiteSpace: 'nowrap',
-                    flexShrink: 0,
-                  }}>
-                  {tab.label}
-                </button>
-              ))}
-              <Link to={leaderboardUrl}
-                style={{
-                  padding: '13px 24px',
-                  fontSize: 13, fontWeight: 700,
-                  color: '#9ca3af',
-                  borderBottom: '3px solid transparent',
-                  whiteSpace: 'nowrap',
-                  flexShrink: 0,
-                  textDecoration: 'none',
-                  display: 'flex', alignItems: 'center',
-                }}>
-                Leaderboard ↗
-              </Link>
-            </div>
-          </div>
-
-          {/* Right: Cover photo — desktop only */}
-          {coverImage && (
-            <div style={{ display: 'none', alignItems: 'center', justifyContent: 'center', padding: 'clamp(20px,4vw,44px) clamp(16px,4vw,44px) clamp(20px,4vw,44px) 0' }} className="event-cover-desktop">
-              <img src={coverImage} alt={eventName}
-                style={{ width: '100%', height: 'auto', boxShadow: '0 6px 32px rgba(0,0,0,0.14)', display: 'block' }} />
-            </div>
-          )}
-        </div>
-      </div>
-
-      {/* ── Tab Content ───────────────────────────────────────────────────────── */}
-      <div style={{ maxWidth: 1100, margin: '0 auto', width: '100%', padding: 'clamp(20px,4vw,32px) clamp(16px,4vw,40px)', flex: 1, boxSizing: 'border-box' }}>
-
+      <main className="mx-auto w-full max-w-[1100px] flex-1 px-4 py-6 sm:px-6 lg:py-8">
         {activeTab === 'overview' && (
-          <OverviewTab event={event} leaderboardUrl={leaderboardUrl} description={description} courseAddress={courseAddress} mapsUrl={mapsUrl} eventId={eid} showBetLink={showBetLink} />
+          <OverviewTab
+            event={event} pairings={pairings} eventPlayers={eventPlayers} description={description}
+            courseAddress={courseAddress} mapsUrl={mapsUrl} eventId={eid} showBetLink={showBetLink}
+            startLabel={startLabel} sponsors={sponsors} onSeePairings={() => setActiveTab('pairings')}
+          />
         )}
 
         {activeTab === 'matchups' && (
@@ -293,245 +199,50 @@ export default function EventPage() {
           <PhotosTab photos={photos} eventId={event.id} onUploaded={photo => setEvent(prev => ({ ...prev, photos: [...(prev.photos ?? []), photo] }))} />
         )}
 
-
-      </div>
-
-      {/* ── Sponsor Scroll Bar ────────────────────────────────────────────────── */}
-      {sponsors.length > 0 && (
-        <SponsorBar sponsors={sponsors} />
-      )}
-
-      {/* Footer */}
-      <div style={{ textAlign: 'center', fontSize: 12, color: '#c7c7cc', padding: '20px 0', borderTop: '1px solid #f3f4f6' }}>
-        Powered by <strong style={{ color: '#9ca3af' }}>Scorify Golf</strong>
-      </div>
-
-      {/* Responsive styles */}
-      <style>{`
-        /* Disable iOS Safari auto-link detection on addresses */
-        a[x-apple-data-detectors] {
-          color: inherit !important;
-          text-decoration: none !important;
-          pointer-events: none;
-        }
-        .event-cover-desktop { display: none; }
-        @media (min-width: 768px) {
-          .event-cover-desktop { display: flex !important; }
-        }
-        @media (max-width: 767px) {
-          .event-hero-grid { grid-template-columns: 1fr !important; }
-        }
-        .event-tab-bar { display: flex; overflow-x: auto; scrollbar-width: none; -webkit-overflow-scrolling: touch; width: 100%; }
-        .event-tab-bar::-webkit-scrollbar { display: none; }
-        .event-tab-bar button, .event-tab-bar a { flex: 1; text-align: center; min-width: 0; padding-left: 8px !important; padding-right: 8px !important; justify-content: center; }
-        @media (min-width: 480px) {
-          .event-tab-bar button, .event-tab-bar a { flex: none; padding-left: 24px !important; padding-right: 24px !important; }
-        }
-      `}</style>
-    </div>
-  )
-}
-
-// ─── Sponsor tiles ────────────────────────────────────────────────────────────
-function SponsorBar({ sponsors }) {
-  const tiles = sponsors.map((s, i) => {
-    const tile = (
-      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', background: '#f9f8f5', border: '1px solid #e5e7eb', borderRadius: 14, padding: '20px 24px 14px', minWidth: 140, gap: 10 }}>
-        {s.logo_url ? (
-          <img src={s.logo_url} alt={s.name ?? 'Sponsor'} style={{ height: 72, maxWidth: 160, objectFit: 'contain' }} />
-        ) : (
-          <div style={{ height: 72, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            <span style={{ fontSize: 13, fontWeight: 700, color: '#374151', textAlign: 'center' }}>{s.name}</span>
-          </div>
+        {activeTab !== 'overview' && sponsors.length > 0 && (
+          <div className="mt-8 max-w-[520px]"><SponsorsCard sponsors={sponsors} /></div>
         )}
-        {s.logo_url && s.name && (
-          <span style={{ fontSize: 11, fontWeight: 500, color: '#6b7280', textAlign: 'center' }}>{s.name}</span>
-        )}
-      </div>
-    )
-    return s.url ? (
-      <a key={i} href={s.url} target="_blank" rel="noopener noreferrer" style={{ textDecoration: 'none', marginRight: 16 }}>{tile}</a>
-    ) : (
-      <div key={i} style={{ marginRight: 16 }}>{tile}</div>
-    )
-  })
+      </main>
 
-  return (
-    <div style={{ background: '#fff', borderTop: '1px solid #e5e7eb', padding: '24px clamp(16px,4vw,40px)' }}>
-      <div style={{ maxWidth: 1100, margin: '0 auto' }}>
-        <div style={{ fontSize: 10, fontWeight: 700, color: '#9ca3af', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: 16 }}>
-          Sponsored by
-        </div>
-        <Marquee pauseOnHover duration={Math.max(20, sponsors.length * 5)} fadeAmount={5}>
-          {tiles}
-        </Marquee>
-      </div>
+      <footer className="py-5 text-center text-xs text-ink-muted">
+        Powered by <strong className="font-semibold">Scorify Golf</strong>
+      </footer>
     </div>
   )
 }
 
-// Local rules: same look as the other overview cards, collapsed until tapped.
-function LocalRulesCard({ text }) {
-  const [open, setOpen] = useState(false)
-  return (
-    <div style={{ background: '#fff', borderRadius: 16, border: '1px solid #e5e7eb', overflow: 'hidden' }}>
-      <button
-        type="button"
-        onClick={() => setOpen(o => !o)}
-        aria-expanded={open}
-        style={{ display: 'flex', width: '100%', alignItems: 'center', justifyContent: 'space-between', padding: '18px 24px', background: 'none', border: 'none', cursor: 'pointer', textAlign: 'left' }}
-      >
-        <span style={{ fontSize: 10, fontWeight: 700, color: '#9ca3af', textTransform: 'uppercase', letterSpacing: '0.08em' }}>Local Rules</span>
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#9ca3af" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"
-          style={{ transform: open ? 'rotate(180deg)' : 'none', transition: 'transform 0.15s' }} aria-hidden="true">
-          <path d="M6 9l6 6 6-6" />
-        </svg>
-      </button>
-      {open && (
-        <div style={{ padding: '0 24px 20px' }}>
-          <p style={{ fontSize: 14, lineHeight: 1.7, color: '#374151', margin: 0 }}
-            dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(markdownToHtml(text), { ALLOWED_TAGS: ['strong', 'em', 'br'], ALLOWED_ATTR: [] }) }}
-          />
-        </div>
-      )}
-    </div>
-  )
-}
 
-// ─── Overview Tab ─────────────────────────────────────────────────────────────
-function OverviewTab({ event, leaderboardUrl, description, courseAddress, mapsUrl, eventId, showBetLink }) {
-  const scheduleItems = (event.schedule_items ?? []).filter(s => s.label?.trim())
-  const customCompetitions = (event.custom_competitions ?? []).filter(c => c?.trim())
-  // Strip per-flight suffix (e.g. net_stroke_a → net_stroke) before label lookup,
-  // then deduplicate so the same format only appears once in the list.
-  const formats = [...new Set(
-    (event.formats ?? (event.format ? [event.format] : []))
-      .map(k => FORMAT_LABELS[k] ?? FORMAT_LABELS[k.replace(/_[a-z]$/, '')])
-      .filter(Boolean)
-  )]
-  const presetGames = (event.side_game_options ?? [])
-    .map(k => {
-      const label = SIDE_GAME_LABELS[k]
-      if (!label) return null
-      const baseKey = k.replace(/_[ab]$/, '')
-      return { name: label, sepEntry: isBuyInEnabled(event, baseKey) }
-    })
-    .filter(Boolean)
-  const allCompetitions = [
-    ...formats.map(name => ({ name, sepEntry: false })),
-    ...presetGames,
-    ...customCompetitions.map(name => ({ name, sepEntry: false })),
-  ].sort((a, b) => (a.sepEntry ? 1 : 0) - (b.sepEntry ? 1 : 0))
-
+// ─── Overview Tab ──────────────────────────────────────────────────────────
+function OverviewTab({ event, pairings, eventPlayers, description, courseAddress, mapsUrl, eventId, showBetLink, startLabel, sponsors, onSeePairings }) {
   const isMIGC = event.league?.org_id === MIGC_ORG
+  const formats = event.formats ?? (event.format ? [event.format] : [])
+  const teams = event.ryder_cup_teams
+  const matchSubtitle = formats.includes('ryder_cup') ? `${teams?.a || 'Team A'} vs ${teams?.b || 'Team B'}` : null
+  const schedule = scheduleEntries(event, startLabel)
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-
-      {isMIGC && eventId && showBetLink && (
-        <a
-          href={`/wager/${eventId}`}
-          style={{
-            display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-            background: GREEN, borderRadius: 14, padding: '16px 20px', textDecoration: 'none',
-          }}
-        >
-          <div>
-            <div style={{ color: '#C9A84C', fontWeight: 800, fontSize: 15 }}>🎰 Place a Bet</div>
-            <div style={{ color: 'rgba(255,255,255,0.7)', fontSize: 12, marginTop: 2 }}>Parimutuel wager board · Venmo or cash</div>
-          </div>
-          <div style={{ color: '#C9A84C', fontWeight: 900, fontSize: 20 }}>→</div>
-        </a>
-      )}
-
-      {description && (
-        <div style={{ background: '#fff', borderRadius: 16, padding: '20px 24px', border: '1px solid #e5e7eb' }}>
-          <div style={{ fontSize: 10, fontWeight: 700, color: '#9ca3af', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 10 }}>Event Details</div>
-          <p style={{ fontSize: 14, lineHeight: 1.7, color: '#374151', margin: 0 }}
-            dangerouslySetInnerHTML={{ __html:
-              DOMPurify.sanitize(
-                description
-                  .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
-                  .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
-                  .replace(/\*(.+?)\*/g, '<em>$1</em>')
-                  .replace(/\n/g, '<br/>'),
-                { ALLOWED_TAGS: ['strong', 'em', 'br'], ALLOWED_ATTR: [] }
-              )
-            }}
-          />
-        </div>
-      )}
-
-      {scheduleItems.length > 0 && (
-        <div style={{ background: '#fff', borderRadius: 16, padding: '20px 24px', border: '1px solid #e5e7eb' }}>
-          <div style={{ fontSize: 10, fontWeight: 700, color: '#9ca3af', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 16 }}>Schedule</div>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-            {scheduleItems.map((item, i) => (
-              <div key={i} style={{ display: 'grid', gridTemplateColumns: '90px 1fr', gap: 16, alignItems: 'start', padding: '14px 16px', background: '#f9f8f5', borderRadius: 12, border: '1px solid #f3f4f6' }}>
-                <div style={{ fontSize: 13, fontWeight: 700, color: '#374151', paddingTop: 1 }}>
-                  {item.time ? formatTime12(item.time) : '—'}
-                </div>
-                <div>
-                  <div style={{ fontSize: 14, fontWeight: 700, color: '#111827' }}>{item.label}</div>
-                  {item.description?.trim() && (
-                    <div style={{ fontSize: 13, color: '#6b7280', marginTop: 3, lineHeight: 1.5 }}>{item.description}</div>
-                  )}
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {allCompetitions.length > 0 && (
-        <div style={{ background: '#fff', borderRadius: 16, padding: '18px 24px', border: '1px solid #e5e7eb' }}>
-          <div style={{ fontSize: 10, fontWeight: 700, color: '#9ca3af', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 12 }}>
-            Competitions &amp; Side Games
-          </div>
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
-            {allCompetitions.map((comp, i) => (
-              <span key={i} style={{
-                display: 'inline-flex', alignItems: 'center', gap: 6,
-                fontSize: 12, fontWeight: 600, color: GREEN,
-                background: '#f0fdf4', border: '1px solid #bbf7d0',
-                borderRadius: 20, padding: '5px 12px', whiteSpace: 'nowrap' }}>
-                {comp.name}
-                {comp.sepEntry && (
-                  <span style={{ fontSize: 9, fontWeight: 700, background: '#D4AF37', color: '#1B4332', borderRadius: 10, padding: '1px 5px', marginLeft: 2 }}>
-                    Sep. Entry
-                  </span>
-                )}
-              </span>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {event.local_rules?.trim() && <LocalRulesCard text={event.local_rules} />}
-
-      {courseAddress && (
-        <div style={{ background: '#fff', borderRadius: 16, padding: '20px 24px', border: '1px solid #e5e7eb' }}>
-          <div style={{ fontSize: 10, fontWeight: 700, color: '#9ca3af', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 14 }}>
-            Course Map
-          </div>
-          <div style={{ borderRadius: 12, overflow: 'hidden', border: '1px solid #e5e7eb' }}>
-            <iframe
-              title="Course location map"
-              src={`https://www.google.com/maps?q=${encodeURIComponent(courseAddress)}&output=embed`}
-              width="100%"
-              height="320"
-              style={{ display: 'block', border: 0 }}
-              loading="lazy"
-              referrerPolicy="no-referrer-when-downgrade"
-            />
-          </div>
-          <a href={mapsUrl} target="_blank" rel="noopener noreferrer"
-            style={{ display: 'inline-block', marginTop: 10, fontSize: 12, fontWeight: 600, color: GREEN, textDecoration: 'underline' }}>
-            Open in Google Maps →
+    <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_360px] lg:items-start">
+      <div className="flex min-w-0 flex-col gap-6">
+        {isMIGC && eventId && showBetLink && (
+          <a href={`/wager/${eventId}`} className="flex items-center justify-between rounded-sm bg-fairway-700 px-5 py-4 text-white no-underline">
+            <span>
+              <span className="block text-[15px] font-bold">Place a Bet</span>
+              <span className="block text-xs text-fairway-200">Parimutuel wager board · Venmo or cash</span>
+            </span>
+            <span className="text-xl font-bold" aria-hidden="true">→</span>
           </a>
-        </div>
-      )}
+        )}
+        <AboutCard text={description} />
+        <MatchupsCard rows={matchupRows(pairings, eventPlayers)} subtitle={matchSubtitle} onSeePairings={onSeePairings} />
+        <CompetitionsCard groups={competitionGroups(event)} />
+      </div>
 
+      <div className="flex min-w-0 flex-col gap-6">
+        <ScheduleCard entries={schedule} />
+        <GettingThereCard courseName={event.course?.name} address={courseAddress} mapsUrl={mapsUrl} />
+        <LocalRulesCard text={event.local_rules} />
+        <SponsorsCard sponsors={sponsors} />
+      </div>
     </div>
   )
 }
@@ -873,39 +584,6 @@ function GroupList({ eventPlayers, event }) {
 
 // ─── Small components ─────────────────────────────────────────────────────────
 
-function MetaRow({ icon, children }) {
-  return (
-    <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10 }}>
-      <div style={{ width: 32, height: 32, borderRadius: 8, background: '#f3f4f6', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, marginTop: 2 }}>
-        {icon}
-      </div>
-      <div>{children}</div>
-    </div>
-  )
-}
-
-function InfoCard({ title, children }) {
-  return (
-    <div style={{ background: '#fff', borderRadius: 16, padding: '20px 22px', border: '1px solid #e5e7eb' }}>
-      <div style={{ fontSize: 10, fontWeight: 700, color: '#9ca3af', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 14 }}>{title}</div>
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>{children}</div>
-    </div>
-  )
-}
-
-function InfoRow({ icon, label, value }) {
-  if (value === null || value === undefined || value === '—') return null
-  return (
-    <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10 }}>
-      <span style={{ fontSize: 15, flexShrink: 0, width: 20, textAlign: 'center', marginTop: 2 }}>{icon}</span>
-      <div>
-        <div style={{ fontSize: 11, color: '#9ca3af', fontWeight: 600 }}>{label}</div>
-        <div style={{ fontSize: 14, fontWeight: 600, color: '#111827' }}>{value}</div>
-      </div>
-    </div>
-  )
-}
-
 function FlightBadge({ flight }) {
   const isA = flight === 'A'
   return (
@@ -929,14 +607,6 @@ function computeTeeTime(startTime, intervalMins, groupNum) {
 }
 
 function formatTime(t) { return computeTeeTime(t, 0, 1) ?? t }
-
-function formatTime12(t) {
-  if (!t) return ''
-  const [h, m] = t.split(':').map(Number)
-  const ampm = h >= 12 ? 'pm' : 'am'
-  const h12 = h % 12 || 12
-  return `${h12}:${String(m).padStart(2, '0')} ${ampm}`
-}
 
 function longDate(d) {
   return new Date(d + 'T00:00:00').toLocaleDateString('en-US', {
