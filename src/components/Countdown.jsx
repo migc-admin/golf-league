@@ -3,7 +3,7 @@ import { useEffect, useState } from 'react'
 const GREEN = '#2D6A4F'
 const GOLD  = '#D4AF37'
 
-function getRemaining(targetDate) {
+export function getRemaining(targetDate) {
   const diff = targetDate.getTime() - Date.now()
   if (diff <= 0) return null
   const days    = Math.floor(diff / (1000 * 60 * 60 * 24))
