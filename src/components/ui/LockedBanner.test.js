@@ -34,6 +34,12 @@ describe('LockedBanner', () => {
     expect(custom).not.toContain('Groups and pairings')
   })
 
+  it('can label its button differently (e.g. "Unlock selections")', () => {
+    const o = html(h(LockedBanner, { onReopen: () => {}, buttonLabel: 'Unlock selections' }))
+    expect(o).toContain('>Unlock selections<')
+    expect(o).not.toContain('Re-open on Overview')
+  })
+
   it('only calls the handler it was given (the page makes it a plain navigation)', () => {
     const calls = []
     const el = LockedBanner({ onReopen: () => calls.push('go') })
