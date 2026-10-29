@@ -1,5 +1,6 @@
 /**
- * LockedBanner — shown at the top of the Groups & pairings page when the event is complete.
+ * LockedBanner — shown at the top of a page (Groups & pairings, Payout setup) when the event is complete.
+ * The title and text default to the Groups wording; pages pass their own.
  *
  *   🔒 Groups and pairings are locked                         [Re-open on Overview]
  *      The event is complete. Re-open it to make changes. Tiebreak winners can still be set.
@@ -21,7 +22,10 @@ function LockIcon() {
   )
 }
 
-export default function LockedBanner({ onReopen, className = '' }) {
+const DEFAULT_TITLE = 'Groups and pairings are locked'
+const DEFAULT_TEXT = 'The event is complete. Re-open it to make changes. Tiebreak winners can still be set.'
+
+export default function LockedBanner({ onReopen, title = DEFAULT_TITLE, text = DEFAULT_TEXT, className = '' }) {
   return (
     <div
       role="status"
@@ -30,8 +34,8 @@ export default function LockedBanner({ onReopen, className = '' }) {
       <div className="flex items-start gap-3">
         <LockIcon />
         <div>
-          <p className="text-sm font-bold">Groups and pairings are locked</p>
-          <p className="text-xs">The event is complete. Re-open it to make changes. Tiebreak winners can still be set.</p>
+          <p className="text-sm font-bold">{title}</p>
+          <p className="text-xs">{text}</p>
         </div>
       </div>
       <ActionButton className="shrink-0 !text-ink" onClick={onReopen}>Re-open on Overview</ActionButton>

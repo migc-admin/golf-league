@@ -20,6 +20,13 @@ describe('SectionCard', () => {
     expect(out).toContain('bg-status-active-bg')
   })
 
+  it('shows an optional muted subtitle and a right-hand note', () => {
+    const out = html(h(SectionCard, { title: 'Long Drive', subtitle: 'One winner per flight', aside: '0 of 2' }))
+    expect(out).toContain('One winner per flight')
+    expect(out).toContain('0 of 2')
+    expect(html(h(SectionCard, { title: 'x' }))).not.toContain('text-ink-muted">0')
+  })
+
   it('renders the header action when given', () => {
     const out = html(h(SectionCard, { title: 'x', headerAction: h('button', null, 'Download print packet') }))
     expect(out).toContain('Download print packet')
