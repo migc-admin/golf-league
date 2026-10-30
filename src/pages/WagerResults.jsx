@@ -3,8 +3,8 @@
  * Route: /wager/:eventId/results   (admin login required, same as the wager board)
  *
  * Same numbers as the board, the Excel export and the PNG: everything comes from
- * computeWagerSettlement, shaped for display by lib/wagerResultsView.js. Nothing here
- * calculates a pool, payout or winner.
+ * computeWagerSettlement, shaped for display by lib/wagerResultsView.js and
+ * lib/wagerSummaryView.js. Nothing here calculates a pool, payout or winner.
  */
 
 import { useEffect, useMemo, useState } from 'react'
@@ -12,11 +12,15 @@ import { useParams, Link } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../hooks/useAuth'
 import { computeWagerSettlement } from '../lib/wagerSettlement'
-import { buildResultsModel, filterResults } from '../lib/wagerResultsView'
-import WagerResultsHeader from '../components/wager-results/WagerResultsHeader'
-import PoolSummaryCard from '../components/wager-results/PoolSummaryCard'
-import WagerResultsCard from '../components/wager-results/WagerResultsCard'
-import MatchWagersCard from '../components/wager-results/MatchWagersCard'
+import { buildResultsModel } from '../lib/wagerResultsView'
+import { buildSummary, filterBettorRows, filterPoolCards, poolView } from '../lib/wagerSummaryView'
+import WagerPageHeader from '../components/wager/WagerPageHeader'
+import StatTiles from '../components/ui/StatTiles'
+import Button from '../components/ui/Button'
+import { summaryTiles } from '../components/wager/WagerPayoutSummary'
+import PngWagerSummary from '../components/wager/PngWagerSummary'
+import { wagerPngFilename } from '../lib/wagerExport'
+import { ResultsToolbar, BettorView, PoolView } from '../components/wager/ResultsViews'
 
 const MIGC_ORG = import.meta.env.VITE_MIGC_ORG_ID
 
@@ -30,8 +34,8 @@ async function fetchScores(eventId) {
   return data ?? []
 }
 
-function Notice({ children, tone = 'text-[#5F5F5A]' }) {
-  return <div className={`flex min-h-screen items-center justify-center bg-[#F5F4F0] px-4 text-center ${tone}`}>{children}</div>
+function Notice({ children, tone = 'text-ink-muted' }) {
+  return <div className={`flex min-h-screen items-center justify-center bg-surface-dim px-4 text-center ${tone}`}>{children}</div>
 }
 
 export default function WagerResults() {
@@ -48,6 +52,8 @@ export default function WagerResults() {
   const [loading,  setLoading]  = useState(true)
   const [error,    setError]    = useState(null)
   const [query,    setQuery]    = useState('')
+  const [view,     setView]     = useState('bettor')
+  const [printing, setPrinting] = useState(false)
 
   useEffect(() => {
     let cancelled = false
@@ -116,51 +122,63 @@ export default function WagerResults() {
   }, [event, wagers, players, scores, pairings, nameOf, members])
 
   if (authLoading || loading) return <Notice>Loading…</Notice>
-  if (!isAdmin) return <Notice tone="text-[#1A1A1A]"><div><div className="text-lg font-bold text-red-600">Access Denied</div><div className="mt-1 text-sm text-[#5F5F5A]">Admin login required.</div><a href="/login" className="mt-3 inline-block text-sm font-semibold text-fairway-700">Sign in →</a></div></Notice>
+  if (!isAdmin) return <Notice tone="text-ink"><div><div className="text-lg font-bold text-red-600">Access Denied</div><div className="mt-1 text-sm text-ink-muted">Admin login required.</div><a href="/login" className="mt-3 inline-block text-sm font-semibold text-fairway-700">Sign in →</a></div></Notice>
   if (error) return <Notice tone="text-red-600">{error}</Notice>
 
-  const shown = filterResults(model, query)
+  const summary = buildSummary(model)
   const searching = query.trim().length > 0
+  const bettorRows = filterBettorRows(summary.bettors, query)
+  const poolCards = filterPoolCards(poolView(model), query)
   const eventDate = event.event_date
     ? new Date(event.event_date + 'T00:00:00').toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' })
     : ''
+  const eventName = event.name ?? `Event #${event.event_number}`
+  const meta = [eventName, event.course?.name, eventDate].filter(Boolean).join(' · ')
+  const generatedOn = new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
 
   return (
-    <div className="min-h-screen bg-[#F5F4F0] font-sans text-[#1A1A1A]">
-      <div className="mx-auto max-w-[1120px] space-y-6 px-4 py-8">
-        <div className="flex justify-end">
-          <Link to={`/wager/${eventId}/board`} className="text-sm font-semibold text-fairway-700 hover:underline">← Wager board</Link>
-        </div>
-
-        <WagerResultsHeader
-          clubName={event.league?.name}
-          title={`${event.name ?? `Event #${event.event_number}`} · Wagers`}
-          meta={[event.course?.name, eventDate].filter(Boolean).join(' · ')}
-          statusLabel={model.statusLabel}
-          final={model.final}
-          logoUrl={event.league?.logo_url ?? '/logo.png'}
-          query={query}
-          onQuery={setQuery}
+    <div className="min-h-screen bg-surface-dim font-sans text-ink">
+      <div className="mx-auto max-w-[1100px] space-y-6 px-4 py-6 sm:px-6 sm:py-8">
+        <WagerPageHeader
+          leagueName={event.league?.name}
+          logoUrl={event.league?.logo_url}
+          title="Wager results"
+          pill={{ tone: model.final ? 'closed' : 'open', label: model.final ? 'Betting closed · Settled' : model.statusLabel }}
+          meta={meta}
+          actions={
+            <>
+              <Button as={Link} to={`/wager/${eventId}/board`} variant="secondary">Wager board</Button>
+              {model.final && <Button onClick={() => setPrinting(true)} icon="download">Download summary (PNG)</Button>}
+            </>
+          }
         />
 
-        <PoolSummaryCard pools={model.pools} betsLabel={model.betsLabel} />
+        <StatTiles tiles={summaryTiles(summary)} />
 
-        {(shown.panels.length > 0 || !searching) && (
-          <WagerResultsCard panels={shown.panels} final={model.final} emptyMessage="No results yet. They appear once scores are entered." />
-        )}
+        <section className="overflow-hidden rounded-sm border border-surface-border bg-white">
+          <ResultsToolbar query={query} onQuery={setQuery} view={view} onView={setView} />
+          {view === 'bettor'
+            ? <BettorView rows={bettorRows} totals={summary.totals} losing={summary.tiles.settled.losing} searching={searching} legend={summary.legend} />
+            : <PoolView cards={poolCards} searching={searching} />}
+        </section>
 
-        {(shown.matches.length > 0 || !searching) && (
-          <MatchWagersCard matches={shown.matches} />
-        )}
-
-        {searching && shown.panels.length === 0 && shown.matches.length === 0 && (
-          <p className="py-6 text-center text-sm text-[#5F5F5A]">No winning bets match “{query.trim()}”.</p>
-        )}
-
-        <p className="text-center text-[10px] text-[#9ca3af]">
+        <p className="text-sm text-ink-muted">
           Full pool paid to winner(s). If no one picks the winner, funds roll to the club. Halved matches refund stakes.
         </p>
       </div>
+
+      {printing && (
+        <PngWagerSummary
+          filename={wagerPngFilename(event).replace(/^wager-results-/, 'wager-summary-')}
+          onDone={() => setPrinting(false)}
+          logoUrl={event.league?.logo_url}
+          leagueName={event.league?.name}
+          eventName={eventName}
+          meta={meta}
+          summary={summary}
+          generatedOn={generatedOn}
+        />
+      )}
     </div>
   )
 }

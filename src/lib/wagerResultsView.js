@@ -70,6 +70,7 @@ function winPanel(settlement, nameOf, resolver) {
     key: 'win',
     title: 'WIN pool',
     pool: settlement.winPool,
+    winnerText: tied ? `T1 · ${names.join(' / ')}` : names[0],
     pill: `${tied ? 'T1' : '1st'} at net ${w.net}: ${join(names)}`,
     note: w.matched
       ? 'Whole pool split among bettors on the winner, pro rata to stake; payout includes stake.'
@@ -85,6 +86,7 @@ function placePanel(settlement, nameOf, resolver) {
     const names = p.topPlayers.map(nameOf)
     return {
       key: 'place', title: 'PLACE pool', pool: settlement.placePool,
+      winnerText: names.join(' / '),
       pill: `${p.twoWayTie ? 'T1' : '1st/2nd'} at net ${p.net}: ${join(names)}`,
       note: `No PLACE bets on ${join(names)}, so the pool rolls to the club.`,
       rows: [],
@@ -99,8 +101,9 @@ function placePanel(settlement, nameOf, resolver) {
   let note = 'Split 50/50 between 1st- and 2nd-place bettors; stake back plus share of profit.'
   if (!p.g1.hasMatch) note += ` No PLACE bets on ${join(g1)}, so all profit goes to ${p.twoWayTie ? 'the other' : '2nd'}-place bettors.`
   else if (!p.g2.hasMatch && g2.length) note += ` No PLACE bets on ${join(g2)}, so all profit goes to ${p.twoWayTie ? 'the other' : '1st'}-place bettors.`
+  const winnerText = p.twoWayTie ? `${[...g1, ...g2].join(' / ')} (dead heat)` : [g1.join(' / '), g2.join(' / ')].filter(Boolean).join(' · ')
   return {
-    key: 'place', title: 'PLACE pool', pool: settlement.placePool, pill, note,
+    key: 'place', title: 'PLACE pool', pool: settlement.placePool, pill, note, winnerText,
     rows: [...p.g1.bettors, ...p.g2.bettors].map(b => rowOf(resolver, nameOf, b, true)),
   }
 }
@@ -122,13 +125,14 @@ function matchCardOf(card, nameOf, resolver) {
     resultLine = `${result.matchStatus} · Final`
   }
   const base = { id: match.id, number: match.match_number, a, b, resultLine, pool }
+  const winnerText = s.type === 'refund' ? 'Halved' : nameOf(s.winnerPid)
   if (s.type === 'refund') {
-    return { ...base, pill: 'Halved · Stakes refunded', halved: true, rows: s.bettors.map(x => rowOf(resolver, nameOf, x, false)) }
+    return { ...base, winnerText, pill: 'Halved · Stakes refunded', halved: true, rows: s.bettors.map(x => rowOf(resolver, nameOf, x, false)) }
   }
   if (s.type === 'club') {
-    return { ...base, pill: `Winner: ${nameOf(s.winnerPid)}`, halved: false, note: 'No bets on the winner.', rows: [] }
+    return { ...base, winnerText, pill: `Winner: ${nameOf(s.winnerPid)}`, halved: false, note: 'No bets on the winner.', rows: [] }
   }
-  return { ...base, pill: `Winner: ${nameOf(s.winnerPid)}`, halved: false, rows: s.bettors.map(x => rowOf(resolver, nameOf, x, false)) }
+  return { ...base, winnerText, pill: `Winner: ${nameOf(s.winnerPid)}`, halved: false, rows: s.bettors.map(x => rowOf(resolver, nameOf, x, false)) }
 }
 
 /** Live odds rows (pool ÷ amount on that player), exactly as the board shows them. */
