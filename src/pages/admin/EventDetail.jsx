@@ -2267,9 +2267,12 @@ function MatchPairingsManager({ event, eventId, eventPlayers, allScores = [], co
 
   async function deletePairing(id) {
     if (!(await assertGroupsEditable(eventId))) return
+    // Bets removed on the wager board are only hidden (deleted_at) but still reference the match,
+    // which blocks the delete. Erase those hidden bets first; live bets are untouched and still block it.
+    await supabase.from('wagers').delete().eq('match_pairing_id', id).not('deleted_at', 'is', null)
     const { error } = await supabase.from('match_pairings').delete().eq('id', id)
     if (error) {
-      // 23503 = foreign key violation: wagers still reference this match
+      // 23503 = foreign key violation: live wagers still reference this match
       toast.error(error.code === '23503'
         ? 'This match has bets on it, so it can\'t be removed. Remove or settle its bets on the wager board first.'
         : error.message)
