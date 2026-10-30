@@ -15,14 +15,18 @@
  */
 
 import { useEffect, useState } from 'react'
-import { useParams } from 'react-router-dom'
+import { useParams, Link } from 'react-router-dom'
 import { Helmet } from 'react-helmet-async'
 import { supabase } from '../lib/supabase'
 import { useSubdomainOrg } from '../lib/SubdomainContext'
 import { OPT_IN_GAME_LABELS, isBuyInEnabled, optInAmount } from '../lib/sideGames'
+import LeagueMark from '../components/ui/LeagueMark'
+import Button from '../components/ui/Button'
 
-const GREEN = '#1B4332'
-const GOLD  = '#D4AF37'
+const GOLD = '#C9A84C' // same gold the league initials mark uses
+const PAY_BTN = 'flex min-h-[52px] w-full items-center justify-center gap-3 rounded-sm px-4 text-[15px] font-bold text-white no-underline transition-opacity hover:opacity-90'
+const HINT = 'text-center text-xs text-ink-muted'
+const FIELD = 'block w-full min-h-[48px] rounded-[10px] border border-surface-highest bg-white px-3.5 text-base text-ink focus:border-fairway-700 focus:outline-none focus:ring-2 focus:ring-fairway-500'
 
 function isMobile() {
   return /android|iphone|ipad|ipod/i.test(navigator.userAgent)
@@ -68,19 +72,23 @@ function VenmoButton({ handle, amount, note }) {
         target="_blank"
         rel="noopener noreferrer"
         onClick={handleClick}
-        className="flex items-center justify-center gap-3 w-full py-3.5 rounded-xl font-bold text-white shadow-lg transition-opacity hover:opacity-90"
+        className={PAY_BTN}
         style={{ background: '#008CFF' }}
       >
         <svg viewBox="0 0 24 24" className="w-5 h-5 fill-white" xmlns="http://www.w3.org/2000/svg">
           <path d="M19.5 2C20.6 4.3 21 6.2 21 8.6c0 6.7-5.7 15.4-10.3 15.4-4.4 0-5.2-3.8-7.7-9.3l3.4-1.2c.8 2.1 1.6 4.4 2.9 4.4 1.5 0 3.9-5 3.9-8.3 0-2.4-.8-3.5-2-3.5-1.1 0-2.1.7-2.8 1.7L5.8 5.5C7.4 3 9.5 2 12 2c2.5 0 5.3 1.2 7.5 0z"/>
         </svg>
-        Pay ${amount} via Venmo
+        Pay with Venmo · ${amount}
       </a>
-      <p className="text-xs text-gray-400 text-center -mt-1">
+      <p className={HINT}>
         Please confirm the amount is <strong>${amount}</strong> before sending.
       </p>
     </>
   )
+}
+
+function Shell({ children }) {
+  return <div className="min-h-screen bg-surface-dim font-sans text-ink">{children}</div>
 }
 
 export default function OptIn() {
@@ -125,21 +133,8 @@ export default function OptIn() {
     load()
   }, [leagueSlug, eventSlug])
 
-  if (loading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center" style={{ background: 'linear-gradient(150deg,#0b2318 0%,#1B4332 45%,#1f5c3e 100%)' }}>
-        <p className="text-white/60">Loading…</p>
-      </div>
-    )
-  }
-
-  if (!event) {
-    return (
-      <div className="min-h-screen flex items-center justify-center" style={{ background: 'linear-gradient(150deg,#0b2318 0%,#1B4332 45%,#1f5c3e 100%)' }}>
-        <p className="text-white/60">Event not found.</p>
-      </div>
-    )
-  }
+  if (loading) return <Shell><p className="py-24 text-center text-ink-muted">Loading…</p></Shell>
+  if (!event) return <Shell><p className="py-24 text-center text-ink-muted">Event not found.</p></Shell>
 
   const selectedPlayer  = eventPlayers.find(ep => ep.player_id === playerId)
   const selectedFlight  = selectedPlayer?.flight ?? null
@@ -190,6 +185,8 @@ export default function OptIn() {
   const eventDate  = event.event_date
     ? new Date(event.event_date + 'T00:00:00').toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })
     : ''
+  const eventHref  = subdomainOrg ? null : `/${orgSlug}/${leagueSlug}/${eventSlug}/event`
+  const closedNow  = !result && isClosed
 
   return (
     <>
@@ -197,46 +194,45 @@ export default function OptIn() {
       <title>Side Game Opt-In — {eventLabel} | Scorify Golf</title>
       <meta name="robots" content="noindex" />
     </Helmet>
-    <div className="min-h-screen flex flex-col items-center justify-center p-4"
-      style={{ background: 'linear-gradient(150deg,#0b2318 0%,#1B4332 45%,#1f5c3e 100%)' }}>
-      <div className="w-full max-w-sm">
-
-        {/* Header */}
-        <div className="text-center mb-8">
-          <img src={event.league?.logo_url ?? '/logo.png'} alt="Golf League Logo"
-            className="w-20 h-20 rounded-full object-cover mx-auto mb-3 shadow-xl" />
-          <h1 className="text-white font-bold text-2xl" style={{ fontFamily: "'Manrope', sans-serif" }}>
-            Side Game Opt-In
-          </h1>
-          <p className="text-white/80 font-semibold mt-1">{eventLabel}</p>
-          <p className="text-white/50 text-sm">{event.course?.name}{event.course?.name && eventDate ? ' · ' : ''}{eventDate}</p>
-          <div className="mx-auto mt-3" style={{ width: 40, height: 2, background: GOLD }} />
+    <Shell>
+      {/* Header band (same as the registration page) */}
+      <header className="border-b border-surface-border bg-white px-4 pb-6 pt-6 text-center">
+        <div className="mx-auto flex max-w-[480px] flex-col items-center">
+          <LeagueMark name={event.league?.name} logoUrl={event.league?.logo_url} size={72} />
+          <p className="mt-3 text-[11px] font-bold uppercase tracking-[0.1em] text-fairway-700">{event.league?.name}</p>
+          <span className={`mt-2 inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-bold ${closedNow ? 'bg-surface-high text-ink-muted' : 'bg-status-upcoming-bg text-status-upcoming-text'}`}>
+            {!closedNow && <span className="h-1.5 w-1.5 rounded-full bg-current" aria-hidden="true" />}
+            {closedNow ? 'Opt-in closed' : 'Opt-in open'}
+          </span>
+          <h1 className="mt-3 text-[clamp(28px,8vw,36px)] font-extrabold leading-[1.1] text-ink" style={{ letterSpacing: '-0.03em' }}>Side game opt-in</h1>
+          <div className="mt-3 h-1 w-11 rounded-full" style={{ background: GOLD }} aria-hidden="true" />
+          <p className="mt-3 text-[15px] font-bold text-ink">{eventLabel}</p>
+          {eventDate && <p className="text-[15px] text-ink-muted">{eventDate}</p>}
+          {event.course?.name && <p className="text-[15px] text-ink-muted">{event.course.name}</p>}
         </div>
+      </header>
 
-        {!result && isClosed && (
-          <div className="bg-white rounded-2xl shadow-2xl p-6 text-center">
-            <p className="text-gray-700 font-semibold mb-1">Opt-in is closed</p>
-            <p className="text-sm text-gray-400">This event's opt-in window has ended. See an event admin if you still need to pay.</p>
+      <main className="mx-auto w-full max-w-[480px] space-y-4 px-4 py-4">
+        {closedNow && (
+          <div className="rounded-sm border border-surface-border bg-white p-6 text-center">
+            <p className="font-bold text-ink">Opt-in is closed</p>
+            <p className="mt-1 text-sm text-ink-muted">This event's opt-in window has ended. See an event admin if you still need to pay.</p>
           </div>
         )}
 
         {!result && !isClosed && availableGames.length === 0 && (
-          <div className="bg-white rounded-2xl shadow-2xl p-6 text-center">
-            <p className="text-gray-500">No opt-in side games are set up for this event yet.</p>
+          <div className="rounded-sm border border-surface-border bg-white p-6 text-center">
+            <p className="text-ink-muted">No opt-in side games are set up for this event yet.</p>
           </div>
         )}
 
         {/* Opt-in form */}
         {!result && !isClosed && availableGames.length > 0 && (
-          <div className="bg-white rounded-2xl shadow-2xl p-6 space-y-5">
+          <section className="space-y-5 rounded-sm border border-surface-border bg-white p-4 sm:p-5">
             <div>
-              <label className="block text-xs font-semibold text-gray-600 mb-1">Your Name</label>
-              <select
-                value={playerId}
-                onChange={e => setPlayerId(e.target.value)}
-                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-600"
-              >
-                <option value="">— Select your name —</option>
+              <label htmlFor="optin-name" className="mb-1.5 block text-sm font-bold text-ink">Your name</label>
+              <select id="optin-name" value={playerId} onChange={e => setPlayerId(e.target.value)} className={FIELD}>
+                <option value="">Select your name</option>
                 {eventPlayers.map(ep => (
                   <option key={ep.player_id} value={ep.player_id}>
                     {ep.player?.first_name} {ep.player?.last_name}
@@ -245,99 +241,92 @@ export default function OptIn() {
               </select>
             </div>
 
-            <div>
-              <p className="text-xs font-semibold text-gray-600 mb-2">Select the games you're joining</p>
+            <fieldset>
+              <legend className="mb-1.5 text-sm font-bold text-ink">Select the games you're joining</legend>
               <div className="space-y-2">
-                {availableGames.map(key => (
-                  <label key={key} className="flex items-center justify-between gap-2 border border-gray-200 rounded-lg px-3 py-2.5 cursor-pointer">
-                    <span className="flex items-center gap-2">
-                      <input
-                        type="checkbox"
-                        checked={selectedGames.has(key)}
-                        onChange={() => toggleGame(key)}
-                        className="accent-fairway-600 w-4 h-4"
-                      />
-                      <span className="text-sm font-medium text-gray-800">{OPT_IN_GAME_LABELS[key]}</span>
-                    </span>
-                    <span className="text-sm text-gray-500">${Number(optInAmount(event, key, selectedFlight)).toFixed(2)}</span>
-                  </label>
-                ))}
+                {availableGames.map(key => {
+                  const on = selectedGames.has(key)
+                  return (
+                    <label
+                      key={key}
+                      className={`flex min-h-[52px] cursor-pointer items-center justify-between gap-3 rounded-sm border px-4 py-2 transition-colors ${
+                        on ? 'border-fairway-700 bg-status-active-bg' : 'border-surface-highest bg-white hover:bg-surface-dim'
+                      }`}
+                    >
+                      <span className="flex items-center gap-3">
+                        <input type="checkbox" checked={on} onChange={() => toggleGame(key)} className="h-5 w-5 shrink-0 accent-fairway-700" />
+                        <span className="text-[15px] font-bold text-ink">{OPT_IN_GAME_LABELS[key]}</span>
+                      </span>
+                      <span className="text-[15px] font-bold tabular-nums text-ink">${Number(optInAmount(event, key, selectedFlight)).toFixed(2)}</span>
+                    </label>
+                  )
+                })}
               </div>
-            </div>
+            </fieldset>
 
             {playerId && alreadyKeys.length > 0 && (
-              <p className="text-xs text-amber-600">
-                Already signed up for {alreadyKeys.map(k => OPT_IN_GAME_LABELS[k]).join(', ')} — no need to pay again for {alreadyKeys.length > 1 ? 'those' : 'that'}.
+              <p className="rounded-sm bg-status-upcoming-bg px-3 py-2 text-sm font-semibold text-status-upcoming-text">
+                Already signed up for {alreadyKeys.map(k => OPT_IN_GAME_LABELS[k]).join(', ')}. No need to pay again for {alreadyKeys.length > 1 ? 'those' : 'that'}.
               </p>
             )}
 
             {playerId && selectedList.length > 0 && newKeys.length === 0 && (
-              <p className="text-sm text-center text-gray-500 font-medium">You're already signed up — no payment needed.</p>
+              <p className="text-center text-sm font-semibold text-ink-muted">You're already signed up. No payment needed.</p>
             )}
 
-            {error && <p className="text-red-500 text-xs text-center">{error}</p>}
+            {error && <div role="alert" className="rounded-sm border border-red-200 bg-red-50 px-4 py-3 text-sm font-semibold text-red-700">{error}</div>}
 
             {newKeys.length > 0 && (
-              <div className="space-y-2">
-                <div className="bg-gray-50 rounded-xl px-4 py-3 text-sm flex justify-between font-bold text-gray-900">
-                  <span>Total</span><span>${total.toFixed(2)}</span>
+              <div className="space-y-3">
+                <div className="flex items-center justify-between rounded-sm border border-fairway-200 bg-status-active-bg px-4 py-3.5">
+                  <span className="text-lg font-extrabold text-fairway-800">Total</span>
+                  <span className="text-[28px] font-extrabold tabular-nums leading-none text-fairway-800">${total.toFixed(2)}</span>
                 </div>
-                <button
-                  type="button"
-                  disabled={!canSubmit}
-                  onClick={() => submit('cash')}
-                  className="w-full py-3 rounded-xl font-bold text-white text-sm transition-opacity disabled:opacity-60"
-                  style={{ background: GREEN }}
-                >
-                  {submitting ? 'Submitting…' : `Pay Cash — $${total.toFixed(2)}`}
-                </button>
-                <p className="text-xs text-gray-400 text-center -mt-1">
-                  Cash must be paid to league admin before event begins.
-                </p>
+                <Button size="lg" className="w-full !min-h-[52px] text-base" disabled={!canSubmit} onClick={() => submit('cash')}>
+                  {submitting ? 'Submitting…' : `Pay cash · $${total.toFixed(2)}`}
+                </Button>
+                <p className={HINT}>Cash must be paid to league admin before event begins.</p>
                 {event.venmo_handle && (
                   <button
                     type="button"
                     disabled={!canSubmit}
                     onClick={() => submit('venmo')}
-                    className="w-full py-3 rounded-xl font-bold text-white text-sm transition-opacity disabled:opacity-60"
+                    className={`${PAY_BTN} disabled:opacity-60`}
                     style={{ background: '#008CFF' }}
                   >
-                    {submitting ? 'Submitting…' : `Pay with Venmo — $${total.toFixed(2)}`}
+                    {submitting ? 'Submitting…' : `Pay with Venmo · $${total.toFixed(2)}`}
                   </button>
                 )}
               </div>
             )}
-          </div>
+          </section>
         )}
 
         {/* Confirmation */}
         {result && (
-          <div className="bg-white rounded-2xl shadow-2xl p-6 space-y-5 text-center">
+          <section className="space-y-5 rounded-sm border border-surface-border bg-white p-5 text-center">
             <div>
-              <div className="w-12 h-12 rounded-full flex items-center justify-center mx-auto mb-3" style={{ background: '#d1fae5' }}>
-                <svg className="w-6 h-6 text-green-700" fill="none" stroke="currentColor" strokeWidth={2.5} viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-                </svg>
+              <div className="mx-auto mb-3 flex h-14 w-14 items-center justify-center rounded-full bg-fairway-700 text-white" aria-hidden="true">
+                <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><path d="M5 12l5 5L20 7" /></svg>
               </div>
-              <h2 className="text-lg font-bold text-gray-900">You're in!</h2>
-              <p className="text-sm text-gray-500 mt-1">
+              <h2 className="text-2xl font-extrabold text-ink" style={{ letterSpacing: '-0.02em' }}>You're in</h2>
+              <p className="mt-1 text-sm text-ink-muted">
                 {playerName}, you're signed up for{' '}
-                <span className="font-semibold text-gray-900">
-                  {result.joinedKeys.map(k => OPT_IN_GAME_LABELS[k]).join(', ')}
-                </span>.
+                <span className="font-bold text-ink">{result.joinedKeys.map(k => OPT_IN_GAME_LABELS[k]).join(', ')}</span>.
               </p>
             </div>
 
             {result.method === 'cash' && (
-              <div className="space-y-1">
-                <p className="text-sm text-gray-600">Tell the League Admin you're paying <strong>${result.total.toFixed(2)}</strong> cash.</p>
-                <p className="text-xs text-amber-600 font-medium">Cash must be paid to league admin before event begins.</p>
+              <div className="space-y-1 rounded-sm border border-surface-border bg-status-upcoming-bg px-4 py-4 text-left">
+                <p className="text-[15px] font-bold text-status-upcoming-text">Next: pay ${result.total.toFixed(2)} cash</p>
+                <p className="text-sm text-status-upcoming-text">Tell the League Admin you're paying <strong>${result.total.toFixed(2)}</strong> cash.</p>
+                <p className="text-sm font-semibold text-status-upcoming-text">Cash must be paid to league admin before event begins.</p>
               </div>
             )}
 
             {result.method === 'venmo' && event.venmo_handle && (
-              <div className="space-y-3">
-                <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Complete your payment</p>
+              <div className="space-y-3 rounded-sm border border-surface-border bg-status-upcoming-bg px-4 py-4 text-left">
+                <p className="text-[15px] font-bold text-status-upcoming-text">Next: complete your payment</p>
                 <VenmoButton
                   handle={event.venmo_handle}
                   amount={result.total.toFixed(2)}
@@ -345,11 +334,16 @@ export default function OptIn() {
                 />
               </div>
             )}
-          </div>
+
+            {eventHref && <Button as={Link} to={eventHref} variant="secondary" size="lg" className="w-full">Back to event page</Button>}
+          </section>
         )}
 
-      </div>
-    </div>
+        <footer className="pb-8 pt-2 text-center">
+          <p className="text-xs text-ink-muted">Powered by <span className="font-bold text-fairway-700">Scorify Golf</span></p>
+        </footer>
+      </main>
+    </Shell>
     </>
   )
 }

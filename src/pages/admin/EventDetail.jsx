@@ -65,6 +65,7 @@ import LockedBanner from '../../components/ui/LockedBanner'
 import WinnerField from '../../components/side-games/WinnerField'
 import LongDriveCard from '../../components/side-games/LongDriveCard'
 import ClosestToPinCard from '../../components/side-games/ClosestToPinCard'
+import OptInHintCard from '../../components/side-games/OptInHintCard'
 import { buildSideGamesPlan, withOverrides, eligiblePlayers, winnerValue } from '../../lib/sideGamesView'
 import PhotosCard from '../../components/ui/PhotosCard'
 import { atLimit, getLimit, nextTier, TIER_LABELS } from '../../lib/features'
@@ -3634,118 +3635,125 @@ function TabSideGamesMain({ event, eventPlayers, course, sideGames, onUpdated, o
 
   return (
     <div className="space-y-6">
+      {/* ── Nothing opted in yet: say how to turn it on ───────────── */}
+      {buyInGames.length === 0 && <OptInHintCard />}
+
       {/* ── Opt-in link ──────────────────────────────────────────── */}
       {buyInGames.length > 0 && (
-        <Card>
-          <CardHeader title="Opt-In Link" subtitle="Share this link (or the printable Check-In QR sign) so players can self-serve join & pay for opt-in games" />
-          <div className="flex items-center gap-2 px-4 pb-4">
-            <input readOnly value={optInUrl} className="input text-xs flex-1 bg-surface-container" onFocus={e => e.target.select()} />
-            <Button size="sm" variant="secondary" onClick={() => { navigator.clipboard.writeText(optInUrl); toast.success('Link copied!') }}>
-              Copy
+        <SectionCard
+          title="Opt-in link"
+          subtitle="Share this link (or the printable Check-In QR sign) so players can self-serve join and pay for opt-in games."
+        >
+          <div className="flex flex-col gap-2 sm:flex-row">
+            <input
+              readOnly value={optInUrl} aria-label="Opt-in link"
+              className="min-h-[44px] min-w-0 flex-1 rounded-sm border border-surface-highest bg-surface-dim px-3 text-sm text-ink focus:border-fairway-700 focus:outline-none focus:ring-2 focus:ring-fairway-500"
+              onFocus={e => e.target.select()}
+            />
+            <Button variant="secondary" icon="copy" onClick={() => { navigator.clipboard.writeText(optInUrl); toast.success('Link copied!') }}>
+              Copy link
             </Button>
           </div>
-        </Card>
+        </SectionCard>
       )}
 
       {/* ── Opt-in rosters ───────────────────────────────────────── */}
       {buyInGames.length > 0 && (
-        <div>
-          <h3 className="text-xs font-semibold text-ink-muted uppercase tracking-widest mb-3">Opt-in Rosters</h3>
-          <div className="space-y-4">
-            {buyInGames.map(key => {
-              const opted      = entries[key] ?? []
-              const paidCount  = opted.filter(pid => paidMethodFor(key, pid) != null).length
-              const cashCount  = opted.filter(pid => paidMethodFor(key, pid) === 'cash').length
-              const venmoCount = opted.filter(pid => paidMethodFor(key, pid) === 'venmo').length
-              const amount     = payoutAmountForKey(key)
-              const pot        = amount != null ? opted.length * amount : null
-              return (
-                <Card key={key}>
-                  <div className="flex items-center justify-between mb-3">
-                    <CardHeader title={gameLabel(key)} subtitle={amount != null ? `$${amount} per entrant · set in Payouts tab` : 'Set the $ per entrant in the Payouts tab'} />
-                    {pot != null && (
-                      <div className="text-right">
-                        <div className="text-xs text-ink-muted">Pot</div>
-                        <div className="text-lg font-bold text-status-active-text">${pot.toFixed(2)}</div>
-                        <div className="text-xs text-ink-muted">{opted.length} entrant{opted.length !== 1 ? 's' : ''}</div>
-                        {opted.length > 0 && (
-                          <div className={`text-xs font-medium ${paidCount === opted.length ? 'text-status-active-text' : 'text-status-upcoming-text'}`}>
-                            {paidCount}/{opted.length} paid
-                            {(cashCount > 0 || venmoCount > 0) && (
-                              <span className="text-ink-muted font-normal"> ({cashCount} cash · {venmoCount} venmo)</span>
+        <div className="space-y-4">
+          <h2 className="text-[11px] font-bold uppercase tracking-widest text-ink-muted">Opt-in rosters</h2>
+          {buyInGames.map(key => {
+            const opted      = entries[key] ?? []
+            const paidCount  = opted.filter(pid => paidMethodFor(key, pid) != null).length
+            const cashCount  = opted.filter(pid => paidMethodFor(key, pid) === 'cash').length
+            const venmoCount = opted.filter(pid => paidMethodFor(key, pid) === 'venmo').length
+            const amount     = payoutAmountForKey(key)
+            const pot        = amount != null ? opted.length * amount : null
+            const allPaid    = opted.length > 0 && paidCount === opted.length
+            const tiles = [
+              { label: 'Entrants', value: opted.length },
+              ...(pot != null ? [{ label: 'Pot', value: `$${pot.toFixed(2)}` }] : []),
+              ...(opted.length > 0 ? [{
+                label: 'Paid', value: `${paidCount}/${opted.length}`, tone: allPaid ? 'good' : 'warn',
+                helper: (cashCount > 0 || venmoCount > 0) ? `${cashCount} cash · ${venmoCount} Venmo` : undefined,
+              }] : []),
+            ]
+            return (
+              <SectionCard
+                key={key}
+                title={gameLabel(key)}
+                subtitle={amount != null ? `$${amount} per entrant · set in the Payout tab` : 'Set the $ per entrant in the Payout tab'}
+              >
+                <StatTiles tiles={tiles} className="mb-4 !grid-cols-3" />
+
+                {key === 'super_ctp' && (
+                  <div className="mb-4">
+                    <label htmlFor="super-ctp-hole" className="mb-1 block text-sm font-bold text-ink">Designated hole</label>
+                    <select
+                      id="super-ctp-hole"
+                      value={superCtpHole}
+                      onChange={e => saveCtpHole(e.target.value)}
+                      className="min-h-[44px] w-full rounded-sm border border-surface-highest bg-white px-3 text-sm text-ink focus:border-fairway-700 focus:outline-none focus:ring-2 focus:ring-fairway-500 sm:max-w-xs"
+                    >
+                      <option value="">Select a par 3 hole</option>
+                      {allPar3sMain.map(h => (
+                        <option key={h.hole} value={h.hole}>Hole {h.hole} (Par 3)</option>
+                      ))}
+                    </select>
+                  </div>
+                )}
+
+                <div className="grid gap-2 sm:grid-cols-2">
+                  {[...eventPlayers].sort(epAlpha).map(ep => {
+                    const pid     = ep.player_id
+                    const p       = ep.player ?? {}
+                    const name    = [p.first_name, p.last_name].filter(Boolean).join(' ') || '—'
+                    const isOpted = opted.includes(pid)
+                    const method  = paidMethodFor(key, pid)
+                    const payBtn  = (m, label, on) => (
+                      <button
+                        type="button"
+                        onClick={() => setPaidMethod(key, pid, method === m ? null : m)}
+                        aria-pressed={method === m}
+                        className={`min-h-[44px] min-w-[60px] rounded-sm border px-3 text-sm font-semibold transition-colors ${
+                          method === m ? on : 'border-surface-highest bg-white text-ink-muted hover:bg-surface-dim'
+                        }`}
+                      >
+                        {label}
+                      </button>
+                    )
+                    return (
+                      <div
+                        key={pid}
+                        className={`flex min-h-[52px] items-center justify-between gap-2 rounded-sm border px-3 py-1 ${
+                          isOpted ? 'border-fairway-200 bg-status-active-bg' : 'border-surface-border bg-white'
+                        }`}
+                      >
+                        <label className="flex min-h-[44px] min-w-0 flex-1 cursor-pointer items-center gap-3">
+                          <input
+                            type="checkbox"
+                            checked={isOpted}
+                            onChange={() => toggleEntry(key, pid)}
+                            className="h-5 w-5 shrink-0 accent-fairway-700"
+                          />
+                          <span className="min-w-0 truncate text-sm font-semibold text-ink">{name}</span>
+                        </label>
+                        {isOpted && (
+                          <div className="flex shrink-0 items-center gap-1.5">
+                            {method === 'unspecified' && (
+                              <span className="text-sm font-bold text-status-active-text" title="Marked paid before cash/Venmo tracking existed">Paid</span>
                             )}
+                            {payBtn('cash', 'Cash', 'border-fairway-700 bg-fairway-700 text-white')}
+                            {payBtn('venmo', 'Venmo', 'border-blue-600 bg-blue-600 text-white')}
                           </div>
                         )}
                       </div>
-                    )}
-                  </div>
-                  {key === 'super_ctp' && (
-                    <div className="mb-3">
-                      <label className="text-xs font-semibold text-ink-muted block mb-1">Designated Hole</label>
-                      <select
-                        value={superCtpHole}
-                        onChange={e => saveCtpHole(e.target.value)}
-                        className="input bg-white text-sm"
-                      >
-                        <option value="">— Select a par 3 hole —</option>
-                        {allPar3sMain.map(h => (
-                          <option key={h.hole} value={h.hole}>Hole {h.hole} (Par 3)</option>
-                        ))}
-                      </select>
-                    </div>
-                  )}
-                  <div className="grid grid-cols-2 gap-1.5">
-                    {[...eventPlayers].sort(epAlpha).map(ep => {
-                      const pid     = ep.player_id
-                      const p       = ep.player ?? {}
-                      const name    = [p.first_name, p.last_name].filter(Boolean).join(' ') || '—'
-                      const isOpted = opted.includes(pid)
-                      const method  = paidMethodFor(key, pid)
-                      return (
-                        <div key={pid} className="flex items-center justify-between gap-1.5 text-sm text-ink">
-                          <label className="flex items-center gap-2 cursor-pointer min-w-0">
-                            <input
-                              type="checkbox"
-                              checked={isOpted}
-                              onChange={() => toggleEntry(key, pid)}
-                              className="accent-fairway-600 w-4 h-4 shrink-0"
-                            />
-                            <span className="truncate">{name}</span>
-                          </label>
-                          {isOpted && (
-                            <div className="flex items-center gap-1 shrink-0">
-                              {method === 'unspecified' && (
-                                <span className="text-xs text-status-active-text" title="Marked paid before cash/Venmo tracking existed">✓</span>
-                              )}
-                              <button
-                                type="button"
-                                onClick={() => setPaidMethod(key, pid, method === 'cash' ? null : 'cash')}
-                                className={`px-1.5 py-0.5 rounded text-xs font-medium border transition-colors ${
-                                  method === 'cash' ? 'bg-fairway-700 text-white border-fairway-700' : 'text-ink-muted border-surface-border hover:border-surface-highest'
-                                }`}
-                              >
-                                Cash
-                              </button>
-                              <button
-                                type="button"
-                                onClick={() => setPaidMethod(key, pid, method === 'venmo' ? null : 'venmo')}
-                                className={`px-1.5 py-0.5 rounded text-xs font-medium border transition-colors ${
-                                  method === 'venmo' ? 'bg-blue-600 text-white border-blue-600' : 'text-ink-muted border-surface-border hover:border-surface-highest'
-                                }`}
-                              >
-                                Venmo
-                              </button>
-                            </div>
-                          )}
-                        </div>
-                      )
-                    })}
-                  </div>
-                  {(savingEn || savingPd) && <p className="text-xs text-ink-muted mt-2">Saving…</p>}
-                </Card>
-              )
-            })}
-          </div>
+                    )
+                  })}
+                </div>
+                {(savingEn || savingPd) && <p className="mt-3 text-sm text-ink-muted">Saving…</p>}
+              </SectionCard>
+            )
+          })}
         </div>
       )}
 
