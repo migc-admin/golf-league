@@ -1,49 +1,71 @@
 /**
- * WagerShareCard — the shareable image of the wager results (PNG export).
+ * WagerShareCard — the shareable image of the wagers (PNG export from the admin board).
  *
- * Rendered off-screen by WagerAdmin and captured with html-to-image. It is the results page
- * without the search box, built from the very same components and the same view-model, so the
- * image always matches the page: header, Pool Summary, Wager Results, Match Play Wagers, and the
- * footer. While an event is still being played it also includes Live Odds (the page doesn't).
- * Winners only.
+ * Rendered off-screen by WagerAdmin and captured with html-to-image. It uses the same building
+ * blocks and the same view-model as the redesigned pages: league header, pool tiles, then either
+ * the winning pools (once the event is final) or live odds and the match pools (while it is still
+ * being played). Winners only; no bettor is listed before the results are final.
  */
 
-import WagerResultsHeader from './wager-results/WagerResultsHeader'
-import PoolSummaryCard from './wager-results/PoolSummaryCard'
-import WagerResultsCard from './wager-results/WagerResultsCard'
-import MatchWagersCard from './wager-results/MatchWagersCard'
-import LiveOddsCard from './wager-results/LiveOddsCard'
+import LeagueMark from './ui/LeagueMark'
+import StatTiles from './ui/StatTiles'
+import { PoolCard } from './wager/ResultsViews'
+import { OddsCard, MatchPoolsCard } from './wager/AdminBoard'
+import { poolView } from '../lib/wagerSummaryView'
+import { money } from '../lib/wagerResultsView'
+import { useEmbeddedLogo } from '../lib/useEmbeddedLogo'
 
-export const WAGER_CARD_WIDTH = 1120
+export const WAGER_CARD_WIDTH = 720
 
 export const WAGER_FOOTER = 'Full pool paid to winner(s). If no one picks the winner, funds roll to the club. Halved matches refund stakes.'
 
-export default function WagerShareCard({ event, eventDate, model, logoUrl }) {
-  const hasResults = model.panels.length > 0
+export const CARD_BACKGROUND = '#f4f3f0' // surface-dim
+
+export default function WagerShareCard({ event, eventDate, model, logoUrl, matchCards = [], playerName = id => id }) {
+  // Embed the logo so the capture never races a network request (initials show if it can't load).
+  const { logo } = useEmbeddedLogo(logoUrl)
+  const cards = poolView(model)
+  const tiles = [
+    { label: 'Win pool', value: money(model.pools.win) },
+    { label: 'Place pool', value: money(model.pools.place) },
+    { label: 'Match pools', value: money(model.pools.match) },
+    { label: 'Total pot', value: money(model.pools.total), helper: model.betsLabel, tone: 'good' },
+  ]
   return (
     <div
-      style={{ width: WAGER_CARD_WIDTH, boxSizing: 'border-box' }}
-      className="space-y-6 bg-[#F5F4F0] p-8 font-sans text-[#1A1A1A]"
+      style={{ width: WAGER_CARD_WIDTH, boxSizing: 'border-box', background: CARD_BACKGROUND }}
+      className="space-y-5 p-6 font-sans text-ink"
     >
-      <WagerResultsHeader
-        clubName={event.league?.name}
-        title={`${event.name ?? `Event #${event.event_number}`} · Wagers`}
-        meta={[event.course?.name, eventDate].filter(Boolean).join(' · ')}
-        statusLabel={model.statusLabel}
-        final={model.final}
-        logoUrl={logoUrl}
-        showSearch={false}
-      />
+      <header>
+        <div className="flex items-center gap-3">
+          <LeagueMark name={event.league?.name} logoUrl={logo} size={44} />
+          <span className="text-[11px] font-bold uppercase tracking-[0.1em] text-fairway-700">{event.league?.name}</span>
+        </div>
+        <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1.5">
+          <h1 className="text-[28px] font-extrabold leading-tight text-ink" style={{ letterSpacing: '-0.02em' }}>
+            {model.final ? 'Wager results' : 'Wager odds'}
+          </h1>
+          <span className={`inline-flex rounded-full px-2.5 py-0.5 text-xs font-bold ${model.final ? 'bg-surface-high text-ink-muted' : 'bg-status-active-bg text-status-active-text'}`}>
+            {model.statusLabel}
+          </span>
+        </div>
+        <p className="mt-1 text-sm text-ink-muted">
+          {[event.name ?? `Event #${event.event_number}`, event.course?.name, eventDate].filter(Boolean).join(' · ')}
+        </p>
+      </header>
 
-      <PoolSummaryCard pools={model.pools} betsLabel={model.betsLabel} />
+      <StatTiles tiles={tiles} />
 
-      {hasResults && <WagerResultsCard panels={model.panels} final={model.final} />}
+      {model.final
+        ? (cards.length > 0 && <div className="space-y-4">{cards.map(c => <PoolCard key={c.key} card={c} />)}</div>)
+        : (
+          <>
+            <OddsCard rows={model.odds} />
+            <MatchPoolsCard cards={matchCards} playerName={playerName} />
+          </>
+        )}
 
-      {model.matches.length > 0 && <MatchWagersCard matches={model.matches} />}
-
-      {!model.final && model.odds.length > 0 && <LiveOddsCard rows={model.odds} />}
-
-      <p className="text-center text-[11px] text-[#9ca3af]">{WAGER_FOOTER}</p>
+      <p className="text-center text-xs text-ink-muted">{WAGER_FOOTER}</p>
     </div>
   )
 }

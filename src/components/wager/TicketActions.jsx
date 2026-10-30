@@ -39,7 +39,7 @@ export default function TicketActions({ captureRef, ticketId, ticketUrl, ready, 
     <div className="mx-auto mt-4 w-full max-w-[420px] space-y-3">
       <Button size="lg" className="w-full" icon="download" onClick={save} loading={saving} disabled={!ready}>Save ticket</Button>
       <div className="grid grid-cols-2 gap-3">
-        <Button size="lg" variant="secondary" as={Link} to={`/wager/${eventId}/results`}>Wager results</Button>
+        <Button size="lg" variant="secondary" as={Link} to={`/wager/${eventId}/results`}>Odds & results</Button>
         {placeMore.to
           ? <Button size="lg" variant="secondary" as={Link} to={placeMore.to}>Place more bets</Button>
           : <Button size="lg" variant="secondary" onClick={placeMore.onClick}>Place more bets</Button>}

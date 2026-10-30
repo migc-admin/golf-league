@@ -3,7 +3,7 @@ import { createElement as h } from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
 import { computeWagerSettlement } from '../lib/wagerSettlement'
 import { buildResultsModel } from '../lib/wagerResultsView'
-import WagerShareCard, { WAGER_CARD_WIDTH, WAGER_FOOTER } from './WagerShareCard'
+import WagerShareCard, { WAGER_CARD_WIDTH, WAGER_FOOTER, CARD_BACKGROUND } from './WagerShareCard'
 
 const html = el => renderToStaticMarkup(el)
 const course = { stroke_index: Array.from({ length: 18 }, (_, i) => i + 1), par_per_hole: Array.from({ length: 18 }, () => 4) }
@@ -29,21 +29,22 @@ const pairings = [{ id: 'm1', match_number: 1, player_a_id: 'p1', player_b_id: '
 const settlement = computeWagerSettlement({ active, players, scores, pairings, course })
 const event = (status) => ({ name: 'Playoffs - Round 1', status, league: { name: "Mulligan's Island Golf Club" }, course: { name: 'The Golf Club of California' } })
 const render = status => html(h(WagerShareCard, {
-  event: event(status), eventDate: 'Sun, Oct 25, 2026', logoUrl: '/logo.png',
+  event: event(status), eventDate: 'Sun, Oct 25, 2026', logoUrl: null,
   model: buildResultsModel({ event: event(status), settlement, active, nameOf }),
+  matchCards: settlement.matchCards, playerName: nameOf,
 }))
 
 describe('WagerShareCard (final)', () => {
   const out = render('complete')
 
-  it('is the results page without the search box: header, pools, results, matches, footer', () => {
-    expect(out).toContain('Playoffs - Round 1 · Wagers')
+  it('has the redesigned header, pool tiles and the winning pools', () => {
+    expect(out).toContain("Mulligan&#x27;s Island Golf Club")
+    expect(out).toContain('Wager results')
     expect(out).toContain('Final · Settled')
-    expect(out).not.toContain('Find a bettor')
-    for (const t of ['Pool Summary', 'Wager Results', 'Match Play Wagers']) expect(out).toContain(t)
+    expect(out).toContain('Playoffs - Round 1 · The Golf Club of California · Sun, Oct 25, 2026')
+    for (const t of ['Win pool', 'Place pool', 'Match pools', 'Total pot']) expect(out).toContain(t)
     expect(out).toContain(WAGER_FOOTER)
-    expect(out.indexOf('Pool Summary')).toBeLessThan(out.indexOf('Wager Results'))
-    expect(out.indexOf('Wager Results')).toBeLessThan(out.indexOf('Match Play Wagers'))
+    expect(out).not.toContain('Find a bettor')
   })
 
   it('has the same numbers as the page: pools, payouts and a signed net', () => {
@@ -55,26 +56,29 @@ describe('WagerShareCard (final)', () => {
     expect(out).toContain('Winner: John Nothdurft')
   })
 
-  it('is winners only and omits live odds once complete', () => {
+  it('is winners only and leaves out live odds once complete', () => {
     for (const loser of ['Daniel Lopez', 'Lost Larry', 'Loser Lou']) expect(out).not.toContain(`>${loser}<`)
-    expect(out).not.toContain('Live Odds')
-    expect(out).not.toMatch(/Venmo|Cash|Ticket|Settlement table/i)
+    expect(out).not.toContain('Live odds')
+    expect(out).not.toMatch(/Venmo|Cash|Ticket/i)
   })
 
-  it('is a fixed-width card that matches the page colors', () => {
-    expect(WAGER_CARD_WIDTH).toBe(1120)
-    expect(out).toContain('width:1120px')
-    expect(out).toContain('bg-[#F5F4F0]')
-    expect(out).toContain('rounded-full')
+  it('is a fixed-width card on the page background, with no old pool colors or emoji', () => {
+    expect(WAGER_CARD_WIDTH).toBe(720)
+    expect(out).toContain('width:720px')
+    expect(out).toContain(`background:${CARD_BACKGROUND}`)
+    expect(out).not.toMatch(/#2E7D4F|#2B59A0|#6B46C1/)
     expect(out).not.toMatch(/\p{Extended_Pictographic}/u)
   })
 })
 
 describe('WagerShareCard (still being played)', () => {
   const out = render('active')
-  it('shows the live status and keeps the Live Odds section the export always had', () => {
+  it('shows odds and match pools but no bettor names', () => {
+    expect(out).toContain('Wager odds')
     expect(out).toContain('>Live<')
-    expect(out).toContain('Live Odds')
+    expect(out).toContain('Live odds')
+    expect(out).toContain('Match pools')
     expect(out).toContain('4.00x') // John: WIN pool $20 / $5 bet on him
+    for (const b of ['Darrick Sogabe', 'Jeff Carey', 'Lost Larry']) expect(out).not.toContain(b)
   })
 })

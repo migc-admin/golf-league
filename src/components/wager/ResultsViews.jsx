@@ -96,7 +96,7 @@ export function BettorView({ rows, totals, losing, searching, legend }) {
   )
 }
 
-function PoolCard({ card }) {
+export function PoolCard({ card }) {
   return (
     <article className="overflow-hidden rounded-sm border border-surface-border bg-white">
       <header className="border-b border-surface-border bg-surface-dim px-4 py-3">

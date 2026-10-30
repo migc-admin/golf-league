@@ -276,7 +276,7 @@ export default function Wager() {
           <div className="rounded-sm border border-surface-border bg-white px-5 py-8 text-center">
             <h2 className="text-lg font-bold text-ink">Betting is closed</h2>
             <p className="mt-1 text-sm text-ink-muted">{closedReason}</p>
-            <Button as={Link} to={`/wager/${eventId}/results`} className="mt-4" variant="secondary">View results & who bet what →</Button>
+            <Button as={Link} to={`/wager/${eventId}/results`} className="mt-4" variant="secondary">View odds & results →</Button>
           </div>
         )}
 
@@ -519,7 +519,7 @@ export default function Wager() {
         </details>
 
         <p className="text-center">
-          <Link to={`/wager/${eventId}/results`} className="inline-flex min-h-[44px] items-center text-sm font-semibold text-fairway-700 underline">View results & who bet what →</Link>
+          <Link to={`/wager/${eventId}/results`} className="inline-flex min-h-[44px] items-center text-sm font-semibold text-fairway-700 underline">View odds & results →</Link>
         </p>
       </div>
     </div>

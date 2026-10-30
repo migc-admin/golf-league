@@ -1,6 +1,9 @@
 /**
- * WagerResults.jsx — read-only, winners-only results for an event's wagers.
- * Route: /wager/:eventId/results   (admin login required, same as the wager board)
+ * WagerResults.jsx — public, read-only page for an event's wagers.
+ * Route: /wager/:eventId/results   (no login; the admin board links here too)
+ *
+ * While bets are open or the event is being played it shows pool sizes and live odds (no bettor
+ * names). Once the event is final it shows the winners-only results.
  *
  * Same numbers as the board, the Excel export and the PNG: everything comes from
  * computeWagerSettlement, shaped for display by lib/wagerResultsView.js and
@@ -21,6 +24,8 @@ import { summaryTiles } from '../components/wager/WagerPayoutSummary'
 import PngWagerSummary from '../components/wager/PngWagerSummary'
 import { wagerPngFilename } from '../lib/wagerExport'
 import { ResultsToolbar, BettorView, PoolView } from '../components/wager/ResultsViews'
+import { OddsCard, MatchPoolsCard } from '../components/wager/AdminBoard'
+import { money } from '../lib/wagerResultsView'
 
 const MIGC_ORG = import.meta.env.VITE_MIGC_ORG_ID
 
@@ -40,7 +45,7 @@ function Notice({ children, tone = 'text-ink-muted' }) {
 
 export default function WagerResults() {
   const { eventId } = useParams()
-  const { isAdmin, loading: authLoading } = useAuth()
+  const { isAdmin } = useAuth()
 
   const [event,    setEvent]    = useState(null)
   const [players,  setPlayers]  = useState([])
@@ -113,22 +118,26 @@ export default function WagerResults() {
     return extra[pid] ? `${extra[pid]} (not in event)` : '—'
   }, [players, extra])
 
-  const model = useMemo(() => {
+  const settlement = useMemo(() => {
     if (!event) return null
-    const settlement = computeWagerSettlement({
+    return computeWagerSettlement({
       active: wagers, players, scores, pairings, course: event.course, matchRules: event.match_rules,
     })
-    return buildResultsModel({ event, settlement, active: wagers, nameOf, memberNames: members })
-  }, [event, wagers, players, scores, pairings, nameOf, members])
+  }, [event, wagers, players, scores, pairings])
 
-  if (authLoading || loading) return <Notice>Loading…</Notice>
-  if (!isAdmin) return <Notice tone="text-ink"><div><div className="text-lg font-bold text-red-600">Access Denied</div><div className="mt-1 text-sm text-ink-muted">Admin login required.</div><a href="/login" className="mt-3 inline-block text-sm font-semibold text-fairway-700">Sign in →</a></div></Notice>
+  const model = useMemo(() => {
+    if (!event || !settlement) return null
+    return buildResultsModel({ event, settlement, active: wagers, nameOf, memberNames: members })
+  }, [event, settlement, wagers, nameOf, members])
+
+  if (loading) return <Notice>Loading…</Notice>
   if (error) return <Notice tone="text-red-600">{error}</Notice>
 
-  const summary = buildSummary(model)
+  const final = model.final
+  const summary = final ? buildSummary(model) : null
   const searching = query.trim().length > 0
-  const bettorRows = filterBettorRows(summary.bettors, query)
-  const poolCards = filterPoolCards(poolView(model), query)
+  const bettorRows = final ? filterBettorRows(summary.bettors, query) : []
+  const poolCards = final ? filterPoolCards(poolView(model), query) : []
   const eventDate = event.event_date
     ? new Date(event.event_date + 'T00:00:00').toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' })
     : ''
@@ -136,38 +145,65 @@ export default function WagerResults() {
   const meta = [eventName, event.course?.name, eventDate].filter(Boolean).join(' · ')
   const generatedOn = new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
 
+  // Before the results are final: pool sizes only (no bettor names).
+  const oddsTiles = [
+    { label: 'Win pool', value: money(model.pools.win) },
+    { label: 'Place pool', value: money(model.pools.place) },
+    { label: 'Match pools', value: money(model.pools.match) },
+    { label: 'Total pot', value: money(model.pools.total), helper: model.betsLabel, tone: 'good' },
+  ]
+
   return (
     <div className="min-h-screen bg-surface-dim font-sans text-ink">
       <div className="mx-auto max-w-[1100px] space-y-6 px-4 py-6 sm:px-6 sm:py-8">
         <WagerPageHeader
           leagueName={event.league?.name}
           logoUrl={event.league?.logo_url}
-          title="Wager results"
-          pill={{ tone: model.final ? 'closed' : 'open', label: model.final ? 'Betting closed · Settled' : model.statusLabel }}
+          title={final ? 'Wager results' : 'Wager odds'}
+          pill={{ tone: final ? 'closed' : 'open', label: final ? 'Betting closed · Settled' : model.statusLabel }}
           meta={meta}
           actions={
             <>
-              <Button as={Link} to={`/wager/${eventId}/board`} variant="secondary">Wager board</Button>
-              {model.final && <Button onClick={() => setPrinting(true)} icon="download">Download summary (PNG)</Button>}
+              {isAdmin && <Button as={Link} to={`/wager/${eventId}/board`} variant="secondary">Wager board</Button>}
+              {!final && <Button as={Link} to={`/wager/${eventId}`} variant={isAdmin ? 'secondary' : 'primary'}>Place a bet</Button>}
+              {final && <Button onClick={() => setPrinting(true)} icon="download">Download summary (PNG)</Button>}
             </>
           }
         />
 
-        <StatTiles tiles={summaryTiles(summary)} />
+        {final ? (
+          <>
+            <StatTiles tiles={summaryTiles(summary)} />
 
-        <section className="overflow-hidden rounded-sm border border-surface-border bg-white">
-          <ResultsToolbar query={query} onQuery={setQuery} view={view} onView={setView} />
-          {view === 'bettor'
-            ? <BettorView rows={bettorRows} totals={summary.totals} losing={summary.tiles.settled.losing} searching={searching} legend={summary.legend} />
-            : <PoolView cards={poolCards} searching={searching} />}
-        </section>
+            <section className="overflow-hidden rounded-sm border border-surface-border bg-white">
+              <ResultsToolbar query={query} onQuery={setQuery} view={view} onView={setView} />
+              {view === 'bettor'
+                ? <BettorView rows={bettorRows} totals={summary.totals} losing={summary.tiles.settled.losing} searching={searching} legend={summary.legend} />
+                : <PoolView cards={poolCards} searching={searching} />}
+            </section>
+          </>
+        ) : (
+          <>
+            <StatTiles tiles={oddsTiles} />
+            {model.odds.length === 0 && settlement.matchCards.every(c => c.pool === 0) && (
+              <p className="rounded-sm border border-surface-border bg-white px-5 py-8 text-center text-sm text-ink-muted">
+                No bets yet. Odds appear here as soon as bets are placed.
+              </p>
+            )}
+            <OddsCard rows={model.odds} />
+            <MatchPoolsCard cards={settlement.matchCards.filter(c => c.pool > 0)} playerName={nameOf} />
+            <p className="text-sm text-ink-muted">
+              Odds update as bets come in and change until betting closes. Results are posted here once the event is final.
+            </p>
+          </>
+        )}
 
         <p className="text-sm text-ink-muted">
           Full pool paid to winner(s). If no one picks the winner, funds roll to the club. Halved matches refund stakes.
         </p>
       </div>
 
-      {printing && (
+      {printing && final && (
         <PngWagerSummary
           filename={wagerPngFilename(event).replace(/^wager-results-/, 'wager-summary-')}
           onDone={() => setPrinting(false)}

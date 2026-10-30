@@ -12,7 +12,7 @@ import { useParams, Link } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../hooks/useAuth'
 import { computeWagerSettlement, wagerOutcomes } from '../lib/wagerSettlement'
-import WagerShareCard, { WAGER_CARD_WIDTH } from '../components/WagerShareCard'
+import WagerShareCard, { WAGER_CARD_WIDTH, CARD_BACKGROUND } from '../components/WagerShareCard'
 import { buildManualWagerRow } from '../lib/wagerManual'
 import { buildResultsModel } from '../lib/wagerResultsView'
 import { buildSummary, poolView } from '../lib/wagerSummaryView'
@@ -253,7 +253,7 @@ export default function WagerAdmin() {
       const dataUrl = await toPng(shareRef.current, {
         pixelRatio: 2,
         cacheBust: true,
-        backgroundColor: '#F5F4F0',
+        backgroundColor: CARD_BACKGROUND,
         width: WAGER_CARD_WIDTH,
       })
       const link = document.createElement('a')
@@ -404,8 +404,10 @@ export default function WagerAdmin() {
           <WagerShareCard
             event={event}
             eventDate={eventDate}
-            logoUrl={event.league?.logo_url ?? '/logo.png'}
+            logoUrl={event.league?.logo_url}
             model={model}
+            matchCards={matchCards}
+            playerName={playerName}
           />
         </div>
       </div>
