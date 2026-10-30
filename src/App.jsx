@@ -50,6 +50,7 @@ import Roadmap        from './pages/Roadmap'
 import Wager          from './pages/Wager'
 import WagerAdmin     from './pages/WagerAdmin'
 import WagerResults   from './pages/WagerResults'
+import WagerTicket    from './pages/WagerTicket'
 
 // React Router doesn't reset scroll position on navigation (unlike a full page
 // load), so clicking an internal link while scrolled down on the previous page
@@ -174,6 +175,7 @@ export default function App() {
 
         {/* Wager — public bet page; board is admin-only */}
         <Route path="/wager/:eventId"       element={<Wager />} />
+        <Route path="/wager/:eventId/ticket/:ticketId" element={<WagerTicket />} />
         <Route path="/wager/:eventId/board" element={<ProtectedRoute><WagerAdmin /></ProtectedRoute>} />
         <Route path="/wager/:eventId/results" element={<ProtectedRoute><WagerResults /></ProtectedRoute>} />
 

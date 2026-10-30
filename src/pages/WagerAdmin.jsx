@@ -1,6 +1,10 @@
 /**
  * WagerAdmin.jsx — Admin wager board
  * Route: /wager/:eventId/board
+ *
+ * Presentation only: shown inside the event admin layout (sidebar with a Wagers item). Every
+ * handler and number is the one the board always had; pool math, winners and payouts live in
+ * lib/wagerSettlement.js.
  */
 
 import { useEffect, useRef, useState } from 'react'
@@ -11,12 +15,20 @@ import { computeWagerSettlement, wagerOutcomes } from '../lib/wagerSettlement'
 import WagerShareCard, { WAGER_CARD_WIDTH } from '../components/WagerShareCard'
 import { buildManualWagerRow } from '../lib/wagerManual'
 import { buildResultsModel } from '../lib/wagerResultsView'
+import { buildSummary, poolView } from '../lib/wagerSummaryView'
+import AdminLayout from '../components/AdminLayout'
+import WagerPageHeader from '../components/wager/WagerPageHeader'
+import StatTiles from '../components/ui/StatTiles'
+import Button from '../components/ui/Button'
+import AmberBanner from '../components/ui/AmberBanner'
+import PngWagerSummary from '../components/wager/PngWagerSummary'
+import { wagerPngFilename } from '../lib/wagerExport'
+import { PoolView } from '../components/wager/ResultsViews'
+import {
+  BettingStatusBar, AllBetsCard, RemovedBetsCard, ManualBetCard, PaymentsCard, OddsCard, MatchPoolsCard, Card, fmt,
+} from '../components/wager/AdminBoard'
 
 const MIGC_ORG = import.meta.env.VITE_MIGC_ORG_ID
-const GREEN    = '#1B4332'
-const GOLD     = '#C9A84C'
-
-function fmt(n) { return `$${Number(n).toFixed(2)}` }
 
 async function fetchWagers(eventId) {
   const { data } = await supabase
@@ -32,117 +44,6 @@ function isTeeTimePast(event) {
   if (!event.event_date || !event.start_time) return false
   const teeTime = new Date(`${event.event_date}T${event.start_time.slice(0, 8)}`)
   return Date.now() >= teeTime.getTime() - 10 * 60 * 1000
-}
-
-const fieldStyle = { width: '100%', fontSize: 14, padding: '9px 10px', borderRadius: 8, border: '1px solid #d6d4cf', background: '#fff', fontFamily: "'Manrope', sans-serif", boxSizing: 'border-box' }
-const labelStyle = { display: 'block', fontSize: 11, fontWeight: 700, color: '#6b7280', marginBottom: 4 }
-
-/** Admin-only form for a bet taken in person. Always available, even after betting has closed. */
-function ManualBetCard({ players, pairings, playerName, bettorNames, onAdd }) {
-  const [open,      setOpen]      = useState(false)
-  const [bettor,    setBettor]    = useState('')
-  const [kind,      setKind]      = useState('win')
-  const [playerId,  setPlayerId]  = useState('')
-  const [matchId,   setMatchId]   = useState('')
-  const [matchPick, setMatchPick] = useState('')
-  const [amount,    setAmount]    = useState('')
-  const [method,    setMethod]    = useState('')
-  const [saving,    setSaving]    = useState(false)
-
-  const sortedPlayers = [...players].sort((a, b) => playerName(a.player_id).localeCompare(playerName(b.player_id)))
-  const match = pairings.find(m => m.id === matchId)
-
-  async function submit(e) {
-    e.preventDefault()
-    setSaving(true)
-    const saved = await onAdd({ bettor, kind, playerId, matchId, matchPick, amount, method })
-    setSaving(false)
-    if (saved) { setPlayerId(''); setMatchId(''); setMatchPick(''); setAmount('') } // keep name + type for the next bet
-  }
-
-  const kindBtn = k => ({
-    flex: 1, fontSize: 12, fontWeight: 700, padding: '9px 0', cursor: 'pointer',
-    border: '1px solid #d6d4cf', background: kind === k ? GREEN : '#fff', color: kind === k ? '#fff' : '#374151',
-  })
-
-  return (
-    <div style={{ background: '#fff', borderRadius: 14, border: '1px solid #e5e7eb', overflow: 'hidden' }}>
-      <button type="button" onClick={() => setOpen(o => !o)} aria-expanded={open}
-        style={{ width: '100%', background: GREEN, padding: '10px 16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', border: 'none', cursor: 'pointer' }}>
-        <span style={{ color: GOLD, fontWeight: 700, fontSize: 13 }}>Add a bet manually</span>
-        <span style={{ color: 'rgba(255,255,255,0.7)', fontSize: 12 }}>{open ? 'Hide' : 'Show'}</span>
-      </button>
-      {open && (
-        <form onSubmit={submit} style={{ padding: '14px 16px', display: 'flex', flexDirection: 'column', gap: 12 }}>
-          <p style={{ fontSize: 12, color: '#6b7280', margin: 0 }}>
-            For bets taken in person. They appear on the board, the Excel export and the PNG right away, and can be added any time, even after betting has closed.
-          </p>
-
-          <div>
-            <label style={labelStyle} htmlFor="mb-name">Bettor name</label>
-            <input id="mb-name" list="mb-names" style={fieldStyle} value={bettor} onChange={e => setBettor(e.target.value)} placeholder="First Last" autoComplete="off" />
-            <datalist id="mb-names">{bettorNames.map(n => <option key={n} value={n} />)}</datalist>
-          </div>
-
-          <div role="group" aria-label="Bet type" style={{ display: 'flex' }}>
-            <button type="button" aria-pressed={kind === 'win'}   onClick={() => setKind('win')}   style={{ ...kindBtn('win'),   borderRadius: '8px 0 0 8px' }}>WIN (1st)</button>
-            <button type="button" aria-pressed={kind === 'place'} onClick={() => setKind('place')} style={{ ...kindBtn('place'), borderLeft: 'none' }}>PLACE (1st or 2nd)</button>
-            <button type="button" aria-pressed={kind === 'match'} onClick={() => setKind('match')} style={{ ...kindBtn('match'), borderLeft: 'none', borderRadius: '0 8px 8px 0' }}>MATCH</button>
-          </div>
-
-          {kind !== 'match' ? (
-            <div>
-              <label style={labelStyle} htmlFor="mb-player">Player</label>
-              <select id="mb-player" style={fieldStyle} value={playerId} onChange={e => setPlayerId(e.target.value)}>
-                <option value="">Select player</option>
-                {sortedPlayers.map(p => <option key={p.player_id} value={p.player_id}>{playerName(p.player_id)}</option>)}
-              </select>
-            </div>
-          ) : (
-            <>
-              <div>
-                <label style={labelStyle} htmlFor="mb-match">Match</label>
-                <select id="mb-match" style={fieldStyle} value={matchId} onChange={e => { setMatchId(e.target.value); setMatchPick('') }}>
-                  <option value="">Select match</option>
-                  {pairings.map(m => <option key={m.id} value={m.id}>Match {m.match_number}: {playerName(m.player_a_id)} vs {playerName(m.player_b_id)}</option>)}
-                </select>
-              </div>
-              {match && (
-                <div>
-                  <label style={labelStyle} htmlFor="mb-pick">Picked to win</label>
-                  <select id="mb-pick" style={fieldStyle} value={matchPick} onChange={e => setMatchPick(e.target.value)}>
-                    <option value="">Select winner</option>
-                    <option value={match.player_a_id}>{playerName(match.player_a_id)}</option>
-                    <option value={match.player_b_id}>{playerName(match.player_b_id)}</option>
-                  </select>
-                </div>
-              )}
-            </>
-          )}
-
-          <div style={{ display: 'flex', gap: 10 }}>
-            <div style={{ flex: 1 }}>
-              <label style={labelStyle} htmlFor="mb-amount">Amount ($)</label>
-              <input id="mb-amount" type="number" min="0" step="0.01" inputMode="decimal" style={fieldStyle} value={amount} onChange={e => setAmount(e.target.value)} placeholder="5" />
-            </div>
-            <div style={{ flex: 1 }}>
-              <label style={labelStyle} htmlFor="mb-method">Paid by</label>
-              <select id="mb-method" style={fieldStyle} value={method} onChange={e => setMethod(e.target.value)}>
-                <option value="">Not set</option>
-                <option value="cash">Cash</option>
-                <option value="venmo">Venmo</option>
-              </select>
-            </div>
-          </div>
-
-          <button type="submit" disabled={saving}
-            style={{ alignSelf: 'flex-end', minHeight: 44, fontSize: 13, fontWeight: 700, padding: '0 18px', borderRadius: 8, border: 'none', background: GREEN, color: '#fff', cursor: saving ? 'not-allowed' : 'pointer', opacity: saving ? 0.6 : 1 }}>
-            {saving ? 'Adding…' : 'Add bet'}
-          </button>
-        </form>
-      )}
-    </div>
-  )
 }
 
 export default function WagerAdmin() {
@@ -164,11 +65,12 @@ export default function WagerAdmin() {
   const shareRef = useRef(null)
   const [extraNames,  setExtraNames]  = useState({}) // id -> name, for picked players no longer in the event
   const [memberNames, setMemberNames] = useState([]) // org members, to show bettors' proper names in the PNG
+  const [printing, setPrinting] = useState(false)
 
   async function loadData() {
     const { data: ev } = await supabase
       .from('events')
-      .select('*, course:courses(*), league:leagues(name, logo_url, org_id)')
+      .select('*, course:courses(*), league:leagues(name, slug, logo_url, org_id)')
       .eq('id', eventId).single()
 
     if (!ev || ev.league?.org_id !== MIGC_ORG) {
@@ -288,9 +190,12 @@ export default function WagerAdmin() {
     setWagers(await fetchWagers(eventId))
   }
 
-  if (authLoading || loading) return <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: "'Manrope', sans-serif", color: '#6b7280' }}>Loading…</div>
-  if (!isAdmin) return <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: "'Manrope', sans-serif", flexDirection: 'column', gap: 8 }}><div style={{ fontSize: 18, fontWeight: 700, color: '#dc2626' }}>Access Denied</div><div style={{ fontSize: 13, color: '#6b7280' }}>Admin login required.</div><a href="/login" style={{ marginTop: 12, fontSize: 13, fontWeight: 600, color: GREEN }}>Sign in →</a></div>
-  if (error) return <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: "'Manrope', sans-serif", color: '#dc2626' }}>{error}</div>
+  const Notice = ({ children, tone = 'text-ink-muted' }) => (
+    <div className={`flex min-h-screen items-center justify-center bg-surface-dim px-4 text-center font-sans ${tone}`}>{children}</div>
+  )
+  if (authLoading || loading) return <Notice>Loading…</Notice>
+  if (!isAdmin) return <Notice tone="text-ink"><div><div className="text-lg font-bold text-red-600">Access Denied</div><div className="mt-1 text-sm text-ink-muted">Admin login required.</div><a href="/login" className="mt-3 inline-block text-sm font-semibold text-fairway-700">Sign in →</a></div></Notice>
+  if (error) return <Notice tone="text-red-600">{error}</Notice>
 
   const active  = wagers.filter(w => !w.deleted_at)
   const inFieldIds = new Set(players.map(p => p.player_id))
@@ -381,458 +286,114 @@ export default function WagerAdmin() {
     ? new Date(event.event_date + 'T00:00:00').toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' })
     : ''
 
-  const BettorTable = ({ bettors, color, border, playerName }) => (
-    <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
-      <thead>
-        <tr style={{ borderBottom: `1px solid ${border}` }}>
-          <th style={{ textAlign: 'left',  padding: '4px 0', color, fontWeight: 700 }}>Bettor</th>
-          <th style={{ textAlign: 'left',  padding: '4px 0', color, fontWeight: 700 }}>Picked</th>
-          <th style={{ textAlign: 'right', padding: '4px 0', color, fontWeight: 700 }}>Stake</th>
-          <th style={{ textAlign: 'right', padding: '4px 0', color, fontWeight: 700 }}>Payout</th>
-        </tr>
-      </thead>
-      <tbody>
-        {bettors.map((b, i) => (
-          <tr key={i} style={{ borderBottom: `1px solid ${border}` }}>
-            <td style={{ padding: '6px 0', fontWeight: 700, color: '#111' }}>{b.name}</td>
-            <td style={{ padding: '6px 0', color: '#374151' }}>{playerName(b.pid)}</td>
-            <td style={{ padding: '6px 0', textAlign: 'right', color: '#6b7280' }}>{fmt(b.bet)}</td>
-            <td style={{ padding: '6px 0', textAlign: 'right', fontWeight: 900, color }}>{fmt(b.payout)}</td>
-          </tr>
-        ))}
-      </tbody>
-    </table>
-  )
+  const model = buildResultsModel({ event, settlement, active, nameOf: playerName, memberNames })
+  const summary = buildSummary(model)
+  const settled = event.status === 'complete'
+  const eventName = event.name ?? `Event #${event.event_number}`
+  const meta = [eventName, event.course?.name, eventDate].filter(Boolean).join(' · ')
+  const generatedOn = new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+  const betFormUrl = `${window.location.origin}/wager/${eventId}`
+  const betNote = autoClosed ? 'Automatically closed 10 min before tee time.' : event.wagers_closed ? 'Manually closed by admin.' : null
 
-  const BetRow = ({ w, isDeleted }) => (
-    <tr style={{ borderTop: '1px solid #f3f4f6', background: isDeleted ? '#fef2f2' : 'transparent', opacity: isDeleted ? 0.75 : 1 }}>
-      <td style={{ padding: '9px 12px', fontWeight: 700, color: '#111' }}>{w.bettor_name}</td>
-      <td style={{ padding: '9px 12px', color: '#374151' }}>{playerName(w.pick_1st ?? w.pick_2nd ?? w.pick_match)}</td>
-      <td style={{ padding: '9px 12px', textAlign: 'center' }}>
-        {w.match_pairing_id
-          ? <span style={{ fontSize: 11, fontWeight: 700, color: '#7c3aed', background: '#f5f3ff', border: '1px solid #ddd6fe', borderRadius: 6, padding: '2px 7px' }}>MATCH</span>
-          : w.pick_1st
-          ? <span style={{ fontSize: 11, fontWeight: 700, color: '#16a34a', background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: 6, padding: '2px 7px' }}>WIN</span>
-          : <span style={{ fontSize: 11, fontWeight: 700, color: '#1d4ed8', background: '#eff6ff', border: '1px solid #bfdbfe', borderRadius: 6, padding: '2px 7px' }}>PLACE</span>
-        }
-      </td>
-      <td style={{ padding: '9px 12px', textAlign: 'right', fontWeight: 700, color: '#111' }}>{fmt(w.amount)}</td>
-      <td style={{ padding: '9px 12px', textAlign: 'center' }}>
-        {isDeleted ? (
-          <span style={{ fontSize: 11, color: '#9ca3af' }}>{w.payment_method ? w.payment_method.toUpperCase() : '—'}</span>
-        ) : (
-          <select
-            value={w.payment_method ?? ''}
-            disabled={acting === w.id}
-            onChange={e => setPaymentMethod(w.id, e.target.value)}
-            style={{
-              fontSize: 11, fontWeight: 700, borderRadius: 6, padding: '3px 4px', cursor: 'pointer',
-              border: `1px solid ${w.payment_method === 'cash' ? '#bbf7d0' : w.payment_method === 'venmo' ? '#bfdbfe' : '#e5e7eb'}`,
-              background: w.payment_method === 'cash' ? '#f0fdf4' : w.payment_method === 'venmo' ? '#eff6ff' : '#fff',
-              color: w.payment_method === 'cash' ? '#16a34a' : w.payment_method === 'venmo' ? '#1d4ed8' : '#9ca3af',
-            }}
-          >
-            <option value="">— not set</option>
-            <option value="venmo">Venmo</option>
-            <option value="cash">Cash</option>
-          </select>
-        )}
-      </td>
-      <td style={{ padding: '9px 12px', textAlign: 'center', color: '#9ca3af', fontSize: 11 }}>
-        {new Date(w.created_at).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}
-      </td>
-      <td style={{ padding: '9px 12px', textAlign: 'center' }}>
-        {isDeleted ? (
-          <button onClick={() => restore(w.id)} disabled={acting === w.id}
-            style={{ fontSize: 11, fontWeight: 700, color: '#16a34a', background: 'none', border: '1px solid #bbf7d0', borderRadius: 6, padding: '3px 8px', cursor: 'pointer', opacity: acting === w.id ? 0.5 : 1 }}>
-            {acting === w.id ? '…' : 'Restore'}
-          </button>
-        ) : (
-          <button onClick={() => softDelete(w.id)} disabled={acting === w.id}
-            style={{ fontSize: 11, fontWeight: 700, color: '#dc2626', background: 'none', border: '1px solid #fca5a5', borderRadius: 6, padding: '3px 8px', cursor: 'pointer', opacity: acting === w.id ? 0.5 : 1 }}>
-            {acting === w.id ? '…' : 'Delete'}
-          </button>
-        )}
-      </td>
-    </tr>
-  )
+  const closeMenu = e => e.currentTarget.closest('details')?.removeAttribute('open')
 
-  const tableHead = (
-    <thead>
-      <tr style={{ background: '#f9fafb' }}>
-        <th style={{ padding: '8px 12px', textAlign: 'left',   color: '#6b7280', fontWeight: 700, fontSize: 11 }}>Bettor</th>
-        <th style={{ padding: '8px 12px', textAlign: 'left',   color: '#6b7280', fontWeight: 700, fontSize: 11 }}>Pick</th>
-        <th style={{ padding: '8px 12px', textAlign: 'center', color: '#6b7280', fontWeight: 700, fontSize: 11 }}>Type</th>
-        <th style={{ padding: '8px 12px', textAlign: 'right',  color: '#6b7280', fontWeight: 700, fontSize: 11 }}>Amt</th>
-        <th style={{ padding: '8px 12px', textAlign: 'center', color: '#6b7280', fontWeight: 700, fontSize: 11 }}>Pay</th>
-        <th style={{ padding: '8px 12px', textAlign: 'center', color: '#6b7280', fontWeight: 700, fontSize: 11 }}>Time</th>
-        <th style={{ padding: '8px 12px' }}></th>
-      </tr>
-    </thead>
-  )
+  const tiles = [
+    { label: 'Win pool', value: fmt(winPool) },
+    { label: 'Place pool', value: fmt(placePool) },
+    { label: 'Match pools', value: fmt(matchPoolTotal), helper: `${pairings.length} match${pairings.length === 1 ? '' : 'es'}` },
+    { label: 'Total pot', value: fmt(totalPot + matchPoolTotal), helper: `${active.length} bet${active.length === 1 ? '' : 's'}`, tone: 'good' },
+  ]
+
+  const eventContext = {
+    eventSlug: event.slug,
+    leagueSlug: event.league?.slug,
+    meta: {
+      id: eventId, isMigc: true, name: eventName, status: event.status,
+      sideGameOptions: event.side_game_options ?? [],
+      hasMatchPlay: [...(event.formats ?? (event.format ? [event.format] : []))].some(f => f === 'match_points' || f === 'ryder_cup'),
+    },
+  }
 
   return (
-    <div style={{ minHeight: '100vh', background: '#f9f8f5', fontFamily: "'Manrope', sans-serif" }}>
-      {/* Header */}
-      <div style={{ background: GREEN, padding: '14px 20px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-        <div>
-          <div style={{ color: GOLD, fontWeight: 800, fontSize: 16 }}>Mulligan's Island Golf Club</div>
-          <div style={{ color: 'rgba(255,255,255,0.85)', fontSize: 13, marginTop: 2 }}>{event.name} · Wager Board — Admin</div>
-          <div style={{ color: 'rgba(255,255,255,0.55)', fontSize: 11, marginTop: 2 }}>{eventDate}</div>
-        </div>
-        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
-          <Link to={`/wager/${eventId}/results`} style={{ fontSize: 12, fontWeight: 600, color: GOLD, textDecoration: 'none', border: `1px solid ${GOLD}`, borderRadius: 8, padding: '5px 10px' }}>
-            Results ↗
-          </Link>
-          <Link to={`/wager/${eventId}`} style={{ fontSize: 12, fontWeight: 600, color: GOLD, textDecoration: 'none', border: `1px solid ${GOLD}`, borderRadius: 8, padding: '5px 10px' }}>
-            Public Page ↗
-          </Link>
-        </div>
-      </div>
-
-      <div style={{ maxWidth: 700, margin: '0 auto', padding: '20px 16px', display: 'flex', flexDirection: 'column', gap: 16 }}>
-
-        {/* Betting Status Control */}
-        {event.status !== 'complete' && (
-          <div style={{ background: '#fff', borderRadius: 14, border: `1px solid ${bettingOpen ? '#bbf7d0' : '#fecaca'}`, padding: '14px 16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-            <div>
-              <div style={{ fontWeight: 700, fontSize: 13, color: bettingOpen ? '#16a34a' : '#dc2626' }}>
-                {bettingOpen ? '🟢 Betting Open' : autoClosed ? '🔴 Auto-Closed (Tee Time)' : '🔴 Betting Closed'}
-              </div>
-              {autoClosed && (
-                <div style={{ fontSize: 11, color: '#9ca3af', marginTop: 2 }}>Automatically closed 10 min before tee time</div>
-              )}
-              {event.wagers_closed && !autoClosed && (
-                <div style={{ fontSize: 11, color: '#9ca3af', marginTop: 2 }}>Manually closed by admin</div>
-              )}
-            </div>
-            {!autoClosed && (
-              <button
-                onClick={toggleBettingClosed}
-                disabled={toggling}
-                style={{
-                  fontSize: 12, fontWeight: 700, padding: '7px 14px', borderRadius: 8, border: 'none', cursor: toggling ? 'not-allowed' : 'pointer',
-                  background: bettingOpen ? '#dc2626' : '#16a34a',
-                  color: '#fff', opacity: toggling ? 0.6 : 1,
-                }}
-              >
-                {toggling ? '…' : bettingOpen ? 'Close Betting' : 'Reopen Betting'}
-              </button>
-            )}
-          </div>
-        )}
-
-        {/* Bets or matches pointing at players who are no longer in this event */}
-        {(Object.keys(orphanPicks).length > 0 || orphanMatches.length > 0) && (
-          <div style={{ background: '#fffbeb', border: '1px solid #fcd34d', borderRadius: 14, padding: '14px 16px' }}>
-            <div style={{ fontWeight: 700, fontSize: 13, color: '#92400e', marginBottom: 6 }}>
-              Some bets are on players who are no longer in this event
-            </div>
-            <ul style={{ margin: 0, paddingLeft: 18, fontSize: 12, color: '#78350f', lineHeight: 1.6 }}>
-              {Object.values(orphanPicks).map(o => (
-                <li key={o.name}>{o.name}: {o.bets} bet{o.bets > 1 ? 's' : ''}, {fmt(o.amount)}</li>
-              ))}
-              {orphanMatches.map(m => (
-                <li key={m.id}>Match {m.match_number} includes a player who is not in the event, so it can't be scored</li>
-              ))}
-            </ul>
-            <div style={{ fontSize: 11, color: '#92400e', marginTop: 8 }}>
-              This usually means a player was removed from the event or a player merge did not finish. Their results and payouts can't be calculated until the player is back in the event (or the merge is completed on the Players page).
-            </div>
-          </div>
-        )}
-
-        {/* Pool Summary */}
-        <div style={{ background: '#fff', borderRadius: 14, border: '1px solid #e5e7eb', overflow: 'hidden' }}>
-          <div style={{ background: GREEN, padding: '10px 16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <span style={{ color: GOLD, fontWeight: 700, fontSize: 13 }}>Pool Summary</span>
-            <span style={{ color: 'rgba(255,255,255,0.6)', fontSize: 12 }}>{active.length} active bet{active.length !== 1 ? 's' : ''}</span>
-          </div>
-          <div style={{ display: 'grid', gridTemplateColumns: `repeat(${matchPoolTotal > 0 ? 4 : 3}, 1fr)`, padding: '14px 16px', gap: 8 }}>
-            {[
-              ['WIN Pool', fmt(winPool), '#16a34a'],
-              ['PLACE Pool', fmt(placePool), '#1d4ed8'],
-              ...(matchPoolTotal > 0 ? [['Match Pool', fmt(matchPoolTotal), '#7c3aed']] : []),
-              ['Total Pot', fmt(totalPot + matchPoolTotal), GREEN],
-            ].map(([label, val, color]) => (
-              <div key={label} style={{ textAlign: 'center' }}>
-                <div style={{ fontSize: 11, color: '#9ca3af', fontWeight: 700, marginBottom: 2 }}>{label}</div>
-                <div style={{ fontSize: 20, fontWeight: 900, color }}>{val}</div>
-              </div>
-            ))}
-          </div>
-        </div>
-
-        {/* Payments: who owes what, and how they chose to pay */}
-        {payRows.length > 0 && (
-          <div style={{ background: '#fff', borderRadius: 14, border: '1px solid #e5e7eb', overflow: 'hidden' }}>
-            <div style={{ background: GREEN, padding: '10px 16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <span style={{ color: GOLD, fontWeight: 700, fontSize: 13 }}>Payments</span>
-              <span style={{ color: 'rgba(255,255,255,0.6)', fontSize: 11 }}>
-                Venmo {fmt(payTotals.venmo)} · Cash {fmt(payTotals.cash)}{payTotals.unset > 0 ? ` · Not set ${fmt(payTotals.unset)}` : ''}
-              </span>
-            </div>
-            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
-              <thead>
-                <tr style={{ background: '#f0f4f2' }}>
-                  <th style={{ padding: '7px 12px', textAlign: 'left',  color: '#6b7280', fontWeight: 700 }}>Bettor</th>
-                  <th style={{ padding: '7px 12px', textAlign: 'right', color: '#1d4ed8', fontWeight: 700 }}>Venmo</th>
-                  <th style={{ padding: '7px 12px', textAlign: 'right', color: '#16a34a', fontWeight: 700 }}>Cash</th>
-                  <th style={{ padding: '7px 12px', textAlign: 'right', color: '#9ca3af', fontWeight: 700 }}>Not set</th>
-                  <th style={{ padding: '7px 12px', textAlign: 'right', color: '#111', fontWeight: 700 }}>Total</th>
-                </tr>
-              </thead>
-              <tbody>
-                {payRows.map((r, i) => (
-                  <tr key={r.name} style={{ borderTop: '1px solid #f3f4f6', background: i % 2 === 0 ? '#fff' : '#fafafa' }}>
-                    <td style={{ padding: '7px 12px', fontWeight: 700, color: '#111' }}>{r.name}</td>
-                    <td style={{ padding: '7px 12px', textAlign: 'right', color: r.venmo ? '#1d4ed8' : '#d1d5db' }}>{r.venmo ? fmt(r.venmo) : '—'}</td>
-                    <td style={{ padding: '7px 12px', textAlign: 'right', color: r.cash ? '#16a34a' : '#d1d5db' }}>{r.cash ? fmt(r.cash) : '—'}</td>
-                    <td style={{ padding: '7px 12px', textAlign: 'right', color: r.unset ? '#6b7280' : '#d1d5db' }}>{r.unset ? fmt(r.unset) : '—'}</td>
-                    <td style={{ padding: '7px 12px', textAlign: 'right', fontWeight: 700, color: '#111' }}>{fmt(r.venmo + r.cash + r.unset)}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
-
-        {/* Odds Board */}
-        {allPickedIds.length > 0 && (
-          <div style={{ background: '#fff', borderRadius: 14, border: '1px solid #e5e7eb', overflow: 'hidden' }}>
-            <div style={{ background: GREEN, padding: '10px 16px' }}>
-              <span style={{ color: GOLD, fontWeight: 700, fontSize: 13 }}>Live Odds</span>
-            </div>
-            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
-              <thead>
-                <tr style={{ background: '#f0f4f2' }}>
-                  <th style={{ padding: '7px 12px', textAlign: 'left',   color: '#6b7280', fontWeight: 700 }}>Player</th>
-                  <th style={{ padding: '7px 12px', textAlign: 'center', color: '#16a34a', fontWeight: 700 }}>WIN Amt</th>
-                  <th style={{ padding: '7px 12px', textAlign: 'center', color: '#16a34a', fontWeight: 700 }}>WIN Odds</th>
-                  <th style={{ padding: '7px 12px', textAlign: 'center', color: '#1d4ed8', fontWeight: 700 }}>PLACE Amt</th>
-                  <th style={{ padding: '7px 12px', textAlign: 'center', color: '#1d4ed8', fontWeight: 700 }}>PLACE Odds</th>
-                </tr>
-              </thead>
-              <tbody>
-                {allPickedIds.map((pid, i) => {
-                  const wAmt = winTotals[pid]   ?? 0
-                  const pAmt = placeTotals[pid] ?? 0
-                  const winOdds   = wAmt > 0 && winPool   > 0 ? (winPool   / wAmt).toFixed(2) + 'x' : '—'
-                  const placeOdds = pAmt > 0 && placePool > 0 ? (placePool / pAmt).toFixed(2) + 'x' : '—'
-                  return (
-                    <tr key={pid} style={{ borderTop: '1px solid #f3f4f6', background: i % 2 === 0 ? '#fff' : '#fafafa' }}>
-                      <td style={{ padding: '8px 12px', fontWeight: 700, color: '#111' }}>{playerName(pid)}</td>
-                      <td style={{ padding: '8px 12px', textAlign: 'center', color: '#16a34a', fontWeight: 600 }}>{wAmt > 0 ? fmt(wAmt) : '—'}</td>
-                      <td style={{ padding: '8px 12px', textAlign: 'center', color: '#6b7280' }}>{winOdds}</td>
-                      <td style={{ padding: '8px 12px', textAlign: 'center', color: '#1d4ed8', fontWeight: 600 }}>{pAmt > 0 ? fmt(pAmt) : '—'}</td>
-                      <td style={{ padding: '8px 12px', textAlign: 'center', color: '#6b7280' }}>{placeOdds}</td>
-                    </tr>
-                  )
-                })}
-              </tbody>
-            </table>
-          </div>
-        )}
-
-        {/* Wager Results — active or complete events with scores */}
-        {showResults && scores.length > 0 && (winResults || placeResults) && (
-          <div style={{ background: '#fff', borderRadius: 14, border: '1px solid #e5e7eb', overflow: 'hidden' }}>
-            <div style={{ background: GREEN, padding: '10px 16px' }}>
-              <span style={{ color: GOLD, fontWeight: 700, fontSize: 13 }}>Wager Results</span>
-              <span style={{ color: 'rgba(255,255,255,0.55)', fontSize: 11, marginLeft: 8 }}>
-                {event.status === 'complete' ? 'Final · Low net score' : 'Live · Updates as scores are entered'}
-              </span>
-            </div>
-            <div style={{ padding: '14px 16px', display: 'flex', flexDirection: 'column', gap: 12 }}>
-
-              {/* WIN results */}
-              {winResults && (() => {
-                const color = '#16a34a', bg = '#f0fdf4', border = '#bbf7d0'
-                if (winResults.matched) return (
-                  <div style={{ background: bg, border: `1px solid ${border}`, borderRadius: 10, padding: '12px 14px' }}>
-                    <div style={{ fontSize: 11, fontWeight: 700, color, marginBottom: 8 }}>WIN Pool · 1st place net {winResults.net}</div>
-                    <BettorTable bettors={winResults.bettors} color={color} border={border} playerName={playerName} />
-                  </div>
-                )
-                return (
-                  <div style={{ background: '#f9fafb', border: '1px solid #e5e7eb', borderRadius: 10, padding: '12px 14px' }}>
-                    <div style={{ fontSize: 11, fontWeight: 700, color: '#9ca3af', marginBottom: 4 }}>WIN Pool · 1st place net {winResults.net}</div>
-                    <div style={{ fontSize: 13, color: '#6b7280' }}>Winner: <strong>{winResults.topPlayers.map(id => playerName(id)).join(', ')}</strong> — no WIN bets placed on {winResults.topPlayers.length === 1 ? 'this player' : 'these players'}.</div>
-                    <div style={{ fontSize: 12, color: '#9ca3af', marginTop: 4 }}>{fmt(winPool)} rolls to the club.</div>
-                  </div>
-                )
-              })()}
-
-              {/* PLACE results */}
-              {placeResults && (() => {
-                const color = '#1d4ed8', bg = '#eff6ff', border = '#bfdbfe'
-                if (!placeResults.matched) return (
-                  <div style={{ background: '#f9fafb', border: '1px solid #e5e7eb', borderRadius: 10, padding: '12px 14px' }}>
-                    <div style={{ fontSize: 11, fontWeight: 700, color: '#9ca3af', marginBottom: 4 }}>PLACE Pool · No matched bets</div>
-                    <div style={{ fontSize: 13, color: '#6b7280' }}>1st/2nd: <strong>{placeResults.topPlayers.map(id => playerName(id)).join(', ')}</strong> — no PLACE bets on these players.</div>
-                    <div style={{ fontSize: 12, color: '#9ca3af', marginTop: 4 }}>{fmt(placePool)} rolls to the club.</div>
-                  </div>
-                )
-                return (
-                  <div style={{ background: bg, border: `1px solid ${border}`, borderRadius: 10, padding: '12px 14px' }}>
-                    <div style={{ fontSize: 11, fontWeight: 700, color, marginBottom: 2 }}>
-                      PLACE Pool · {placeResults.twoWayTie ? `Tied for 1st — net ${placeResults.net}` : `1st net ${placeResults.net} · 2nd net ${placeResults.net2}`}
-                    </div>
-                    <div style={{ fontSize: 10, color, marginBottom: 8 }}>Pool split 50/50 between 1st-place and 2nd-place bettors (all of it goes to one side if nobody bet the other) · Each bettor gets stake back + proportional share of profit</div>
-
-                    {/* Group 1 — 1st place */}
-                    {placeResults.g1.hasMatch ? (
-                      <>
-                        <div style={{ fontSize: 11, fontWeight: 700, color: '#374151', margin: '6px 0 4px' }}>
-                          1st place — {placeResults.g1.players.map(id => playerName(id)).join(' / ')}
-                        </div>
-                        <BettorTable bettors={placeResults.g1.bettors} color={color} border={border} playerName={playerName} />
-                      </>
-                    ) : (
-                      <div style={{ fontSize: 12, color: '#9ca3af', margin: '6px 0' }}>
-                        1st place ({placeResults.g1.players.map(id => playerName(id)).join(', ')}) — no PLACE bets, so all of the profit goes to the other place's bettors.
-                      </div>
-                    )}
-
-                    {/* Group 2 — 2nd place */}
-                    {placeResults.g2.players.length > 0 && (
-                      placeResults.g2.hasMatch ? (
-                        <>
-                          <div style={{ fontSize: 11, fontWeight: 700, color: '#374151', margin: '10px 0 4px' }}>
-                            2nd place — {placeResults.g2.players.map(id => playerName(id)).join(' / ')}
-                          </div>
-                          <BettorTable bettors={placeResults.g2.bettors} color={color} border={border} playerName={playerName} />
-                        </>
-                      ) : (
-                        <div style={{ fontSize: 12, color: '#9ca3af', margin: '6px 0' }}>
-                          2nd place ({placeResults.g2.players.map(id => playerName(id)).join(', ')}) — no PLACE bets, so all of the profit goes to the other place's bettors.
-                        </div>
-                      )
-                    )}
-                  </div>
-                )
-              })()}
-
-            </div>
-          </div>
-        )}
-
-        {/* Match Play Wagers */}
-        {matchCards.length > 0 && (
-          <div style={{ background: '#fff', borderRadius: 14, border: '1px solid #e5e7eb', overflow: 'hidden' }}>
-            <div style={{ background: GREEN, padding: '10px 16px' }}>
-              <span style={{ color: GOLD, fontWeight: 700, fontSize: 13 }}>Match Play Wagers</span>
-              <span style={{ color: 'rgba(255,255,255,0.55)', fontSize: 11, marginLeft: 8 }}>
-                Pool per match · halved = stakes refunded
-              </span>
-            </div>
-            {matchCards.map(({ match, sideAmt, pool, result, settlement }, i) => (
-              <div key={match.id} style={{ padding: '12px 16px', borderTop: i === 0 ? 'none' : '1px solid #f3f4f6' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 6 }}>
-                  <span style={{ fontSize: 12, fontWeight: 800, color: '#111' }}>
-                    Match {match.match_number}: {playerName(match.player_a_id)} vs {playerName(match.player_b_id)}
-                  </span>
-                  <span style={{ fontSize: 11, color: '#6b7280', fontWeight: 700 }}>Pool {fmt(pool)}</span>
+    <AdminLayout eventContext={eventContext}>
+      <div className="space-y-6 font-sans">
+        <WagerPageHeader
+          leagueName={event.league?.name}
+          logoUrl={event.league?.logo_url}
+          title="Wagers"
+          pill={{ tone: bettingOpen ? 'open' : 'closed', label: bettingOpen ? 'Betting open' : settled ? 'Betting closed · Settled' : 'Betting closed' }}
+          meta={meta}
+          actions={
+            <>
+              <Button as={Link} to={`/wager/${eventId}`} variant="secondary" icon="external" iconAfter>Bet form</Button>
+              <Button as={Link} to={`/wager/${eventId}/results`} variant="secondary" icon="external" iconAfter>Public results</Button>
+              <details className="relative">
+                <summary className="inline-flex min-h-[44px] cursor-pointer list-none items-center rounded-sm border border-surface-highest bg-white px-4 text-sm font-semibold text-ink hover:bg-surface-dim [&::-webkit-details-marker]:hidden">Exports</summary>
+                <div className="absolute right-0 z-20 mt-1 w-44 rounded-sm border border-surface-border bg-white p-1 shadow-card">
+                  {wagers.length > 0 && <button type="button" disabled={exporting} onClick={e => { closeMenu(e); exportExcel() }} className="flex min-h-[44px] w-full items-center rounded-sm px-3 text-left text-sm text-ink hover:bg-surface-dim disabled:opacity-60">{exporting ? 'Exporting…' : 'Export Excel'}</button>}
+                  {active.length > 0 && <button type="button" disabled={exportingPng} onClick={e => { closeMenu(e); exportPng() }} className="flex min-h-[44px] w-full items-center rounded-sm px-3 text-left text-sm text-ink hover:bg-surface-dim disabled:opacity-60">{exportingPng ? 'Creating…' : 'Export PNG'}</button>}
+                  {wagers.length === 0 && <span className="block px-3 py-2 text-xs text-ink-muted">Nothing to export yet.</span>}
                 </div>
-                <div style={{ fontSize: 11, color: '#9ca3af', marginBottom: 6 }}>
-                  {result ? `${result.matchStatus}${result.winner ? ' · Final' : ''}` : 'Match not scored yet'}
-                </div>
-                {[match.player_a_id, match.player_b_id].map(pid => {
-                  const amt = sideAmt[pid] ?? 0
-                  return (
-                    <div key={pid} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, padding: '2px 0' }}>
-                      <span style={{ fontWeight: 600, color: '#374151' }}>{playerName(pid)}</span>
-                      <span>
-                        {amt > 0
-                          ? <><span style={{ fontWeight: 700, color: '#7c3aed' }}>{fmt(amt)}</span> <span style={{ color: '#9ca3af', fontSize: 11 }}>{(pool / amt).toFixed(2)}x</span></>
-                          : <span style={{ color: '#d1d5db' }}>—</span>}
-                      </span>
-                    </div>
-                  )
-                })}
-                {settlement?.type === 'paid' && (
-                  <div style={{ background: '#f5f3ff', border: '1px solid #ddd6fe', borderRadius: 10, padding: '10px 12px', marginTop: 8 }}>
-                    <div style={{ fontSize: 11, fontWeight: 700, color: '#7c3aed', marginBottom: 6 }}>Winner: {playerName(settlement.winnerPid)}</div>
-                    <BettorTable bettors={settlement.bettors} color="#7c3aed" border="#ddd6fe" playerName={playerName} />
-                  </div>
-                )}
-                {settlement?.type === 'refund' && (
-                  <div style={{ background: '#f9fafb', border: '1px solid #e5e7eb', borderRadius: 10, padding: '10px 12px', marginTop: 8 }}>
-                    <div style={{ fontSize: 11, fontWeight: 700, color: '#6b7280', marginBottom: settlement.bettors.length ? 6 : 0 }}>Match halved — all stakes refunded</div>
-                    {settlement.bettors.length > 0 && <BettorTable bettors={settlement.bettors} color="#6b7280" border="#e5e7eb" playerName={playerName} />}
-                  </div>
-                )}
-                {settlement?.type === 'club' && (
-                  <div style={{ background: '#f9fafb', border: '1px solid #e5e7eb', borderRadius: 10, padding: '10px 12px', marginTop: 8, fontSize: 12, color: '#6b7280' }}>
-                    Winner: <strong>{playerName(settlement.winnerPid)}</strong> — no bets on the winner. {fmt(pool)} rolls to the club.
-                  </div>
-                )}
-              </div>
-            ))}
-          </div>
-        )}
-
-        <ManualBetCard
-          players={players}
-          pairings={pairings}
-          playerName={playerName}
-          bettorNames={[...new Set(active.map(w => w.bettor_name.trim()))].sort((a, b) => a.localeCompare(b))}
-          onAdd={addManualBet}
+              </details>
+              {settled && <Button onClick={() => setPrinting(true)} icon="download">Payout summary (PNG)</Button>}
+            </>
+          }
         />
 
-        {/* Active Bets */}
-        <div style={{ background: '#fff', borderRadius: 14, border: '1px solid #e5e7eb', overflow: 'hidden' }}>
-          <div style={{ background: GREEN, padding: '10px 16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <span style={{ color: GOLD, fontWeight: 700, fontSize: 13 }}>Active Bets</span>
-            <div style={{ display: 'flex', gap: 8 }}>
-              {active.length > 0 && (
-                <button onClick={exportPng} disabled={exportingPng}
-                  style={{ fontSize: 11, fontWeight: 700, color: GOLD, background: 'transparent', border: `1px solid ${GOLD}`, borderRadius: 6, padding: '4px 10px', cursor: exportingPng ? 'not-allowed' : 'pointer', opacity: exportingPng ? 0.6 : 1 }}>
-                  {exportingPng ? 'Creating…' : 'Export PNG'}
-                </button>
-              )}
-              {wagers.length > 0 && (
-                <button onClick={exportExcel} disabled={exporting}
-                  style={{ fontSize: 11, fontWeight: 700, color: GOLD, background: 'transparent', border: `1px solid ${GOLD}`, borderRadius: 6, padding: '4px 10px', cursor: exporting ? 'not-allowed' : 'pointer', opacity: exporting ? 0.6 : 1 }}>
-                  {exporting ? 'Exporting…' : 'Export Excel'}
-                </button>
-              )}
-              {active.length > 0 && (
-                <button onClick={clearAll}
-                  style={{ fontSize: 11, fontWeight: 700, color: '#fca5a5', background: 'rgba(220,38,38,0.15)', border: '1px solid rgba(220,38,38,0.3)', borderRadius: 6, padding: '4px 10px', cursor: 'pointer' }}>
-                  Remove All
-                </button>
-              )}
-            </div>
-          </div>
-          {active.length === 0 ? (
-            <div style={{ padding: '28px 16px', textAlign: 'center', color: '#9ca3af', fontSize: 13 }}>No active bets.</div>
-          ) : (
-            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
-              {tableHead}
-              <tbody>{active.map(w => <BetRow key={w.id} w={w} isDeleted={false} />)}</tbody>
-            </table>
-          )}
-        </div>
+        <StatTiles tiles={tiles} />
 
-        {/* Removed Bets */}
-        {deleted.length > 0 && (
-          <div style={{ background: '#fff', borderRadius: 14, border: '1px solid #fecaca', overflow: 'hidden' }}>
-            <button onClick={() => setShowDeleted(s => !s)}
-              style={{ width: '100%', background: '#fef2f2', padding: '10px 16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', border: 'none', cursor: 'pointer' }}>
-              <span style={{ color: '#dc2626', fontWeight: 700, fontSize: 13 }}>Removed Bets ({deleted.length})</span>
-              <span style={{ color: '#dc2626', fontSize: 12 }}>{showDeleted ? '▲ Hide' : '▼ Show'}</span>
-            </button>
-            {showDeleted && (
-              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
-                {tableHead}
-                <tbody>{deleted.map(w => <BetRow key={w.id} w={w} isDeleted={true} />)}</tbody>
-              </table>
-            )}
-          </div>
+        <BettingStatusBar
+          open={bettingOpen}
+          count={active.length}
+          note={betNote}
+          canToggle={!settled && !autoClosed}
+          toggling={toggling}
+          onToggle={toggleBettingClosed}
+        />
+
+        {(Object.keys(orphanPicks).length > 0 || orphanMatches.length > 0) && (
+          <AmberBanner title="Some bets are on players who are no longer in this event.">
+            {[
+              ...Object.values(orphanPicks).map(o => `${o.name}: ${o.bets} bet${o.bets > 1 ? 's' : ''}, ${fmt(o.amount)}.`),
+              ...orphanMatches.map(m => `Match ${m.match_number} includes a player who is not in the event, so it can't be scored.`),
+            ].join(' ')} Their results and payouts can't be calculated until the player is back in the event.
+          </AmberBanner>
         )}
 
-        <p style={{ fontSize: 10, color: '#9ca3af', textAlign: 'center' }}>
+        <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_380px]">
+          <div className="min-w-0 space-y-6">
+            <AllBetsCard
+              bets={active}
+              pairings={pairings}
+              playerName={playerName}
+              acting={acting}
+              onPayment={setPaymentMethod}
+              onDelete={softDelete}
+              onClearAll={clearAll}
+              onCopyLink={() => navigator.clipboard?.writeText(betFormUrl)}
+            />
+            <RemovedBetsCard bets={deleted} pairings={pairings} playerName={playerName} acting={acting} onRestore={restore} />
+          </div>
+          <ManualBetCard
+            players={players}
+            pairings={pairings}
+            playerName={playerName}
+            bettorNames={[...new Set(active.map(w => w.bettor_name.trim()))].sort((a, b) => a.localeCompare(b))}
+            onAdd={addManualBet}
+          />
+        </div>
+
+        <PaymentsCard rows={payRows} totals={payTotals} />
+        <OddsCard rows={model.odds} />
+        <MatchPoolsCard cards={matchCards} playerName={playerName} />
+
+        {showResults && scores.length > 0 && (winResults || placeResults || model.matches.length > 0) && (
+          <Card title="Wager results" aside={settled ? 'Final · Low net score' : 'Live · Updates as scores are entered'}>
+            <PoolView cards={poolView(model)} searching={false} />
+          </Card>
+        )}
+
+        <p className="text-xs text-ink-muted">
           Full pool paid to winner(s). If no one picks the winner, funds roll to the club. Halved matches refund stakes.
         </p>
       </div>
@@ -844,10 +405,23 @@ export default function WagerAdmin() {
             event={event}
             eventDate={eventDate}
             logoUrl={event.league?.logo_url ?? '/logo.png'}
-            model={buildResultsModel({ event, settlement, active, nameOf: playerName, memberNames })}
+            model={model}
           />
         </div>
       </div>
-    </div>
+
+      {printing && (
+        <PngWagerSummary
+          filename={wagerPngFilename(event).replace(/^wager-results-/, 'wager-summary-')}
+          onDone={() => setPrinting(false)}
+          logoUrl={event.league?.logo_url}
+          leagueName={event.league?.name}
+          eventName={eventName}
+          meta={meta}
+          summary={summary}
+          generatedOn={generatedOn}
+        />
+      )}
+    </AdminLayout>
   )
 }

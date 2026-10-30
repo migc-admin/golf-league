@@ -52,6 +52,7 @@ const EVENT_TABS = [
     { label: 'Setup',            view: 'setup'          },
     { label: 'Results',          view: 'results'        },
   ]},
+  { key: 'Wagers',         label: 'Wagers',          icon: DollarIcon,    sub: [] },
   { key: 'Pre/Post Round', label: 'Print & share',   icon: ClipboardIcon, sub: [
     { label: 'Print Assets',     anchor: 'print-assets'   },
     { label: 'Export Scorecards',anchor: 'export-scorecards' },
@@ -215,9 +216,16 @@ function GlobalSidebar({ org, user, profile, tier, isOwner, onSignOut, onClose }
 }
 
 // ─── Event context sidebar ────────────────────────────────────────────────────
-function EventSidebar({ org, eventName, eventStatus, hasMatchPlay = false, sideGameOptions = [], basePath, onClose, onSignOut, user, profile }) {
+function EventSidebar({ org, eventName, eventStatus, hasMatchPlay = false, sideGameOptions = [], basePath, wagersHref = null, activeKey = null, onClose, onSignOut, user, profile }) {
   const [searchParams, setSearchParams] = useSearchParams()
-  const activeTab = searchParams.get('tab') ?? 'Overview'
+  const navigate  = useNavigate()
+  // `activeKey` is set when the sidebar is shown on a page that is not the event's own admin page
+  // (the wager board): tabs then link back to the event admin instead of changing the query string.
+  const activeTab = activeKey ?? searchParams.get('tab') ?? 'Overview'
+  const goTab = (key, extra = {}) => {
+    if (activeKey) navigate(`${basePath}?${new URLSearchParams({ tab: key, ...extra })}`)
+    else setSearchParams({ tab: key, ...extra })
+  }
   const location  = useLocation()
   const initials  = (profile?.full_name ?? user?.email ?? '?').split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase()
 
@@ -263,6 +271,16 @@ function EventSidebar({ org, eventName, eventStatus, hasMatchPlay = false, sideG
       {/* Tab nav */}
       <nav className="flex-1 px-3 py-4 space-y-0.5 overflow-y-auto">
         {EVENT_TABS.map(({ key, label, icon: Icon, sub }) => {
+          if (key === 'Wagers') {
+            if (!wagersHref) return null
+            return (
+              <Link key={key} to={wagersHref} onClick={onClose} aria-current={activeTab === key ? 'page' : undefined}
+                className={tabClass(key)} style={{ width: '100%' }}>
+                <Icon className="w-4 h-4 shrink-0" />
+                {label}
+              </Link>
+            )
+          }
           // For Side Games tab, filter sub-items to only those relevant to this event
           const SIDE_GAME_ANCHOR_KEYS = {
             'opt-ins':        null,          // always show if there are opt-in games (super_ctp, super_skins)
@@ -289,7 +307,7 @@ function EventSidebar({ org, eventName, eventStatus, hasMatchPlay = false, sideG
           return (
             <div key={key}>
               <button
-                onClick={() => { setSearchParams({ tab: key }); onClose?.() }}
+                onClick={() => { goTab(key); onClose?.() }}
                 className={tabClass(key)}
                 style={{ width: '100%', textAlign: 'left' }}>
                 <Icon className="w-4 h-4 shrink-0" />
@@ -304,7 +322,7 @@ function EventSidebar({ org, eventName, eventStatus, hasMatchPlay = false, sideG
                       <button
                         key={view}
                         type="button"
-                        onClick={() => { setSearchParams({ tab: key, view }); onClose?.() }}
+                        onClick={() => { goTab(key, { view }); onClose?.() }}
                         className={`flex min-h-[44px] w-full items-center gap-2 rounded-sm pl-3 pr-3 text-left text-xs font-medium transition-colors ${
                           searchParams.get('view') === view ? 'bg-status-active-bg text-status-active-text' : 'text-ink-muted hover:bg-surface-dim hover:text-ink'
                         }`}
@@ -357,7 +375,7 @@ function EventSidebar({ org, eventName, eventStatus, hasMatchPlay = false, sideG
 }
 
 // ─── AdminLayout ──────────────────────────────────────────────────────────────
-export default function AdminLayout({ children }) {
+export default function AdminLayout({ children, eventContext = null }) {
   const { user, profile, signOut } = useAuth()
   const navigate   = useNavigate()
   const [drawerOpen,      setDrawerOpen]      = useState(false)
@@ -367,7 +385,12 @@ export default function AdminLayout({ children }) {
   const [eventMeta,       setEventMeta]       = useState(null) // { name, status }
   const ctxOrg = useOrg()
 
-  const { isEventRoute, orgSlug, leagueSlug, eventSlug, basePath } = useEventRoute()
+  const route = useEventRoute()
+  // eventContext: a page outside /admin (the wager board) that still wants the event sidebar.
+  const isEventRoute = eventContext ? true : route.isEventRoute
+  const eventSlug      = eventContext ? eventContext.eventSlug : route.eventSlug
+  const leagueSlug     = eventContext ? eventContext.leagueSlug : route.leagueSlug
+  const orgSlug        = eventContext ? null : route.orgSlug
 
   useEffect(() => {
     if (!user) return
@@ -385,14 +408,15 @@ export default function AdminLayout({ children }) {
 
   // Fetch event name + status when on an event route
   useEffect(() => {
+    if (eventContext) { setEventMeta(eventContext.meta); return }
     if (!isEventRoute || !eventSlug) { setEventMeta(null); return }
     supabase
       .from('events')
-      .select('name, event_number, status, side_game_options, formats, format')
+      .select('id, name, event_number, status, side_game_options, formats, format, league:leagues(org_id)')
       .eq('slug', eventSlug)
       .single()
       .then(({ data }) => {
-        if (data) setEventMeta({ name: data.name ?? `Event #${data.event_number}`, status: data.status, sideGameOptions: data.side_game_options ?? [], hasMatchPlay: [...(data.formats ?? (data.format ? [data.format] : []))].some(f => f === 'match_points' || f === 'ryder_cup') })
+        if (data) setEventMeta({ id: data.id, isMigc: data.league?.org_id === import.meta.env.VITE_MIGC_ORG_ID, name: data.name ?? `Event #${data.event_number}`, status: data.status, sideGameOptions: data.side_game_options ?? [], hasMatchPlay: [...(data.formats ?? (data.format ? [data.format] : []))].some(f => f === 'match_points' || f === 'ryder_cup') })
       })
   }, [isEventRoute, eventSlug])
 
@@ -404,14 +428,19 @@ export default function AdminLayout({ children }) {
     navigate('/login')
   }
 
+  const basePath = eventContext ? `/admin/${org?.slug}/${leagueSlug}/${eventSlug}` : route.basePath
+  // The Wagers page is Mulligan's Island only (as the wager pages themselves are).
+  const wagersHref = eventMeta?.isMigc && eventMeta?.id ? `/wager/${eventMeta.id}/board` : null
+  const activeKey = eventContext ? 'Wagers' : null
+
   const sharedProps = { org, user, profile, onSignOut: handleSignOut }
 
   const sidebarContent = isEventRoute
-    ? <EventSidebar {...sharedProps} eventName={eventMeta?.name ?? '…'} eventStatus={eventMeta?.status} hasMatchPlay={eventMeta?.hasMatchPlay ?? false} sideGameOptions={eventMeta?.sideGameOptions ?? []} basePath={basePath} onClose={() => setDrawerOpen(false)} />
+    ? <EventSidebar {...sharedProps} eventName={eventMeta?.name ?? '…'} eventStatus={eventMeta?.status} hasMatchPlay={eventMeta?.hasMatchPlay ?? false} sideGameOptions={eventMeta?.sideGameOptions ?? []} basePath={basePath} wagersHref={wagersHref} activeKey={activeKey} onClose={() => setDrawerOpen(false)} />
     : <GlobalSidebar {...sharedProps} tier={tier} isOwner={isOwner} onClose={() => setDrawerOpen(false)} />
 
   const sidebarDesktop = isEventRoute
-    ? <EventSidebar {...sharedProps} eventName={eventMeta?.name ?? '…'} eventStatus={eventMeta?.status} hasMatchPlay={eventMeta?.hasMatchPlay ?? false} sideGameOptions={eventMeta?.sideGameOptions ?? []} basePath={basePath} />
+    ? <EventSidebar {...sharedProps} eventName={eventMeta?.name ?? '…'} eventStatus={eventMeta?.status} hasMatchPlay={eventMeta?.hasMatchPlay ?? false} sideGameOptions={eventMeta?.sideGameOptions ?? []} basePath={basePath} wagersHref={wagersHref} activeKey={activeKey} />
     : <GlobalSidebar {...sharedProps} tier={tier} isOwner={isOwner} />
 
   return (
