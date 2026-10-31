@@ -5,14 +5,13 @@
  *   [GMAIL]  Tournament details email                [Preview] [Copy email]
  *            One-line description
  *
- * Purely presentational: the page passes the handlers. Today both buttons open the same
- * email modal (the copy button lives inside it), so `onPreview` and `onCopy` may be the
- * same function. "Copy email" is the one Primary button on the page.
+ * Purely presentational: the page passes the handler. The button opens the email modal,
+ * which has the preview and the real copy action. "Copy email" is the one Primary button.
  */
 
 import { ActionButton } from './Button'
 
-export default function HeroEmailCard({ title, description, onPreview, onCopy, stacked = false, className = '' }) {
+export default function HeroEmailCard({ title, description, onCopy, stacked = false, className = '' }) {
   return (
     <div
       className={`mb-5 flex flex-col gap-4 rounded-sm border border-fairway-200 bg-fairway-50 p-4 ` +
@@ -28,7 +27,6 @@ export default function HeroEmailCard({ title, description, onPreview, onCopy, s
         {description && <p className="mt-0.5 text-sm text-ink-muted">{description}</p>}
       </div>
       <div className={`flex flex-wrap items-center gap-2 ${stacked ? '' : 'sm:shrink-0'}`}>
-        <ActionButton variant="secondary" onClick={onPreview}>Preview</ActionButton>
         <ActionButton variant="primary" onClick={onCopy}>Copy email</ActionButton>
       </div>
     </div>

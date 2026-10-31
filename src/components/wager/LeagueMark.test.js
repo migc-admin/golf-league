@@ -36,7 +36,7 @@ describe('LeagueMark', () => {
 describe('ExportHeader', () => {
   it('has the logo left of the league name, title, pill, meta and right-hand lines, with no solid band', () => {
     const out = html(h(ExportHeader, { leagueName: 'Mulligans', logoUrl: '/l.png', title: 'Wager payout summary', pill: 'Final · Settled', meta: 'Playoffs · Course · Sun', right: ['Generated Oct 25, 2026', 'Payouts include stake'] }))
-    expect(out.indexOf('<img')).toBeLessThan(out.indexOf('Mulligans</span>'))
+    expect(out.indexOf('<img')).toBeLessThan(out.indexOf('Mulligans</div>'))
     expect(out).toContain('Wager payout summary')
     expect(out).toContain('Final · Settled')
     expect(out).toContain('Generated Oct 25, 2026')

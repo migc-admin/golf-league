@@ -16,7 +16,10 @@ import { computeLeaderboards, computeStableford, computeBlindPartners, blindPart
 import { computeAllSkins, computeSuperSkins } from '../../lib/engines/skins'
 import { computeTGLEventResults, assignTGLPoints } from '../../lib/engines/tgl'
 import Card, { CardHeader } from '../../components/ui/Card'
-import { ExportScorecardsButton, ExportSkinsGridButton, ExportResultsButton, ExportTeamPlayButton, ExportMatchPlayCardsButton } from '../../components/ScorecardExport'
+import { ExportScorecardsButton, ExportMatchPlayCardsButton } from '../../components/ScorecardExport'
+import ExportSkinsGridButton from '../../components/export/SkinsExport'
+import ExportResultsButton from '../../components/export/ResultsExport'
+import ExportTeamPlayButton from '../../components/export/TeamPlayExport'
 import { useOrg, useFeatures } from '../../lib/OrgContext'
 import Button from '../../components/ui/Button'
 import Modal from '../../components/ui/Modal'
@@ -26,7 +29,7 @@ import ImageUpload from '../../components/ui/ImageUpload'
 import UpgradePrompt from '../../components/ui/UpgradePrompt'
 import PrintAssets from '../../components/ui/PrintAssets'
 import { matchCH, computeMatchPoints, TIEBREAK_PRESETS } from '../../lib/engines/matchPoints'
-import { computePlayerPayouts } from '../../lib/engines/payoutSummary'
+import { computePayoutSummary } from '../../lib/engines/payoutSummary'
 import EventEmailModal from '../../components/ui/EventEmailModal'
 import { ActionButton } from '../../components/ui/Button'
 import ExportRow from '../../components/ui/ExportRow'
@@ -283,9 +286,10 @@ export default function EventDetail() {
   // Only computed when the "Payouts per Player" print asset is open — mirrors
   // TabPayoutSummary's exact computation so the printed sheet always matches
   // the on-screen Payout Summary tab.
-  const payoutsByPlayer = printAsset === 'payouts_per_player'
-    ? computePlayerPayouts(event, eventPlayers, allScores, course, sideGames)
-    : []
+  const payoutSummary = printAsset === 'payouts_per_player'
+    ? computePayoutSummary(event, eventPlayers, allScores, course, sideGames)
+    : { players: [], totalPot: 0, buyInPotTotal: 0 }
+  const payoutsByPlayer = payoutSummary.players
 
   return (
     <div className="space-y-5">
@@ -459,7 +463,7 @@ export default function EventDetail() {
         />
       )}
 
-      {printAsset && <PrintAssets type={printAsset} event={event} eventPlayers={eventPlayers} tglSelections={tglSelections} orgSlug={orgSlug} leagueSlug={leagueSlug} payoutsByPlayer={payoutsByPlayer} onClose={() => setPrintAsset(null)} />}
+      {printAsset && <PrintAssets type={printAsset} event={event} eventPlayers={eventPlayers} tglSelections={tglSelections} orgSlug={orgSlug} leagueSlug={leagueSlug} payoutsByPlayer={payoutsByPlayer} payoutSummary={payoutSummary} onClose={() => setPrintAsset(null)} />}
     </div>
   )
 }
@@ -1413,7 +1417,6 @@ function TabPostRound({ event, eventPlayers, allScores, course, sideGames, orgNa
           stacked={isComplete}
           title="Tournament details email"
           description="Event info, groups, tee times and matchups"
-          onPreview={() => setEmailKind('pre')}
           onCopy={() => setEmailKind('pre')}
         />
         <h3 className="mb-1 text-[11px] font-bold uppercase tracking-widest text-ink-muted">Print</h3>
@@ -1515,7 +1518,6 @@ function TabPostRound({ event, eventPlayers, allScores, course, sideGames, orgNa
         <HeroEmailCard
           title="Results email"
           description="Winners, payouts and match results"
-          onPreview={() => setEmailKind('post')}
           onCopy={() => setEmailKind('post')}
         />
         <ExportRow
@@ -1614,6 +1616,9 @@ function TabPostRound({ event, eventPlayers, allScores, course, sideGames, orgNa
           logoUrl={logoUrl}
           orgSlug={orgSlug}
           leagueSlug={leagueSlug}
+          tglTeams={hasTgl ? tglTeams : undefined}
+          tglMembers={tglMembers}
+          tglSelections={tglSelections}
           onClose={() => setEmailKind(null)}
         />
       )}

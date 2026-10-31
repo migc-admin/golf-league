@@ -2,7 +2,7 @@
  * PrintAssets — Printable golf event assets
  *
  * Five asset types:
- *  'cards'           → CTP and Long Drive cards  (4.72" × 8.27" portrait / A5)
+ *  'cards'           → CTP and Long Drive signs  (4.72" × 8.27" portrait / A5)
  *  'tee_sheet'       → Tee Sheet                 (8.5" × 11" portrait)
  *  'cart_signs'      → Cart Signs                (8.5" × 5.5" landscape)
  *  'checkin_qr'      → Check-In QR sign          (8.5" × 11" portrait)
@@ -15,8 +15,13 @@ import { toPng } from 'html-to-image'
 import html2canvas from 'html2canvas'
 import QRCode from 'qrcode'
 import { supabase } from '../../lib/supabase'
-import { buildPairings } from '../../lib/engines/matchPoints'
+import { buildPairings, matchCH } from '../../lib/engines/matchPoints'
 import { OPT_IN_GAME_LABELS, isBuyInEnabled, optInAmount } from '../../lib/sideGames'
+import PayoutsPerPlayerSheet from '../export/PayoutsPerPlayerSheet'
+import TeeSheetPage, { teeSheetChunks } from '../export/TeeSheet'
+import { SignsPage } from '../export/SideGameSigns'
+import { buildSignItems, signPages } from '../../lib/signsView'
+import { payoutsPerPlayerView } from '../../lib/payoutsPerPlayerView'
 
 const GOLD  = '#C9A84C'
 const GREEN = '#1B4332'
@@ -109,8 +114,8 @@ function hasMatchPlayFormat(event) {
 }
 
 function pairInfo(playerA, playerB, matchNumber) {
-  const chA = playerA.course_handicap ?? 0
-  const chB = playerB.course_handicap ?? 0
+  const chA = matchCH(playerA) ?? 0
+  const chB = matchCH(playerB) ?? 0
   const baseline = Math.min(chA, chB)
   const nameOf = ep => [ep?.player?.first_name, ep?.player?.last_name].filter(Boolean).join(' ') || '—'
   return {
@@ -151,239 +156,6 @@ function buildMatchupsByGroup(eventPlayers, storedPairings) {
     }
   }
   return groupMap
-}
-
-// ═══════════════════════════════════════════════════════════════════════════════
-// ASSET TYPE 1 — CTP / Long Drive Cards  (4.72" × 8.27" — A5 portrait)
-// ═══════════════════════════════════════════════════════════════════════════════
-function CtpLongDriveCard({ logoUrl, leagueName, eventName, date, competitionLine }) {
-  return (
-    <div style={{
-      width: '4.72in', height: '8.27in',
-      display: 'flex', flexDirection: 'column',
-      alignItems: 'center',
-      background: '#fff', color: '#111',
-      padding: '0.45in 0.55in 0.4in',
-      boxSizing: 'border-box',
-      fontFamily: FONT,
-    }}>
-      {/* Logo */}
-      {logoUrl ? (
-        <img src={logoUrl} alt="" style={{
-          width: '1.15in', height: '1.15in', borderRadius: '50%',
-          objectFit: 'cover', marginBottom: '0.18in',
-        }} />
-      ) : (
-        <div style={{
-          width: '1.15in', height: '1.15in', borderRadius: '50%',
-          background: GREEN, display: 'flex', alignItems: 'center', justifyContent: 'center',
-          color: GOLD, fontWeight: 'bold', fontSize: '0.38in', marginBottom: '0.18in',
-          fontFamily: FONT,
-        }}>
-          {leagueName?.slice(0, 2)?.toUpperCase() ?? '⛳'}
-        </div>
-      )}
-
-      {/* League name */}
-      <div style={{ fontSize: '0.24in', fontWeight: 'bold', color: '#111', textAlign: 'center', lineHeight: 1.2, marginBottom: '0.06in', fontFamily: FONT }}>
-        {leagueName}
-      </div>
-
-      {/* Event / date */}
-      <div style={{ fontSize: '0.18in', color: '#333', textAlign: 'center', lineHeight: 1.3, marginBottom: '0.22in', fontFamily: FONT }}>
-        {eventName}{eventName && date ? ' / ' : ''}{date}
-      </div>
-
-      {/* Divider */}
-      <div style={{ width: '2.8in', height: '1px', background: '#bbb', marginBottom: '0.22in' }} />
-
-      {/* Competition label */}
-      <div style={{ fontSize: '0.26in', fontWeight: 'bold', color: '#111', textAlign: 'center', lineHeight: 1.2, marginBottom: '0.3in', fontFamily: FONT }}>
-        {competitionLine}
-      </div>
-
-      {/* Write-in lines */}
-      <div style={{ width: '100%', flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'space-around', paddingTop: '0.1in' }}>
-        {Array.from({ length: 8 }).map((_, i) => (
-          <div key={i} style={{ borderBottom: '1px solid #bbb', width: '100%' }} />
-        ))}
-      </div>
-    </div>
-  )
-}
-
-// Two CTP/Long Drive cards, shrunk to fit side-by-side on a standard Letter sheet
-const CTP_ORIG_W    = 4.72
-const CTP_ORIG_H    = 8.27
-const CTP_PAGE_MARGIN = 0.4  // in
-const CTP_GAP         = 0.3  // in
-
-function CtpCardsPage({ cards }) {
-  const availW = 8.5 - CTP_PAGE_MARGIN * 2
-  const cardW  = (availW - CTP_GAP) / 2
-  const scale  = cardW / CTP_ORIG_W
-  const cardH  = CTP_ORIG_H * scale
-
-  return (
-    <div style={{
-      width: '8.5in', height: '11in',
-      boxSizing: 'border-box',
-      padding: `${CTP_PAGE_MARGIN}in`,
-      display: 'flex', justifyContent: 'center', alignItems: 'flex-start',
-      gap: `${CTP_GAP}in`,
-      background: '#fff',
-      pageBreakAfter: 'always',
-    }}>
-      {cards.map((c, i) => (
-        <div key={i} style={{
-          width: `${cardW}in`, height: `${cardH}in`,
-          boxSizing: 'border-box',
-          border: '1.5px dashed #999',
-          overflow: 'hidden',
-        }}>
-          <div style={{
-            width: `${CTP_ORIG_W}in`, height: `${CTP_ORIG_H}in`,
-            transform: `scale(${scale})`, transformOrigin: 'top left',
-          }}>
-            <CtpLongDriveCard {...c} />
-          </div>
-        </div>
-      ))}
-    </div>
-  )
-}
-
-// ═══════════════════════════════════════════════════════════════════════════════
-// ASSET TYPE 2 — Tee Sheet  (8.5" × 11")
-// ═══════════════════════════════════════════════════════════════════════════════
-function TeeSheetPage({ event, eventPlayers, forPng = false, tglSelections = [], matchupsByGroup = {} }) {
-  const league     = event?.league ?? {}
-  const logoUrl    = league.logo_url ?? null
-  const leagueName = league.name ?? ''
-  const eventName  = event?.name ?? (event?.event_number ? `Event #${event.event_number}` : '')
-  const date       = formatEventDate(event?.event_date)
-  const courseName = event?.course?.name ?? ''
-  const interval   = event?.tee_time_interval_mins ?? 10
-  const isShotgun  = event?.shotgun_start ?? false
-  const holeMap    = event?.group_hole_assignments ?? {}
-
-  const hasFlights = eventPlayers.some(ep => ep.flight === 'A' || ep.flight === 'B')
-  const tglSet     = tglSelections.length > 0 ? new Set(tglSelections.map(s => s.player_id)) : null
-  const hasTgl     = tglSet && tglSet.size > 0
-
-  const groups    = groupedPlayers(eventPlayers)
-  const groupNums = Object.keys(groups).map(Number).sort((a, b) => a - b)
-
-  const cols = '0.85in 0.55in 4.5in 0.75in'
-
-  return (
-    <div style={{
-      width: '8.5in', ...(forPng ? {} : { minHeight: '11in' }),
-      background: '#fff', color: '#111',
-      padding: '0.5in 0.55in',
-      boxSizing: 'border-box',
-      fontFamily: FONT,
-      ...(forPng ? {} : { pageBreakAfter: 'always' }),
-    }}>
-      {/* Page header */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: '0.22in', marginBottom: '0.22in' }}>
-        {logoUrl ? (
-          <img src={logoUrl} alt="" style={{ width: '0.85in', height: '0.85in', borderRadius: '50%', objectFit: 'cover', border: `2px solid ${GOLD}`, flexShrink: 0 }} />
-        ) : (
-          <div style={{ width: '0.85in', height: '0.85in', borderRadius: '50%', background: GREEN, display: 'flex', alignItems: 'center', justifyContent: 'center', color: GOLD, fontWeight: 'bold', fontSize: '0.28in', flexShrink: 0, fontFamily: FONT }}>
-            {leagueName?.slice(0, 2)?.toUpperCase() ?? '⛳'}
-          </div>
-        )}
-        <div>
-          <div style={{ fontSize: '0.22in', fontWeight: 'bold', color: GREEN, fontFamily: FONT }}>{leagueName}</div>
-          <div style={{ fontSize: '0.17in', color: '#333', marginTop: '0.03in', fontFamily: FONT }}>{eventName}</div>
-          <div style={{ fontSize: '0.12in', color: '#666', marginTop: '0.02in', fontFamily: FONT }}>
-            {[
-              date,
-              courseName,
-              isShotgun ? 'Shotgun Start' : (event?.start_time ? `First tee ${calcTeeTime(event.start_time, interval, 1)}` : null),
-              !isShotgun ? `${interval}-min intervals` : null,
-            ].filter(Boolean).join('  ·  ')}
-          </div>
-        </div>
-      </div>
-
-      {/* Divider */}
-      <div style={{ height: '2px', background: `linear-gradient(90deg, ${GOLD}, ${GREEN})`, marginBottom: '0.18in' }} />
-
-      {/* Table header */}
-      <div style={{
-        display: 'grid', gridTemplateColumns: cols,
-        gap: '0 0.1in', padding: '0.07in 0.1in',
-        background: GREEN, color: '#fff', borderRadius: '3px',
-        fontSize: '0.12in', fontWeight: 'bold', letterSpacing: '0.04em', textTransform: 'uppercase',
-        marginBottom: '0.03in', fontFamily: FONT,
-      }}>
-        <div>Time</div>
-        <div>Group</div>
-        <div>Players</div>
-        <div>Hole</div>
-      </div>
-
-      {/* Rows */}
-      {groupNums.map((g, i) => {
-        const members = groups[g]
-        const teeTime = isShotgun
-          ? calcTeeTime(event?.start_time, 0, 1)
-          : calcTeeTime(event?.start_time, interval, g)
-        const names = members.map(ep => epName(ep, { showFlight: hasFlights, tglSet })).join('  /  ')
-        const hole  = isShotgun ? (holeMap[g] ? `Hole ${holeMap[g]}` : '—') : 'Hole 1'
-        const matchups = matchupsByGroup[g] ?? []
-
-        return (
-          <div key={g} style={{
-            display: 'grid', gridTemplateColumns: cols,
-            gap: '0 0.1in', padding: '0.09in 0.1in',
-            background: i % 2 === 0 ? '#f7f7f5' : '#fff',
-            borderBottom: '1px solid #e8e8e4',
-            alignItems: 'center',
-          }}>
-            <div style={{ fontSize: '0.14in', fontWeight: 'bold', color: GREEN, whiteSpace: 'nowrap', fontFamily: FONT }}>
-              {teeTime ?? '—'}
-            </div>
-            <div style={{ fontSize: '0.13in', color: '#555', fontWeight: 'bold', fontFamily: FONT }}>#{g}</div>
-            <div style={{ fontSize: '0.13in', color: '#222', lineHeight: 1.3, wordBreak: 'break-word', fontFamily: FONT }}>
-              {names || '—'}
-              {matchups.length > 0 && (
-                <div style={{ fontSize: '0.1in', color: GREEN, fontWeight: 600, marginTop: '0.03in', fontFamily: FONT }}>
-                  {matchups.map(m =>
-                    `${m.nameA}${m.relA > 0 ? ` (${m.relA})` : ''} vs ${m.nameB}${m.relB > 0 ? ` (${m.relB})` : ''}`
-                  ).join('  ·  ')}
-                </div>
-              )}
-            </div>
-            <div style={{ fontSize: '0.12in', color: '#888', whiteSpace: 'nowrap', fontFamily: FONT }}>{hole}</div>
-          </div>
-        )
-      })}
-
-      {groupNums.length === 0 && (
-        <div style={{ textAlign: 'center', padding: '0.5in', color: '#999', fontSize: '0.14in', fontFamily: FONT }}>
-          No groups assigned yet.
-        </div>
-      )}
-
-      {/* Footer */}
-      <div style={{ marginTop: '0.2in', borderTop: `1px solid ${GOLD}`, paddingTop: '0.1in' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-          <div style={{ fontSize: '0.1in', color: '#aaa', fontFamily: FONT }}>
-            {groupNums.length} group{groupNums.length !== 1 ? 's' : ''} · {eventPlayers.filter(ep => ep.group_number).length} players
-          </div>
-          <div style={{ fontSize: '0.1in', color: '#aaa', fontFamily: FONT }}>Printed {new Date().toLocaleDateString()}</div>
-        </div>
-        {hasTgl && (
-          <div style={{ marginTop: '0.06in', fontSize: '0.1in', color: '#888', fontFamily: FONT }}>
-            * Participating in Team Play for this event
-          </div>
-        )}
-      </div>
-    </div>
-  )
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -672,94 +444,12 @@ function OptInRosterSheet({ event, games, players }) {
 // ═══════════════════════════════════════════════════════════════════════════════
 // ASSET TYPE 6 — Payouts per Player  (8.5" × 11", single page — name, total, breakdown)
 // ═══════════════════════════════════════════════════════════════════════════════
-function PayoutsPerPlayerSheet({ event, players }) {
-  const league     = event?.league ?? {}
-  const logoUrl    = league.logo_url ?? null
-  const leagueName = league.name ?? ''
-  const eventName  = event?.name ?? (event?.event_number ? `Event #${event.event_number}` : '')
-  const date       = formatEventDate(event?.event_date)
-  const courseName = event?.course?.name ?? ''
-  const totalPot   = players.reduce((sum, p) => sum + p.total, 0)
-
-  return (
-    <div style={{
-      // No fixed height here — unlike the other single-page sheets, this list
-      // can run longer than one page. minHeight keeps short lists looking like
-      // a full page; a long list simply grows taller and flows across
-      // additional print pages (see PAGE_MARGIN + pageBreakInside below), and
-      // still captures as one continuous image for the PNG export.
-      width: '8.5in', minHeight: '11in',
-      background: '#fff', color: '#111',
-      padding: '0.5in 0.6in',
-      boxSizing: 'border-box',
-      fontFamily: FONT,
-      display: 'flex', flexDirection: 'column',
-    }}>
-      {/* Header */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: '0.15in', marginBottom: '0.15in' }}>
-        {logoUrl ? (
-          <img src={logoUrl} alt="" style={{ width: '0.5in', height: '0.5in', borderRadius: '50%', objectFit: 'cover', border: `2px solid ${GOLD}`, flexShrink: 0 }} />
-        ) : (
-          <div style={{ width: '0.5in', height: '0.5in', borderRadius: '50%', background: GREEN, display: 'flex', alignItems: 'center', justifyContent: 'center', color: GOLD, fontWeight: 'bold', fontSize: '0.18in', flexShrink: 0, fontFamily: FONT }}>
-            {leagueName?.slice(0, 2)?.toUpperCase() ?? '⛳'}
-          </div>
-        )}
-        <div>
-          <div style={{ fontSize: '0.15in', fontWeight: 'bold', color: GREEN, fontFamily: FONT }}>{leagueName}</div>
-          <div style={{ fontSize: '0.12in', color: '#333', marginTop: '0.01in', fontFamily: FONT }}>{eventName}</div>
-          <div style={{ fontSize: '0.09in', color: '#666', marginTop: '0.01in', fontFamily: FONT }}>
-            {[date, courseName].filter(Boolean).join('  ·  ')}
-          </div>
-        </div>
-      </div>
-
-      <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', marginBottom: '0.12in' }}>
-        <div style={{ fontSize: '0.18in', fontWeight: 900, color: GREEN, fontFamily: FONT }}>
-          Payouts per Player
-        </div>
-        <div style={{ fontSize: '0.13in', fontWeight: 700, color: '#333', fontFamily: FONT }}>
-          Total Pot: ${totalPot.toFixed(2)}
-        </div>
-      </div>
-
-      {/* Player list — name + total, with category breakdown underneath */}
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.09in' }}>
-        {players.map(p => (
-          <div
-            key={p.playerId}
-            style={{
-              border: '1.5px solid #111', borderRadius: 4, padding: '0.08in 0.14in',
-              // Keep a player's card from being split across a print page break.
-              breakInside: 'avoid', pageBreakInside: 'avoid',
-            }}
-          >
-            <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between' }}>
-              <span style={{ fontSize: '0.14in', fontWeight: 700, color: '#111', fontFamily: FONT }}>{p.name}</span>
-              <span style={{ fontSize: '0.14in', fontWeight: 900, color: GREEN, fontFamily: FONT }}>${p.total.toFixed(2)}</span>
-            </div>
-            {p.items.length > 0 && (
-              <div style={{ marginTop: '0.03in', display: 'flex', flexDirection: 'column', gap: '0.01in' }}>
-                {p.items.map((item, i) => (
-                  <div key={i} style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.1in', color: '#555', fontFamily: FONT }}>
-                    <span>{item.category}</span>
-                    <span>${item.amount.toFixed(2)}</span>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-        ))}
-      </div>
-    </div>
-  )
-}
-
 // ═══════════════════════════════════════════════════════════════════════════════
 // Main export
 // ═══════════════════════════════════════════════════════════════════════════════
 const PAGE_SIZE = {
   cards:               '8.5in 11in',
-  tee_sheet:           '8.5in 11in',
+  tee_sheet:           '11in 8.5in',
   cart_signs:          '8.5in 11in',
   checkin_qr:          '8.5in 11in',
   opt_in_rosters:      '8.5in 11in',
@@ -779,7 +469,7 @@ const PAGE_MARGIN = {
 const PREVIEW_DIMS = {
   cart_signs:          { w: 8.5 * 96, h: 11 * 96 },
   cards:               { w: 8.5 * 96, h: 11 * 96 },
-  tee_sheet:           { w: 8.5 * 96, h: 11 * 96 },
+  tee_sheet:           { w: 11 * 96, h: 8.5 * 96 },
   checkin_qr:          { w: 8.5 * 96, h: 11 * 96 },
   opt_in_rosters:      { w: 8.5 * 96, h: 11 * 96 },
   payouts_per_player:  { w: 8.5 * 96, h: 11 * 96 },
@@ -794,7 +484,7 @@ const PREVIEW_SCALE = {
 }
 
 const TITLES = {
-  cards:               'CTP & Long Drive Cards',
+  cards:               'CTP & Long Drive Signs',
   tee_sheet:           'Tee Sheet',
   cart_signs:          'Cart Signs',
   checkin_qr:          'Check-In QR Sign',
@@ -802,7 +492,7 @@ const TITLES = {
   payouts_per_player:  'Payouts per Player',
 }
 
-export default function PrintAssets({ type, event, eventPlayers = [], tglSelections = [], orgSlug, leagueSlug, payoutsByPlayer = [], onClose }) {
+export default function PrintAssets({ type, event, eventPlayers = [], tglSelections = [], orgSlug, leagueSlug, payoutsByPlayer = [], payoutSummary = null, onClose }) {
   const league     = event?.league ?? {}
   const logoUrl    = league.logo_url ?? null
   const leagueName = league.name ?? ''
@@ -882,54 +572,28 @@ export default function PrintAssets({ type, event, eventPlayers = [], tglSelecti
   let printNodes = []
   let itemCount  = 0
 
-  // ── CTP / Long Drive cards ────────────────────────────────────────────────
+  // ── CTP / Long Drive signs ────────────────────────────────────────────────
   if (type === 'cards') {
-    const sideGames    = event?.side_game_options ?? []
-    const payoutConfig = event?.payout_config ?? {}
-    const cardItems    = []
-
-    const hasCtp   = sideGames.includes('ctp')
-    const ctpHoles = Object.keys(payoutConfig)
-      .filter(k => k.startsWith('ctp_'))
-      .map(k => parseInt(k.replace('ctp_', ''), 10))
-      .sort((a, b) => a - b)
-
-    if (hasCtp && ctpHoles.length > 0) {
-      ctpHoles.forEach(h => {
-        cardItems.push({
-          logoUrl, leagueName, eventName, date,
-          competitionLine: `Closest to Pin #${h}`,
-        })
-      })
-    } else if (hasCtp) {
-      cardItems.push({ logoUrl, leagueName, eventName, date, competitionLine: 'Closest to Pin' })
-    }
-
-    const hasLongDrive = sideGames.some(s => s.startsWith('long_drive'))
-    const ldHole       = event?.long_drive_hole ?? null
-
-    if (hasLongDrive) {
-      cardItems.push({
-        logoUrl, leagueName, eventName, date,
-        competitionLine: ldHole ? `Longest Drive #${ldHole}` : 'Longest Drive',
-      })
-    }
-
-    // Custom competitions
-    const customCompetitions = (event?.custom_competitions ?? []).filter(c => c?.trim())
-    customCompetitions.forEach(name => {
-      cardItems.push({ logoUrl, leagueName, eventName, date, competitionLine: name })
-    })
-
-    itemCount = cardItems.length
-    for (let i = 0; i < cardItems.length; i += 2) {
-      printNodes.push(<CtpCardsPage key={`page_${i / 2}`} cards={cardItems.slice(i, i + 2)} />)
-    }
+    const signItems = buildSignItems(event, eventPlayers)
+    const pages = signPages(signItems)
+    itemCount = signItems.length
+    printNodes = pages.map((items, i) => (
+      <SignsPage key={`page_${i}`} items={items} event={event} pageNum={i + 1} pageCount={pages.length} totalSigns={signItems.length} last={i === pages.length - 1} />
+    ))
   }
 
   // ── Tee Sheet ─────────────────────────────────────────────────────────────
   if (type === 'tee_sheet') {
-    printNodes = [<TeeSheetPage key="tee_sheet" event={event} eventPlayers={eventPlayers} tglSelections={tglSelections} matchupsByGroup={matchupsByGroup} />]
+    const groups    = groupedPlayers(eventPlayers)
+    const groupNums = Object.keys(groups).map(Number).sort((a, b) => a - b)
+    const chunks    = teeSheetChunks(groupNums)
+    printNodes = chunks.map((nums, i) => (
+      <TeeSheetPage
+        key={`tee_sheet_${i}`} event={event} eventPlayers={eventPlayers} tglSelections={tglSelections}
+        matchupsByGroup={matchupsByGroup} groups={groups} groupNums={nums} allGroupCount={groupNums.length}
+        first={i === 0} last={i === chunks.length - 1} pageNum={i + 1} pageCount={chunks.length}
+      />
+    ))
     itemCount  = 1
   }
 
@@ -1027,9 +691,15 @@ export default function PrintAssets({ type, event, eventPlayers = [], tglSelecti
   }
 
   // ── Payouts per Player ───────────────────────────────────────────────────
+  let payoutsSheetRows = 0
   if (type === 'payouts_per_player' && payoutsByPlayer.length > 0) {
-    printNodes = [<PayoutsPerPlayerSheet key="payouts_per_player" event={event} players={payoutsByPlayer} />]
+    const view = payoutsPerPlayerView({
+      event, eventPlayers, players: payoutsByPlayer,
+      totalPot: payoutSummary?.totalPot ?? 0, buyInPotTotal: payoutSummary?.buyInPotTotal ?? 0,
+    })
+    printNodes = [<PayoutsPerPlayerSheet key="payouts_per_player" view={view} leagueName={leagueName} logoUrl={logoUrl} className="export-print-fit" />]
     itemCount  = 1
+    payoutsSheetRows = view.rows.length
   }
 
   // ── Print CSS ─────────────────────────────────────────────────────────────
@@ -1044,6 +714,8 @@ export default function PrintAssets({ type, event, eventPlayers = [], tglSelecti
       @media print {
         body > * { display: none !important; }
         #print-assets-root { display: block !important; }
+        /* The 1000px PNG layout is scaled to fit the printable width of a Letter page */
+        #print-assets-root .export-print-fit { zoom: 0.8; }
       }
     `
     document.head.appendChild(style)
@@ -1053,7 +725,7 @@ export default function PrintAssets({ type, event, eventPlayers = [], tglSelecti
   // ── Empty state ───────────────────────────────────────────────────────────
   if (printNodes.length === 0) {
     const hint = type === 'cards'
-      ? "Enable CTP, Long Drive, or add custom competitions in the event's Side Games to generate cards."
+      ? "Enable CTP, Long Drive, or add custom competitions in the event's Side Games to generate signs."
       : type === 'cart_signs'
       ? 'Assign players to groups in the Groups tab first.'
       : type === 'checkin_qr'
@@ -1076,14 +748,16 @@ export default function PrintAssets({ type, event, eventPlayers = [], tglSelecti
   }
 
   const pageCount = printNodes.length
-  const subtitle  = type === 'tee_sheet' || type === 'checkin_qr'
+  const subtitle  = type === 'tee_sheet'
+    ? `${pageCount} page${pageCount !== 1 ? 's' : ''} · 11" × 8.5" landscape`
+    : type === 'checkin_qr'
     ? '1 page · 8.5" × 11"'
     : type === 'cart_signs'
     ? `${itemCount} sign${itemCount !== 1 ? 's' : ''} · ${pageCount} page${pageCount !== 1 ? 's' : ''} · 8.5" × 11"`
     : type === 'opt_in_rosters'
     ? `${optInRosterPlayerCount} player${optInRosterPlayerCount !== 1 ? 's' : ''} · 1 page · 8.5" × 11"`
     : type === 'payouts_per_player'
-    ? `${payoutsByPlayer.length} player${payoutsByPlayer.length !== 1 ? 's' : ''} · 1 page · 8.5" × 11"`
+    ? `${payoutsByPlayer.length} player${payoutsByPlayer.length !== 1 ? 's' : ''} · PNG`
     : `${itemCount} card${itemCount !== 1 ? 's' : ''} · ${pageCount} page${pageCount !== 1 ? 's' : ''} · 8.5" × 11"`
 
   return (
@@ -1155,8 +829,10 @@ export default function PrintAssets({ type, event, eventPlayers = [], tglSelecti
         {/* Scrollable preview */}
         <div className="flex-1 overflow-y-auto py-8 flex flex-col items-center gap-8">
           {printNodes.map((node, i) => {
-            const dims  = PREVIEW_DIMS[type]
-            const scale = PREVIEW_SCALE[type]
+            const dims  = type === 'payouts_per_player'
+              ? { w: 1000, h: 400 + payoutsSheetRows * 56 }
+              : PREVIEW_DIMS[type]
+            const scale = type === 'payouts_per_player' ? 0.62 : PREVIEW_SCALE[type]
             const outerW = dims.w * scale
             const outerH = dims.h * scale
             return (
@@ -1166,7 +842,7 @@ export default function PrintAssets({ type, event, eventPlayers = [], tglSelecti
                   position: 'absolute', top: -24, left: 0,
                   fontSize: 11, color: '#aaa', letterSpacing: '0.05em', textTransform: 'uppercase',
                 }}>
-                  {type === 'tee_sheet' ? 'Tee Sheet' : `Page ${i + 1} of ${printNodes.length}`}
+                  {type === 'tee_sheet' && printNodes.length === 1 ? 'Tee Sheet' : `Page ${i + 1} of ${printNodes.length}`}
                 </div>
                 {/* Scaled card */}
                 <div style={{
@@ -1198,7 +874,11 @@ export default function PrintAssets({ type, event, eventPlayers = [], tglSelecti
       {type === 'tee_sheet' && createPortal(
         <div style={{ position: 'fixed', top: '-99999px', left: '-99999px', pointerEvents: 'none', zIndex: -1 }}>
           <div ref={pngRef}>
-            <TeeSheetPage forPng event={event} eventPlayers={eventPlayers} tglSelections={tglSelections} matchupsByGroup={matchupsByGroup} />
+            <TeeSheetPage
+              forPng event={event} eventPlayers={eventPlayers} tglSelections={tglSelections} matchupsByGroup={matchupsByGroup}
+              groups={groupedPlayers(eventPlayers)} allGroupCount={Object.keys(groupedPlayers(eventPlayers)).length}
+              groupNums={Object.keys(groupedPlayers(eventPlayers)).map(Number).sort((a, b) => a - b)}
+            />
           </div>
         </div>,
         document.body

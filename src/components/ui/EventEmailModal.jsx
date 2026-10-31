@@ -4,13 +4,14 @@
  */
 import { useEffect, useMemo, useState } from 'react'
 import toast from 'react-hot-toast'
-import Modal from './Modal'
+import SegmentedToggle from './SegmentedToggle'
 import Button from './Button'
 import { supabase } from '../../lib/supabase'
-import { buildPreRoundEmail, buildPostRoundEmail, copyRichHtml } from '../../lib/eventEmails'
-import { computePlayerPayouts } from '../../lib/engines/payoutSummary'
-import { computeMatchPoints } from '../../lib/engines/matchPoints'
+import { buildPreRoundEmail, buildPostRoundEmail, copyRichHtml, preRoundIncludes } from '../../lib/eventEmails'
+import { buildResultsView, shortDateText } from '../../lib/resultsView'
+import { teamPlayExportView } from '../../lib/teamPlayExport'
 
+const NONE = []
 const MIGC_ORG = import.meta.env.VITE_MIGC_ORG_ID
 const PROD_ORIGIN = 'https://www.scorifygolf.com'
 
@@ -29,8 +30,23 @@ function htmlToPlainText(html) {
     .replace(/\n{3,}/g, '\n\n').trim()
 }
 
+// What the results email contains, for the "Included automatically" box.
+function postRoundIncludes({ event, eventPlayers, allScores, course, sideGames, matchPairings, hasTeams, nextEvent }) {
+  let view = null
+  if (course) { try { view = buildResultsView({ event, eventPlayers, allScores, course, sideGames: sideGames ?? [], matchPairings }) } catch { view = null } }
+  const items = [{ label: 'Low net and total pot', missing: !view }]
+  if (view?.scoring) items.push({ label: 'Net stroke play by flight', missing: false })
+  if (view?.skins) items.push({ label: 'Skins', missing: false })
+  if (view?.ctp || view?.longDrive || view?.lowPutts) items.push({ label: 'Closest to pin, long drive, low putts', missing: false })
+  if (view?.matchPlay) items.push({ label: 'Match play results', missing: false })
+  if (hasTeams) items.push({ label: 'Team play standings', missing: false })
+  items.push({ label: 'Next event', missing: !nextEvent, hint: 'none scheduled' })
+  return items
+}
+
 export default function EventEmailModal({
   kind, event, eventPlayers, allScores, course, sideGames, leagueName, logoUrl, orgSlug, leagueSlug, onClose,
+  tglTeams = NONE, tglMembers = NONE, tglSelections = NONE,
 }) {
   const isPre = kind === 'pre'
   const formats = event?.formats ?? (event?.format ? [event.format] : [])
@@ -38,6 +54,7 @@ export default function EventEmailModal({
 
   const [note, setNote] = useState('')
   const [matchPairings, setMatchPairings] = useState([])
+  const [nextEvent, setNextEvent] = useState(null)
 
   useEffect(() => {
     if (!hasMatchPlay) return
@@ -48,6 +65,22 @@ export default function EventEmailModal({
       .order('match_number')
       .then(({ data }) => setMatchPairings(data ?? []))
   }, [event.id, hasMatchPlay])
+
+  // The league's next upcoming event, for the "Next up" line in the results email
+  useEffect(() => {
+    if (isPre || !event.league_id || !event.event_date) return
+    let cancelled = false
+    supabase
+      .from('events')
+      .select('id, name, slug, event_date')
+      .eq('league_id', event.league_id)
+      .eq('status', 'upcoming')
+      .gt('event_date', event.event_date)
+      .order('event_date')
+      .limit(1)
+      .then(({ data }) => { if (!cancelled) setNextEvent(data?.[0] ?? null) })
+    return () => { cancelled = true }
+  }, [isPre, event.league_id, event.event_date])
 
   const { subject, html } = useMemo(() => {
     const origin = publicOrigin()
@@ -60,15 +93,23 @@ export default function EventEmailModal({
         wagerUrl: isMIGC ? `${origin}/wager/${event.id}` : null,
       })
     }
-    const payouts = computePlayerPayouts(event, eventPlayers, allScores, course, sideGames)
-    const matchResults = hasMatchPlay && course
-      ? computeMatchPoints(eventPlayers, allScores, course, matchPairings, event.match_rules).pairings.filter(r => r.holesPlayed > 0)
+    let view = null
+    if (course) {
+      try { view = buildResultsView({ event, eventPlayers, allScores, course, sideGames: sideGames ?? [], matchPairings }) } catch { view = null }
+    }
+    const teamRows = tglTeams.length > 0
+      ? teamPlayExportView({ event, eventPlayers, allScores, course, tglTeams, tglMembers, tglSelections }).rows
       : []
+    const leaderboardUrl = `${base}/leaderboard?eid=${event.id}`
     return buildPostRoundEmail({
-      event, payouts, matchResults, leagueName, logoUrl, note,
-      leaderboardUrl: `${base}/leaderboard?eid=${event.id}`,
+      event, view, teamRows, leagueName, logoUrl, note,
+      leaderboardUrl, payoutsUrl: leaderboardUrl,
+      nextEvent: nextEvent ? {
+        name: nextEvent.name, dateText: shortDateText(nextEvent.event_date),
+        url: `${origin}/${orgSlug}/${leagueSlug}/${nextEvent.slug}/event`,
+      } : null,
     })
-  }, [isPre, event, eventPlayers, allScores, course, sideGames, matchPairings, leagueName, logoUrl, orgSlug, leagueSlug, note, hasMatchPlay])
+  }, [isPre, event, eventPlayers, allScores, course, sideGames, matchPairings, leagueName, logoUrl, orgSlug, leagueSlug, note, nextEvent, tglTeams, tglMembers, tglSelections])
 
   async function copyEmail() {
     try {
@@ -92,46 +133,112 @@ export default function EventEmailModal({
     window.open(`https://mail.google.com/mail/?view=cm&fs=1&su=${encodeURIComponent(subject)}`, '_blank', 'noopener')
   }
 
+  const includes = isPre ? preRoundIncludes(event, eventPlayers) : postRoundIncludes({ event, eventPlayers, allScores, course, sideGames, matchPairings, hasTeams: tglTeams.length > 0, nextEvent })
+  const [device, setDevice] = useState('desktop')
+  const eyebrow = `${event?.name ?? 'Event'} · ${isPre ? 'Step 1 · Before the round' : 'Step 3 · After the round'}`
+
+  // Same keyboard and scroll behavior the shared Modal gives.
+  useEffect(() => {
+    const onKey = e => { if (e.key === 'Escape') onClose() }
+    document.addEventListener('keydown', onKey)
+    const prev = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+    return () => { document.removeEventListener('keydown', onKey); document.body.style.overflow = prev }
+  }, [onClose])
+
   return (
-    <Modal open onClose={onClose} title={isPre ? 'Pre-Round Email' : 'Results Email'} maxWidth="max-w-2xl">
-      <div className="p-5 space-y-4 overflow-y-auto">
-        <div>
-          <label className="label">Message to players (optional)</label>
-          <textarea
-            value={note}
-            onChange={e => setNote(e.target.value)}
-            rows={3}
-            className="input"
-            placeholder={isPre ? 'e.g. Weather looks great — arrive 30 minutes before your tee time.' : 'e.g. Great round everyone — payouts go out this week.'}
-          />
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-3 sm:p-6" onMouseDown={e => { if (e.target === e.currentTarget) onClose() }}>
+      <div role="dialog" aria-modal="true" aria-label={isPre ? 'Tournament details email' : 'Results email'}
+        className="flex max-h-[90vh] w-full max-w-[1100px] flex-col overflow-hidden rounded-sm bg-white shadow-card">
+        <div className="flex items-start justify-between gap-4 border-b border-surface-border px-5 py-4">
+          <div className="min-w-0">
+            <div className="truncate text-xs font-semibold uppercase tracking-wide text-fairway-700">{eyebrow}</div>
+            <h2 className="text-lg font-bold text-ink">{isPre ? 'Tournament details email' : 'Results email'}</h2>
+          </div>
+          <Button variant="ghost" size="sm" iconOnly label="Close" onClick={onClose}>×</Button>
         </div>
 
-        <div>
-          <div className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-1">Subject</div>
-          <div className="text-sm text-gray-800 bg-gray-50 rounded-lg px-3 py-2">{subject}</div>
-        </div>
+        <div className="grid min-h-0 flex-1 grid-cols-1 overflow-y-auto min-[900px]:grid-cols-[380px_1fr] min-[900px]:overflow-hidden">
+          {/* Controls */}
+          <div className="flex flex-col gap-5 p-5 min-[900px]:overflow-y-auto">
+            <div>
+              <label htmlFor="email-subject" className="label">Subject</label>
+              <div className="flex items-center gap-2">
+                <input id="email-subject" readOnly value={subject} className="input min-w-0 flex-1" />
+                <Button variant="secondary" size="md" iconOnly label="Copy subject" onClick={copySubject}>
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                    <rect x="9" y="9" width="11" height="11" rx="2" /><path d="M5 15V6a2 2 0 012-2h9" />
+                  </svg>
+                </Button>
+              </div>
+            </div>
 
-        <div>
-          <div className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-1">Preview</div>
-          {/* sandboxed: preview only, no scripts */}
-          <iframe
-            title="Email preview"
-            sandbox=""
-            srcDoc={`<!doctype html><html><body style="margin:0;background:#fff;">${html}</body></html>`}
-            className="w-full rounded-lg border border-gray-200"
-            style={{ height: 420 }}
-          />
-        </div>
+            <div>
+              <label htmlFor="email-note" className="label">Message to players (optional)</label>
+              <textarea
+                id="email-note"
+                value={note}
+                onChange={e => setNote(e.target.value)}
+                rows={4}
+                className="input"
+                placeholder={isPre ? 'e.g. Weather looks great — arrive 30 minutes before your tee time.' : 'e.g. Great round everyone — payouts go out this week.'}
+              />
+              <p className="mt-1 text-xs text-ink-muted">Shows near the top of the email as a note from you.</p>
+            </div>
 
-        <div className="flex flex-wrap gap-2">
-          <Button onClick={copyEmail}>Copy email</Button>
-          <Button variant="secondary" onClick={copySubject}>Copy subject</Button>
-          <Button variant="secondary" onClick={openGmail}>Open Gmail ↗</Button>
+            {includes && (
+              <div className="rounded-sm border border-surface-border bg-surface-dim p-4">
+                <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-ink-muted">Included automatically</div>
+                <ul className="space-y-1.5 text-sm">
+                  {includes.map(i => (
+                    <li key={i.label} className={i.missing ? 'font-medium text-status-upcoming-text' : 'text-ink'}>
+                      {i.label}{i.missing ? ` (${i.hint ?? 'not set yet'})` : ''}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+
+            <div className="mt-auto space-y-4">
+              <div>
+                <div className="mb-1.5 text-sm font-semibold text-ink">Send it in 3 steps</div>
+                <ol className="list-decimal space-y-1 pl-5 text-sm text-ink-muted">
+                  <li>Copy the email</li>
+                  <li>Open Gmail and paste into a new message</li>
+                  <li>Add recipients and send</li>
+                </ol>
+              </div>
+              <div className="space-y-2">
+                <Button className="w-full" size="lg" onClick={copyEmail}>Copy email</Button>
+                <Button className="w-full" size="lg" variant="secondary" onClick={openGmail}>Open Gmail ↗</Button>
+              </div>
+            </div>
+          </div>
+
+          {/* Preview */}
+          <div className="flex min-h-[420px] min-w-0 flex-col bg-surface-high min-[900px]:min-h-0">
+            <div className="flex flex-wrap items-center justify-between gap-3 px-5 py-3">
+              <div className="text-xs font-semibold uppercase tracking-wide text-ink-muted">Preview</div>
+              <SegmentedToggle
+                label="Preview width"
+                value={device}
+                onChange={setDevice}
+                options={[{ value: 'desktop', label: 'Desktop' }, { value: 'phone', label: 'Phone' }]}
+              />
+            </div>
+            <div className="min-h-0 flex-1 overflow-auto px-5 pb-5">
+              {/* sandboxed: preview only, no scripts. Renders the exact HTML Copy email copies. */}
+              <iframe
+                title="Email preview"
+                sandbox=""
+                srcDoc={`<!doctype html><html><body style="margin:0;background:#fff;">${html}</body></html>`}
+                className="mx-auto block h-full min-h-[560px] rounded-sm border border-surface-highest bg-white"
+                style={{ width: device === 'phone' ? 375 : 600, maxWidth: '100%' }}
+              />
+            </div>
+          </div>
         </div>
-        <p className="text-xs text-gray-400">
-          Open Gmail, click into the message body, and paste (Cmd+V / Ctrl+V). Then add recipients and send.
-        </p>
       </div>
-    </Modal>
+    </div>
   )
 }
