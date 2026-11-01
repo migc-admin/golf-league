@@ -8,7 +8,7 @@ const TAB = 'inline-flex min-h-[48px] shrink-0 items-center whitespace-nowrap bo
  * Register button (only passed while registration is open) stays pinned at the right end.
  * Props: tabs [{ key, label }], value, onChange(key), leaderboardUrl, registerLabel, registerHref.
  */
-export default function EventTabBar({ tabs, value, onChange, leaderboardUrl, registerLabel, registerHref }) {
+export default function EventTabBar({ tabs, value, onChange, leaderboardUrl, registerLabel, registerHref, ariaLabel = 'Event sections', idPrefix = 'event-tab' }) {
   function onKeyDown(e, i) {
     const last = tabs.length - 1
     const next = e.key === 'ArrowRight' ? (i === last ? 0 : i + 1)
@@ -17,20 +17,20 @@ export default function EventTabBar({ tabs, value, onChange, leaderboardUrl, reg
     if (next === null) return
     e.preventDefault()
     onChange(tabs[next].key)
-    if (typeof document !== 'undefined') document.getElementById(`event-tab-${tabs[next].key}`)?.focus()
+    if (typeof document !== 'undefined') document.getElementById(`${idPrefix}-${tabs[next].key}`)?.focus()
   }
 
   return (
     <div className="sticky top-0 z-20 border-b border-surface-border bg-white">
       <div className="mx-auto flex max-w-[1100px] items-center gap-2 px-2 sm:px-4">
         <div className="flex min-w-0 flex-1 items-center overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-          <div role="tablist" aria-label="Event sections" className="flex">
+          <div role="tablist" aria-label={ariaLabel} className="flex">
             {tabs.map((t, i) => {
               const on = t.key === value
               return (
                 <button
                   key={t.key}
-                  id={`event-tab-${t.key}`}
+                  id={`${idPrefix}-${t.key}`}
                   type="button"
                   role="tab"
                   aria-selected={on}
@@ -44,7 +44,7 @@ export default function EventTabBar({ tabs, value, onChange, leaderboardUrl, reg
               )
             })}
           </div>
-          <Link to={leaderboardUrl} className={`${TAB} border-transparent text-ink-muted hover:text-ink`}>Leaderboard ↗</Link>
+          {leaderboardUrl && <Link to={leaderboardUrl} className={`${TAB} border-transparent text-ink-muted hover:text-ink`}>Leaderboard ↗</Link>}
         </div>
         {registerLabel && (
           <Button as={Link} to={registerHref} size="md" className="shrink-0">{registerLabel}</Button>

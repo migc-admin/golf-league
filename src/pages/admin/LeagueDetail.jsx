@@ -462,7 +462,7 @@ export const FORMAT_OPTIONS = [
 export const PLACES_OPTIONS = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
 
 // ─── TGL Teams Modal ─────────────────────────────────────────────────────────
-function TGLTeamsModal({ open, onClose, league }) {
+export function TGLTeamsModal({ open, onClose, league }) {
   const [teams,       setTeams]       = useState([])
   const [members,     setMembers]     = useState([])
   const [allPlayers,  setAllPlayers]  = useState([])
@@ -590,7 +590,7 @@ function formatDate(d) {
 }
 
 // ─── Standings Settings ───────────────────────────────────────────────────────
-const STANDINGS_TOGGLES = [
+export const STANDINGS_TOGGLES = [
   { key: 'include_scoring',    label: 'Scoring (Net / Gross / Stableford)', description: 'Place finishes from scoring formats count toward season earnings' },
   { key: 'include_skins',      label: 'Skins',                              description: 'Skins hole winnings count toward season earnings' },
   { key: 'include_ctp',        label: 'Closest to Pin (CTP)',               description: 'CTP winnings count toward season earnings' },
@@ -598,7 +598,7 @@ const STANDINGS_TOGGLES = [
   { key: 'include_low_putts',  label: 'Low Putts',                          description: 'Low Putts winnings count toward season earnings' },
 ]
 
-const DEFAULT_STANDINGS_CONFIG = {
+export const DEFAULT_STANDINGS_CONFIG = {
   include_scoring:    true,
   include_skins:      true,
   include_ctp:        true,

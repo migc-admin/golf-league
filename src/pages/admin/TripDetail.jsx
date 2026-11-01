@@ -1,21 +1,34 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { Link, useParams, useNavigate } from 'react-router-dom'
 import { supabase } from '../../lib/supabase'
+import { useAuth } from '../../hooks/useAuth'
 import toast from 'react-hot-toast'
 import Button from '../../components/ui/Button'
 import Modal from '../../components/ui/Modal'
 import Input, { Textarea } from '../../components/ui/Input'
 import ImageUpload from '../../components/ui/ImageUpload'
-import { LeagueDetailView } from './LeagueDetail'
-import TripTravelers from '../../components/TripTravelers'
-import { formatScheduledWhen, formatItineraryDay } from '../../lib/tripSchedule'
+import StatTiles from '../../components/ui/StatTiles'
+import TripTravelersRooms from '../../components/TripTravelers'
+import TripHeader from '../../components/trip/TripHeader'
+import TripItineraryCard from '../../components/trip/TripItineraryCard'
+import TripRoundsCard from '../../components/trip/TripRoundsCard'
+import { StayingCard, GettingThereCard, TripStandingsCard, DeleteTripBox } from '../../components/trip/TripSideCards'
+import { buildItinerary } from '../../lib/tripItinerary'
+import { tripTiles } from '../../lib/tripView'
 
 export default function TripDetail() {
   const { tripSlug } = useParams()
   const navigate = useNavigate()
+  const { user } = useAuth()
   const [trip,        setTrip]        = useState(null)
   const [orgSlug,     setOrgSlug]     = useState(null)
-  const [loading,      setLoading]     = useState(true)
+  const [orgName,     setOrgName]     = useState('')
+  const [orgTier,     setOrgTier]     = useState('free')
+  const [league,      setLeague]      = useState(null)
+  const [rounds,      setRounds]      = useState([])
+  const [travelers,   setTravelers]   = useState([])
+  const [roster,      setRoster]      = useState([])
+  const [loading,     setLoading]     = useState(true)
   const [editModal,   setEditModal]   = useState(false)
   const [deleteModal, setDeleteModal] = useState(false)
   const [infoModal,   setInfoModal]   = useState(false)
@@ -30,15 +43,67 @@ export default function TripDetail() {
     setTrip(data)
     if (data.org_id) {
       const { data: org } = await supabase
-        .from('organizations').select('slug').eq('id', data.org_id).single()
+        .from('organizations').select('slug, name').eq('id', data.org_id).single()
       setOrgSlug(org?.slug ?? null)
+      setOrgName(org?.name ?? '')
     }
     setLoading(false)
+  }
+
+  // The trip's hidden league: its rounds (events) and standings settings.
+  async function loadLeague(t = trip) {
+    if (!t?.league_id) return
+    const { data: lg } = await supabase
+      .from('leagues')
+      .select('id, name, slug, season_year, logo_url, team_play_label, standings_config')
+      .eq('id', t.league_id)
+      .single()
+    if (lg) setLeague(lg)
+    const { data: ev } = await supabase
+      .from('events')
+      .select('id, event_number, name, slug, event_date, start_time, status, display_order, course:courses(name)')
+      .eq('league_id', t.league_id)
+      .order('display_order', { ascending: true, nullsFirst: false })
+    setRounds(ev ?? [])
+  }
+
+  async function loadTravelers(t = trip) {
+    if (!t) return
+    const [{ data: tr }, { data: p }] = await Promise.all([
+      supabase.from('trip_travelers')
+        .select('*, player:players(id, first_name, last_name, email)')
+        .eq('trip_id', t.id),
+      supabase.from('players')
+        .select('id, first_name, last_name, email')
+        .eq('org_id', t.org_id)
+        .order('last_name'),
+    ])
+    setTravelers(tr || [])
+    setRoster(p || [])
   }
 
   useEffect(() => {
     if (tripSlug) load()
   }, [tripSlug])
+
+  useEffect(() => {
+    if (trip) { loadLeague(trip); loadTravelers(trip) }
+  }, [trip?.id])
+
+  // Same owner / platform-admin "Club" override the league page uses for Team play.
+  useEffect(() => {
+    async function tier() {
+      if (!user) return
+      const { data: profile } = await supabase
+        .from('profiles').select('is_owner, is_platform_admin').eq('id', user.id).single()
+      const { data: prof } = await supabase.from('profiles').select('org_id').eq('id', user.id).single()
+      const { data: org } = prof?.org_id
+        ? await supabase.from('organizations').select('tier').eq('id', prof.org_id).single()
+        : { data: null }
+      setOrgTier(profile?.is_owner || profile?.is_platform_admin ? 'club' : (org?.tier ?? 'free'))
+    }
+    tier()
+  }, [user])
 
   async function handleDeleteTrip() {
     if (!trip?.league_id) return
@@ -46,6 +111,9 @@ export default function TripDetail() {
     if (error) toast.error(error.message)
     else { toast.success('Trip deleted'); navigate('/admin/trips') }
   }
+
+  const days  = useMemo(() => (trip ? buildItinerary({ trip, rounds }) : []), [trip, rounds])
+  const tiles = useMemo(() => (trip ? tripTiles({ trip, travelers, rounds }) : []), [trip, travelers, rounds])
 
   if (loading || !trip) {
     return (
@@ -57,63 +125,37 @@ export default function TripDetail() {
   }
 
   return (
-    <div className="space-y-6">
-      {/* Back nav */}
+    <div className="space-y-5">
       <div>
-        <Link to="/admin/trips" className="text-sm text-ink-muted hover:text-ink">← All Trips</Link>
+        <Link to="/admin/trips" className="inline-flex min-h-[44px] items-center text-sm text-ink-muted hover:text-ink">← All trips</Link>
       </div>
 
-      {/* Trip header card */}
-      <div className="card overflow-hidden p-0">
-        <div className="flex flex-col gap-4 px-5 py-5 border-b border-surface-border sm:flex-row sm:items-start sm:gap-5">
-          <div className="shrink-0">
-            {trip.logo_url ? (
-              <img src={trip.logo_url} alt="" className="w-20 h-20 rounded-sm object-cover border border-surface-border" />
-            ) : (
-              <div className="w-20 h-20 rounded-sm flex items-center justify-center text-ink-muted text-xl font-bold bg-surface-high">
-                {trip.name.slice(0, 2).toUpperCase()}
-              </div>
-            )}
-          </div>
+      <TripHeader
+        trip={trip}
+        clubName={orgName}
+        meta={`${formatDateRange(trip.start_date, trip.end_date)}${trip.location ? ` · ${trip.location}` : ''}`}
+        tripPageHref={orgSlug ? `/${orgSlug}/trip/${trip.slug}` : null}
+        onEdit={() => setEditModal(true)}
+      />
 
-          <div className="flex-1 min-w-0">
-            <h1 className="text-2xl font-bold text-ink" style={{ letterSpacing: '-0.03em' }}>{trip.name}</h1>
-            <p className="text-sm text-ink-muted mt-0.5">
-              {formatDateRange(trip.start_date, trip.end_date)}{trip.location ? ` · ${trip.location}` : ''}
-            </p>
-            {trip.description && <p className="text-sm text-ink-muted mt-2">{trip.description}</p>}
-          </div>
+      <StatTiles tiles={tiles} />
 
-          <div className="flex items-center gap-2 flex-wrap sm:justify-end sm:shrink-0">
-            {orgSlug && (
-              <Button size="sm" variant="secondary" href={`/${orgSlug}/trip/${trip.slug}`} target="_blank">
-                Trip page <span aria-hidden="true">↗</span>
-              </Button>
-            )}
-            <Button size="sm" variant="secondary" onClick={() => setEditModal(true)}>Edit Trip</Button>
-            <Button size="sm" variant="danger" onClick={() => setDeleteModal(true)}>Delete</Button>
-          </div>
+      <div className="grid gap-5 lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)] lg:items-start">
+        <div className="min-w-0 space-y-5">
+          <TripItineraryCard days={days} onAddItem={() => setInfoModal(true)} />
+          {league && (
+            <TripRoundsCard league={league} rounds={rounds} setRounds={setRounds} orgSlug={orgSlug} orgTier={orgTier} />
+          )}
+          <TripTravelersRooms trip={trip} travelers={travelers} roster={roster} onReload={() => loadTravelers(trip)} />
         </div>
+
+        <aside className="min-w-0 space-y-5">
+          <StayingCard trip={trip} onEdit={() => setInfoModal(true)} />
+          <GettingThereCard trip={trip} onEdit={() => setInfoModal(true)} />
+          {league && <TripStandingsCard league={league} onSaved={() => loadLeague(trip)} />}
+          <DeleteTripBox onDelete={() => setDeleteModal(true)} />
+        </aside>
       </div>
-
-      {/* Trip info: day-by-day schedule, lodging, travel */}
-      <TripInfoCard trip={trip} onEdit={() => setInfoModal(true)} />
-
-      {/* Who's going, and who's rooming with whom */}
-      <TripTravelers trip={trip} />
-
-      {/* Reuse full league detail view (rounds, scoring, side games, payouts, team play, standings) */}
-      {trip.league?.slug && (
-        <LeagueDetailView
-          leagueSlug={trip.league.slug}
-          containerLabel="Trip"
-          roundLabel="Round"
-          hideSeasonYear
-          hideHeader
-          backTo="/admin/trips"
-          backLabel="All Trips"
-        />
-      )}
 
       <EditTripModal
         open={editModal}
@@ -145,125 +187,6 @@ const EMPTY_SCHEDULED_ENTRY = { date: '', time: '', name: '', venue: '', locatio
 const EMPTY_LODGING = {
   name: '', address: '', booking_company: '',
   checkin_date: '', checkin_time: '', checkout_date: '', checkout_time: '',
-}
-
-function TripInfoCard({ trip, onEdit }) {
-  const itinerary     = Array.isArray(trip.itinerary) ? trip.itinerary : []
-  const airports      = Array.isArray(trip.nearest_airports) ? trip.nearest_airports : []
-  const meals         = Array.isArray(trip.meals) ? trip.meals : []
-  const socialEvents  = Array.isArray(trip.social_events) ? trip.social_events : []
-  const lodging       = trip.lodging && typeof trip.lodging === 'object' ? trip.lodging : {}
-  const hasLodging    = !!(lodging.name || lodging.address || lodging.booking_company || lodging.checkin_date || lodging.checkout_date)
-  const hasInfo       = itinerary.length > 0 || airports.length > 0 || hasLodging || meals.length > 0 || socialEvents.length > 0 || trip.travel_info
-
-  return (
-    <div className="card p-5 space-y-5">
-      <div className="flex items-center justify-between">
-        <h2 className="font-semibold text-ink">Trip Info</h2>
-        <Button size="sm" variant="secondary" onClick={onEdit}>
-          {hasInfo ? 'Edit Trip Info' : '+ Add Trip Info'}
-        </Button>
-      </div>
-
-      {!hasInfo && (
-        <p className="text-sm text-ink-muted">
-          Add nearest airports, lodging, meals, and social events for the group.
-        </p>
-      )}
-
-      {itinerary.length > 0 && (
-        <InfoSection title="Day-by-Day Schedule">
-          <div className="space-y-3">
-            {itinerary.map((entry, i) => (
-              <div key={i} className="pl-3 border-l-2 border-surface-border">
-                {formatItineraryDay(entry) && <p className="text-sm font-semibold text-ink">{formatItineraryDay(entry)}</p>}
-                {entry.text && <p className="text-sm text-ink-muted whitespace-pre-wrap">{entry.text}</p>}
-              </div>
-            ))}
-          </div>
-        </InfoSection>
-      )}
-
-      {airports.length > 0 && (
-        <InfoSection title="Nearest Airport(s)">
-          <div className="space-y-0.5">
-            {airports.map((a, i) => (
-              <p key={i} className="text-sm text-ink-muted">
-                {a.code && <span className="font-semibold text-ink">{a.code}</span>}
-                {a.name ? `${a.code ? ' — ' : ''}${a.name}` : ''}
-                {a.distance ? ` · ${a.distance}` : ''}
-              </p>
-            ))}
-          </div>
-        </InfoSection>
-      )}
-
-      {hasLodging && (
-        <InfoSection title="Base Camp">
-          <div className="space-y-0.5">
-            {lodging.name && <p className="text-sm font-semibold text-ink">{lodging.name}</p>}
-            {lodging.address && <p className="text-sm text-ink-muted">{lodging.address}</p>}
-            {lodging.booking_company && <p className="text-sm text-ink-muted">Booked via {lodging.booking_company}</p>}
-            {(lodging.checkin_date || lodging.checkout_date) && (
-              <p className="text-sm text-ink-muted">{formatCheckInOut(lodging)}</p>
-            )}
-          </div>
-        </InfoSection>
-      )}
-
-      {meals.length > 0 && (
-        <InfoSection title="Scheduled Meals">
-          <ScheduledEntryReadList entries={meals} />
-        </InfoSection>
-      )}
-
-      <InfoSection title="Scheduled Golf">
-        <p className="text-sm text-ink-muted">Managed in the Rounds section below.</p>
-      </InfoSection>
-
-      {socialEvents.length > 0 && (
-        <InfoSection title="Scheduled Social Events">
-          <ScheduledEntryReadList entries={socialEvents} />
-        </InfoSection>
-      )}
-
-      {trip.travel_info && (
-        <InfoSection title="Travel & Transportation">
-          <p className="text-sm text-ink-muted whitespace-pre-wrap">{trip.travel_info}</p>
-        </InfoSection>
-      )}
-    </div>
-  )
-}
-
-function InfoSection({ title, children }) {
-  return (
-    <div className="max-w-3xl">
-      <p className="text-xs font-semibold uppercase tracking-wide text-ink-muted mb-1.5" style={{ letterSpacing: '0.04em' }}>{title}</p>
-      {children}
-    </div>
-  )
-}
-
-function ScheduledEntryReadList({ entries }) {
-  return (
-    <div className="space-y-0.5">
-      {entries.map((entry, i) => (
-        <p key={i} className="text-sm text-ink-muted">
-          {entry.name && <span className="font-semibold text-ink">{entry.name}</span>}
-          {formatScheduledWhen(entry) && ` — ${formatScheduledWhen(entry)}`}
-          {[entry.venue, entry.location].filter(Boolean).map(v => ` · ${v}`).join('')}
-        </p>
-      ))}
-    </div>
-  )
-}
-
-function formatCheckInOut(lodging) {
-  const parts = []
-  if (lodging.checkin_date) parts.push(`Check-in ${fmtDate(lodging.checkin_date)}${lodging.checkin_time ? ` ${lodging.checkin_time}` : ''}`)
-  if (lodging.checkout_date) parts.push(`Check-out ${fmtDate(lodging.checkout_date)}${lodging.checkout_time ? ` ${lodging.checkout_time}` : ''}`)
-  return parts.join(' · ')
 }
 
 function TripInfoModal({ open, onClose, trip, onSaved }) {
@@ -568,6 +491,7 @@ function seedScheduled(list, tripStartDate) {
     date: entry.date || parseLegacyDay(entry.day, tripStartDate),
     time: toInputTime(entry.time),
     name: entry.name ?? '',
+    venue: entry.venue ?? '',
     location: entry.location ?? '',
   }))
 }

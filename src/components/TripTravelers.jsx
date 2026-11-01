@@ -9,7 +9,8 @@ import {
 import { CSS } from '@dnd-kit/utilities'
 import toast from 'react-hot-toast'
 import { supabase } from '../lib/supabase'
-import Button from './ui/Button'
+import Button, { ActionButton } from './ui/Button'
+import SectionCard from './ui/SectionCard'
 import Modal from './ui/Modal'
 import Input from './ui/Input'
 
@@ -27,80 +28,69 @@ function byName(a, b) {
   return travelerName(a).localeCompare(travelerName(b))
 }
 
-export default function TripTravelers({ trip }) {
-  const [travelers, setTravelers] = useState([])
-  const [roster,    setRoster]    = useState([])
-  const [loading,   setLoading]   = useState(true)
-  const [addOpen,   setAddOpen]   = useState(false)
+/**
+ * TripTravelersRooms — the "Travelers & rooms" card (the old Travelers and Rooms cards in one).
+ * Every traveler appears once: inside a room, or in "Not in a room" at the top.
+ *
+ * The parent page owns the data (`travelers`, `roster`) and passes `onReload`, which re-reads
+ * trip_travelers after any change. Nothing about how rooms are stored has changed.
+ */
+export default function TripTravelersRooms({ trip, travelers, roster, onReload }) {
+  const [addOpen, setAddOpen] = useState(false)
+  const [confirm, setConfirm] = useState(null) // { kind: 'clear' } | { kind: 'remove', traveler }
+  const [busy,    setBusy]    = useState(false)
+  const [extraRooms, setExtraRooms] = useState(0)
 
-  async function load() {
-    const [{ data: t }, { data: p }] = await Promise.all([
-      supabase.from('trip_travelers')
-        .select('*, player:players(id, first_name, last_name, email)')
-        .eq('trip_id', trip.id),
-      supabase.from('players')
-        .select('id, first_name, last_name, email')
-        .eq('org_id', trip.org_id)
-        .order('last_name'),
-    ])
-    setTravelers(t || [])
-    setRoster(p || [])
-    setLoading(false)
-  }
-
-  useEffect(() => { load() }, [trip.id])
-
-  async function removeTraveler(t) {
+  async function removeFromTrip(t) {
+    setBusy(true)
     const { error } = await supabase.from('trip_travelers').delete().eq('id', t.id)
+    setBusy(false)
+    setConfirm(null)
     if (error) return toast.error(error.message)
-    setTravelers(prev => prev.filter(x => x.id !== t.id))
+    onReload()
   }
 
-  if (loading) {
-    return <div className="card p-5"><p className="text-sm text-ink-muted">Loading travelers…</p></div>
+  async function clearRooms() {
+    setBusy(true)
+    const { error } = await supabase
+      .from('trip_travelers')
+      .update({ room_number: null, room_order: null })
+      .in('id', travelers.map(t => t.id))
+    setBusy(false)
+    setConfirm(null)
+    if (error) return toast.error(error.message)
+    setExtraRooms(0)
+    onReload()
   }
+
+  const anyAssigned = travelers.some(t => t.room_number)
+  const count = `${travelers.length} traveler${travelers.length === 1 ? '' : 's'}`
 
   return (
-    <div className="space-y-4">
-      <div className="card p-5 space-y-4">
-        <div className="flex items-center justify-between gap-3 flex-wrap">
-          <div>
-            <h2 className="font-semibold text-ink">Travelers</h2>
-            <p className="text-sm text-ink-muted mt-0.5">
-              {travelers.length} traveler{travelers.length !== 1 ? 's' : ''} on this trip
-            </p>
-          </div>
-          <Button size="sm" onClick={() => setAddOpen(true)}>+ Add Travelers</Button>
+    <SectionCard
+      title="Travelers & rooms"
+      subtitle={`${count} · drag between rooms, or use each person's menu on a phone`}
+      headerAction={
+        <div className="flex flex-wrap items-center gap-2">
+          {anyAssigned && <ActionButton variant="ghost" onClick={() => setConfirm({ kind: 'clear' })}>Clear rooms</ActionButton>}
+          {travelers.length > 0 && <ActionButton onClick={() => setExtraRooms(n => n + 1)}>+ Add room</ActionButton>}
+          <ActionButton onClick={() => setAddOpen(true)}>+ Add travelers</ActionButton>
         </div>
-
-        {travelers.length === 0 ? (
-          <p className="text-sm text-ink-muted">
-            Add the people coming on this trip. Travelers are separate from round rosters —
-            adding someone here won't change any golf round.
-          </p>
-        ) : (
-          <div className="max-w-3xl grid gap-1 sm:grid-cols-2">
-            {[...travelers].sort(byName).map(t => (
-              <div key={t.id} className="flex items-center justify-between gap-2 rounded-lg border px-3 py-2" style={{ borderColor: '#ebe9e4' }}>
-                <span className="text-sm text-ink truncate">
-                  {travelerName(t)}
-                  {!t.player && <span className="ml-2 text-xs rounded-full px-1.5 py-0.5" style={{ background: '#f3f2ef', color: '#86868b' }}>Guest</span>}
-                </span>
-                <button
-                  onClick={() => removeTraveler(t)}
-                  title="Remove traveler"
-                  className="text-gray-300 hover:text-red-400 transition-colors leading-none text-base font-bold px-1 shrink-0"
-                >
-                  ✕
-                </button>
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
-
-      {travelers.length > 0 && (
-        <RoomBoard trip={trip} travelers={travelers} onUpdated={load} />
+      }
+    >
+      {travelers.length === 0 ? (
+        <p className="text-sm text-ink-muted">
+          Add the people coming on this trip. Travelers are separate from round rosters —
+          adding someone here won't change any golf round.
+        </p>
+      ) : (
+        <RoomBoard
+          trip={trip}
+          travelers={travelers}
+          extraRooms={extraRooms}
+          onUpdated={onReload}
+          onRemove={t => setConfirm({ kind: 'remove', traveler: t })}
+        />
       )}
 
       <AddTravelersModal
@@ -109,20 +99,42 @@ export default function TripTravelers({ trip }) {
         trip={trip}
         roster={roster}
         travelers={travelers}
-        onSaved={() => { setAddOpen(false); load() }}
+        onSaved={() => { setAddOpen(false); onReload() }}
       />
-    </div>
+
+      <Modal open={confirm?.kind === 'clear'} onClose={() => setConfirm(null)} title="Clear all rooms?">
+        <div className="space-y-4">
+          <p className="text-sm text-ink-muted">Everyone moves to "Not in a room". Travelers stay on the trip.</p>
+          <div className="flex justify-end gap-3">
+            <Button type="button" variant="secondary" onClick={() => setConfirm(null)}>Cancel</Button>
+            <Button type="button" loading={busy} onClick={clearRooms}>Clear rooms</Button>
+          </div>
+        </div>
+      </Modal>
+
+      <Modal open={confirm?.kind === 'remove'} onClose={() => setConfirm(null)} title="Remove from trip?">
+        <div className="space-y-4">
+          <p className="text-sm text-ink-muted">
+            Remove <span className="font-semibold text-ink">{confirm?.traveler ? travelerName(confirm.traveler) : ''}</span> from this trip?
+            Round rosters are not affected.
+          </p>
+          <div className="flex justify-end gap-3">
+            <Button type="button" variant="secondary" onClick={() => setConfirm(null)}>Cancel</Button>
+            <Button type="button" variant="danger" loading={busy} onClick={() => removeFromTrip(confirm.traveler)}>Remove traveler</Button>
+          </div>
+        </div>
+      </Modal>
+    </SectionCard>
   )
 }
 
 // ─── Rooming board ────────────────────────────────────────────────
 // Mirrors the event Groups drag-and-drop: containers keyed 'unassigned'
 // and 'room-N', persisted to trip_travelers.room_number / room_order.
-function RoomBoard({ trip, travelers, onUpdated }) {
+function RoomBoard({ trip, travelers, extraRooms, onUpdated, onRemove }) {
   const [containers, setContainers] = useState({})
   const [activeId,   setActiveId]   = useState(null)
   const [saving,     setSaving]     = useState(false)
-  const [extraRooms, setExtraRooms] = useState(0)
   const [labels,     setLabels]     = useState(
     trip.room_labels && typeof trip.room_labels === 'object' ? trip.room_labels : {}
   )
@@ -211,7 +223,7 @@ function RoomBoard({ trip, travelers, onUpdated }) {
     }
   }
 
-  // Tap-to-move alternative — the drag handle is awkward on touch.
+  // The phone's "Room" menu and the ✕ button use this; drag-and-drop on a desktop ends in persist().
   function moveToContainer(t, fromKey, toKey) {
     if (!toKey || fromKey === toKey) return
     setContainers(prev => {
@@ -248,44 +260,19 @@ function RoomBoard({ trip, travelers, onUpdated }) {
     }
   }
 
-  async function clearAll() {
-    setSaving(true)
-    const { error } = await supabase
-      .from('trip_travelers')
-      .update({ room_number: null, room_order: null })
-      .in('id', travelers.map(t => t.id))
-    setSaving(false)
-    if (error) return toast.error(error.message)
-    setExtraRooms(0)
-    onUpdated()
-  }
-
   const unassigned = containers['unassigned'] ?? []
   const roomKeys = Object.keys(containers)
     .filter(k => k !== 'unassigned')
     .sort((a, b) => parseInt(a.replace('room-', ''), 10) - parseInt(b.replace('room-', ''), 10))
   const moveOptions = [
-    { key: 'unassigned', label: 'Unassigned' },
+    { key: 'unassigned', label: 'Not in a room' },
     ...roomKeys.map(key => ({ key, label: roomLabel(labels, parseInt(key.replace('room-', ''), 10) + 1) })),
   ]
   const activeTraveler = activeId ? travelers.find(t => t.id === activeId) : null
 
   return (
-    <div className="card p-5 space-y-4">
-      <div className="flex items-center justify-between gap-3 flex-wrap">
-        <div>
-          <h2 className="font-semibold text-ink">Rooms</h2>
-          <p className="text-sm text-ink-muted mt-0.5">Drag travelers into rooms to set who's rooming together.</p>
-        </div>
-        <div className="flex items-center gap-2 shrink-0">
-          {saving && <span className="text-xs text-ink-muted">Saving…</span>}
-          {travelers.some(t => t.room_number) && (
-            <Button size="sm" variant="ghost" onClick={clearAll}>Clear All</Button>
-          )}
-          <Button size="sm" variant="secondary" onClick={() => setExtraRooms(n => n + 1)}>+ Add Room</Button>
-        </div>
-      </div>
-
+    <div>
+      {saving && <p className="mb-2 text-xs text-ink-muted" role="status">Saving…</p>}
       <DndContext
         sensors={sensors}
         collisionDetection={closestCenter}
@@ -293,18 +280,19 @@ function RoomBoard({ trip, travelers, onUpdated }) {
         onDragOver={handleDragOver}
         onDragEnd={handleDragEnd}
       >
-        {unassigned.length > 0 && (
-          <DroppableRoom
-            id="unassigned"
-            title="Unassigned"
-            subtitle="Drag into a room below, or use Move to on mobile"
-            members={unassigned}
-            moveOptions={moveOptions}
-            onMoveToRoom={moveToContainer}
-          />
-        )}
-
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 mt-3">
+        <div className="grid gap-3" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(min(100%, 230px), 1fr))' }}>
+          {unassigned.length > 0 && (
+            <DroppableRoom
+              id="unassigned"
+              title="Not in a room"
+              subtitle={`${unassigned.length} traveler${unassigned.length === 1 ? '' : 's'}`}
+              warn
+              members={unassigned}
+              moveOptions={moveOptions}
+              onMoveToRoom={moveToContainer}
+              onRemoveFromTrip={onRemove}
+            />
+          )}
           {roomKeys.map(key => {
             const n = parseInt(key.replace('room-', ''), 10) + 1
             const members = containers[key] ?? []
@@ -330,39 +318,41 @@ function RoomBoard({ trip, travelers, onUpdated }) {
   )
 }
 
-function DroppableRoom({ id, title, roomNum, nameValue, onRename, subtitle, members, moveOptions, onMoveToRoom }) {
+function DroppableRoom({ id, title, roomNum, nameValue, onRename, subtitle, warn = false, members, moveOptions, onMoveToRoom, onRemoveFromTrip }) {
   const { setNodeRef, isOver } = useDroppable({ id })
   return (
-    <div
+    <section
       ref={setNodeRef}
-      className="rounded-xl border-2 transition-colors"
-      style={{ borderColor: isOver ? '#1B4332' : '#e5e7eb', background: isOver ? '#f0fdf4' : '#fff', minHeight: 80 }}
+      className={`overflow-hidden rounded-sm border transition-colors ${isOver ? 'border-fairway-700 bg-fairway-50' : 'border-surface-border bg-surface-container'}`}
     >
-      <div className="px-4 py-3 border-b border-gray-100">
+      <header className={`border-b border-surface-border px-4 py-2 ${warn ? 'bg-status-upcoming-bg' : ''}`}>
         {onRename ? (
           <RoomNameInput roomNum={roomNum} value={nameValue} onRename={onRename} />
         ) : (
-          <div className="font-semibold text-gray-900 text-sm">{title}</div>
+          <h3 className={`flex h-11 items-center text-sm font-bold ${warn ? 'text-status-upcoming-text' : 'text-ink'}`}>{title}</h3>
         )}
-        <div className="text-xs text-gray-400">{subtitle}</div>
-      </div>
+        <p className={`-mt-1 text-xs ${warn ? 'text-status-upcoming-text' : 'text-ink-muted'}`}>{subtitle}</p>
+      </header>
       <SortableContext items={members.map(t => t.id)} strategy={verticalListSortingStrategy}>
-        <div className="p-2 space-y-1">
+        <ul className="bg-white">
           {members.map(t => (
-            <SortableTravelerCard
+            <TravelerRow
               key={t.id}
               traveler={t}
-              moveOptions={moveOptions}
               currentKey={id}
+              moveOptions={moveOptions}
               onMoveToRoom={onMoveToRoom}
+              onRemoveFromTrip={onRemoveFromTrip}
             />
           ))}
-          {members.length === 0 && (
-            <div className="text-xs text-gray-300 text-center py-4">Drop travelers here</div>
-          )}
-        </div>
+        </ul>
       </SortableContext>
-    </div>
+      {members.length === 0 && (
+        <div className="m-2 flex min-h-[44px] items-center justify-center rounded-sm border border-dashed border-surface-highest px-3 text-xs text-ink-muted">
+          Drop travelers here
+        </div>
+      )}
+    </section>
   )
 }
 
@@ -382,45 +372,84 @@ function RoomNameInput({ roomNum, value, onRename }) {
       }}
       placeholder={`Room ${roomNum}`}
       aria-label={`Name for room ${roomNum}`}
-      className="w-full font-semibold text-gray-900 text-sm bg-transparent border-0 border-b border-transparent hover:border-gray-200 focus:border-gray-400 focus:outline-none px-0 py-0"
+      className="block h-11 w-full border-0 border-b border-transparent bg-transparent px-0 text-sm font-bold text-ink placeholder:text-ink-muted hover:border-surface-highest focus:border-fairway-700 focus:outline-none"
     />
   )
 }
 
-function SortableTravelerCard({ traveler, moveOptions, currentKey, onMoveToRoom }) {
-  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: traveler.id })
-  const style = {
-    transform: CSS.Transform.toString(transform),
-    transition,
-    opacity: isDragging ? 0.4 : 1,
-  }
+function HandleIcon() {
   return (
-    <div ref={setNodeRef} style={style} className="flex items-center justify-between rounded-lg px-3 py-2 border bg-white border-gray-100 hover:border-gray-200">
-      <div className="flex items-center gap-2 min-w-0">
-        <span {...attributes} {...listeners} className="cursor-grab text-gray-300 hover:text-gray-500 select-none hidden sm:inline" title="Drag to move">⠿</span>
-        <span className="text-sm font-medium text-gray-900 truncate">{travelerName(traveler)}</span>
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+      {[6, 12, 18].flatMap(y => [9, 15].map(x => <circle key={`${x}-${y}`} cx={x} cy={y} r="1.6" />))}
+    </svg>
+  )
+}
+
+function CloseIcon() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true">
+      <path d="M6 6l12 12M18 6L6 18" />
+    </svg>
+  )
+}
+
+function TravelerRow({ traveler, currentKey, moveOptions, onMoveToRoom, onRemoveFromTrip }) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: traveler.id })
+  const name = travelerName(traveler)
+  const inRoom = currentKey !== 'unassigned'
+  // In a room, ✕ moves the person back to "Not in a room". There, ✕ removes them from the trip.
+  const onClose = inRoom ? () => onMoveToRoom(traveler, currentKey, 'unassigned') : () => onRemoveFromTrip(traveler)
+  const closeLabel = inRoom ? `Remove ${name} from this room` : `Remove ${name} from the trip`
+
+  return (
+    <li
+      ref={setNodeRef}
+      style={{ transform: CSS.Transform.toString(transform), transition, opacity: isDragging ? 0.4 : 1 }}
+      className="flex min-h-[44px] flex-col justify-center gap-1.5 border-t border-surface-border bg-white px-3 py-2 first:border-t-0 md:flex-row md:items-center md:gap-2"
+    >
+      <div className="flex min-w-0 flex-1 items-center gap-2">
+        <span
+          {...attributes}
+          {...listeners}
+          aria-label={`Drag ${name}`}
+          className="hidden cursor-grab select-none text-surface-outline hover:text-ink-muted md:inline-flex"
+        >
+          <HandleIcon />
+        </span>
+        <span className="truncate text-sm font-medium text-ink">{name}</span>
         {!traveler.player && (
-          <span className="text-xs rounded-full px-1.5 py-0.5 shrink-0" style={{ background: '#f3f2ef', color: '#86868b' }}>Guest</span>
+          <span className="inline-flex h-5 shrink-0 items-center rounded-sm bg-surface-high px-1.5 text-[10px] font-bold uppercase tracking-wide text-ink-muted">Guest</span>
         )}
       </div>
-      <select
-        value=""
-        onChange={e => { if (e.target.value) onMoveToRoom(traveler, currentKey, e.target.value) }}
-        className="input py-0.5 text-xs w-28 bg-white text-gray-500 sm:hidden shrink-0"
-      >
-        <option value="">Move to…</option>
-        {moveOptions.filter(o => o.key !== currentKey).map(o => (
-          <option key={o.key} value={o.key}>{o.label}</option>
-        ))}
-      </select>
-    </div>
+      <div className="flex items-center gap-2 md:shrink-0">
+        <label className="flex flex-1 items-center gap-2 text-xs text-ink-muted md:hidden">
+          <span>Room</span>
+          <select
+            className="input h-11 min-w-0 flex-1 bg-white py-0 text-sm"
+            value={currentKey}
+            onChange={e => onMoveToRoom(traveler, currentKey, e.target.value)}
+          >
+            {moveOptions.map(o => <option key={o.key} value={o.key}>{o.label}</option>)}
+          </select>
+        </label>
+        <button
+          type="button"
+          aria-label={closeLabel}
+          title={closeLabel}
+          onClick={onClose}
+          className="flex h-11 w-11 shrink-0 items-center justify-center rounded-sm text-ink-muted transition-colors hover:bg-surface-dim hover:text-red-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-fairway-500"
+        >
+          <CloseIcon />
+        </button>
+      </div>
+    </li>
   )
 }
 
 function DragCard({ traveler }) {
   return (
-    <div style={{ display: 'inline-flex', alignItems: 'center', gap: 8, background: '#fff', border: '2px solid #1B4332', borderRadius: 8, padding: '6px 12px', boxShadow: '0 8px 24px rgba(0,0,0,0.18)', fontSize: 13, fontWeight: 600, color: '#111827', whiteSpace: 'nowrap', width: 'fit-content' }}>
-      <span style={{ color: '#9ca3af' }}>⠿</span>
+    <div className="inline-flex items-center gap-2 whitespace-nowrap rounded-sm border-2 border-fairway-700 bg-white px-3 py-1.5 text-[13px] font-semibold text-ink shadow-float">
+      <span className="text-ink-muted"><HandleIcon /></span>
       {travelerName(traveler)}
     </div>
   )

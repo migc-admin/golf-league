@@ -1,11 +1,7 @@
 import { useEffect, useState } from 'react'
 import { supabase } from '../../lib/supabase'
 import { useSubdomainOrg } from '../../lib/SubdomainContext'
-import LeagueLayout from '../../components/LeagueLayout'
 import { travelerName, roomLabel } from '../../components/TripTravelers'
-import {
-  formatScheduledDay, formatDisplayTime,
-} from '../../lib/tripSchedule'
 import {
   useSeasonStandings,
   EventCard,
@@ -13,8 +9,21 @@ import {
   MoneyList,
   SideGameTable,
 } from '../../components/SeasonStandings'
+import TripSiteHeader from '../../components/trip-page/TripSiteHeader'
+import TripHero from '../../components/trip-page/TripHero'
+import EventTabBar from '../../components/event-page/EventTabBar'
+import PageCard from '../../components/event-page/EventCard'
+import { RoundsCard, ScheduleCard, StayingCard, GettingThereCard, WhosGoingCard } from '../../components/trip-page/TripPageCards'
+import { buildItinerary, time12 } from '../../lib/tripItinerary'
+import { tripStatus, heroFacts, dayOfTrip } from '../../lib/tripView'
 
 const GREEN = '#1B4332'
+const TABS = [
+  { key: 'overview',  label: 'Overview' },
+  { key: 'schedule',  label: 'Schedule' },
+  { key: 'travelers', label: 'Travelers' },
+  { key: 'standings', label: 'Standings' },
+]
 
 export default function TripHome({ orgSlug, tripSlug, initialTab = 'overview' }) {
   const [trip,           setTrip]           = useState(null)
@@ -54,7 +63,7 @@ export default function TripHome({ orgSlug, tripSlug, initialTab = 'overview' })
 
       const { data: allLeagues } = await supabase
         .from('leagues')
-        .select('id, name, slug')
+        .select('id, name, slug, logo_url')
         .eq('org_id', tripData.org_id)
         .eq('is_trip_league', false)
         .order('season_year', { ascending: false })
@@ -62,7 +71,7 @@ export default function TripHome({ orgSlug, tripSlug, initialTab = 'overview' })
 
       const { data: eventsData } = await supabase
         .from('events')
-        .select('id, name, event_number, slug, status, event_date, course:courses(name)')
+        .select('id, name, event_number, slug, status, event_date, start_time, course:courses(name)')
         .eq('league_id', tripData.league.id)
         .order('event_date', { ascending: true })
       setEvents(eventsData || [])
@@ -110,47 +119,78 @@ export default function TripHome({ orgSlug, tripSlug, initialTab = 'overview' })
   const hasCTP         = sideGameStats.some(s => s.ctpWins > 0)
   const hasLD          = sideGameStats.some(s => s.ldWins > 0)
 
-  const tabs = ['overview', 'schedule', 'travelers', 'standings']
+  const status      = tripStatus(trip)
+  const lodging     = trip.lodging && typeof trip.lodging === 'object' ? trip.lodging : {}
+  const airports    = Array.isArray(trip.nearest_airports) ? trip.nearest_airports : []
+  const facts       = heroFacts({ trip, rounds: events })
+  const days        = buildItinerary({ trip, rounds: events })
+  const names       = [...travelers].sort((a, b) => travelerName(a).localeCompare(travelerName(b))).map(travelerName)
+
+  // The club's main league gives the site header its display name and logo; the org is the fallback.
+  const mainLeague  = leagues.find(l => l.logo_url) ?? leagues[0] ?? null
+  const clubName    = mainLeague?.name ?? org?.name ?? 'League'
+  const clubLogo    = mainLeague?.logo_url ?? org?.logo_url ?? null
+  const navLinks    = [{ key: 'home', label: 'Home', to: '/' }, ...leagues.map(lg => ({ key: lg.id, label: lg.name, to: `/${lg.slug}` }))]
+
+  const checkIn = lodging.checkin_date
+    ? `Check in ${new Date(`${lodging.checkin_date}T00:00:00`).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })}${lodging.checkin_time ? ` at ${time12(lodging.checkin_time)}` : ''}`
+    : null
+  const target = trip.start_date ? new Date(`${trip.start_date}T00:00:00`) : null
+
+  function goTab(key) {
+    setActiveTab(key)
+    requestAnimationFrame(() => document.getElementById('trip-tabs')?.scrollIntoView({ block: 'start' }))
+  }
+  function showDirections() {
+    setActiveTab('overview')
+    setTimeout(() => document.getElementById('where-staying')?.scrollIntoView({ block: 'start', behavior: 'smooth' }), 50)
+  }
 
   return (
-    <LeagueLayout org={org} leagues={leagues}>
-      {/* Trip header */}
-      <div className="mb-6">
-        <h1 className="text-3xl font-extrabold" style={{ color: GREEN }}>{trip.name}</h1>
-        <p className="text-gray-500 mt-1">
-          {formatDateRange(trip.start_date, trip.end_date)}{trip.location ? ` · ${trip.location}` : ''}
-        </p>
-        {trip.description && <p className="text-gray-500 mt-2 max-w-2xl">{trip.description}</p>}
+    <div className="flex min-h-screen flex-col bg-surface-dim">
+      <TripSiteHeader name={clubName} logoUrl={clubLogo} links={navLinks} />
+
+      <TripHero
+        title={trip.name}
+        status={status}
+        facts={facts}
+        coverUrl={trip.logo_url}
+        targetDate={status === 'upcoming' ? target : null}
+        progress={status === 'active' ? dayOfTrip(trip) : null}
+        goingCount={travelers.length}
+        checkIn={checkIn}
+        onDirections={showDirections}
+        onSeeSchedule={() => goTab('schedule')}
+        onSeeStandings={() => goTab('standings')}
+      />
+
+      <div id="trip-tabs" className="scroll-mt-0">
+        <EventTabBar tabs={TABS} value={activeTab} onChange={setActiveTab} ariaLabel="Trip sections" idPrefix="trip-tab" />
       </div>
 
-      {/* Tabs */}
-      <div className="flex gap-1 mb-6 border-b" style={{ borderColor: '#ebe9e4' }}>
-        {tabs.map(tab => (
-          <button
-            key={tab}
-            onClick={() => setActiveTab(tab)}
-            className="px-4 pb-3 text-sm font-semibold capitalize transition-colors"
-            style={{
-              color:       activeTab === tab ? GREEN : '#86868b',
-              borderBottom: activeTab === tab ? `2px solid ${GREEN}` : '2px solid transparent',
-              marginBottom: -1,
-            }}
-          >
-            {tab}
-          </button>
-        ))}
-      </div>
+      <main className="mx-auto w-full max-w-[1100px] flex-1 px-4 py-6 sm:px-6 lg:py-8">
+        {activeTab === 'overview' && (
+          <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_360px] lg:items-start">
+            <div className="flex min-w-0 flex-col gap-6">
+              <RoundsCard rounds={events} leagueSlug={trip.league.slug} orgSlug={eventLinkOrgSlug} onStandings={() => goTab('standings')} />
+              <ScheduleCard days={days} />
+            </div>
+            <div className="flex min-w-0 flex-col gap-6">
+              <StayingCard lodging={lodging} />
+              <GettingThereCard airports={airports} travelInfo={trip.travel_info} />
+              <WhosGoingCard names={names} />
+            </div>
+          </div>
+        )}
 
-      {/* Overview tab */}
-      {activeTab === 'overview' && <OverviewTab trip={trip} />}
+        {activeTab === 'schedule' && <ScheduleCard days={days} />}
 
-      {/* Schedule tab */}
-      {activeTab === 'schedule' && (
-        <ScheduleTab trip={trip} events={events} leagueSlug={trip.league.slug} eventLinkOrgSlug={eventLinkOrgSlug} />
-      )}
-
-      {/* Travelers tab */}
-      {activeTab === 'travelers' && <TravelerRooms travelers={travelers} roomLabels={trip.room_labels} />}
+        {activeTab === 'travelers' && (
+          <div className="flex flex-col gap-6">
+            <WhosGoingCard names={names} />
+            <TravelerRooms travelers={travelers} roomLabels={trip.room_labels} />
+          </div>
+        )}
 
       {/* Standings tab */}
       {activeTab === 'standings' && (
@@ -234,7 +274,12 @@ export default function TripHome({ orgSlug, tripSlug, initialTab = 'overview' })
           )}
         </div>
       )}
-    </LeagueLayout>
+      </main>
+
+      <footer className="py-5 text-center text-xs text-ink-muted">
+        Powered by <a href="https://www.scorifygolf.com" target="_blank" rel="noreferrer" className="font-semibold text-ink-muted hover:underline">Scorify Golf</a>
+      </footer>
+    </div>
   )
 }
 
@@ -247,237 +292,25 @@ function TravelerRooms({ travelers, roomLabels }) {
   }
   Object.values(rooms).forEach(list => list.sort((a, b) => (a.room_order ?? 0) - (b.room_order ?? 0)))
   const roomNumbers = Object.keys(rooms).map(Number).sort((a, b) => a - b)
+  if (roomNumbers.length === 0) return null
 
   return (
-    <div className="max-w-3xl space-y-6">
-      <div>
-        <h2 className="text-lg font-bold text-gray-700 mb-1">Travelers</h2>
-        <p className="text-sm text-gray-500 mb-3">{travelers.length} going on this trip</p>
-        <div className="grid gap-1 sm:grid-cols-2">
-          {[...travelers].sort((a, b) => travelerName(a).localeCompare(travelerName(b))).map(t => (
-            <div key={t.id} className="bg-white border rounded-lg px-3 py-2 text-sm text-gray-700" style={{ borderColor: '#ebe9e4' }}>
-              {travelerName(t)}
+    <PageCard title="Rooms">
+      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+        {roomNumbers.map(n => (
+          <div key={n} className="overflow-hidden rounded-sm border border-surface-border">
+            <div className="border-b border-surface-border bg-surface-container px-4 py-2">
+              <p className="text-sm font-bold text-fairway-700">{roomLabel(roomLabels, n)}</p>
             </div>
-          ))}
-        </div>
+            <ul className="space-y-0.5 px-4 py-2">
+              {rooms[n].map(t => <li key={t.id} className="text-sm text-ink">{travelerName(t)}</li>)}
+            </ul>
+          </div>
+        ))}
       </div>
-
-      {roomNumbers.length > 0 && (
-        <div>
-          <h2 className="text-lg font-bold text-gray-700 mb-3">Rooms</h2>
-          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-            {roomNumbers.map(n => (
-              <div key={n} className="bg-white border rounded-xl overflow-hidden" style={{ borderColor: '#ebe9e4' }}>
-                <div className="px-4 py-2 border-b" style={{ borderColor: '#ebe9e4', background: '#faf9f7' }}>
-                  <p className="text-sm font-bold" style={{ color: GREEN }}>{roomLabel(roomLabels, n)}</p>
-                </div>
-                <div className="px-4 py-2 space-y-0.5">
-                  {rooms[n].map(t => (
-                    <p key={t.id} className="text-sm text-gray-700">{travelerName(t)}</p>
-                  ))}
-                </div>
-              </div>
-            ))}
-          </div>
-          {unassigned.length > 0 && (
-            <p className="text-sm text-gray-400 mt-3">
-              Not yet assigned a room: {unassigned.map(travelerName).join(', ')}
-            </p>
-          )}
-        </div>
+      {unassigned.length > 0 && (
+        <p className="mt-3 text-sm text-ink-muted">Not yet assigned a room: {unassigned.map(travelerName).join(', ')}</p>
       )}
-    </div>
+    </PageCard>
   )
-}
-
-function OverviewTab({ trip }) {
-  const airports   = Array.isArray(trip.nearest_airports) ? trip.nearest_airports : []
-  const lodging    = trip.lodging && typeof trip.lodging === 'object' ? trip.lodging : {}
-  const hasLodging = !!(lodging.name || lodging.address || lodging.booking_company || lodging.checkin_date || lodging.checkout_date)
-  const nights     = tripNights(trip.start_date, trip.end_date)
-
-  return (
-    <div className="bg-white border rounded-xl p-5 space-y-4" style={{ borderColor: '#ebe9e4' }}>
-      <TripInfoBlock title="Dates">
-        <p className="text-sm font-semibold text-gray-700">{formatDateRange(trip.start_date, trip.end_date)}</p>
-        {nights != null && <p className="text-sm text-gray-500">{nights} night{nights !== 1 ? 's' : ''}</p>}
-      </TripInfoBlock>
-
-      {airports.length > 0 && (
-        <TripInfoBlock title="Nearest Airport(s)">
-          <div className="overflow-hidden rounded-lg border" style={{ borderColor: '#ebe9e4' }}>
-            <table className="w-full text-sm table-fixed">
-              <thead>
-                <tr className="bg-gray-50">
-                  <th className="text-left font-bold text-gray-400 px-3 py-1.5 w-20">Code</th>
-                  <th className="text-left font-bold text-gray-400 px-3 py-1.5">Airport</th>
-                  <th className="text-left font-bold text-gray-400 px-3 py-1.5 w-32">Distance</th>
-                </tr>
-              </thead>
-              <tbody>
-                {airports.map((a, i) => (
-                  <tr key={i} className={i > 0 ? 'border-t' : ''} style={{ borderColor: '#ebe9e4' }}>
-                    <td className="px-3 py-1.5 font-bold text-gray-700">{a.code || '—'}</td>
-                    <td className="px-3 py-1.5 text-gray-500">{a.name || '—'}</td>
-                    <td className="px-3 py-1.5 text-gray-500">{a.distance || '—'}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </TripInfoBlock>
-      )}
-
-      {hasLodging && (
-        <TripInfoBlock title="Base Camp">
-          <div className="rounded-lg overflow-hidden border" style={{ borderColor: '#ebe9e4' }}>
-            <div className="bg-gray-50 px-4 py-3 space-y-1">
-              {lodging.name && <p className="text-sm font-bold text-gray-700">{lodging.name}</p>}
-              {lodging.address && <p className="text-sm text-gray-500">{lodging.address}</p>}
-              {lodging.booking_company && <p className="text-sm text-gray-500">Booked via {lodging.booking_company}</p>}
-            </div>
-            {(lodging.checkin_date || lodging.checkout_date) && (
-              <div className="px-4 py-2 text-sm text-gray-500 border-t" style={{ borderColor: '#ebe9e4' }}>
-                {formatCheckInOut(lodging)}
-              </div>
-            )}
-            {lodging.address && (
-              <div className="border-t" style={{ borderColor: '#ebe9e4' }}>
-                <iframe
-                  title="Base camp location map"
-                  src={`https://www.google.com/maps?q=${encodeURIComponent(lodging.address)}&output=embed`}
-                  width="100%"
-                  height="260"
-                  style={{ display: 'block', border: 0 }}
-                  loading="lazy"
-                  referrerPolicy="no-referrer-when-downgrade"
-                />
-                <div className="px-4 py-2 border-t" style={{ borderColor: '#ebe9e4' }}>
-                  <a
-                    href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(lodging.address)}`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-xs font-semibold underline"
-                    style={{ color: GREEN }}
-                  >
-                    Open in Google Maps →
-                  </a>
-                </div>
-              </div>
-            )}
-          </div>
-        </TripInfoBlock>
-      )}
-
-      {trip.travel_info && (
-        <TripInfoBlock title="Travel & Transportation">
-          <p className="text-sm text-gray-500 whitespace-pre-wrap">{trip.travel_info}</p>
-        </TripInfoBlock>
-      )}
-    </div>
-  )
-}
-
-function ScheduleTab({ trip, events, leagueSlug, eventLinkOrgSlug }) {
-  const meals        = Array.isArray(trip.meals) ? trip.meals : []
-  const socialEvents = Array.isArray(trip.social_events) ? trip.social_events : []
-  const hasAnything  = meals.length > 0 || socialEvents.length > 0 || events.length > 0
-
-  if (!hasAnything) return <p className="text-gray-400">Nothing scheduled yet.</p>
-
-  return (
-    <div className="space-y-8">
-      {events.length > 0 && (
-        <section>
-          <h2 className="text-lg font-bold text-gray-700 mb-4">Golf Activities</h2>
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            {events.map(ev => (
-              <EventCard key={ev.id} event={ev} leagueSlug={leagueSlug} orgSlug={eventLinkOrgSlug} muted={ev.status === 'complete'} />
-            ))}
-          </div>
-        </section>
-      )}
-
-      {meals.length > 0 && (
-        <section>
-          <h2 className="text-lg font-bold text-gray-700 mb-4">Scheduled Meals</h2>
-          <div className="bg-white border rounded-xl p-5" style={{ borderColor: '#ebe9e4' }}>
-            <TripInfoEntryList entries={meals} nameLabel="Event" />
-          </div>
-        </section>
-      )}
-
-      {socialEvents.length > 0 && (
-        <section>
-          <h2 className="text-lg font-bold text-gray-700 mb-4">Social Events</h2>
-          <div className="bg-white border rounded-xl p-5" style={{ borderColor: '#ebe9e4' }}>
-            <TripInfoEntryList entries={socialEvents} />
-          </div>
-        </section>
-      )}
-    </div>
-  )
-}
-
-function TripInfoBlock({ title, children }) {
-  return (
-    <div>
-      <p className="text-xs font-bold uppercase tracking-wide text-gray-400 mb-1.5" style={{ letterSpacing: '0.04em' }}>{title}</p>
-      {children}
-    </div>
-  )
-}
-
-function TripInfoEntryList({ entries, nameLabel = 'Name' }) {
-  return (
-    <div className="overflow-hidden rounded-lg border" style={{ borderColor: '#ebe9e4' }}>
-      <table className="w-full text-sm table-fixed">
-        <thead>
-          <tr className="bg-gray-50">
-            <th className="text-left font-bold text-gray-400 px-3 py-1.5 w-32">When</th>
-            <th className="text-left font-bold text-gray-400 px-3 py-1.5">{nameLabel}</th>
-            <th className="text-left font-bold text-gray-400 px-3 py-1.5">Venue</th>
-            <th className="text-left font-bold text-gray-400 px-3 py-1.5">Location/Address</th>
-          </tr>
-        </thead>
-        <tbody>
-          {entries.map((entry, i) => (
-            <tr key={i} className={i > 0 ? 'border-t' : ''} style={{ borderColor: '#ebe9e4' }}>
-              <td className="px-3 py-2 align-top">
-                {formatScheduledDay(entry) && <div className="font-bold text-gray-700 leading-snug">{formatScheduledDay(entry)}</div>}
-                {entry.time && <div className="text-xs text-gray-500">{formatDisplayTime(entry.time)}</div>}
-                {!formatScheduledDay(entry) && !entry.time && <span className="text-gray-500">—</span>}
-              </td>
-              <td className="px-3 py-2 align-top text-gray-700 break-words">{entry.name || '—'}</td>
-              <td className="px-3 py-2 align-top text-gray-500 break-words">{entry.venue || '—'}</td>
-              <td className="px-3 py-2 align-top text-gray-500 break-words">{entry.location || '—'}</td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
-  )
-}
-
-function formatCheckInOut(lodging) {
-  const parts = []
-  if (lodging.checkin_date) parts.push(`Check-in ${fmtDate(lodging.checkin_date)}${lodging.checkin_time ? ` ${lodging.checkin_time}` : ''}`)
-  if (lodging.checkout_date) parts.push(`Check-out ${fmtDate(lodging.checkout_date)}${lodging.checkout_time ? ` ${lodging.checkout_time}` : ''}`)
-  return parts.join(' · ')
-}
-
-function fmtDate(d) {
-  return new Date(d + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
-}
-
-function formatDateRange(start, end) {
-  if (!start && !end) return 'Dates TBD'
-  if (start && end && start !== end) return `${fmtDate(start)} – ${fmtDate(end)}`
-  return fmtDate(start || end)
-}
-
-function tripNights(start, end) {
-  if (!start || !end || start === end) return null
-  const ms = new Date(end + 'T00:00:00') - new Date(start + 'T00:00:00')
-  return Math.round(ms / 86400000)
 }

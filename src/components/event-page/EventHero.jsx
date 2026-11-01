@@ -16,7 +16,7 @@ function StatusPill({ kind, label }) {
   )
 }
 
-function FactRow({ icon, children }) {
+export function FactRow({ icon, children }) {
   return (
     <div className="flex items-start gap-3">
       <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-sm bg-fairway-50 text-fairway-700" aria-hidden="true">
@@ -27,7 +27,7 @@ function FactRow({ icon, children }) {
   )
 }
 
-const CalendarIcon = (
+export const CalendarIcon = (
   <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
     <rect x="3" y="4" width="18" height="18" rx="2" /><path d="M16 2v4M8 2v4M3 10h18" />
   </svg>
