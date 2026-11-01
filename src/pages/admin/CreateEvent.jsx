@@ -15,6 +15,8 @@ import {
   buildFormatsArray,
   buildSideGameOptions,
 } from './LeagueDetail'
+import { StandingsBadge } from '../../components/ui/StandingsBadge'
+import { toggleOverride } from '../../lib/standingsBuckets'
 
 export default function CreateEvent() {
   const { leagueSlug } = useParams()
@@ -37,7 +39,7 @@ export default function CreateEvent() {
         setOrgTier(isPrivileged ? 'club' : (org?.tier ?? 'free'))
       }
       const { data: lg } = await supabase
-        .from('leagues').select('id, name, slug').eq('slug', leagueSlug).single()
+        .from('leagues').select('id, name, slug, standings_config').eq('slug', leagueSlug).single()
       if (!lg) { navigate('/admin/leagues'); return }
       setLeague(lg)
       setLoading(false)
@@ -73,6 +75,7 @@ function CreateEventForm({ league, orgTier, onDone }) {
   const [payoutPlaces, setPayoutPlaces] = useState({})   // { format_key: number }
   const [sideGames,    setSideGames]    = useState(new Set())
   const [customCompetitions, setCustomCompetitions] = useState([])
+  const [standingsOverrides, setStandingsOverrides] = useState({})
   const [gameScope,    setGameScope]    = useState({})   // { game_key: 'flight'|'group' }
   const [numFlights,   setNumFlights]   = useState(0)   // 0 = no flights, 2–25 = number of flights
   const [startTime,    setStartTime]    = useState('')
@@ -129,6 +132,7 @@ function CreateEventForm({ league, orgTier, onDone }) {
       use_flights:            numFlights > 0,
       num_flights:            numFlights > 0 ? numFlights : null,
       side_game_options:      buildSideGameOptions(sideGames, gameScope, numFlights),
+      standings_overrides:    standingsOverrides,
       payout_places:          Object.keys(payoutPlaces).length > 0 ? payoutPlaces : null,
       start_time:             startTime || null,
       tee_time_interval_mins: parseInt(interval, 10),
@@ -250,7 +254,10 @@ function CreateEventForm({ league, orgTier, onDone }) {
           </div>
 
           <div>
-            <label className="label">Scoring Formats</label>
+            <div className="mb-1.5 flex flex-wrap items-center gap-x-3 gap-y-1">
+            <label className="label !mb-0">Scoring Formats</label>
+            <StandingsBadge bucket="scoring" config={league?.standings_config} overrides={standingsOverrides} onToggle={b => setStandingsOverrides(prev => toggleOverride(prev, b, league?.standings_config))} />
+          </div>
             <div className="bg-surface-container rounded-sm px-4 py-3 space-y-3">
               {FORMAT_OPTIONS.map(group => (
                 <div key={group.group}>
@@ -325,6 +332,7 @@ function CreateEventForm({ league, orgTier, onDone }) {
                         onChange={() => !locked && toggleSideGame(opt.key)}
                         disabled={locked} className="accent-fairway-600 w-4 h-4" />
                       <span className="text-sm text-ink">{opt.label}</span>
+                      <StandingsBadge gameKey={opt.key} config={league?.standings_config} overrides={standingsOverrides} onToggle={b => setStandingsOverrides(prev => toggleOverride(prev, b, league?.standings_config))} />
                       {locked && <span className="text-xs font-semibold px-1.5 py-0.5 rounded-full bg-status-active-bg text-status-active-text">Pro</span>}
                     </label>
                     {checked && isPerFlight && numFlights > 0 && (

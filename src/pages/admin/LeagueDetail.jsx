@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { Link, useParams, useNavigate } from 'react-router-dom'
 import { supabase } from '../../lib/supabase'
+import { STANDINGS_TOGGLES, DEFAULT_STANDINGS_CONFIG } from '../../lib/standingsBuckets'
 import { useAuth } from '../../hooks/useAuth'
 import { hasFeature as checkFeature } from '../../lib/features'
 import toast from 'react-hot-toast'
@@ -590,21 +591,7 @@ function formatDate(d) {
 }
 
 // ─── Standings Settings ───────────────────────────────────────────────────────
-export const STANDINGS_TOGGLES = [
-  { key: 'include_scoring',    label: 'Scoring (Net / Gross / Stableford)', description: 'Place finishes from scoring formats count toward season earnings' },
-  { key: 'include_skins',      label: 'Skins',                              description: 'Skins hole winnings count toward season earnings' },
-  { key: 'include_ctp',        label: 'Closest to Pin (CTP)',               description: 'CTP winnings count toward season earnings' },
-  { key: 'include_long_drive', label: 'Long Drive',                         description: 'Long Drive winnings count toward season earnings' },
-  { key: 'include_low_putts',  label: 'Low Putts',                          description: 'Low Putts winnings count toward season earnings' },
-]
-
-export const DEFAULT_STANDINGS_CONFIG = {
-  include_scoring:    true,
-  include_skins:      true,
-  include_ctp:        true,
-  include_long_drive: true,
-  include_low_putts:  false,
-}
+export { STANDINGS_TOGGLES, DEFAULT_STANDINGS_CONFIG }
 
 function StandingsSettings({ league, onSaved }) {
   const config = { ...DEFAULT_STANDINGS_CONFIG, ...(league?.standings_config ?? {}) }
@@ -634,7 +621,8 @@ function StandingsSettings({ league, onSaved }) {
       <div className="flex items-center justify-between">
         <div>
           <h2 className="text-base font-bold text-ink">Standings Settings</h2>
-          <p className="text-xs text-ink-muted mt-0.5">Choose which categories count toward season earnings on the public standings page.</p>
+          <p className="text-xs text-ink-muted mt-0.5">Choose which games count toward season earnings on the public standings page.</p>
+          <p className="text-xs text-ink-muted mt-0.5">Standings are kept separately for each league. Events in other leagues, including trips and special events, never count here.</p>
         </div>
         {dirty && (
           <Button size="sm" loading={saving} onClick={handleSave}>Save</Button>

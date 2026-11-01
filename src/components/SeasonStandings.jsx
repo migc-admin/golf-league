@@ -5,15 +5,12 @@ import { computeLeaderboards, computeStableford, computeBlindPartners } from '..
 import { computeAllSkins, computeSuperSkins } from '../lib/engines/skins'
 import { computePayouts } from '../lib/engines/payouts'
 
+import { DEFAULT_STANDINGS_CONFIG, STANDINGS_TOGGLES, bucketOfCategory, eventStandingsConfig } from '../lib/standingsBuckets'
+
 const GREEN = '#1B4332'
 
-export const DEFAULT_STANDINGS_CONFIG = {
-  include_scoring:    true,
-  include_skins:      true,
-  include_ctp:        true,
-  include_long_drive: true,
-  include_low_putts:  false,
-}
+export { DEFAULT_STANDINGS_CONFIG }
+const INCLUDE_BY_BUCKET = Object.fromEntries(STANDINGS_TOGGLES.map(t => [t.bucket, t.key]))
 
 // ─── Cross-event standings computation ─────────────────────────────────────────
 // Reused by both a league's "Season" tab (LeagueHome) and a trip's "Standings"
@@ -22,11 +19,11 @@ export function useSeasonStandings() {
   const [standings,        setStandings]        = useState([])
   const [sideGameStats,    setSideGameStats]    = useState([])
   const [standingsLoading, setStandingsLoading] = useState(false)
+  // Raw per-event data the standings were built from (read by the Team Play season view)
+  const [eventData,        setEventData]        = useState({ events: [], epsByEvent: {}, scoresByEvent: {}, sideGamesByEvent: {} })
 
-  async function loadStandings(leagueId, standingsConfig) {
+  async function loadStandings(leagueId, rawConfig) {
     setStandingsLoading(true)
-    const cfg = { ...DEFAULT_STANDINGS_CONFIG, ...(standingsConfig ?? {}) }
-
     const { data: evs } = await supabase
       .from('events')
       .select('*, course:courses(*)')
@@ -53,6 +50,8 @@ export function useSeasonStandings() {
 
     for (const ev of evs) {
       const course    = ev.course
+      // The league's settings, plus any games this event counts differently
+      const cfg       = eventStandingsConfig(rawConfig, ev.standings_overrides)
       if (!course) continue
       const eps       = (allEPs       ?? []).filter(ep => ep.event_id === ev.id)
       const scores    = scoresByEvent[ev.id] ?? []
@@ -80,21 +79,14 @@ export function useSeasonStandings() {
           const ep = eps.find(e => e.player_id === playerId)
           const player = ep?.player ?? null
 
-          // Categorize each item
-          const scoringItems   = (items ?? []).filter(item => !item.category.startsWith('Skins') && !item.category.startsWith('Closest') && !item.category.startsWith('Long Drive') && !item.category.startsWith('Low Putts'))
-          const skinsItems     = (items ?? []).filter(item => item.category.startsWith('Skins'))
-          const ctpItems       = (items ?? []).filter(item => item.category.startsWith('Closest'))
-          const ldItems        = (items ?? []).filter(item => item.category.startsWith('Long Drive'))
-          const lpItems        = (items ?? []).filter(item => item.category.startsWith('Low Putts'))
-
-          // Build included items based on config
-          const includedItems = [
-            ...(cfg.include_scoring    ? scoringItems : []),
-            ...(cfg.include_skins      ? skinsItems   : []),
-            ...(cfg.include_ctp        ? ctpItems     : []),
-            ...(cfg.include_long_drive ? ldItems      : []),
-            ...(cfg.include_low_putts  ? lpItems      : []),
-          ]
+          // Sort each payout line into its bucket (see lib/standingsBuckets.js), then keep the
+          // buckets this league has switched on.
+          const allItems     = items ?? []
+          const skinsItems   = allItems.filter(item => bucketOfCategory(item.category) === 'skins')
+          const ctpItems     = allItems.filter(item => bucketOfCategory(item.category) === 'ctp')
+          const ldItems      = allItems.filter(item => bucketOfCategory(item.category) === 'long_drive')
+          const lpItems      = allItems.filter(item => bucketOfCategory(item.category) === 'low_putts')
+          const includedItems = allItems.filter(item => cfg[INCLUDE_BY_BUCKET[bucketOfCategory(item.category)]])
 
           const includedTotal = includedItems.reduce((sum, item) => sum + item.amount, 0)
 
@@ -130,6 +122,13 @@ export function useSeasonStandings() {
       } catch (err) { console.error('[Standings] error for event', ev.name, err) }
     }
 
+    setEventData({
+      events: evs,
+      epsByEvent: Object.fromEntries(evs.map(ev => [ev.id, (allEPs ?? []).filter(ep => ep.event_id === ev.id)])),
+      scoresByEvent,
+      sideGamesByEvent: Object.fromEntries(evs.map(ev => [ev.id, (allSideGames ?? []).filter(sg => sg.event_id === ev.id)])),
+    })
+
     const sorted = Object.values(playerEarnings).sort((a, b) => b.totalEarnings - a.totalEarnings)
     setStandings(sorted)
 
@@ -140,7 +139,7 @@ export function useSeasonStandings() {
     setStandingsLoading(false)
   }
 
-  return { standings, sideGameStats, standingsLoading, loadStandings }
+  return { standings, sideGameStats, standingsLoading, loadStandings, eventData }
 }
 
 // ─── Shared presentational bits ────────────────────────────────────────────────

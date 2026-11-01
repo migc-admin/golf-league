@@ -73,6 +73,8 @@ import { buildSideGamesPlan, withOverrides, eligiblePlayers, winnerValue } from 
 import PhotosCard from '../../components/ui/PhotosCard'
 import { atLimit, getLimit, nextTier, TIER_LABELS } from '../../lib/features'
 import { BUY_IN_ELIGIBLE_KEYS, OPT_IN_GAME_LABELS, optInAmount, isBuyInEnabled, baseSideGameKey, isPerFlight } from '../../lib/sideGames'
+import { StandingsBadge, StandingsLegend } from '../../components/ui/StandingsBadge'
+import { toggleOverride } from '../../lib/standingsBuckets'
 
 // Collapsed from 7 → 4 tabs: Players = Registrations + Players & Flights; Payout = Config + Side Games + Summary
 // The H1 on every event tab is the tab's name; the event name lives in the meta line.
@@ -3168,6 +3170,8 @@ function TabPayoutConfig({ event, eventPlayers, course, onUpdated, onGoToOvervie
         />
       )}
 
+      <StandingsLegend keys={activePayoutKeys(event)} config={event.league?.standings_config} overrides={event.standings_overrides} leagueName={event.league?.name} />
+
       <PotAndHolesCard
         locked={locked}
         basis={payoutBasis} onBasis={setPayoutBasis}
@@ -4176,6 +4180,7 @@ function EditEventModal({ open, onClose, event, onSaved }) {
   const [useHandicaps, setUseHandicaps] = useState(true)
   const [saving,       setSaving]       = useState(false)
   const [sideGameBuyIns, setSideGameBuyIns] = useState({})
+  const [standingsOverrides, setStandingsOverrides] = useState({})
 
   useEffect(() => {
     if (event && open) {
@@ -4209,6 +4214,7 @@ function EditEventModal({ open, onClose, event, onSaved }) {
       setHolesPlayed(event.holes_played ?? 18)
       setUseHandicaps(event.use_handicaps ?? true)
       setSideGameBuyIns(event.side_game_buy_ins ?? {})
+      setStandingsOverrides(event.standings_overrides ?? {})
     }
   }, [event, open])
 
@@ -4244,6 +4250,7 @@ function EditEventModal({ open, onClose, event, onSaved }) {
         format:                 formatsArr[0]?.replace(/_[a-z]$/, '') ?? formatsArr[0],
         formats:                formatsArr,
         side_game_options:      buildSideGameOptions(sideGames, gameScope, numFlights),
+        standings_overrides:    standingsOverrides,
         payout_places:          Object.keys(payoutPlaces).length > 0 ? payoutPlaces : null,
         use_flights:            numFlights > 0,
         num_flights:            numFlights > 0 ? numFlights : null,
@@ -4475,7 +4482,10 @@ function EditEventModal({ open, onClose, event, onSaved }) {
 
         {/* Scoring Formats */}
         <div>
-          <label className="label">Scoring Formats</label>
+          <div className="mb-1.5 flex flex-wrap items-center gap-x-3 gap-y-1">
+            <label className="label !mb-0">Scoring Formats</label>
+            <StandingsBadge bucket="scoring" config={event.league?.standings_config} overrides={standingsOverrides} onToggle={b => setStandingsOverrides(prev => toggleOverride(prev, b, event.league?.standings_config))} />
+          </div>
           <div className="bg-surface-container rounded-sm px-4 py-3 space-y-3">
             {EDIT_FORMAT_OPTIONS.map(group => (
               <div key={group.group}>
@@ -4552,6 +4562,7 @@ function EditEventModal({ open, onClose, event, onSaved }) {
                   <label className="flex items-center gap-2.5 cursor-pointer">
                     <input type="checkbox" checked={checked} onChange={() => toggleSideGame(opt.key)} className="accent-fairway-600 w-4 h-4" />
                     <span className="text-sm text-ink">{opt.label}</span>
+                    <StandingsBadge gameKey={opt.key} config={event.league?.standings_config} overrides={standingsOverrides} onToggle={b => setStandingsOverrides(prev => toggleOverride(prev, b, event.league?.standings_config))} />
                   </label>
                   {checked && isPerFlight && numFlights > 0 && (
                     <div className="ml-6 mt-1.5 flex gap-4">
