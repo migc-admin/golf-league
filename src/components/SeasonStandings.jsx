@@ -72,7 +72,7 @@ export function useSeasonStandings() {
         const blindPartnersData = computeBlindPartners(ev, nonGuest, scores, course)
         const superSkinsResult  = computeSuperSkins(ev, nonGuest, scores, course)
         const { byPlayer } = computePayouts(ev, nonGuest.length, leaderboards, sideGames, skinsResults, flightCounts, {
-          stablefordData, blindPartnersData, superSkinsResult, stablefordGrossData,
+          stablefordData, blindPartnersData, superSkinsResult, stablefordGrossData, eventPlayers: nonGuest,
         })
 
         for (const { playerId, items } of byPlayer) {

@@ -591,10 +591,14 @@ export function computePayouts(event, playerCount, leaderboards, sideGames, skin
   }
 
   // Imported skins winners are paid out as recorded
-  for (const r of importedSkins) {
+  // Most skins first (bigger amount breaks a tie)
+  for (const r of [...importedSkins].sort((a, b) => (b.skins_won - a.skins_won) || (Number(b.amount) - Number(a.amount)))) {
     const amount = Number(r.amount) || 0
-    const label = `${getCategoryLabel('skins')} (${r.skins_won} skin${r.skins_won !== 1 ? 's' : ''})`
-    byCategory.push({ key: `skins_${r.player_id}`, label, amount, playerId: r.player_id, isSkin: true })
+    // Filed under the player's own flight when the event has flights (same keys as per-flight skins)
+    const fl = eventPlayers.find(ep => ep.player_id === r.player_id)?.flight
+    const skinsKey = fl ? `skins_${String(fl).toLowerCase()}` : 'skins'
+    const label = `${getCategoryLabel(skinsKey)} (${r.skins_won} skin${r.skins_won !== 1 ? 's' : ''})`
+    byCategory.push({ key: `${skinsKey}_${r.player_id}`, label, amount, playerId: r.player_id, isSkin: true })
     if (!byPlayer[r.player_id]) byPlayer[r.player_id] = { total: 0, items: [] }
     byPlayer[r.player_id].total += amount
     byPlayer[r.player_id].items.push({ category: label, amount })

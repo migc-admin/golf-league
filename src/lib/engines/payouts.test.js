@@ -186,6 +186,24 @@ describe('computePayouts — imported skins', () => {
     expect(r.byPlayer.find(p => p.playerId === 'p1').items[0].category).toBe('Skins (Full Field) (2 skins)')
     expect(r.byCategory.find(c => c.playerId === 'p1')).toMatchObject({ key: 'skins_p1', isSkin: true, amount: 40 })
   })
+  it('files imported skins under the player flight', () => {
+    const event = { payout_config: {}, entry_fee: 0, imported_skins: [
+      { player_id: 'p1', skins_won: 1, amount: 10 }, { player_id: 'p2', skins_won: 2, amount: 20 }, { player_id: 'p3', skins_won: 1, amount: 5 },
+    ] }
+    const eps = [makePlayer('p1', 'A', 0), makePlayer('p2', 'B', 0), makePlayer('p3', null, 0)]
+    const r = computePayouts(event, 3, {}, [], {}, {}, { eventPlayers: eps })
+    const cat = id => r.byCategory.find(c => c.playerId === id)
+    expect(cat('p1')).toMatchObject({ key: 'skins_a_p1', label: 'Skins — Flight A (1 skin)' })
+    expect(cat('p2').label).toBe('Skins — Flight B (2 skins)')
+    expect(cat('p3')).toMatchObject({ key: 'skins_p3', label: 'Skins (Full Field) (1 skin)' })
+  })
+  it('lists imported skins winners with the most skins first', () => {
+    const event = { payout_config: {}, entry_fee: 0, imported_skins: [
+      { player_id: 'p1', skins_won: 1, amount: 10 }, { player_id: 'p2', skins_won: 3, amount: 30 }, { player_id: 'p3', skins_won: 1, amount: 15 },
+    ] }
+    const r = computePayouts(event, 3, {}, [], {}, {})
+    expect(r.byCategory.map(c => c.playerId)).toEqual(['p2', 'p3', 'p1'])
+  })
   it('skips skins worked out from hole scores when winners were imported', () => {
     const eps = [makePlayer('p1', 'A', 0), makePlayer('p2', 'A', 0)]
     const scores = [...makeScores('p1', 3), ...makeScores('p2', 5)]

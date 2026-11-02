@@ -1057,6 +1057,8 @@ function ImportPastResults() {
   const [leagues,   setLeagues]   = useState([])
   const [leagueId,  setLeagueId]  = useState('')
   const [results,   setResults]   = useState([]) // per-event import results
+  const [keep,      setKeep]      = useState(() => new Set()) // players to leave untouched (lowercase 'first last')
+  const [keepFilter, setKeepFilter] = useState('')
 
   useEffect(() => {
     async function load() {
@@ -1077,7 +1079,13 @@ function ImportPastResults() {
     const { headers, rows } = parseCSV(text)
     setHeaders(headers)
     setRows(rows.map(r => ({ ...r, _status: null, _message: null })))
+    setKeep(new Set())
   }
+
+  const keyOf = (first, last) => `${first ?? ''} ${last ?? ''}`.trim().toLowerCase()
+  const csvPlayers = [...new Map(rows.map(r => [keyOf(r.player_first, r.player_last), `${r.player_first?.trim() ?? ''} ${r.player_last?.trim() ?? ''}`.trim()])).entries()]
+    .filter(([k]) => k).sort((a, b) => a[1].localeCompare(b[1]))
+  function toggleKeep(k) { setKeep(prev => { const n = new Set(prev); n.has(k) ? n.delete(k) : n.add(k); return n }) }
 
   async function runImport() {
     if (!leagueId) { toast.error('Select a league first'); return }
@@ -1185,6 +1193,7 @@ function ImportPastResults() {
         const front  = parseInt(row.gross_front)
         const back   = parseInt(row.gross_back)
         const putts  = row.putts?.trim() ? parseInt(row.putts) : null
+        if (keep.has(keyOf(first, last))) continue  // left exactly as it is in the event
         const skinsWon = row.skins_won?.trim() ? parseInt(row.skins_won) : null
         const skinsAmt = row.skins_amount?.trim() ? parseFloat(row.skins_amount.replace(/[$,]/g, '')) : null
 
@@ -1379,6 +1388,26 @@ function ImportPastResults() {
           />
           {!leagueId && (
             <p className="mb-3 text-sm text-status-upcoming-text">Select a league above before importing.</p>
+          )}
+          {csvPlayers.length > 0 && (
+            <div className="mb-4 rounded-sm border border-surface-border bg-surface-dim p-4">
+              <div className="text-sm font-semibold text-ink">Leave these players as they are (optional)</div>
+              <p className="mt-0.5 text-xs text-ink-muted">Tick anyone whose scores you've fixed by hand. They are skipped on import, so their scores, handicap and flight stay unchanged.{keep.size > 0 && ` ${keep.size} selected.`}</p>
+              <input
+                className="input mt-2 min-h-[44px] w-full" placeholder="Search players" aria-label="Search players"
+                value={keepFilter} onChange={e => setKeepFilter(e.target.value)}
+              />
+              <ul className="mt-2 grid max-h-56 grid-cols-1 gap-x-4 overflow-y-auto sm:grid-cols-2">
+                {csvPlayers.filter(([, n]) => n.toLowerCase().includes(keepFilter.trim().toLowerCase())).map(([k, n]) => (
+                  <li key={k}>
+                    <label className="flex min-h-[44px] cursor-pointer items-center gap-2 text-sm text-ink">
+                      <input type="checkbox" className="h-4 w-4" checked={keep.has(k)} onChange={() => toggleKeep(k)} />
+                      {n}
+                    </label>
+                  </li>
+                ))}
+              </ul>
+            </div>
           )}
           <PreviewTable headers={headers} rows={rows} />
         </Card>
