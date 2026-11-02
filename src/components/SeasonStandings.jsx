@@ -78,6 +78,8 @@ export function useSeasonStandings() {
         for (const { playerId, items } of byPlayer) {
           const ep = eps.find(e => e.player_id === playerId)
           const player = ep?.player ?? null
+          // Guests are paid at the event (they count in the pot) but stay off the season standings
+          if (player?.intended_role === 'guest') continue
 
           // Sort each payout line into its bucket (see lib/standingsBuckets.js), then keep the
           // buckets this league has switched on.

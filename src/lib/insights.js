@@ -124,7 +124,7 @@ export function ctpWinsByFlight({ events, epsByEvent, sideGamesByEvent }) {
     for (const sg of sideGamesByEvent?.[ev.id] ?? []) {
       if (sg.game_type !== 'ctp' || !sg.winner_player_id) continue
       const ep = eps.find(e => e.player_id === sg.winner_player_id)
-      if (!ep || ep.is_guest) continue
+      if (!ep || ep.is_guest || ep.player?.intended_role === 'guest') continue
       const f = ep.flight === 'B' ? 'B' : 'A'
       out[f] = (out[f] ?? 0) + 1
     }
