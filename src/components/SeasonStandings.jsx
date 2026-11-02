@@ -58,7 +58,7 @@ export function useSeasonStandings() {
       const sideGames = (allSideGames ?? []).filter(sg => sg.event_id === ev.id)
       if (!eps.length) continue
 
-      const nonGuest     = eps.filter(ep => !ep.is_guest && ep.player?.intended_role !== 'guest')
+      const nonGuest     = eps.filter(ep => !ep.is_guest)
       const flightCounts = {
         A: nonGuest.filter(ep => ep.flight === 'A').length,
         B: nonGuest.filter(ep => ep.flight === 'B').length,
