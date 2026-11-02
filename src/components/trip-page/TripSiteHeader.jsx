@@ -23,7 +23,7 @@ export default function TripSiteHeader({ name, logoUrl, links = [], activeKey = 
           )}
           <span className="text-[15px] font-bold text-ink">{name}</span>
         </Link>
-        <nav aria-label="Site" className="flex flex-wrap items-center gap-x-5">
+        {links.length > 0 && <nav aria-label="Site" className="flex flex-wrap items-center gap-x-5">
           {links.map(l => (
             <Link
               key={l.key}
@@ -34,7 +34,7 @@ export default function TripSiteHeader({ name, logoUrl, links = [], activeKey = 
               {l.label}
             </Link>
           ))}
-        </nav>
+        </nav>}
       </div>
     </header>
   )

@@ -1024,10 +1024,10 @@ function ImportRoster() {
 }
 
 // ─── Tab 4: Import Past Results ───────────────────────────────────
-const PAST_RESULTS_TEMPLATE = `event_name,event_date,course_name,tee,league_name,player_first,player_last,flight,course_handicap,gross_front,gross_back,putts
-Event 1 - Sample Course,2024-04-15,Sample Golf Club,Yellow,,John,Smith,A,10,34,37,31
-Event 1 - Sample Course,2024-04-15,Sample Golf Club,Yellow,,Mike,Johnson,A,15,36,38,32
-Event 1 - Sample Course,2024-04-15,Sample Golf Club,Yellow,,Tom,Williams,A,7,34,42,29`
+const PAST_RESULTS_TEMPLATE = `event_name,event_date,course_name,tee,league_name,player_first,player_last,flight,course_handicap,gross_front,gross_back,putts,skins_won,skins_amount
+Event 1 - Sample Course,2024-04-15,Sample Golf Club,Yellow,,John,Smith,A,10,34,37,31,2,40
+Event 1 - Sample Course,2024-04-15,Sample Golf Club,Yellow,,Mike,Johnson,A,15,36,38,32,,
+Event 1 - Sample Course,2024-04-15,Sample Golf Club,Yellow,,Tom,Williams,A,7,34,42,29,,`
 
 /**
  * Distribute a 9-hole total across 9 holes proportionally by par.
@@ -1185,6 +1185,8 @@ function ImportPastResults() {
         const front  = parseInt(row.gross_front)
         const back   = parseInt(row.gross_back)
         const putts  = row.putts?.trim() ? parseInt(row.putts) : null
+        const skinsWon = row.skins_won?.trim() ? parseInt(row.skins_won) : null
+        const skinsAmt = row.skins_amount?.trim() ? parseFloat(row.skins_amount.replace(/[$,]/g, '')) : null
 
         if (!first || !last || isNaN(front) || isNaN(back)) {
           playerErr++
@@ -1251,6 +1253,20 @@ function ImportPastResults() {
           putts:       idx === 0 && putts != null ? putts : null, // store total putts on h1 for now
         }))
 
+        // Skins winners entered directly (re-import safe: replace this player's row)
+        await supabase.from('imported_skins').delete().eq('event_id', eventId).eq('player_id', playerId)
+        if ((skinsWon != null && skinsWon > 0) || (skinsAmt != null && skinsAmt > 0)) {
+          const { error: skErr } = await supabase.from('imported_skins').insert({
+            event_id: eventId, player_id: playerId, skins_won: skinsWon ?? 0, amount: skinsAmt ?? 0,
+          })
+          if (skErr) {
+            console.error(`[PastResults] skins insert failed for ${first} ${last}:`, skErr)
+            playerErrMessages.push(`${first} ${last} (skins): ${skErr.message}`)
+            playerErr++
+            continue
+          }
+        }
+
         const { error: scErr } = await supabase.from('scores').insert(scoreRows)
         if (scErr) {
           console.error(`[PastResults] scores insert failed for ${first} ${last}:`, scErr)
@@ -1310,9 +1326,9 @@ function ImportPastResults() {
         />
         <div className="bg-ink rounded-sm px-4 py-3 text-xs text-surface-outline font-mono overflow-x-auto">
           <div className="text-ink-muted mb-1"># past_results_template.csv</div>
-          <div>event_name,event_date,course_name,tee,league_name,player_first,player_last,flight,course_handicap,gross_front,gross_back,putts</div>
-          <div className="text-ink-muted">Event 1 - Sample Course,2024-04-15,Sample Golf Club,Yellow,,John,Smith,A,10,34,37,31</div>
-          <div className="text-ink-muted">Event 1 - Sample Course,2024-04-15,Sample Golf Club,Yellow,,Mike,Johnson,A,15,36,38,32</div>
+          <div>event_name,event_date,course_name,tee,league_name,player_first,player_last,flight,course_handicap,gross_front,gross_back,putts,skins_won,skins_amount</div>
+          <div className="text-ink-muted">Event 1 - Sample Course,2024-04-15,Sample Golf Club,Yellow,,John,Smith,A,10,34,37,31,2,40</div>
+          <div className="text-ink-muted">Event 1 - Sample Course,2024-04-15,Sample Golf Club,Yellow,,Mike,Johnson,A,15,36,38,32,,</div>
         </div>
         <ul className="mt-3 text-xs text-ink-muted space-y-1 list-disc list-inside">
           <li><strong>event_name</strong> and <strong>event_date</strong> (YYYY-MM-DD) identify the event. Multiple players with the same event_name+date are grouped into one event.</li>
@@ -1322,6 +1338,7 @@ function ImportPastResults() {
           <li><strong>course_handicap</strong> — the course handicap assigned for that tournament (not the USGA index). Used directly for net score calculation.</li>
           <li><strong>gross_front</strong> / <strong>gross_back</strong> — required. Scores are distributed proportionally across holes by par.</li>
           <li><strong>putts</strong> — optional round total. Stored for stats but not distributed per hole.</li>
+          <li><strong>skins_won</strong> / <strong>skins_amount</strong> — optional, only on the rows of players who won skins. Use these when hole-by-hole scores weren't tallied for the full field: the skins are recorded as entered (no skins are worked out from the made-up hole scores) and show in the event's results and season stats.</li>
           <li>Players not in your roster will be created automatically.</li>
         </ul>
       </Card>

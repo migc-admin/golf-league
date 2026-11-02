@@ -490,6 +490,8 @@ export function computePayouts(event, playerCount, leaderboards, sideGames, skin
   } = options
 
   const config = event.payout_config ?? {}
+  // Skins winners entered by the past-results import: [{ player_id, skins_won, amount }]
+  const importedSkins = (event.imported_skins ?? []).filter(r => Number(r.amount) > 0 || r.skins_won > 0)
 
   function getFlightCount(fl) {
     if (!fl) return playerCount
@@ -588,6 +590,16 @@ export function computePayouts(event, playerCount, leaderboards, sideGames, skin
     }
   }
 
+  // Imported skins winners are paid out as recorded
+  for (const r of importedSkins) {
+    const amount = Number(r.amount) || 0
+    const label = `${getCategoryLabel('skins')} (${r.skins_won} skin${r.skins_won !== 1 ? 's' : ''})`
+    byCategory.push({ key: `skins_${r.player_id}`, label, amount, playerId: r.player_id, isSkin: true })
+    if (!byPlayer[r.player_id]) byPlayer[r.player_id] = { total: 0, items: [] }
+    byPlayer[r.player_id].total += amount
+    byPlayer[r.player_id].items.push({ category: label, amount })
+  }
+
   // Process standalone keys (skins, super skins, long drive, low putts, ctp)
   for (const { key, amount } of standaloneEntries) {
     // Super Skins — same hole-by-hole skins payout as regular Skins, but over
@@ -613,6 +625,7 @@ export function computePayouts(event, playerCount, leaderboards, sideGames, skin
     // Skins — any flight letter
     const skinsFlightMatch = key.match(/^skins_([a-z])$/)
     if (key === 'skins' || skinsFlightMatch) {
+      if (importedSkins.length) continue  // winners were imported; hole scores aren't real, so don't work skins out from them
       const fl = skinsFlightMatch ? skinsFlightMatch[1].toUpperCase() : null
       const skinsResult = fl ? skinsResults?.[fl] : skinsResults?.[''] ?? Object.values(skinsResults ?? {})[0]
       if (!skinsResult) continue

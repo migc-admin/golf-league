@@ -26,7 +26,7 @@ export function useSeasonStandings() {
     setStandingsLoading(true)
     const { data: evs } = await supabase
       .from('events')
-      .select('*, course:courses(*)')
+      .select('*, course:courses(*), imported_skins(*)')
       .eq('league_id', leagueId)
       .eq('status', 'complete')
       .order('event_number')

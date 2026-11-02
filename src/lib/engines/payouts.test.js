@@ -174,3 +174,26 @@ describe('computePayouts — fixed pot', () => {
     expect(totalPot).toBe(500)
   })
 })
+
+
+describe('computePayouts — imported skins', () => {
+  it('pays imported skins as recorded, with no payout config needed', () => {
+    const event = { payout_config: {}, entry_fee: 0, imported_skins: [
+      { player_id: 'p1', skins_won: 2, amount: 40 }, { player_id: 'p2', skins_won: 1, amount: 0 },
+    ] }
+    const r = computePayouts(event, 2, {}, [], {}, {})
+    expect(r.byPlayer.find(p => p.playerId === 'p1').total).toBe(40)
+    expect(r.byPlayer.find(p => p.playerId === 'p1').items[0].category).toBe('Skins (Full Field) (2 skins)')
+    expect(r.byCategory.find(c => c.playerId === 'p1')).toMatchObject({ key: 'skins_p1', isSkin: true, amount: 40 })
+  })
+  it('skips skins worked out from hole scores when winners were imported', () => {
+    const eps = [makePlayer('p1', 'A', 0), makePlayer('p2', 'A', 0)]
+    const scores = [...makeScores('p1', 3), ...makeScores('p2', 5)]
+    const lb = computeLeaderboards(eps, scores, course)
+    const skins = computeAllSkins(eps, scores, course)
+    const event = { payout_config: { skins: 20 }, entry_fee: 0, imported_skins: [{ player_id: 'p2', skins_won: 1, amount: 15 }] }
+    const r = computePayouts(event, 2, lb, [], skins, { A: 2 })
+    expect(r.byPlayer.map(p => p.playerId)).toEqual(['p2'])
+    expect(r.byPlayer[0].total).toBe(15)
+  })
+})

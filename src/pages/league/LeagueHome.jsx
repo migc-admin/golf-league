@@ -156,7 +156,6 @@ export default function LeagueHome({ orgSlug, leagueSlug, initialTab = 'events' 
   const mainLeague = (league.logo_url ? league : null) ?? leagues.find(l => l.logo_url) ?? league
   const clubName   = mainLeague?.name ?? org?.name ?? 'League'
   const clubLogo   = mainLeague?.logo_url ?? org?.logo_url ?? null
-  const navLinks   = [{ key: 'home', label: 'Home', to: '/' }, ...leagues.map(lg => ({ key: lg.id, label: lg.name, to: `/${lg.slug}` }))]
 
   const eventHref = ev => (eventLinkOrgSlug ? `/${eventLinkOrgSlug}/${leagueSlug}/${ev.slug}/event` : `/${leagueSlug}/${ev.slug}`)
 
@@ -216,7 +215,7 @@ export default function LeagueHome({ orgSlug, leagueSlug, initialTab = 'events' 
 
   return (
     <div className="flex min-h-screen flex-col bg-surface-dim">
-      <TripSiteHeader name={clubName} logoUrl={clubLogo} links={navLinks} activeKey={league.id} />
+      <TripSiteHeader name={clubName} logoUrl={clubLogo} links={[]} />
 
       <SeasonHero pill={pill} title={heroTitle} meta={heroMeta} next={next} />
 

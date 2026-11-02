@@ -107,7 +107,7 @@ export default function Leaderboard() {
       if (directEventId) {
         const { data } = await supabase
           .from('events')
-          .select('*, course:courses(*), league:leagues(name, slug)')
+          .select('*, course:courses(*), league:leagues(name, slug), imported_skins(*)')
           .eq('id', directEventId)
           .single()
         ev = data
@@ -116,7 +116,7 @@ export default function Leaderboard() {
         if (!league) { setLoading(false); return }
         const { data } = await supabase
           .from('events')
-          .select('*, course:courses(*), league:leagues(name, slug)')
+          .select('*, course:courses(*), league:leagues(name, slug), imported_skins(*)')
           .eq('league_id', league.id)
           .eq('slug', eventSlug)
           .single()
