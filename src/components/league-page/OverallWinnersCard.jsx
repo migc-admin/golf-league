@@ -5,6 +5,7 @@
  * Presentational over the result of overallWinners().
  */
 import { useState } from 'react'
+import { Link } from 'react-router-dom'
 import RankBadge from './RankBadge'
 import { parseLocalDate } from '../../lib/seasonView'
 
@@ -19,7 +20,7 @@ const dateText = str => {
   return d ? d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : ''
 }
 
-function Finishes({ player, id }) {
+function Finishes({ player, id, hrefs }) {
   return (
     <div id={id} className="bg-surface-dim pb-3 pl-[44px] pr-2 pt-1 sm:pl-[52px]">
       <p className="mb-1 text-xs font-semibold text-ink-muted">{player.name} · finishes in the top three</p>
@@ -27,7 +28,9 @@ function Finishes({ player, id }) {
         {player.finishes.map(f => (
           <li key={f.eventId} className="flex items-center justify-between gap-3 py-1.5 text-sm">
             <span className="min-w-0">
-              <span className="block truncate font-medium text-ink">{f.eventName}</span>
+              {hrefs[f.eventId]
+                ? <Link to={hrefs[f.eventId]} className="block min-h-[44px] truncate pt-3 font-medium text-fairway-700 underline-offset-2 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-fairway-500">{f.eventName}</Link>
+                : <span className="block truncate font-medium text-ink">{f.eventName}</span>}
               <span className="block text-xs text-ink-muted">{dateText(f.date)}</span>
             </span>
             <span className="shrink-0 text-right">
@@ -53,7 +56,7 @@ function Counts({ r }) {
 
 const ROW_BTN = 'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-fairway-500'
 
-function FlightTable({ flight, showHeading }) {
+function FlightTable({ flight, showHeading, hrefs }) {
   const [showAll, setShowAll] = useState(false)
   const [open, setOpen] = useState(null)
   const rows = showAll ? flight.rows : flight.rows.slice(0, PAGE)
@@ -114,7 +117,7 @@ function FlightTable({ flight, showHeading }) {
                   <Counts r={r} />
                 </div>
               )}
-              {openPlayer && <Finishes player={openPlayer} id={`finishes-${flight.flight}-${openPlayer.id}`} />}
+              {openPlayer && <Finishes player={openPlayer} id={`finishes-${flight.flight}-${openPlayer.id}`} hrefs={hrefs} />}
             </li>
           )
         })}
@@ -132,7 +135,7 @@ function FlightTable({ flight, showHeading }) {
   )
 }
 
-export default function OverallWinnersCard({ flights }) {
+export default function OverallWinnersCard({ flights, hrefs = {} }) {
   if (flights.length === 0) return null
   return (
     <section className="rounded-sm border border-surface-border bg-white p-5 sm:p-6" aria-labelledby="overall-title">
@@ -141,7 +144,7 @@ export default function OverallWinnersCard({ flights }) {
         Times each player has finished 1st, 2nd or 3rd{flights.length > 1 ? ' in their flight' : ''}, by net score. Tap a player to see which events.
       </p>
       <div className="flex flex-col gap-6">
-        {flights.map(f => <FlightTable key={f.flight} flight={f} showHeading={flights.length > 1} />)}
+        {flights.map(f => <FlightTable key={f.flight} flight={f} showHeading={flights.length > 1} hrefs={hrefs} />)}
       </div>
     </section>
   )

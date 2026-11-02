@@ -163,6 +163,7 @@ export default function LeagueHome({ orgSlug, leagueSlug, initialTab = 'events' 
   const clubLogo   = mainLeague?.logo_url ?? org?.logo_url ?? null
 
   const eventHref = ev => (eventLinkOrgSlug ? `/${eventLinkOrgSlug}/${leagueSlug}/${ev.slug}/event` : `/${leagueSlug}/${ev.slug}`)
+  const eventHrefs = Object.fromEntries(past.filter(ev => ev.slug).map(ev => [ev.id, eventHref(ev)]))
 
   // Next event card
   let next = null
@@ -275,7 +276,7 @@ export default function LeagueHome({ orgSlug, leagueSlug, initialTab = 'events' 
 
                 <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_340px] lg:items-start">
                   <div className="flex min-w-0 flex-col gap-6">
-                    {overallFlights.length > 0 && <OverallWinnersCard flights={overallFlights} />}
+                    {overallFlights.length > 0 && <OverallWinnersCard flights={overallFlights} hrefs={eventHrefs} />}
                     {teamView && <TeamStandingsCard view={teamView} events={teamEvents} />}
                     {standings.length === 0 ? (
                       <div className="rounded-sm border border-surface-border bg-white p-10 text-center">
@@ -283,13 +284,13 @@ export default function LeagueHome({ orgSlug, leagueSlug, initialTab = 'events' 
                         <p className="mt-1 text-sm text-ink-muted">Standings are calculated from completed events with payout configurations.</p>
                       </div>
                     ) : (
-                      <MoneyListCard rows={moneyRows(standings)} events={past} subtitle={moneyListSubtitle(cfg)} />
+                      <MoneyListCard rows={moneyRows(standings)} events={past} hrefs={eventHrefs} subtitle={moneyListSubtitle(cfg)} />
                     )}
                   </div>
 
                   <div className="flex min-w-0 flex-col gap-6">
                     {hasSideStats && (
-                      <SideLeadersCard rows={sideRows(sideGameStats)} subtitle={sideGameSubtitle(cfg, { skins: hasSkins, ctp: hasCTP, ld: hasLD, lp: hasLP })} hasSkins={hasSkins} hasCTP={hasCTP} hasLD={hasLD} hasLP={hasLP} />
+                      <SideLeadersCard rows={sideRows(sideGameStats)} events={past} hrefs={eventHrefs} subtitle={sideGameSubtitle(cfg, { skins: hasSkins, ctp: hasCTP, ld: hasLD, lp: hasLP })} hasSkins={hasSkins} hasCTP={hasCTP} hasLD={hasLD} hasLP={hasLP} />
                     )}
                     {resultItems.length > 0 && <ResultsByEventCard items={resultItems} onAllEvents={() => goTab('events')} />}
                   </div>

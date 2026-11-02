@@ -110,6 +110,7 @@ export default function App() {
             <Route path="/" element={<OrgHome orgSlug={subdomainSlug} />} />
             <Route path="/login" element={<Login />} />
             <Route path="/:leagueSlug" element={<LeagueHomeRoute orgSlug={subdomainSlug} />} />
+            <Route path="/:leagueSlug/standings" element={<LeagueHomeRoute orgSlug={subdomainSlug} initialTab="standings" />} />
             <Route path="/trip/:tripSlug" element={<TripHomeRoute orgSlug={subdomainSlug} />} />
             <Route path="/:leagueSlug/:eventSlug" element={<EventPage />} />
             <Route path="/:leagueSlug/:eventSlug/leaderboard" element={<OrgProvider orgSlug={subdomainSlug}><Leaderboard /></OrgProvider>} />

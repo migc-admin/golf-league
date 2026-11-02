@@ -6,9 +6,9 @@ const TAB = 'inline-flex min-h-[48px] shrink-0 items-center whitespace-nowrap bo
 /**
  * Sticky tab bar for the public event page. The tabs scroll sideways on phones; the
  * Register button (only passed while registration is open) stays pinned at the right end.
- * Props: tabs [{ key, label }], value, onChange(key), leaderboardUrl, registerLabel, registerHref.
+ * Props: tabs [{ key, label }], value, onChange(key), leaderboardUrl, standingsUrl, registerLabel, registerHref.
  */
-export default function EventTabBar({ tabs, value, onChange, leaderboardUrl, registerLabel, registerHref, ariaLabel = 'Event sections', idPrefix = 'event-tab' }) {
+export default function EventTabBar({ tabs, value, onChange, leaderboardUrl, standingsUrl, registerLabel, registerHref, ariaLabel = 'Event sections', idPrefix = 'event-tab' }) {
   function onKeyDown(e, i) {
     const last = tabs.length - 1
     const next = e.key === 'ArrowRight' ? (i === last ? 0 : i + 1)
@@ -45,6 +45,7 @@ export default function EventTabBar({ tabs, value, onChange, leaderboardUrl, reg
             })}
           </div>
           {leaderboardUrl && <Link to={leaderboardUrl} className={`${TAB} border-transparent text-ink-muted hover:text-ink`}>Leaderboard ↗</Link>}
+          {standingsUrl && <Link to={standingsUrl} className={`${TAB} border-transparent text-ink-muted hover:text-ink`}>Standings ↗</Link>}
         </div>
         {registerLabel && (
           <Button as={Link} to={registerHref} size="md" className="shrink-0">{registerLabel}</Button>

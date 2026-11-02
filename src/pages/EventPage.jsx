@@ -106,6 +106,9 @@ export default function EventPage() {
   const leaderboardUrl = subdomainOrg
     ? `/${_leagueSlug}/${event.slug}/leaderboard?eid=${eid}`
     : `/${orgSlug}/${_leagueSlug}/${event.slug}/leaderboard?eid=${eid}`
+  const standingsUrl   = event.league?.is_trip_league ? null : (subdomainOrg
+    ? `/${_leagueSlug}/standings`
+    : `/${orgSlug}/${_leagueSlug}/standings`)
   const regUrl         = event.league?.slug && event.slug && !event.league?.is_trip_league
     ? `/register/${event.league.slug}/${event.slug}`
     : null
@@ -174,6 +177,7 @@ export default function EventPage() {
         value={activeTab}
         onChange={setActiveTab}
         leaderboardUrl={leaderboardUrl}
+        standingsUrl={standingsUrl}
         registerLabel={heroRegisterPassed ? registerLabel : null}
         registerHref={regUrl}
       />

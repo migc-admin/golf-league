@@ -5,6 +5,7 @@
  * Presentational over rows from moneyRows(). `events` are the league's completed events.
  */
 import { useMemo, useState } from 'react'
+import { Link } from 'react-router-dom'
 import { UNNAMED, parseLocalDate } from '../../lib/seasonView'
 import RankBadge from './RankBadge'
 
@@ -12,7 +13,7 @@ const PAGE = 10
 const money = n => `$${Number(n).toFixed(2)}`
 const COLS = 'grid-cols-[36px_minmax(0,1fr)_auto] sm:grid-cols-[44px_minmax(0,1fr)_64px_92px_104px]'
 
-function Breakdown({ source, events }) {
+function Breakdown({ source, events, hrefs }) {
   const shown = events.filter(ev => source.itemsByEvent?.[ev.id]?.length)
   return (
     <div className="space-y-3 bg-surface-dim px-4 pb-4 pt-3 sm:pl-[60px]">
@@ -21,7 +22,9 @@ function Breakdown({ source, events }) {
         return (
           <div key={ev.id}>
             <p className="mb-1 text-xs font-semibold text-ink-muted">
-              Event #{ev.event_number}{ev.name ? ` — ${ev.name}` : ''}
+              {hrefs[ev.id]
+                ? <Link to={hrefs[ev.id]} className="inline-flex min-h-[44px] items-center text-fairway-700 underline-offset-2 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-fairway-500">Event #{ev.event_number}{ev.name ? ` — ${ev.name}` : ''}</Link>
+                : <>Event #{ev.event_number}{ev.name ? ` — ${ev.name}` : ''}</>}
               {d ? ` · ${d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}` : ''}
             </p>
             <div className="space-y-0.5">
@@ -43,7 +46,7 @@ function Breakdown({ source, events }) {
   )
 }
 
-export default function MoneyListCard({ rows, events, subtitle }) {
+export default function MoneyListCard({ rows, events, subtitle, hrefs = {} }) {
   const [query, setQuery] = useState('')
   const [showAll, setShowAll] = useState(false)
   const [open, setOpen] = useState(null)
@@ -106,7 +109,7 @@ export default function MoneyListCard({ rows, events, subtitle }) {
                   <span className="hidden text-right text-sm tabular-nums text-ink-muted sm:block">{money(r.perEvent)}</span>
                   <span className="text-right text-[15px] font-bold tabular-nums text-ink">{money(r.earnings)}</span>
                 </button>
-                {isOpen && <Breakdown source={r.source} events={events} />}
+                {isOpen && <Breakdown source={r.source} events={events} hrefs={hrefs} />}
               </li>
             )
           })}

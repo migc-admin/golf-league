@@ -105,7 +105,7 @@ export function useSeasonStandings() {
           // Side game stats — always tallied regardless of config (for the side game leaderboard)
           if (skinsItems.length || ctpItems.length || ldItems.length || lpItems.length) {
             if (!sideGameTotals[playerId]) {
-              sideGameTotals[playerId] = { player, skinsWon: 0, skinsTotal: 0, ctpWins: 0, ctpTotal: 0, ldWins: 0, ldTotal: 0, lpWins: 0, lpTotal: 0 }
+              sideGameTotals[playerId] = { player, skinsWon: 0, skinsTotal: 0, ctpWins: 0, ctpTotal: 0, ldWins: 0, ldTotal: 0, lpWins: 0, lpTotal: 0, itemsByEvent: {} }
             }
             // Skins: parse hole count from label e.g. "(2 skins)"
             for (const item of skinsItems) {
@@ -113,6 +113,7 @@ export function useSeasonStandings() {
               sideGameTotals[playerId].skinsWon   += m ? parseInt(m[1]) : 1
               sideGameTotals[playerId].skinsTotal += item.amount
             }
+            sideGameTotals[playerId].itemsByEvent[ev.id] = [...skinsItems, ...ctpItems, ...ldItems, ...lpItems]
             sideGameTotals[playerId].ctpWins   += ctpItems.length
             sideGameTotals[playerId].ctpTotal  += ctpItems.reduce((s, i) => s + i.amount, 0)
             sideGameTotals[playerId].ldWins    += ldItems.length

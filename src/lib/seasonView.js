@@ -64,6 +64,7 @@ export function sideRows(stats) {
       lp: s.lpWins,
       total: s.skinsTotal + s.ctpTotal + s.ldTotal + s.lpTotal,
       order: i,
+      source: s,
     }))
     .sort((a, b) => (cents(b.total) - cents(a.total)) || (a.order - b.order))
 }
