@@ -157,7 +157,7 @@ export default function Players() {
   // Value a row sorts by, per column. Blanks sort last regardless of direction.
   function sortValue(p, key) {
     if (key === 'league') return (isGuestPlayer(p) ? 'Guest' : primaryLeagueRow(p)?.name ?? '').toLowerCase()
-    if (key === 'name')   return `${p.last_name} ${p.first_name}`.toLowerCase()
+    if (key === 'name')   return `${p.first_name ?? ''} ${p.last_name ?? ''}`.trim().toLowerCase()
     if (key === 'events') return totalEvents(p.id)
     return (p[key] ?? '').toString().toLowerCase()
   }

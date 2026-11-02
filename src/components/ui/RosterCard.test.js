@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import { createElement as h } from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
-import RosterCard, { formatHi, flightValue, nextFlightValue, needsFlight, filterPlayers } from './RosterCard'
+import RosterCard, { formatHi, flightValue, nextFlightValue, needsFlight, filterPlayers, sortRoster } from './RosterCard'
 
 const html = el => renderToStaticMarkup(el)
 let n = 0
@@ -135,5 +135,12 @@ describe('RosterCard', () => {
     expect(out).not.toMatch(/\bbg-(?:gray|amber|yellow|green|blue|purple)-/)
     expect(out).not.toMatch(/\p{Extended_Pictographic}/u)
     expect(out).toContain('<svg')
+  })
+})
+
+describe('sortRoster', () => {
+  it('orders by first name A–Z, then last name, ignoring case and spaces', () => {
+    const rows = [ep('zed', 'Adams'), ep(' Bob', 'Young'), ep('Bob', 'Allen'), ep('amy', 'Zane')]
+    expect(sortRoster(rows).map(r => `${r.player.first_name.trim()} ${r.player.last_name}`)).toEqual(['amy Zane', 'Bob Allen', 'Bob Young', 'zed Adams'])
   })
 })

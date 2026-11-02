@@ -48,6 +48,14 @@ export function filterPlayers(players, query) {
   })
 }
 
+/** First name A–Z (then last name), ignoring case and stray spaces. Guests sort with everyone else. */
+export function sortRoster(players) {
+  const part = v => (v ?? '').trim()
+  return [...players].sort((a, b) =>
+    part(a.player?.first_name).localeCompare(part(b.player?.first_name), undefined, { sensitivity: 'base' })
+    || part(a.player?.last_name).localeCompare(part(b.player?.last_name), undefined, { sensitivity: 'base' }))
+}
+
 function nameOf(ep) {
   return `${ep.player?.first_name ?? ''} ${ep.player?.last_name ?? ''}`.trim()
 }
@@ -137,7 +145,7 @@ export default function RosterCard({
 }) {
   const [query, setQuery] = useState('')
   const searchId = useId()
-  const shown = filterPlayers(players, query)
+  const shown = sortRoster(filterPlayers(players, query))
   const missing = useFlights ? needsFlight(players) : 0
 
   return (
