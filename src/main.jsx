@@ -23,6 +23,17 @@ if (import.meta.env.VITE_SENTRY_DSN) {
   })
 }
 
+// After a deploy, a page opened earlier can ask for a script file that no longer exists.
+// Reload once to pick up the new version instead of leaving a blank page.
+window.addEventListener('vite:preloadError', event => {
+  event.preventDefault()
+  try {
+    if (sessionStorage.getItem('chunk-reload')) return
+    sessionStorage.setItem('chunk-reload', '1')
+  } catch { /* storage blocked: reload anyway, once per page load */ }
+  window.location.reload()
+})
+
 ReactDOM.createRoot(document.getElementById('root')).render(
   <React.StrictMode>
     <ErrorBoundary>
