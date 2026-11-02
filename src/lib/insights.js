@@ -114,17 +114,37 @@ export function seasonInsights(allRows, { ctpByFlight = null } = {}) {
 }
 
 /**
- * Recorded closest-to-pin winners per flight ({ A: n, B: n }), straight from the side-game results.
- * Guests are left out; a league with no flights counts everyone as Flight A. Super CTP isn't counted.
+ * Player-rounds that stay out of the season insights: guests (by profile role or event entry) and
+ * players marked no-show for the event (every score entered_by "no_show"; their scores only exist
+ * so bets could settle). Returns a Set of "eventId-playerId", the same key playerScoringRows uses.
  */
-export function ctpWinsByFlight({ events, epsByEvent, sideGamesByEvent }) {
+export function insightExclusions({ events, epsByEvent, scoresByEvent }) {
+  const out = new Set()
+  for (const ev of events) {
+    const byPlayer = {}
+    for (const sc of scoresByEvent?.[ev.id] ?? []) (byPlayer[sc.player_id] ??= []).push(sc)
+    for (const ep of epsByEvent?.[ev.id] ?? []) {
+      const mine = byPlayer[ep.player_id] ?? []
+      const noShow = mine.length > 0 && mine.every(sc => sc.entered_by === 'no_show')
+      if (ep.is_guest || ep.player?.intended_role === 'guest' || noShow) out.add(`${ev.id}-${ep.player_id}`)
+    }
+  }
+  return out
+}
+
+/**
+ * Recorded closest-to-pin winners per flight ({ A: n, B: n }), straight from the side-game results.
+ * Guests and no-shows are left out; a league with no flights counts everyone as Flight A. Super CTP isn't counted.
+ */
+export function ctpWinsByFlight({ events, epsByEvent, sideGamesByEvent, scoresByEvent }) {
+  const skip = insightExclusions({ events, epsByEvent, scoresByEvent })
   const out = {}
   for (const ev of events) {
     const eps = epsByEvent[ev.id] ?? []
     for (const sg of sideGamesByEvent?.[ev.id] ?? []) {
       if (sg.game_type !== 'ctp' || !sg.winner_player_id) continue
       const ep = eps.find(e => e.player_id === sg.winner_player_id)
-      if (!ep || ep.is_guest || ep.player?.intended_role === 'guest') continue
+      if (!ep || skip.has(`${ev.id}-${ep.player_id}`)) continue
       const f = ep.flight === 'B' ? 'B' : 'A'
       out[f] = (out[f] ?? 0) + 1
     }

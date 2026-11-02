@@ -18,7 +18,7 @@ import { teamSeasonView } from '../../lib/teamSeason'
 import { overallWinners } from '../../lib/overallWinners'
 import PlayerScoringCard from '../../components/league-page/PlayerScoringCard'
 import InsightsGrid from '../../components/league-page/InsightsGrid'
-import { seasonInsights, ctpWinsByFlight } from '../../lib/insights'
+import { seasonInsights, ctpWinsByFlight, insightExclusions } from '../../lib/insights'
 import { playerScoringRows } from '../../lib/playerScoring'
 import { registrationState } from '../../lib/eventPageView'
 import { monthDay, moneyRows, sideRows, playerName, moneyListSubtitle, sideGameSubtitle, nextEventOf, seasonMeta, UNNAMED } from '../../lib/seasonView'
@@ -95,7 +95,12 @@ export default function LeagueHome({ orgSlug, leagueSlug, initialTab = 'events' 
   }, [activeTab, league])
 
   const scoringRows = useMemo(() => playerScoringRows(eventData), [eventData])
-  const insightCards = useMemo(() => seasonInsights(scoringRows, { ctpByFlight: ctpWinsByFlight(eventData) }), [scoringRows, eventData])
+  // Insights leave out guests and no-shows; the Player scoring tab still lists every round
+  const insightRows  = useMemo(() => {
+    const skip = insightExclusions(eventData)
+    return scoringRows.filter(r => !skip.has(r.key))
+  }, [scoringRows, eventData])
+  const insightCards = useMemo(() => seasonInsights(insightRows, { ctpByFlight: ctpWinsByFlight(eventData) }), [insightRows, eventData])
 
   // Team Play tables for this league (only read once the standings have loaded)
   useEffect(() => {
@@ -183,8 +188,9 @@ export default function LeagueHome({ orgSlug, leagueSlug, initialTab = 'events' 
   const onScoring = activeTab === 'scoring'
   const onInsights = activeTab === 'insights'
   const heroTitle = onStandings ? 'Season standings' : onScoring ? 'Player scoring' : onInsights ? 'Season insights' : league.name
+  const heroRows = onInsights ? insightRows : scoringRows
   const heroMeta = onScoring || onInsights
-    ? (scoringRows.length ? `${scoringRows.length} round${scoringRows.length === 1 ? '' : 's'} · ${new Set(scoringRows.map(r => r.playerId)).size} players · ${past.length} event${past.length === 1 ? '' : 's'}` : null)
+    ? (heroRows.length ? `${heroRows.length} round${heroRows.length === 1 ? '' : 's'} · ${new Set(heroRows.map(r => r.playerId)).size} players · ${past.length} event${past.length === 1 ? '' : 's'}` : null)
     : onStandings
     ? seasonMeta({ played: past.length, inMoney: standings.length > 0 ? standings.length : null, latestName: latest ? (latest.name || `Event #${latest.event_number}`) : null })
     : `${past.length} event${past.length === 1 ? '' : 's'} played${upcoming.length ? ` · ${upcoming.length} upcoming` : ''}`

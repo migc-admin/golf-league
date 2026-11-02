@@ -8,7 +8,7 @@ import { useState } from 'react'
 import RankBadge from './RankBadge'
 import { parseLocalDate } from '../../lib/seasonView'
 
-const PAGE = 10
+const PAGE = 5
 const COLS = 'grid-cols-[36px_minmax(0,1fr)_36px_36px_36px] sm:grid-cols-[44px_minmax(0,1fr)_56px_56px_56px]'
 const count = n => (n ? n : '–')
 const ORD = { 1: '1st', 2: '2nd', 3: '3rd' }

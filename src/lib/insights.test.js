@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { seasonInsights, median, ctpWinsByFlight } from './insights'
+import { seasonInsights, median, ctpWinsByFlight, insightExclusions } from './insights'
 
 const r = (player, playerId, eventId, course, flight, gross, net, putts = null) => ({ player, playerId, eventId, course, event: `Event ${eventId}`, flight, gross, net, putts })
 const rows = [
@@ -68,5 +68,24 @@ describe('ctpWinsByFlight', () => {
       { game_type: 'ctp', winner_player_id: null }, { game_type: 'super_ctp', winner_player_id: 'a' },
     ]
     expect(ctpWinsByFlight({ events, epsByEvent, sideGamesByEvent: { e1: sgs } })).toEqual({ A: 2, B: 1 })
+  })
+})
+
+describe('insightExclusions', () => {
+  const events = [{ id: 'e1' }]
+  const sc = (player_id, entered_by) => ({ player_id, entered_by })
+  it('skips guests (profile role or entry) and players whose scores are all no_show', () => {
+    const epsByEvent = { e1: [
+      { player_id: 'a' }, { player_id: 'g1', is_guest: true },
+      { player_id: 'g2', player: { intended_role: 'guest' } }, { player_id: 'n' }, { player_id: 'p' },
+    ] }
+    const scoresByEvent = { e1: [sc('a', 'Sam'), sc('n', 'no_show'), sc('n', 'no_show'), sc('p', 'no_show'), sc('p', 'Sam')] }
+    expect([...insightExclusions({ events, epsByEvent, scoresByEvent })].sort()).toEqual(['e1-g1', 'e1-g2', 'e1-n'])
+  })
+  it('keeps a CTP win by a no-show out of the count', () => {
+    const epsByEvent = { e1: [{ player_id: 'n', flight: 'A' }, { player_id: 'a', flight: 'A' }] }
+    const scoresByEvent = { e1: [sc('n', 'no_show'), sc('a', 'Sam')] }
+    const sideGamesByEvent = { e1: [{ game_type: 'ctp', winner_player_id: 'n' }, { game_type: 'ctp', winner_player_id: 'a' }] }
+    expect(ctpWinsByFlight({ events, epsByEvent, sideGamesByEvent, scoresByEvent })).toEqual({ A: 1 })
   })
 })
