@@ -274,7 +274,7 @@ export default function LeagueHome({ orgSlug, leagueSlug, initialTab = 'events' 
               <>
                 <LeaderTiles tiles={tiles} />
 
-                <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_340px] lg:items-start">
+                <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_440px] lg:items-start">
                   <div className="flex min-w-0 flex-col gap-6">
                     {overallFlights.length > 0 && <OverallWinnersCard flights={overallFlights} hrefs={eventHrefs} />}
                     {teamView && <TeamStandingsCard view={teamView} events={teamEvents} />}
