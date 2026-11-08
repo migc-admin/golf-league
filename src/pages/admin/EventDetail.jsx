@@ -1851,6 +1851,7 @@ function TabFlights({ event, eventPlayers, course, allPlayers, onUpdated, regist
         onSetTee={(ep, value) => overrideTee(ep.id, value)}
         onEditHi={ep => setEditingEp(ep)}
         onRemove={ep => removePlayer(ep.id)}
+        exportName={event.name || `event ${event.event_number ?? ''}`}
       />
 
       <AddPlayerModal

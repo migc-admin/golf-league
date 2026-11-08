@@ -5,7 +5,7 @@
  * Presentational over rows from playerScoringRows().
  */
 import { useMemo, useState } from 'react'
-import { sortScoringRows, filterScoringRows, scoringFilterOptions } from '../../lib/playerScoring'
+import { sortScoringRows, filterScoringRows, scoringFilterOptions, scoringRowsToCsv } from '../../lib/playerScoring'
 import { parseLocalDate } from '../../lib/seasonView'
 
 const PAGE = 25
@@ -38,31 +38,70 @@ function FlightBadge({ flight }) {
 const SELECT = 'input min-h-[44px] w-full'
 
 export default function PlayerScoringCard({ rows }) {
+  const [season, setSeason] = useState('')
   const [eventId, setEventId] = useState('')
   const [playerId, setPlayerId] = useState('')
   const [sort, setSort] = useState({ key: 'player', dir: 'asc' })
   const [showAll, setShowAll] = useState(false)
 
   const options = useMemo(() => scoringFilterOptions(rows), [rows])
-  const filtered = useMemo(() => sortScoringRows(filterScoringRows(rows, { eventId, playerId }), sort.key, sort.dir), [rows, eventId, playerId, sort])
+  const filtered = useMemo(() => sortScoringRows(filterScoringRows(rows, { season, eventId, playerId }), sort.key, sort.dir), [rows, season, eventId, playerId, sort])
   const visible = showAll ? filtered : filtered.slice(0, PAGE)
 
   function sortBy(key) {
     setSort(s => (s.key === key ? { key, dir: s.dir === 'asc' ? 'desc' : 'asc' } : { key, dir: key === 'player' || key === 'event' || key === 'flight' ? 'asc' : 'asc' }))
   }
+  // Exports what the filters and sort currently show (every matching round, not just the visible page)
+  function exportCsv() {
+    const csv = '\uFEFF' + scoringRowsToCsv(filtered)
+    const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' }))
+    const a = document.createElement('a')
+    a.href = url
+    a.download = 'player-scoring.csv'
+    document.body.appendChild(a)
+    a.click()
+    a.remove()
+    setTimeout(() => URL.revokeObjectURL(url), 1000)
+  }
   const ariaSort = key => (sort.key === key ? (sort.dir === 'asc' ? 'ascending' : 'descending') : 'none')
 
   return (
     <section className="rounded-sm border border-surface-border bg-white p-5 sm:p-6" aria-labelledby="scoring-title">
-      <h2 id="scoring-title" className="text-lg font-bold text-ink">Player gross and net scoring</h2>
-      <p className="mb-4 text-sm text-ink-muted">Every completed round, one row per player per event. Net is gross less course handicap.</p>
+      <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
+        <div className="min-w-0">
+          <h2 id="scoring-title" className="text-lg font-bold text-ink">Player gross and net scoring</h2>
+          <p className="text-sm text-ink-muted">Every completed round, one row per player per event. Net is gross less course handicap.</p>
+        </div>
+        <button
+          type="button"
+          onClick={exportCsv}
+          disabled={filtered.length === 0}
+          className="inline-flex min-h-[44px] shrink-0 items-center rounded-sm border border-surface-border bg-white px-5 text-sm font-semibold text-ink hover:bg-surface-dim focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-fairway-500 disabled:opacity-50"
+        >
+          Export CSV
+        </button>
+      </div>
 
-      <div className="mb-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-[1fr_1fr_auto]">
+      <div className="mb-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-[auto_1fr_1fr_auto]">
+        {(
+          <div>
+            <label htmlFor="scoring-season" className="mb-1 block text-[11px] font-bold uppercase tracking-[0.08em] text-ink-muted">Season</label>
+            <select
+              id="scoring-season"
+              value={season}
+              onChange={e => { setSeason(e.target.value); setEventId(''); setShowAll(false) }}
+              className={SELECT}
+            >
+              <option value="">All seasons</option>
+              {options.seasons.map(y => <option key={y} value={y}>{y}</option>)}
+            </select>
+          </div>
+        )}
         <div>
           <label htmlFor="scoring-event" className="mb-1 block text-[11px] font-bold uppercase tracking-[0.08em] text-ink-muted">Tournament</label>
           <select id="scoring-event" value={eventId} onChange={e => { setEventId(e.target.value); setShowAll(false) }} className={SELECT}>
             <option value="">All tournaments</option>
-            {options.events.map(e => <option key={e.id} value={e.id}>{e.label}</option>)}
+            {options.events.filter(e => !season || String(e.date).startsWith(season)).map(e => <option key={e.id} value={e.id}>{e.label}</option>)}
           </select>
         </div>
         <div>

@@ -9,7 +9,7 @@ vi.mock('./engines/scoring', () => ({
   }),
 }))
 
-import { playerScoringRows, sortScoringRows, filterScoringRows, scoringFilterOptions } from './playerScoring'
+import { playerScoringRows, sortScoringRows, filterScoringRows, scoringFilterOptions, scoringRowsToCsv } from './playerScoring'
 
 const ep = (id, first, flight, putts) => ({ player_id: id, flight, putts, player: { first_name: first, last_name: 'X' } })
 const ev = (id, name, date) => ({ id, name, event_date: date, course: { par_per_hole: [4] } })
@@ -52,5 +52,34 @@ describe('sort and filter', () => {
     const o = scoringFilterOptions(rows())
     expect(o.players.map(p => p.label)).toEqual(['Ann X', 'Bo X'])
     expect(o.events.map(e => e.label)).toEqual(['Native Oaks', 'CCRB'])
+  })
+})
+
+describe('scoringRowsToCsv', () => {
+  it('writes a header, blanks for missing values, and quotes commas and quotes', () => {
+    const csv = scoringRowsToCsv([
+      { player: 'Ann Lee', role: 'Member', event: 'Event #1, "Open"', date: '2026-05-17', season: '2026', course: 'Links', flight: 'A', hcp: 7, gross: 81, net: 74, front9: 40, back9: 41, putts: null },
+    ])
+    expect(csv.split('\r\n')).toEqual([
+      'Player,Role,Tournament,Date,Season,Course,Flight,HCP,Gross,Net,Front 9,Back 9,Putts',
+      'Ann Lee,Member,"Event #1, ""Open""",2026-05-17,2026,Links,A,7,81,74,40,41,',
+      '',
+    ])
+  })
+  it('marks text that would run as a spreadsheet formula', () => {
+    expect(scoringRowsToCsv([{ player: '=SUM(A1)', net: -3 }])).toContain("'=SUM(A1)")
+    expect(scoringRowsToCsv([{ player: 'x', net: -3 }])).toContain(',-3,')
+  })
+})
+
+describe('season filter', () => {
+  const rows = [
+    { key: 'a', season: '2026', eventId: 'e1', playerId: 'p1', player: 'A', date: '2026-05-01' },
+    { key: 'b', season: '2027', eventId: 'e2', playerId: 'p1', player: 'A', date: '2027-05-01' },
+  ]
+  it('filters by the year of the event date and lists seasons newest first', () => {
+    expect(filterScoringRows(rows, { season: '2027' }).map(r => r.key)).toEqual(['b'])
+    expect(filterScoringRows(rows, { season: '' })).toHaveLength(2)
+    expect(scoringFilterOptions(rows).seasons).toEqual(['2027', '2026'])
   })
 })

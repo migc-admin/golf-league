@@ -19,6 +19,7 @@
 import { useId, useState } from 'react'
 import { ActionButton } from './Button'
 import AmberBanner from './AmberBanner'
+import { rosterToCsv, rosterFileName } from '../../lib/rosterExport'
 
 export function formatHi(ep) {
   const n = Number(ep?.handicap_index)
@@ -141,20 +142,43 @@ function PlayerRow({ ep, tees, useFlights, onSetFlight, onSetTee, onEditHi, onRe
 
 export default function RosterCard({
   id = 'roster', players, tees = [], useFlights = true,
-  onSetFlight, onSetTee, onEditHi, onRemove, className = '',
+  onSetFlight, onSetTee, onEditHi, onRemove, exportName = '', className = '',
 }) {
   const [query, setQuery] = useState('')
   const searchId = useId()
   const shown = sortRoster(filterPlayers(players, query))
   const missing = useFlights ? needsFlight(players) : 0
 
+  // Everyone on the event (not just the search matches), in the roster import's column layout
+  function exportCsv() {
+    const url = URL.createObjectURL(new Blob([rosterToCsv(players)], { type: 'text/csv;charset=utf-8' }))
+    const a = document.createElement('a')
+    a.href = url
+    a.download = rosterFileName(exportName)
+    document.body.appendChild(a)
+    a.click()
+    a.remove()
+    setTimeout(() => URL.revokeObjectURL(url), 1000)
+  }
+
   return (
     <section id={id} className={`rounded-sm border border-surface-border bg-white p-5 sm:p-6 ${className}`.trim()}>
       <header className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <h2 className="text-lg font-bold text-ink">Roster</h2>
-        <div className="sm:w-72">
-          <label htmlFor={searchId} className="sr-only">Search players</label>
-          <input id={searchId} type="search" className="input h-11" placeholder="Search players" value={query} onChange={e => setQuery(e.target.value)} />
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+          <button
+            type="button"
+            onClick={exportCsv}
+            disabled={players.length === 0}
+            title="Download the roster as a CSV you can fill in and bring back through Import > Roster"
+            className="inline-flex min-h-[44px] shrink-0 items-center justify-center rounded-sm border border-surface-border bg-white px-5 text-sm font-semibold text-ink hover:bg-surface-dim focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-fairway-500 disabled:opacity-50"
+          >
+            Export CSV
+          </button>
+          <div className="sm:w-72">
+            <label htmlFor={searchId} className="sr-only">Search players</label>
+            <input id={searchId} type="search" className="input h-11" placeholder="Search players" value={query} onChange={e => setQuery(e.target.value)} />
+          </div>
         </div>
       </header>
 
