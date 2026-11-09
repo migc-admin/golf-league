@@ -13,6 +13,7 @@ import EventCoverImage from '../components/event-page/EventCoverImage'
 import useScrolledPast from '../components/event-page/useScrolledPast'
 import EventTabBar from '../components/event-page/EventTabBar'
 import AboutCard from '../components/event-page/AboutCard'
+import { matchCH } from '../lib/engines/matchPoints'
 import MatchupsCard from '../components/event-page/MatchupsCard'
 import CompetitionsCard from '../components/event-page/CompetitionsCard'
 import ScheduleCard from '../components/event-page/ScheduleCard'
@@ -428,8 +429,8 @@ function PhotosTab({ photos, eventId, onUploaded }) {
 function MatchupsTab({ pairings, event, eventPlayers }) {
   const epByPlayerId = Object.fromEntries(eventPlayers.map(ep => [ep.player_id, ep]))
   function relativeStrokes(aId, bId) {
-    const chA = epByPlayerId[aId]?.course_handicap ?? 0
-    const chB = epByPlayerId[bId]?.course_handicap ?? 0
+    const chA = matchCH(epByPlayerId[aId]) ?? 0
+    const chB = matchCH(epByPlayerId[bId]) ?? 0
     const baseline = Math.min(chA, chB)
     return { relA: Math.max(0, chA - baseline), relB: Math.max(0, chB - baseline) }
   }

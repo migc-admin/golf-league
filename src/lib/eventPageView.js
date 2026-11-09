@@ -3,6 +3,7 @@
 
 import { FORMAT_LABELS, SIDE_GAME_LABELS } from './eventLabels'
 import { isBuyInEnabled } from './sideGames'
+import { matchCH } from './engines/matchPoints'
 
 /**
  * Which hero/CTA state the page is in.
@@ -120,8 +121,8 @@ export function matchupRows(pairings, eventPlayers) {
   const byPlayer = Object.fromEntries((eventPlayers ?? []).map(ep => [ep.player_id, ep]))
   const name = p => [p?.first_name, p?.last_name].filter(Boolean).join(' ')
   return (pairings ?? []).map(p => {
-    const chA = byPlayer[p.player_a_id]?.course_handicap ?? 0
-    const chB = byPlayer[p.player_b_id]?.course_handicap ?? 0
+    const chA = matchCH(byPlayer[p.player_a_id]) ?? 0
+    const chB = matchCH(byPlayer[p.player_b_id]) ?? 0
     const base = Math.min(chA, chB)
     return {
       id: p.id,

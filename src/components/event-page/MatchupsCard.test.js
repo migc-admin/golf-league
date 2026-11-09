@@ -20,6 +20,13 @@ describe('matchupRows', () => {
     expect(m1.b).toEqual({ name: 'Joe Ng', strokes: 0 })
     expect(m2.a.strokes).toBe(0)
   })
+  it('uses the match play handicap override when set', () => {
+    const [m1] = matchupRows(pairings, [
+      { player_id: 'a', course_handicap: 12, match_play_course_handicap: 20 },
+      { player_id: 'b', course_handicap: 8 },
+    ])
+    expect(m1.a.strokes).toBe(12)
+  })
   it('handles no pairings', () => {
     expect(matchupRows(null, null)).toEqual([])
   })
