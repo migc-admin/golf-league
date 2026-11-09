@@ -278,6 +278,12 @@ export default function LeagueHome({ orgSlug, leagueSlug, initialTab = 'events' 
                   <div className="flex min-w-0 flex-col gap-6">
                     {overallFlights.length > 0 && <OverallWinnersCard flights={overallFlights} hrefs={eventHrefs} />}
                     {teamView && <TeamStandingsCard view={teamView} events={teamEvents} />}
+                    {hasSideStats && (
+                      <SideLeadersCard rows={sideRows(sideGameStats)} events={past} hrefs={eventHrefs} subtitle={sideGameSubtitle(cfg, { skins: hasSkins, ctp: hasCTP, ld: hasLD, lp: hasLP })} hasSkins={hasSkins} hasCTP={hasCTP} hasLD={hasLD} hasLP={hasLP} />
+                    )}
+                  </div>
+
+                  <div className="flex min-w-0 flex-col gap-6">
                     {standings.length === 0 ? (
                       <div className="rounded-sm border border-surface-border bg-white p-10 text-center">
                         <p className="font-medium text-ink-muted">No earnings data yet</p>
@@ -285,12 +291,6 @@ export default function LeagueHome({ orgSlug, leagueSlug, initialTab = 'events' 
                       </div>
                     ) : (
                       <MoneyListCard rows={moneyRows(standings)} events={past} hrefs={eventHrefs} subtitle={moneyListSubtitle(cfg)} />
-                    )}
-                  </div>
-
-                  <div className="flex min-w-0 flex-col gap-6">
-                    {hasSideStats && (
-                      <SideLeadersCard rows={sideRows(sideGameStats)} events={past} hrefs={eventHrefs} subtitle={sideGameSubtitle(cfg, { skins: hasSkins, ctp: hasCTP, ld: hasLD, lp: hasLP })} hasSkins={hasSkins} hasCTP={hasCTP} hasLD={hasLD} hasLP={hasLP} />
                     )}
                     {resultItems.length > 0 && <ResultsByEventCard items={resultItems} onAllEvents={() => goTab('events')} />}
                   </div>

@@ -71,10 +71,16 @@ function csvCell(v) {
   return /[",\n\r]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s
 }
 
+// 2026-01-25 -> 1/25/2026. Anything that isn't a plain date passes through unchanged.
+function usDate(d) {
+  const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(String(d ?? ''))
+  return m ? `${Number(m[2])}/${Number(m[3])}/${m[1]}` : d
+}
+
 /** The rows as CSV text (header first), in the order given. Blank cells for missing values. */
 export function scoringRowsToCsv(rows) {
   const lines = [CSV_COLUMNS.map(([label]) => label).join(',')]
-  for (const r of rows) lines.push(CSV_COLUMNS.map(([, key]) => csvCell(r[key])).join(','))
+  for (const r of rows) lines.push(CSV_COLUMNS.map(([, key]) => csvCell(key === 'date' ? usDate(r[key]) : r[key])).join(','))
   return lines.join('\r\n') + '\r\n'
 }
 

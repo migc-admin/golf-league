@@ -62,7 +62,7 @@ describe('scoringRowsToCsv', () => {
     ])
     expect(csv.split('\r\n')).toEqual([
       'Player,Role,Tournament,Date,Season,Course,Flight,HCP,Gross,Net,Front 9,Back 9,Putts',
-      'Ann Lee,Member,"Event #1, ""Open""",2026-05-17,2026,Links,A,7,81,74,40,41,',
+      'Ann Lee,Member,"Event #1, ""Open""",5/17/2026,2026,Links,A,7,81,74,40,41,',
       '',
     ])
   })
