@@ -2,6 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Scorify Golf — Quick Start Guide</title>
   <style>
     @font-face { font-family: 'Inter'; font-style: normal; font-weight: 400; font-display: swap; src: url('/fonts/inter-latin-400-normal.woff2') format('woff2'); }
@@ -9,472 +10,265 @@
     @font-face { font-family: 'Inter'; font-style: normal; font-weight: 600; font-display: swap; src: url('/fonts/inter-latin-600-normal.woff2') format('woff2'); }
     @font-face { font-family: 'Inter'; font-style: normal; font-weight: 700; font-display: swap; src: url('/fonts/inter-latin-700-normal.woff2') format('woff2'); }
     @font-face { font-family: 'Inter'; font-style: normal; font-weight: 800; font-display: swap; src: url('/fonts/inter-latin-800-normal.woff2') format('woff2'); }
-    @font-face { font-family: 'Playfair Display'; font-style: normal; font-weight: 700; font-display: swap; src: url('/fonts/playfair-display-latin-700-normal.woff2') format('woff2'); }
-    @font-face { font-family: 'Playfair Display'; font-style: normal; font-weight: 900; font-display: swap; src: url('/fonts/playfair-display-latin-900-normal.woff2') format('woff2'); }
+
+    /* Platform tokens (tailwind.config.js) — same values the exports use */
+    :root {
+      --green: #1B4332;       /* fairway-700 */
+      --green-500: #2D6A4F;   /* fairway-500 */
+      --green-tint: #eaf1ec;  /* status-active-bg */
+      --ink: #1d1d1f;
+      --muted: #86868b;
+      --border: #ebe9e4;      /* surface-border */
+      --surface: #fbfaf8;     /* surface */
+      --surface-high: #eceae5;
+      --gold: #C9A84C;
+      --gold-tint: #f4f1e4;   /* status-upcoming-bg */
+      --gold-text: #8a6d1a;   /* status-upcoming-text */
+    }
+
+    @page { size: letter portrait; margin: 0.375in; }
 
     * { margin: 0; padding: 0; box-sizing: border-box; }
-
     body {
-      font-family: 'Inter', sans-serif;
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
       background: #fff;
-      color: #1d1d1f;
-      font-size: 13px;
-      line-height: 1.5;
+      color: var(--ink);
+      font-size: 10.5px;
+      line-height: 1.35;
+      -webkit-print-color-adjust: exact;
+      print-color-adjust: exact;
     }
+    .page { width: 7.75in; margin: 0 auto; padding: 0.375in 0; background: #fff; }
 
-    .page {
-      width: 8.5in;
-      min-height: 11in;
-      margin: 0 auto;
-      padding: 0.55in 0.65in 0.5in;
-      background: #fff;
-    }
+    /* Header */
+    .header { display: flex; align-items: center; gap: 14px; padding-bottom: 10px; border-bottom: 1px solid var(--border); }
+    .mark { width: 60px; height: 60px; object-fit: contain; flex-shrink: 0; }
+    .eyebrow { font-size: 10.5px; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; color: var(--green); }
+    .title-row { display: flex; align-items: center; gap: 10px; margin-top: 1px; }
+    h1 { font-size: 22px; font-weight: 800; letter-spacing: -0.02em; line-height: 1.15; }
+    .pill { display: inline-flex; align-items: center; border-radius: 999px; padding: 2px 9px; font-size: 10.5px; font-weight: 700; background: var(--gold-tint); color: var(--gold-text); }
+    .summary { margin-top: 2px; font-size: 12px; color: var(--muted); }
 
-    /* ── Header ── */
-    .header {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      padding-bottom: 16px;
-      border-bottom: 3px solid #1B4332;
-      margin-bottom: 20px;
-    }
-    .logo-area {
-      display: flex;
-      align-items: center;
-      gap: 12px;
-    }
-    .logo-mark {
-      width: 44px;
-      height: 44px;
-      background: #1B4332;
-      border-radius: 10px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-    }
-    .logo-mark svg { display: block; }
-    .logo-text {
-      display: flex;
-      flex-direction: column;
-    }
-    .logo-name {
-      font-family: 'Playfair Display', serif;
-      font-size: 22px;
-      font-weight: 900;
-      color: #1B4332;
-      line-height: 1;
-    }
-    .logo-sub {
-      font-size: 10px;
-      font-weight: 600;
-      color: #6b7280;
-      letter-spacing: 0.1em;
-      text-transform: uppercase;
-      margin-top: 3px;
-    }
-    .header-right {
-      text-align: right;
-    }
-    .header-title {
-      font-size: 17px;
-      font-weight: 800;
-      color: #111827;
-      letter-spacing: -0.02em;
-    }
-    .header-sub {
-      font-size: 11px;
-      color: #9ca3af;
-      margin-top: 2px;
-    }
+    /* Login strip */
+    .login { margin-top: 10px; display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 20px; align-items: end; background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 8px 14px; break-inside: avoid; }
+    .field-label { font-size: 9px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); }
+    .login-url { font-size: 13px; font-weight: 700; color: var(--green); margin-top: 2px; }
+    .write-in { margin-top: 14px; border-bottom: 1px solid #a8a8a4; }
 
-    /* ── Grid layout ── */
-    .grid {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 14px;
-    }
-    .full-width { grid-column: 1 / -1; }
+    /* Cards */
+    .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 8px; }
+    .card { background: #fff; border: 1px solid var(--border); border-radius: 10px; padding: 9px 12px; break-inside: avoid; page-break-inside: avoid; }
+    .label { display: flex; align-items: center; gap: 8px; font-size: 10px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: var(--green); margin-bottom: 3px; }
+    .icon { width: 22px; height: 22px; border-radius: 6px; background: var(--green-tint); display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+    .icon svg { width: 13px; height: 13px; stroke: var(--green); fill: none; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
 
-    /* ── Cards ── */
-    .card {
-      border: 1px solid #e5e7eb;
-      border-radius: 12px;
-      overflow: hidden;
-    }
-    .card-header {
-      background: #1B4332;
-      color: #fff;
-      padding: 8px 14px;
-      display: flex;
-      align-items: center;
-      gap: 8px;
-    }
-    .card-header .num {
-      width: 20px;
-      height: 20px;
-      border-radius: 50%;
-      background: #D4AF37;
-      color: #1B4332;
-      font-size: 11px;
-      font-weight: 900;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      flex-shrink: 0;
-    }
-    .card-header .title {
-      font-size: 12px;
-      font-weight: 800;
-      letter-spacing: 0.03em;
-      text-transform: uppercase;
-    }
-    .card-body {
-      padding: 10px 14px;
-      background: #fff;
-    }
+    /* Numbered steps */
+    .step { display: flex; gap: 9px; padding: 4px 0; border-top: 1px solid var(--border); }
+    .step:first-of-type { border-top: none; }
+    .num { width: 18px; height: 18px; border-radius: 50%; background: var(--green); color: #fff; font-size: 10px; font-weight: 700; display: flex; align-items: center; justify-content: center; flex-shrink: 0; margin-top: 1px; }
+    .step-name { font-size: 11px; font-weight: 700; }
+    .step-desc { color: #4b4b4f; margin-top: 1px; }
+    .path { color: var(--green); font-weight: 600; }
 
-    /* ── Steps ── */
-    .step {
-      display: flex;
-      gap: 8px;
-      padding: 5px 0;
-      border-bottom: 1px solid #f3f4f6;
-    }
-    .step:last-child { border-bottom: none; }
-    .step-dot {
-      width: 6px;
-      height: 6px;
-      border-radius: 50%;
-      background: #D4AF37;
-      flex-shrink: 0;
-      margin-top: 6px;
-    }
-    .step-text { font-size: 12px; color: #374151; line-height: 1.5; }
-    .step-text strong { color: #111827; font-weight: 700; }
-    .step-text em { color: #6b7280; font-style: normal; font-size: 11px; }
+    .tip { margin-top: 6px; background: var(--gold-tint); border: 1px solid #e8e0c4; border-radius: 8px; padding: 5px 9px; color: var(--gold-text); }
+    .tip strong { font-weight: 700; }
 
-    /* ── URL highlight ── */
-    .url-box {
-      background: #f0fdf4;
-      border: 1px solid #bbf7d0;
-      border-radius: 8px;
-      padding: 8px 12px;
-      margin: 8px 0 4px;
-      font-size: 12px;
-      color: #15803d;
-      font-weight: 700;
-      letter-spacing: 0.01em;
-    }
+    /* Bottom row */
+    .chip-group { font-size: 9px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); margin: 5px 0 3px; }
+    .chips { display: flex; flex-wrap: wrap; gap: 4px; }
+    .chip { border-radius: 5px; padding: 2px 7px; font-size: 10.5px; font-weight: 600; background: var(--surface-high); color: var(--ink); }
+    .chip.event { background: var(--green-tint); color: var(--green); }
+    .check { display: flex; gap: 9px; padding: 4px 0; border-top: 1px solid var(--border); }
+    .check:first-of-type { border-top: none; }
+    .check-box { width: 18px; height: 18px; border-radius: 5px; background: var(--green-tint); display: flex; align-items: center; justify-content: center; flex-shrink: 0; margin-top: 1px; }
+    .check-box svg { width: 11px; height: 11px; stroke: var(--green); fill: none; stroke-width: 2.4; stroke-linecap: round; stroke-linejoin: round; }
+    .url { margin-top: 5px; background: var(--green-tint); border-radius: 8px; padding: 5px 9px; font-weight: 600; color: var(--green); }
+    .url strong { font-weight: 700; }
 
-    /* ── Setup order card ── */
-    .setup-steps { display: flex; flex-direction: column; gap: 0; }
-    .setup-step {
-      display: flex;
-      align-items: flex-start;
-      gap: 10px;
-      padding: 7px 0;
-      border-bottom: 1px solid #f3f4f6;
-    }
-    .setup-step:last-child { border-bottom: none; }
-    .setup-num {
-      width: 22px;
-      height: 22px;
-      border-radius: 50%;
-      background: #1B4332;
-      color: #fff;
-      font-size: 11px;
-      font-weight: 800;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      flex-shrink: 0;
-      margin-top: 1px;
-    }
-    .setup-content { flex: 1; }
-    .setup-label { font-size: 12px; font-weight: 700; color: #111827; }
-    .setup-desc { font-size: 11px; color: #6b7280; margin-top: 1px; line-height: 1.4; }
-
-    /* ── Tip box ── */
-    .tip-box {
-      background: #fffbeb;
-      border: 1px solid #fde68a;
-      border-radius: 8px;
-      padding: 7px 11px;
-      font-size: 11px;
-      color: #92400e;
-      margin-top: 8px;
-    }
-    .tip-box strong { color: #78350f; }
-
-    /* ── Footer ── */
-    .footer {
-      margin-top: 20px;
-      padding-top: 12px;
-      border-top: 1px solid #e5e7eb;
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-    }
-    .footer-left { font-size: 11px; color: #9ca3af; }
-    .footer-right { font-size: 11px; color: #9ca3af; font-weight: 600; }
-
-    /* ── Nav list ── */
-    .nav-list { display: flex; flex-direction: column; gap: 0; }
-    .nav-item {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      padding: 5px 0;
-      border-bottom: 1px solid #f3f4f6;
-      font-size: 12px;
-    }
-    .nav-item:last-child { border-bottom: none; }
-    .nav-icon {
-      width: 28px;
-      height: 28px;
-      background: #f3f4f6;
-      border-radius: 6px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-size: 13px;
-      flex-shrink: 0;
-    }
-    .nav-name { font-weight: 700; color: #111827; }
-    .nav-desc { font-size: 11px; color: #6b7280; }
+    /* Footer */
+    .footer { margin-top: 8px; padding-top: 6px; border-top: 1px solid var(--border); display: flex; justify-content: space-between; font-size: 10px; color: var(--muted); }
+    .footer .right { font-weight: 600; }
 
     @media print {
-      body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-      .page { margin: 0; padding: 0.5in 0.6in; }
+      .page { padding: 0; width: auto; }
+    }
+    @media screen and (max-width: 8in) {
+      .page { width: auto; padding: 16px; }
+      .grid, .login { grid-template-columns: 1fr; }
     }
   </style>
 </head>
 <body>
-<div class="page">
+<main class="page">
 
-  <!-- Header -->
-  <div class="header">
-    <div class="logo-area">
-      <div class="logo-mark">
-        <!-- Diamond logo mark -->
-        <svg width="26" height="26" viewBox="0 0 26 26" fill="none">
-          <path d="M13 2L24 13L13 24L2 13L13 2Z" fill="#D4AF37"/>
-          <path d="M13 7L19 13L13 19L7 13L13 7Z" fill="#1B4332"/>
-        </svg>
+  <header class="header">
+    <img class="mark" src="/logo.png" alt="Scorify Golf" width="60" height="60" />
+    <div>
+      <div class="eyebrow">Scorify Golf · League management</div>
+      <div class="title-row">
+        <h1>Quick start guide</h1>
+        <span class="pill">For league admins</span>
       </div>
-      <div class="logo-text">
-        <div class="logo-name">Scorify Golf</div>
-        <div class="logo-sub">Golf League Management</div>
-      </div>
+      <p class="summary">Set up a league, run an event, and share results — in the order you'll do it.</p>
     </div>
-    <div class="header-right">
-      <div class="header-title">Quick Start Guide</div>
-      <div class="header-sub">For League Administrators</div>
-    </div>
-  </div>
+  </header>
 
-  <!-- Login box -->
-  <div class="card full-width" style="margin-bottom:14px;">
-    <div class="card-header">
-      <span style="font-size:14px;">🔐</span>
-      <span class="title">Your Login</span>
+  <section class="login" aria-label="Your login">
+    <div>
+      <div class="field-label">Sign in at</div>
+      <div class="login-url">scorifygolf.com/login</div>
     </div>
-    <div class="card-body" style="display:flex;gap:32px;align-items:center;">
-      <div>
-        <div style="font-size:11px;color:#9ca3af;font-weight:600;text-transform:uppercase;letter-spacing:0.07em;margin-bottom:4px;">Website</div>
-        <div class="url-box" style="margin:0;">scorifygolf.com/login</div>
-      </div>
-      <div>
-        <div style="font-size:11px;color:#9ca3af;font-weight:600;text-transform:uppercase;letter-spacing:0.07em;margin-bottom:2px;">Email</div>
-        <div style="font-size:13px;font-weight:600;color:#374151;padding:4px 0;">________________________________</div>
-      </div>
-      <div>
-        <div style="font-size:11px;color:#9ca3af;font-weight:600;text-transform:uppercase;letter-spacing:0.07em;margin-bottom:2px;">Password</div>
-        <div style="font-size:13px;font-weight:600;color:#374151;padding:4px 0;">________________________________</div>
-      </div>
+    <div>
+      <div class="field-label">Email</div>
+      <div class="write-in"></div>
     </div>
-  </div>
+    <div>
+      <div class="field-label">Password</div>
+      <div class="write-in"></div>
+    </div>
+  </section>
 
   <div class="grid">
 
-    <!-- Navigation -->
-    <div class="card">
-      <div class="card-header">
-        <span style="font-size:14px;">🧭</span>
-        <span class="title">Admin Sidebar</span>
+    <section class="card">
+      <div class="label">
+        <span class="icon"><svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg></span>
+        1 · Set up once
       </div>
-      <div class="card-body">
-        <div class="nav-list">
-          <div class="nav-item">
-            <div class="nav-icon">🏠</div>
-            <div><div class="nav-name">Dashboard</div><div class="nav-desc">Overview of leagues &amp; events</div></div>
-          </div>
-          <div class="nav-item">
-            <div class="nav-icon">🏆</div>
-            <div><div class="nav-name">Leagues</div><div class="nav-desc">Create &amp; manage leagues</div></div>
-          </div>
-          <div class="nav-item">
-            <div class="nav-icon">⛳</div>
-            <div><div class="nav-name">Courses</div><div class="nav-desc">Add golf courses</div></div>
-          </div>
-          <div class="nav-item">
-            <div class="nav-icon">👤</div>
-            <div><div class="nav-name">Players</div><div class="nav-desc">Your player roster</div></div>
-          </div>
-          <div class="nav-item">
-            <div class="nav-icon">⚙️</div>
-            <div><div class="nav-name">Settings</div><div class="nav-desc">Org details &amp; billing</div></div>
-          </div>
-        </div>
-      </div>
-    </div>
+      <div class="step"><span class="num">1</span><div>
+        <div class="step-name">Add your courses</div>
+        <div class="step-desc"><span class="path">Courses → New course.</span> Search by name or add manually; set tees, par and yardage.</div>
+      </div></div>
+      <div class="step"><span class="num">2</span><div>
+        <div class="step-name">Create a league</div>
+        <div class="step-desc"><span class="path">Leagues → New league.</span> Set scoring format, entry fee, side games and league logo.</div>
+      </div></div>
+      <div class="step"><span class="num">3</span><div>
+        <div class="step-name">Add players to your roster</div>
+        <div class="step-desc"><span class="path">Players.</span> Name, email and handicap index.</div>
+      </div></div>
+    </section>
 
-    <!-- Setup Order -->
-    <div class="card">
-      <div class="card-header">
-        <span style="font-size:14px;">🚀</span>
-        <span class="title">First-Time Setup Order</span>
+    <section class="card">
+      <div class="label">
+        <span class="icon"><svg viewBox="0 0 24 24"><rect x="4" y="5" width="16" height="15" rx="2"/><path d="M4 10h16M9 3v4M15 3v4"/></svg></span>
+        2 · Before each event
       </div>
-      <div class="card-body">
-        <div class="setup-steps">
-          <div class="setup-step">
-            <div class="setup-num">1</div>
-            <div class="setup-content">
-              <div class="setup-label">Add a Course</div>
-              <div class="setup-desc">Courses → New Course. Search by name or add manually. Set holes, tees, par &amp; yardage.</div>
-            </div>
-          </div>
-          <div class="setup-step">
-            <div class="setup-num">2</div>
-            <div class="setup-content">
-              <div class="setup-label">Create a League</div>
-              <div class="setup-desc">Leagues → New League. Set scoring format, entry fee, and side games.</div>
-            </div>
-          </div>
-          <div class="setup-step">
-            <div class="setup-num">3</div>
-            <div class="setup-content">
-              <div class="setup-label">Create an Event</div>
-              <div class="setup-desc">Inside a league → New Event. Set date, course, tee time, holes (9 or 18).</div>
-            </div>
-          </div>
-          <div class="setup-step">
-            <div class="setup-num">4</div>
-            <div class="setup-content">
-              <div class="setup-label">Add Players</div>
-              <div class="setup-desc">Event → Players tab. Add from roster or create new. Enter handicap index.</div>
-            </div>
-          </div>
-          <div class="setup-step">
-            <div class="setup-num">5</div>
-            <div class="setup-content">
-              <div class="setup-label">Assign Groups</div>
-              <div class="setup-desc">Event → Groups tab. Drag players into groups. Generate group codes.</div>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
+      <div class="step"><span class="num">1</span><div>
+        <div class="step-name">Create the event</div>
+        <div class="step-desc"><span class="path">League → + Event.</span> Date, course, first tee time, 9 or 18 holes.</div>
+      </div></div>
+      <div class="step"><span class="num">2</span><div>
+        <div class="step-name">Share registration</div>
+        <div class="step-desc"><span class="path">Event → Players.</span> Copy the registration link; assign flights and tees.</div>
+      </div></div>
+      <div class="step"><span class="num">3</span><div>
+        <div class="step-name">Set groups &amp; pairings</div>
+        <div class="step-desc"><span class="path">Event → Groups.</span> Auto-assign or drag players; this creates each group's scoring code.</div>
+      </div></div>
+      <div class="step"><span class="num">4</span><div>
+        <div class="step-name">Set the payout</div>
+        <div class="step-desc"><span class="path">Event → Payout → Setup.</span> Prize amounts per place and side game.</div>
+      </div></div>
+      <div class="step"><span class="num">5</span><div>
+        <div class="step-name">Send details &amp; print</div>
+        <div class="step-desc"><span class="path">Event → Print &amp; share.</span> Tournament details email, tee sheet, scorecards, cart &amp; side game signs.</div>
+      </div></div>
+    </section>
 
-    <!-- Day of Event -->
-    <div class="card">
-      <div class="card-header">
-        <span style="font-size:14px;">📱</span>
-        <span class="title">Day of Event — Scoring</span>
+    <section class="card">
+      <div class="label">
+        <span class="icon"><svg viewBox="0 0 24 24"><rect x="7" y="3" width="10" height="18" rx="2"/><path d="M11 18h2"/></svg></span>
+        3 · Day of the event
       </div>
-      <div class="card-body">
-        <div class="step">
-          <div class="step-dot"></div>
-          <div class="step-text"><strong>Players score via phone</strong> — go to the event's public page, enter their group code, tap their name, and score hole-by-hole.</div>
-        </div>
-        <div class="step">
-          <div class="step-dot"></div>
-          <div class="step-text"><strong>Admin can score manually</strong> — Event → Groups tab → click any group → Enter Scores.</div>
-        </div>
-        <div class="step">
-          <div class="step-dot"></div>
-          <div class="step-text"><strong>Live leaderboard</strong> updates in real time as scores come in. Share the public URL with players.</div>
-        </div>
-        <div class="step">
-          <div class="step-dot"></div>
-          <div class="step-text"><strong>Activate the event</strong> before scoring begins — Event → Overview → Start Event.</div>
-        </div>
-        <div class="tip-box">
-          <strong>Tip:</strong> Print Cart Signs from the Pre/Post Round tab — each group gets a card with their code and hole assignments.
-        </div>
-      </div>
-    </div>
+      <div class="step"><span class="num">1</span><div>
+        <div class="step-name">Activate the event</div>
+        <div class="step-desc"><span class="path">Event → Overview → Activate event.</span> Required before anyone can score.</div>
+      </div></div>
+      <div class="step"><span class="num">2</span><div>
+        <div class="step-name">Players score on their phones</div>
+        <div class="step-desc"><span class="path">Scan the cart sign QR code</span> or enter the group code, then score hole by hole. No app or account needed.</div>
+      </div></div>
+      <div class="step"><span class="num">3</span><div>
+        <div class="step-name">Correct scores if needed</div>
+        <div class="step-desc"><span class="path">Event → Print &amp; share → Edit scores.</span></div>
+      </div></div>
+      <div class="step"><span class="num">4</span><div>
+        <div class="step-name">Share the live leaderboard</div>
+        <div class="step-desc"><span class="path">Event page → Leaderboard.</span> It updates as scores come in.</div>
+      </div></div>
+      <div class="tip"><strong>Tip:</strong> print cart signs from <strong>Event → Print &amp; share</strong> — each group's sign shows its group code and starting hole.</div>
+    </section>
 
-    <!-- After the Round -->
-    <div class="card">
-      <div class="card-header">
-        <span style="font-size:14px;">🏁</span>
-        <span class="title">After the Round</span>
+    <section class="card">
+      <div class="label">
+        <span class="icon"><svg viewBox="0 0 24 24"><path d="M8 4h8v5a4 4 0 0 1-8 0V4zM8 6H5a3 3 0 0 0 3 4M16 6h3a3 3 0 0 1-3 4M12 13v4M9 20h6"/></svg></span>
+        4 · After the round
       </div>
-      <div class="card-body">
-        <div class="step">
-          <div class="step-dot"></div>
-          <div class="step-text"><strong>View Results</strong> — Event → Leaderboard tab. Full standings with net &amp; gross scores.</div>
-        </div>
-        <div class="step">
-          <div class="step-dot"></div>
-          <div class="step-text"><strong>Calculate Payouts</strong> — Event → Payout tab. Enter prize amounts; system calculates who earns what.</div>
-        </div>
-        <div class="step">
-          <div class="step-dot"></div>
-          <div class="step-text"><strong>Record side game winners</strong> — CTP, Long Drive, Skins winners entered in the Payout tab.</div>
-        </div>
-        <div class="step">
-          <div class="step-dot"></div>
-          <div class="step-text"><strong>Print Assets</strong> — Pre/Post Round tab: Tee Sheet, Cart Signs, CTP/Side Game cards.</div>
-        </div>
-        <div class="step">
-          <div class="step-dot"></div>
-          <div class="step-text"><strong>Complete the event</strong> — locks scores and posts final results to the public leaderboard.</div>
-        </div>
-      </div>
-    </div>
+      <div class="step"><span class="num">1</span><div>
+        <div class="step-name">Check results</div>
+        <div class="step-desc"><span class="path">Event page → Leaderboard.</span> Net and gross standings for every flight.</div>
+      </div></div>
+      <div class="step"><span class="num">2</span><div>
+        <div class="step-name">Enter side game winners</div>
+        <div class="step-desc"><span class="path">Event → Side Games.</span> Closest to pin and long drive winners.</div>
+      </div></div>
+      <div class="step"><span class="num">3</span><div>
+        <div class="step-name">Review the payout</div>
+        <div class="step-desc"><span class="path">Event → Payout → Results.</span> Confirm it balances to the pot.</div>
+      </div></div>
+      <div class="step"><span class="num">4</span><div>
+        <div class="step-name">Close the event</div>
+        <div class="step-desc"><span class="path">Event → Close event.</span> Locks scores and posts final results.</div>
+      </div></div>
+      <div class="step"><span class="num">5</span><div>
+        <div class="step-name">Share results</div>
+        <div class="step-desc"><span class="path">Event → Print &amp; share.</span> Results email and result images.</div>
+      </div></div>
+    </section>
 
-    <!-- Public Event Page -->
-    <div class="card full-width">
-      <div class="card-header">
-        <span style="font-size:14px;">🌐</span>
-        <span class="title">Public Event Page</span>
+    <section class="card">
+      <div class="label">
+        <span class="icon"><svg viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="16" rx="2"/><path d="M9 4v16"/></svg></span>
+        Where things live
       </div>
-      <div class="card-body" style="display:flex;gap:24px;align-items:flex-start;">
-        <div style="flex:1;">
-          <div class="step">
-            <div class="step-dot"></div>
-            <div class="step-text">Every event has a shareable public URL — share it with players before the round.</div>
-          </div>
-          <div class="step">
-            <div class="step-dot"></div>
-            <div class="step-text">Shows event details, schedule, competitions &amp; side games, pairings, and live leaderboard link.</div>
-          </div>
-          <div class="step">
-            <div class="step-dot"></div>
-            <div class="step-text">Players can upload photos from the round directly on the event page.</div>
-          </div>
-        </div>
-        <div style="flex:1;">
-          <div style="font-size:11px;color:#9ca3af;font-weight:600;text-transform:uppercase;letter-spacing:0.07em;margin-bottom:6px;">Your event URL format</div>
-          <div class="url-box">scorifygolf.com / [org] / [league] / [event]</div>
-          <div class="tip-box" style="margin-top:8px;">
-            <strong>Registration:</strong> If online registration is enabled, players can register &amp; pay directly from the public event page.
-          </div>
-        </div>
+      <div class="chip-group">Main menu</div>
+      <div class="chips">
+        <span class="chip">Home</span><span class="chip">Leagues</span><span class="chip">Trips</span><span class="chip">Courses</span><span class="chip">Players</span><span class="chip">Import</span><span class="chip">Settings</span>
       </div>
-    </div>
+      <div class="chip-group">Inside an event</div>
+      <div class="chips">
+        <span class="chip event">Overview</span><span class="chip event">Players</span><span class="chip event">Groups</span><span class="chip event">Side Games</span><span class="chip event">Payout</span><span class="chip event">Wagers</span><span class="chip event">Print &amp; share</span><span class="chip event">Team play</span>
+      </div>
+    </section>
+
+    <section class="card">
+      <div class="label">
+        <span class="icon"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8"/><path d="M4 12h16M12 4c2.5 2.5 2.5 13.5 0 16M12 4c-2.5 2.5-2.5 13.5 0 16"/></svg></span>
+        What players see
+      </div>
+      <div class="check"><span class="check-box"><svg viewBox="0 0 24 24"><path d="M5 12l5 5 9-10"/></svg></span><div>
+        <div class="step-name">Event page</div>
+        <div class="step-desc">Details, schedule, side games, pairings, registration and photo uploads.</div>
+      </div></div>
+      <div class="check"><span class="check-box"><svg viewBox="0 0 24 24"><path d="M5 12l5 5 9-10"/></svg></span><div>
+        <div class="step-name">Leaderboard &amp; scoring</div>
+        <div class="step-desc">Live scores on any phone; players score with their group code.</div>
+      </div></div>
+      <div class="check"><span class="check-box"><svg viewBox="0 0 24 24"><path d="M5 12l5 5 9-10"/></svg></span><div>
+        <div class="step-name">Season standings &amp; wager board</div>
+        <div class="step-desc">Money list, side game leaders and betting.</div>
+      </div></div>
+      <div class="url">Event link format: <strong>scorifygolf.com/[org]/[league]/[event]/event</strong></div>
+    </section>
 
   </div>
 
-  <!-- Footer -->
-  <div class="footer">
-    <div class="footer-left">Questions? Contact your league administrator.</div>
-    <div class="footer-right">scorifygolf.com &nbsp;·&nbsp; Golf League Management Software</div>
-  </div>
+  <footer class="footer">
+    <span>Questions? Contact your league administrator.</span>
+    <span class="right">scorifygolf.com · Golf league management</span>
+  </footer>
 
-</div>
+</main>
 </body>
 </html>
