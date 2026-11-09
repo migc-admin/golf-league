@@ -11,7 +11,7 @@ import RankBadge from './RankBadge'
 
 const PAGE = 10
 const money = n => `$${Number(n).toFixed(2)}`
-const COLS = 'grid-cols-[36px_minmax(0,1fr)_auto] sm:grid-cols-[44px_minmax(0,1fr)_64px_92px_104px]'
+const COLS = 'grid-cols-[36px_minmax(0,1fr)_auto] sm:grid-cols-[44px_minmax(0,1fr)_64px_104px]'
 
 function Breakdown({ source, events, hrefs }) {
   const shown = events.filter(ev => source.itemsByEvent?.[ev.id]?.length)
@@ -79,7 +79,6 @@ export default function MoneyListCard({ rows, events, subtitle, hrefs = {} }) {
         <span>Rank</span>
         <span>Player</span>
         <span className="hidden text-right sm:block">Events</span>
-        <span className="hidden text-right sm:block">Per event</span>
         <span className="text-right">Earnings</span>
       </div>
 
@@ -106,7 +105,6 @@ export default function MoneyListCard({ rows, events, subtitle, hrefs = {} }) {
                     <span className="mt-0.5 block text-xs text-ink-muted sm:hidden">{r.events} event{r.events === 1 ? '' : 's'} · {money(r.perEvent)} per event</span>
                   </span>
                   <span className="hidden text-right text-sm tabular-nums text-ink-muted sm:block">{r.events}</span>
-                  <span className="hidden text-right text-sm tabular-nums text-ink-muted sm:block">{money(r.perEvent)}</span>
                   <span className="text-right text-[15px] font-bold tabular-nums text-ink">{money(r.earnings)}</span>
                 </button>
                 {isOpen && <Breakdown source={r.source} events={events} hrefs={hrefs} />}
