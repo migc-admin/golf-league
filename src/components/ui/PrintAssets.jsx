@@ -12,6 +12,9 @@
 import { useEffect, useRef, useState, forwardRef } from 'react'
 import { createPortal } from 'react-dom'
 import { toPng } from 'html-to-image'
+import '@fontsource/playfair-display/400.css'
+import '@fontsource/playfair-display/700.css'
+import '@fontsource/playfair-display/900.css'
 import html2canvas from 'html2canvas'
 import QRCode from 'qrcode'
 import { supabase } from '../../lib/supabase'
@@ -709,7 +712,6 @@ export default function PrintAssets({ type, event, eventPlayers = [], tglSelecti
     const style = document.createElement('style')
     style.id    = 'print-assets-style'
     style.textContent = `
-      @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;700;900&display=swap');
       @page { size: ${size}; margin: ${margin}; }
       @media print {
         body > * { display: none !important; }
