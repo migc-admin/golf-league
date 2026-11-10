@@ -19,12 +19,14 @@ describe('BylawsCard', () => {
   it('shows headings, bullets, bold and links', () => {
     expect(html).toContain('League rules &amp; bylaws')
     expect(html).toContain('Last updated Nov 9, 2026')
-    expect(html.match(/<h3/g)).toHaveLength(3)
+    expect(html.match(/<details/g)).toHaveLength(3)
+    expect(html).not.toContain('<details open')
     expect(html).toContain('<strong class="font-semibold">24 hours</strong>')
     expect(html).toContain('href="https://www.usga.org/handicapping"')
   })
-  it('lists sections when there are three or more headings', () => {
-    expect(html).toContain('Contents')
+  it('starts collapsed with an Expand all button', () => {
+    expect(html).toContain('Expand all')
+    expect(html).toContain('ARTICLE II – HANDICAPS</span>')
   })
   it('never renders pasted markup', () => {
     expect(html).not.toContain('<script>')

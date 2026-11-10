@@ -70,3 +70,22 @@ export function inlineParts(line) {
   if (last < line.length) parts.push({ type: 'text', value: line.slice(last) })
   return parts
 }
+
+/**
+ * Group blocks into collapsible sections. When any heading starts with "Article", only those
+ * start a section (other headings stay inside as subheadings); otherwise every heading does.
+ * Text before the first section heading is returned as `intro` and always shown.
+ */
+export function groupSections(blocks) {
+  const isArticle = b => b.type === 'heading' && /^article\b/i.test(b.text)
+  const byArticle = blocks.some(isArticle)
+  const starts = b => (byArticle ? isArticle(b) : b.type === 'heading')
+  const intro = []
+  const sections = []
+  for (const b of blocks) {
+    if (starts(b)) sections.push({ id: b.id, title: b.text, blocks: [] })
+    else if (sections.length) sections[sections.length - 1].blocks.push(b)
+    else intro.push(b)
+  }
+  return { intro, sections }
+}

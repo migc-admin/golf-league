@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { parseBylaws, inlineParts, isHeading } from './bylaws'
+import { parseBylaws, inlineParts, isHeading, groupSections } from './bylaws'
 
 describe('isHeading', () => {
   it('spots title-like lines', () => {
@@ -49,5 +49,18 @@ describe('inlineParts', () => {
   })
   it('does not treat javascript: as a link', () => {
     expect(inlineParts('javascript:alert(1)')).toEqual([{ type: 'text', value: 'javascript:alert(1)' }])
+  })
+})
+
+describe('groupSections', () => {
+  it('collapses by article and keeps other headings inside', () => {
+    const { intro, sections } = groupSections(parseBylaws('Preamble text\n\nARTICLE I – DUES\nSection 1. Amount\n$50\n\nARTICLE II – PLAY\nBe quick'))
+    expect(intro.map(b => b.type)).toEqual(['para'])
+    expect(sections.map(s => s.title)).toEqual(['ARTICLE I – DUES', 'ARTICLE II – PLAY'])
+    expect(sections[0].blocks.map(b => b.type)).toEqual(['heading', 'para'])
+  })
+  it('uses every heading when there are no articles', () => {
+    const { sections } = groupSections(parseBylaws('Dues:\n$50\nPace of play:\nBe quick'))
+    expect(sections.map(s => s.title)).toEqual(['Dues', 'Pace of play'])
   })
 })
