@@ -8,7 +8,7 @@ import toast from 'react-hot-toast'
 import Card from '../../components/ui/Card'
 import Button from '../../components/ui/Button'
 import Modal from '../../components/ui/Modal'
-import Input, { Select } from '../../components/ui/Input'
+import Input, { Select, Textarea } from '../../components/ui/Input'
 import { StatusBadge } from '../../components/ui/Badge'
 import ImageUpload from '../../components/ui/ImageUpload'
 
@@ -253,6 +253,9 @@ export function LeagueDetailView({ leagueSlug, containerLabel = 'League', roundL
 
       {/* Standings Settings */}
       <StandingsSettings league={league} onSaved={refreshLeague} />
+
+      {/* Rules & bylaws (leagues only; trips have their own public page) */}
+      {containerLabel === 'League' && <BylawsSettings league={league} orgSlug={orgSlug} />}
 
       <LeagueModal
         open={leagueModal}
@@ -653,6 +656,104 @@ function StandingsSettings({ league, onSaved }) {
           </label>
         ))}
       </div>
+    </div>
+  )
+}
+
+function BylawsSettings({ league, orgSlug }) {
+  const [saved,   setSaved]   = useState({ body: '', is_public: false, updated_at: null })
+  const [body,    setBody]    = useState('')
+  const [isPublic, setIsPublic] = useState(false)
+  const [loading, setLoading] = useState(true)
+  const [saving,  setSaving]  = useState(false)
+
+  useEffect(() => {
+    if (!league?.id) return
+    let cancelled = false
+    supabase.from('league_bylaws').select('body, is_public, updated_at').eq('league_id', league.id).maybeSingle()
+      .then(({ data, error }) => {
+        if (cancelled) return
+        if (error) toast.error(error.message)
+        const row = data ?? { body: '', is_public: false, updated_at: null }
+        setSaved(row)
+        setBody(row.body)
+        setIsPublic(row.is_public)
+        setLoading(false)
+      })
+    return () => { cancelled = true }
+  }, [league?.id])
+
+  const hasText = body.trim().length > 0
+  const dirty = body !== saved.body || isPublic !== saved.is_public
+  const publicUrl = orgSlug && league?.slug ? `/${orgSlug}/${league.slug}/rules` : null
+
+  async function handleSave() {
+    setSaving(true)
+    const row = { league_id: league.id, body, is_public: isPublic && hasText, updated_at: new Date().toISOString() }
+    const { error } = await supabase.from('league_bylaws').upsert(row)
+    setSaving(false)
+    if (error) { toast.error(error.message); return }
+    setSaved(row)
+    setIsPublic(row.is_public)
+    toast.success(row.is_public ? 'Rules & bylaws saved and visible to members' : 'Rules & bylaws saved (hidden from the public page)')
+  }
+
+  return (
+    <div className="card p-5 space-y-4">
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <h2 className="text-base font-bold text-ink">Rules &amp; Bylaws</h2>
+          <p className="text-xs text-ink-muted mt-0.5">Paste your league rules or bylaws. Members can read them on the public league page without logging in, in a "Rules &amp; bylaws" tab, while the switch below is on.</p>
+          <p className="text-xs text-ink-muted mt-0.5">Formatting is kept as pasted. ALL CAPS lines, lines starting with "Article", "Section" or "Rule", and short lines ending in ":" become headings. Lines starting with "-" become bullets. Wrap text in **double asterisks** for bold.</p>
+        </div>
+        {dirty && <Button size="sm" loading={saving} onClick={handleSave}>Save</Button>}
+      </div>
+
+      {loading ? (
+        <p className="text-sm text-ink-muted">Loading…</p>
+      ) : (
+        <>
+          <Textarea
+            label="Rules & bylaws"
+            value={body}
+            onChange={e => setBody(e.target.value)}
+            rows={14}
+            placeholder={'ARTICLE I – MEMBERSHIP\nMembership is open to...\n\nARTICLE II – HANDICAPS\n- Handicaps are updated...'}
+            className="[&_textarea]:font-mono [&_textarea]:text-sm"
+          />
+
+          <label className={`flex items-start gap-3 ${hasText ? 'cursor-pointer' : 'cursor-not-allowed opacity-60'}`}>
+            <div className="relative mt-0.5 flex-shrink-0">
+              <input
+                type="checkbox"
+                className="sr-only peer"
+                checked={isPublic && hasText}
+                disabled={!hasText}
+                onChange={() => setIsPublic(v => !v)}
+              />
+              <div className={`w-9 h-5 rounded-full transition-colors peer-focus-visible:ring-2 peer-focus-visible:ring-fairway-500 ${isPublic && hasText ? 'bg-fairway-700' : 'bg-surface-highest'}`} />
+              <div
+                className="absolute top-0.5 left-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform"
+                style={{ transform: isPublic && hasText ? 'translateX(16px)' : 'translateX(0)' }}
+              />
+            </div>
+            <div>
+              <div className="text-sm font-semibold text-ink leading-tight">Visible on the public league page</div>
+              <div className="text-xs text-ink-muted mt-0.5">
+                {hasText ? 'Off keeps them private to your admins.' : 'Add some text first.'}
+                {dirty ? ' Save to apply.' : ''}
+              </div>
+            </div>
+          </label>
+
+          <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-ink-muted">
+            {saved.updated_at && <span>Last saved {new Date(saved.updated_at).toLocaleString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' })}</span>}
+            {saved.is_public && publicUrl && (
+              <a href={publicUrl} target="_blank" rel="noopener noreferrer" className="font-semibold text-fairway-700 hover:underline">View public page ↗</a>
+            )}
+          </div>
+        </>
+      )}
     </div>
   )
 }

@@ -87,9 +87,9 @@ function LeagueHomeRoute({ orgSlug, initialTab }) {
   return <LeagueHome orgSlug={orgSlug} leagueSlug={leagueSlug} initialTab={initialTab} />
 }
 
-function LeagueStandingsRoute() {
+function LeagueStandingsRoute({ initialTab = 'standings' }) {
   const { orgSlug, leagueSlug } = useParams()
-  return <OrgProvider orgSlug={orgSlug}><LeagueHome orgSlug={orgSlug} leagueSlug={leagueSlug} initialTab="standings" /></OrgProvider>
+  return <OrgProvider orgSlug={orgSlug}><LeagueHome orgSlug={orgSlug} leagueSlug={leagueSlug} initialTab={initialTab} /></OrgProvider>
 }
 
 function TripHomeRoute({ orgSlug: fixedOrgSlug, initialTab }) {
@@ -111,6 +111,7 @@ export default function App() {
             <Route path="/login" element={<Login />} />
             <Route path="/:leagueSlug" element={<LeagueHomeRoute orgSlug={subdomainSlug} />} />
             <Route path="/:leagueSlug/standings" element={<LeagueHomeRoute orgSlug={subdomainSlug} initialTab="standings" />} />
+            <Route path="/:leagueSlug/rules" element={<LeagueHomeRoute orgSlug={subdomainSlug} initialTab="rules" />} />
             <Route path="/trip/:tripSlug" element={<TripHomeRoute orgSlug={subdomainSlug} />} />
             <Route path="/:leagueSlug/:eventSlug" element={<EventPage />} />
             <Route path="/:leagueSlug/:eventSlug/leaderboard" element={<OrgProvider orgSlug={subdomainSlug}><Leaderboard /></OrgProvider>} />
@@ -206,6 +207,7 @@ export default function App() {
         {/* Generic slug-based routes — must be LAST to avoid conflicts */}
         <Route path="/:orgSlug/trip/:tripSlug"                     element={<TripHomeRoute />} />
         <Route path="/:orgSlug/:leagueSlug/standings"              element={<LeagueStandingsRoute />} />
+        <Route path="/:orgSlug/:leagueSlug/rules"                  element={<LeagueStandingsRoute initialTab="rules" />} />
         <Route path="/:orgSlug/:leagueSlug/:eventSlug/event"       element={<EventPage />} />
         <Route path="/:orgSlug/:leagueSlug/:eventSlug/leaderboard" element={<OrgRouteWrapper><Leaderboard /></OrgRouteWrapper>} />
         <Route path="/:orgSlug/:leagueSlug/:eventSlug/schedule"    element={<OrgRouteWrapper><Schedule /></OrgRouteWrapper>} />

@@ -18,6 +18,7 @@ import { teamSeasonView } from '../../lib/teamSeason'
 import { overallWinners } from '../../lib/overallWinners'
 import PlayerScoringCard from '../../components/league-page/PlayerScoringCard'
 import InsightsGrid from '../../components/league-page/InsightsGrid'
+import BylawsCard from '../../components/league-page/BylawsCard'
 import { seasonInsights, ctpWinsByFlight, insightExclusions } from '../../lib/insights'
 import { playerScoringRows } from '../../lib/playerScoring'
 import { registrationState } from '../../lib/eventPageView'
@@ -30,6 +31,7 @@ const TABS = [
   { key: 'scoring',   label: 'Player scoring' },
   { key: 'insights',  label: 'Insights' },
 ]
+const RULES_TAB = { key: 'rules', label: 'Rules & bylaws' }
 
 export default function LeagueHome({ orgSlug, leagueSlug, initialTab = 'events' }) {
   const [league,         setLeague]         = useState(null)
@@ -37,6 +39,7 @@ export default function LeagueHome({ orgSlug, leagueSlug, initialTab = 'events' 
   const [leagues,        setLeagues]        = useState([])
   const [events,         setEvents]         = useState([])
   const [activeTab,      setActiveTab]      = useState(initialTab)
+  const [bylaws,         setBylaws]         = useState(null)
   const [loading,        setLoading]        = useState(true)
   const [error,          setError]          = useState(null)
   const [nextCount,      setNextCount]      = useState(null)
@@ -60,6 +63,15 @@ export default function LeagueHome({ orgSlug, leagueSlug, initialTab = 'events' 
 
       if (leagueErr || !leagueData) { setError('League not found.'); setLoading(false); return }
       setLeague(leagueData)
+
+      // Rules & bylaws: shown only when the league has switched them on (the database
+      // also hides unpublished bylaws from anyone outside the org).
+      const { data: bylawsRow } = await supabase
+        .from('league_bylaws')
+        .select('body, is_public, updated_at')
+        .eq('league_id', leagueData.id)
+        .maybeSingle()
+      setBylaws(bylawsRow?.is_public && bylawsRow.body?.trim() ? bylawsRow : null)
 
       const { data: orgData } = await supabase
         .from('organizations')
@@ -89,7 +101,7 @@ export default function LeagueHome({ orgSlug, leagueSlug, initialTab = 'events' 
 
   // Load standings data when tab is first opened
   useEffect(() => {
-    if ((activeTab === 'events') || !league) return
+    if (activeTab === 'events' || activeTab === 'rules' || !league) return
     if (standings.length > 0) return  // already loaded
     loadStandings(league.id, league.standings_config)
   }, [activeTab, league])
@@ -227,7 +239,7 @@ export default function LeagueHome({ orgSlug, leagueSlug, initialTab = 'events' 
       <SeasonHero pill={pill} title={heroTitle} meta={heroMeta} next={next} />
 
       <div id="league-tabs">
-        <EventTabBar tabs={TABS} value={activeTab} onChange={setActiveTab} ariaLabel="League sections" idPrefix="league-tab" />
+        <EventTabBar tabs={bylaws ? [...TABS, RULES_TAB] : TABS} value={activeTab} onChange={setActiveTab} ariaLabel="League sections" idPrefix="league-tab" />
       </div>
 
       <main className="mx-auto w-full max-w-[1100px] flex-1 px-4 py-6 sm:px-6 lg:py-8">
@@ -316,6 +328,19 @@ export default function LeagueHome({ orgSlug, leagueSlug, initialTab = 'events' 
               </div>
             ) : (
               <PlayerScoringCard rows={scoringRows} />
+            )}
+          </div>
+        )}
+        {/* Rules & bylaws tab */}
+        {activeTab === 'rules' && (
+          <div role="tabpanel" aria-labelledby="league-tab-rules">
+            {bylaws ? (
+              <BylawsCard leagueName={league?.name} text={bylaws.body} updatedAt={bylaws.updated_at} />
+            ) : (
+              <div className="rounded-sm border border-surface-border bg-white p-10 text-center">
+                <p className="font-medium text-ink-muted">No rules posted yet</p>
+                <p className="mt-1 text-sm text-ink-muted">Check back later or ask your league administrator.</p>
+              </div>
             )}
           </div>
         )}
