@@ -128,7 +128,7 @@ export default function Leaderboard() {
       const eventId = ev.id
 
       const [{ data: eps }, { data: sg }, { data: mp }] = await Promise.all([
-        supabase.from('event_players').select('*, player:players(*)').eq('event_id', eventId),
+        supabase.from('event_players').select('*, player:players(id, first_name, last_name, intended_role)').eq('event_id', eventId),
         supabase.from('side_games').select('*, winner:players(first_name,last_name)').eq('event_id', eventId),
         supabase.from('match_pairings').select('*').eq('event_id', eventId).order('match_number'),
       ])

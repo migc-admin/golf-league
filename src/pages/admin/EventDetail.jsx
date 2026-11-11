@@ -4699,9 +4699,17 @@ function Row({ label, value }) {
 // ─── Access Code Section ───────────────────────────────────────────
 // ─── Per-Group Code Section ────────────────────────────────────────
 function AccessCodeSection({ event, eventPlayers, onUpdated, orgSlug }) {
-  // group_codes stored as { "1": "ABC123", "2": "XYZ789" }
-  const [groupCodes, setGroupCodes] = useState(event.group_codes ?? {})
+  // Codes live in event_group_codes ({ "1": "ABC123", "2": "XYZ789" }), readable only by
+  // this club's admins; the public pages never receive them.
+  const [groupCodes, setGroupCodes] = useState({})
   const [saving,     setSaving]     = useState(false)
+
+  useEffect(() => {
+    let cancelled = false
+    supabase.from('event_group_codes').select('codes').eq('event_id', event.id).maybeSingle()
+      .then(({ data }) => { if (!cancelled) setGroupCodes(data?.codes ?? {}) })
+    return () => { cancelled = true }
+  }, [event.id])
   const scorecardUrl = `${window.location.origin}/${orgSlug}/${event.league?.slug}/${event.slug}/scorecard?eid=${event.id}`
 
   // Unique sorted group numbers from event players
@@ -4728,9 +4736,8 @@ function AccessCodeSection({ event, eventPlayers, onUpdated, orgSlug }) {
 
   async function saveAll() {
     setSaving(true)
-    const { error } = await supabase.from('events')
-      .update({ group_codes: groupCodes })
-      .eq('id', event.id)
+    const { error } = await supabase.from('event_group_codes')
+      .upsert({ event_id: event.id, codes: groupCodes, updated_at: new Date().toISOString() })
     setSaving(false)
     if (error) { toast.error('Failed to save codes'); return }
     toast.success('Group codes saved')

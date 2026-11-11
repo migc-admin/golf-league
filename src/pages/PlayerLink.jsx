@@ -28,7 +28,7 @@ const GOLD  = '#C9A84C'
 const GREEN = '#1B4332'
 const bg = { background: 'linear-gradient(150deg,#0b2318 0%,#1B4332 45%,#1f5c3e 100%)', fontFamily: "'Manrope', sans-serif" }
 
-const EVENT_FIELDS = 'id, name, event_number, event_date, start_time, status, slug, group_codes, shotgun_start, tee_time_interval_mins, group_hole_assignments, course:courses(*), league:leagues(slug, name, org_id, org:organizations(slug))'
+const EVENT_FIELDS = 'id, name, event_number, event_date, start_time, status, slug, shotgun_start, tee_time_interval_mins, group_hole_assignments, course:courses(*), league:leagues(slug, name, org_id, org:organizations(slug))'
 
 function prettyDate(d) {
   if (!d) return ''
@@ -59,11 +59,8 @@ export default function PlayerLink() {
 
     async function load() {
       try {
-        const { data: p } = await supabase
-          .from('players')
-          .select('id, first_name, last_name')
-          .eq('player_link_token', token)
-          .maybeSingle()
+        const { data: found } = await supabase.rpc('player_link_profile', { p_token: token })
+        const p = Array.isArray(found) ? found[0] : found
         if (!mounted) return
         if (!p) { setStatus('invalid'); return }
         setPlayer(p)
@@ -126,10 +123,16 @@ export default function PlayerLink() {
   const urls = ev ? eventUrls(ev, MIGC_ORG) : null
   const group = current?.row.group_number ?? null
   const tee = ev ? teeInfo(ev, group) : null
-  const accessCode = ev && group != null ? (ev.group_codes ?? {})[String(group)] : null
-  const canScore = current?.kind === 'active' && !!accessCode
+  const canScore = current?.kind === 'active' && group != null
 
-  function startScoring() {
+  // The group code is fetched from the server only when the player taps "Start scoring"
+  // (possession of this link is the credential); codes are never part of the page data.
+  async function startScoring() {
+    const { data: accessCode } = await supabase.rpc('player_link_code', { p_token: token, p_event_id: ev.id })
+    if (!accessCode) {
+      window.alert('Scoring is not open for your group yet. Check with your league admin.')
+      return
+    }
     localStorage.setItem(GUEST_KEY, JSON.stringify({
       eventId: ev.id,
       groupNum: group,

@@ -35,7 +35,7 @@ export function useSeasonStandings() {
 
     const eventIds = evs.map(e => e.id)
     const [{ data: allEPs }, { data: allSideGames }] = await Promise.all([
-      supabase.from('event_players').select('*, player:players(*)').in('event_id', eventIds),
+      supabase.from('event_players').select('*, player:players(id, first_name, last_name, intended_role)').in('event_id', eventIds),
       supabase.from('side_games').select('*, winner:players(first_name,last_name)').in('event_id', eventIds),
     ])
     // Fetch scores per-event to avoid Supabase's 1000-row server limit

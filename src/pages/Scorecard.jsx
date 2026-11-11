@@ -157,12 +157,11 @@ export default function Scorecard() {
 
       if (!ev) { setError('Event not found.'); setLoading(false); return }
 
-      // Verify guest group code
+      // Verify guest group code on the server (codes are never sent to the browser)
       if (guestGroupNum != null) {
         const guest = readGuestSession()
-        const groupCodes = ev.group_codes ?? {}
-        const expectedCode = groupCodes[String(guestGroupNum)]
-        if (!expectedCode || expectedCode !== guest?.accessCode) {
+        const { data: codeGroup } = await supabase.rpc('group_for_code', { p_event_id: evId, p_code: guest?.accessCode ?? '' })
+        if (codeGroup == null || Number(codeGroup) !== Number(guestGroupNum)) {
           clearGuestSession()
           setCodeEventId(evId)
           setNeedsCode(true)
@@ -215,7 +214,7 @@ export default function Scorecard() {
       // - If not admin and no group → only see own player row
       const query = supabase
         .from('event_players')
-        .select('*, player:players(*)')
+        .select('*, player:players(id, first_name, last_name, intended_role)')
         .eq('event_id', evId)
 
       if (groupNum && !eventComplete) {
@@ -357,6 +356,8 @@ export default function Scorecard() {
         gross_score: gross,
         putts,
         entered_by:  enteredBy,
+        // Guests (no login) save through the server, which checks their group code
+        ...(!user ? { access_code: readGuestSession()?.accessCode ?? '' } : {}),
       })
 
       if (result?.error) {
@@ -382,7 +383,7 @@ export default function Scorecard() {
     } else if (allValid && currentHole === nh) {
       setShowReconcile(true)
     }
-  }, [event, course, currentHole, groupPlayers, scores, saveScore])
+  }, [event, course, currentHole, groupPlayers, scores, saveScore, user])
 
   function handleHoleNav(targetHole) {
     if (dirtyHoles.has(currentHole)) {
@@ -1262,7 +1263,7 @@ function GuestCodeEntry({ eventId, onSuccess }) {
     async function loadEventInfo() {
       const { data: ev } = await supabase
         .from('events')
-        .select('id, name, event_number, group_codes, league_id, course:courses(name)')
+        .select('id, name, event_number, league_id, course:courses(name)')
         .eq('id', eventId)
         .single()
       if (!ev) return
@@ -1284,16 +1285,15 @@ function GuestCodeEntry({ eventId, onSuccess }) {
     setError('')
 
     const trimmed = code.trim().toUpperCase()
-    const groupCodes = eventInfo?.group_codes ?? {}
-    const match = Object.entries(groupCodes).find(([, c]) => c?.toUpperCase() === trimmed)
+    const { data: codeGroup, error: codeErr } = await supabase.rpc('group_for_code', { p_event_id: eventId, p_code: trimmed })
 
-    if (!match) {
-      setError('Code not recognized. Check with your group leader and try again.')
+    if (codeErr || codeGroup == null) {
+      setError(codeErr ? 'Could not check the code. Try again.' : 'Code not recognized. Check with your group leader and try again.')
       setChecking(false)
       return
     }
 
-    const groupNum = parseInt(match[0], 10)
+    const groupNum = Number(codeGroup)
 
     // Load players in this group
     const { data: eps } = await supabase

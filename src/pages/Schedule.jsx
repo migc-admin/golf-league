@@ -210,7 +210,6 @@ export default function Schedule() {
 
         {sortedGroups.map(([groupNum, members]) => {
           const teeTime = computeTeeTime(event.start_time, event.shotgun_start ? 0 : (event.tee_time_interval_mins ?? 10), parseInt(groupNum))
-          const groupCode = event.group_codes?.[groupNum] ?? null
           return (
             <GroupCard
               key={groupNum}
@@ -218,7 +217,6 @@ export default function Schedule() {
               members={members}
               teeTime={teeTime}
               format={format}
-              groupCode={groupCode}
             />
           )
         })}
@@ -246,7 +244,7 @@ export default function Schedule() {
 }
 
 // ─── Group Card ───────────────────────────────────────────────────
-function GroupCard({ groupNum, members, teeTime, format, groupCode }) {
+function GroupCard({ groupNum, members, teeTime, format }) {
   const flightA = members.filter(m => m.flight === 'A')
   const flightB = members.filter(m => m.flight === 'B')
   const hasFlights = flightA.length > 0 || flightB.length > 0
@@ -264,12 +262,6 @@ function GroupCard({ groupNum, members, teeTime, format, groupCode }) {
             <div className="font-bold text-white text-sm">Group {groupNum}</div>
             <div className="text-fairway-200 text-xs">{members.length} players</div>
           </div>
-          {groupCode && (
-            <div className="bg-white/20 rounded-lg px-2.5 py-1 text-center">
-              <div className="text-fairway-200 text-xs leading-none mb-0.5">Scoring Access Code</div>
-              <div className="text-white font-bold text-sm tracking-widest">{groupCode}</div>
-            </div>
-          )}
         </div>
         <div className="text-right">
           {teeTime ? (

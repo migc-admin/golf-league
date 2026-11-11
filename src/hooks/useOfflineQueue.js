@@ -12,6 +12,10 @@
  * Usage:
  *   const { saveScore, pendingCount, syncing } = useOfflineQueue()
  *   await saveScore({ event_id, player_id, hole_number, gross_score, putts, entered_by })
+ *
+ * Guests (no login) also pass `access_code`; their saves go through the guest_save_score
+ * database function, which checks the code against the player's group before writing
+ * (the audit log and conflict check happen there too).
  */
 
 import { useState, useEffect, useCallback, useRef } from 'react'
@@ -57,7 +61,15 @@ function deduped(queue, item) {
 }
 
 async function persistScore(score) {
-  const { event_id, player_id, hole_number, gross_score, putts, entered_by } = score
+  const { event_id, player_id, hole_number, gross_score, putts, entered_by, access_code } = score
+
+  if (access_code != null) {
+    const { data, error } = await supabase.rpc('guest_save_score', {
+      p_event_id: event_id, p_code: access_code, p_player_id: player_id, p_hole: hole_number,
+      p_gross: gross_score, p_putts: putts ?? null, p_entered_by: entered_by ?? null,
+    })
+    return { error, isConflict: !!data?.conflict }
+  }
 
   // 1. Fetch existing score to detect conflict
   const { data: existing } = await supabase

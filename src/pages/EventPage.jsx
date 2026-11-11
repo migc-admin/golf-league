@@ -537,7 +537,6 @@ function GroupList({ eventPlayers, event }) {
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))', gap: 12 }}>
         {filtered.map(([groupNum, members]) => {
           const teeTime   = computeTeeTime(event.start_time, event.shotgun_start ? 0 : (event.tee_time_interval_mins ?? 10), parseInt(groupNum))
-          const code      = event.group_codes?.[groupNum] ?? null
           const startHole = event.shotgun_start ? (event.group_hole_assignments?.[groupNum] ?? null) : null
           return (
             <div key={groupNum} style={{ background: '#fff', borderRadius: 14, overflow: 'hidden', border: '1px solid #e5e7eb' }}>
@@ -550,12 +549,6 @@ function GroupList({ eventPlayers, event }) {
                     <div style={{ fontWeight: 700, fontSize: 13 }}>Group {groupNum}</div>
                     <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.55)' }}>{members.length} players</div>
                   </div>
-                  {code && (
-                    <div style={{ background: 'rgba(255,255,255,0.15)', borderRadius: 8, padding: '3px 9px' }}>
-                      <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.55)' }}>Code</div>
-                      <div style={{ fontWeight: 800, fontSize: 12, letterSpacing: '0.1em' }}>{code}</div>
-                    </div>
-                  )}
                 </div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
                   {startHole && <div style={{ textAlign: 'right' }}><div style={{ fontWeight: 800, fontSize: 15 }}>Hole {startHole}</div><div style={{ fontSize: 10, color: 'rgba(255,255,255,0.55)' }}>Start</div></div>}

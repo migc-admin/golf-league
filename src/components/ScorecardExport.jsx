@@ -61,14 +61,16 @@ export function ExportScorecardsButton({ event, eventPlayers, course, orgName, o
     eventPlayers.map(ep => ep.group_number).filter(Boolean)
   )].sort((a, b) => a - b)
 
-  const groupCodes = event.group_codes ?? {}
-
   async function handleExport() {
     setExportError(null)
     if (!course) { setExportError('No course loaded — cannot export.'); return }
     if (groupNums.length === 0) { setExportError('No groups assigned.'); return }
     setExporting(true)
     try {
+      // Group codes are admin-only (event_group_codes), so fetch them at export time
+      const { data: codeRow } = await supabase.from('event_group_codes').select('codes').eq('event_id', event.id).maybeSingle()
+      const groupCodes = codeRow?.codes ?? {}
+
       // Pre-fetch logo once for all groups (4s timeout, skip on failure)
       let logoDataUrl = null
       if (orgLogoUrl) {
