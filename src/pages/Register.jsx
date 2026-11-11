@@ -164,7 +164,7 @@ export default function Register() {
   useEffect(() => {
     supabase
       .from('events')
-      .select('id, name, slug, event_number, event_date, entry_fee, tournament_fee, status, venmo_handle, paypal_link, zelle_handle, custom_questions, schedule_items, course:courses(name, address), league:leagues(name, slug, logo_url, org:organizations(logo_url, slug)), use_flights')
+      .select('id, name, slug, event_number, event_date, entry_fee, tournament_fee, status, venmo_handle, paypal_link, zelle_handle, registration_open, custom_questions, schedule_items, course:courses(name, address), league:leagues(name, slug, logo_url, org:organizations(logo_url, slug)), use_flights')
       .eq('slug', eventSlug)
       .eq('league.slug', leagueSlug)
       .single()
@@ -245,7 +245,9 @@ export default function Register() {
     ? `Register for ${eventLabel} — ${event.league?.name ?? ''} | Scorify Golf`
     : 'Event Registration | Scorify Golf'
 
-  const isClosed   = event?.status === 'complete'
+  // Closed once the event has started, or while the admin has registration switched off
+  // (the database refuses sign-ups then too).
+  const isClosed   = !!event && (event.status !== 'upcoming' || event.registration_open === false)
   const fee        = Number(event?.tournament_fee) > 0 ? Number(event.tournament_fee) : 0
   const payAmount  = Number(event?.tournament_fee || event?.entry_fee || 0).toFixed(2)
   const hasPayment = !!(event?.venmo_handle || event?.paypal_link || event?.zelle_handle)

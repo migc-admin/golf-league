@@ -46,8 +46,18 @@ function CountdownBand({ targetDate }) {
  *   kind 'open'     — countdown + fee + Register now
  *   kind 'closed'   — countdown (if still ahead) + "Registration closed", no Register
  *   kind 'complete' — final leaderboard + photos buttons, no Register
+ *   kind 'none'     — registration switched off: countdown only (nothing when it has passed)
  */
 export default function EventActionCard({ kind, targetDate, fee, regUrl, leaderboardUrl, onPhotos }) {
+  if (kind === 'none') {
+    if (!targetDate || !getRemaining(targetDate)) return null
+    return (
+      <div className="overflow-hidden rounded-sm border border-surface-border bg-white">
+        <CountdownBand targetDate={targetDate} />
+      </div>
+    )
+  }
+
   if (kind === 'complete') {
     return (
       <div className="flex flex-col gap-3 sm:flex-row">

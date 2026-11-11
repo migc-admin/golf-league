@@ -90,7 +90,7 @@ export default function LeagueHome({ orgSlug, leagueSlug, initialTab = 'events' 
 
       const { data: eventsData } = await supabase
         .from('events')
-        .select('id, name, event_number, slug, status, event_date, registration_spots, course:courses(name)')
+        .select('id, name, event_number, slug, status, event_date, registration_spots, registration_open, course:courses(name)')
         .eq('league_id', leagueData.id)
         .order('event_date', { ascending: false })
       setEvents(eventsData || [])
@@ -183,7 +183,7 @@ export default function LeagueHome({ orgSlug, leagueSlug, initialTab = 'events' 
     const md = monthDay(nextEv.event_date)
     const spotsLeft = nextEv.registration_spots != null ? Math.max(0, nextEv.registration_spots - (nextCount ?? 0)) : null
     const regUrl = nextEv.slug ? `/register/${leagueSlug}/${nextEv.slug}` : null
-    const reg = registrationState({ status: nextEv.status, regUrl, spotsLeft })
+    const reg = registrationState({ status: nextEv.status, regUrl, spotsLeft, open: nextEv.registration_open !== false })
     if (md && nextEv.slug) {
       next = {
         ...md,

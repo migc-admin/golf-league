@@ -11,8 +11,10 @@ import { matchCH } from './engines/matchPoints'
  *   closed   — active, full, or no registration link (no Register anywhere)
  *   complete — final results
  */
-export function registrationState({ status, regUrl, spotsLeft }) {
+export function registrationState({ status, regUrl, spotsLeft, open = true }) {
   if (status === 'complete') return { kind: 'complete', canRegister: false, pill: 'Final results' }
+  // Registration switched off by the admin: the event isn't taking sign-ups, so say nothing about it.
+  if (!open) return { kind: 'none', canRegister: false, pill: null }
   const full = spotsLeft != null && spotsLeft <= 0
   if (status === 'upcoming' && regUrl && !full) return { kind: 'open', canRegister: true, pill: 'Registration open' }
   return { kind: 'closed', canRegister: false, pill: 'Registration closed' }

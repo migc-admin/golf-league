@@ -275,6 +275,7 @@ export default function EventDetail() {
       event_number: nextNum,
       name: `${baseName} (Copy)`,
       status: 'upcoming',
+      registration_open: false, // a copy starts closed, like any new event
     }).select('slug').single()
 
     if (error) { toast.error(error.message); return }
@@ -4798,6 +4799,16 @@ function TabRegistrations({ event, onUpdated, orgId }) {
   const [regs,              setRegs]              = useState([])
   const [loading,           setLoading]           = useState(true)
   const [confirmedExpanded, setConfirmedExpanded] = useState(false)
+  const [togglingOpen,      setTogglingOpen]      = useState(false)
+
+  async function setRegistrationOpen(next) {
+    setTogglingOpen(true)
+    const { error } = await supabase.from('events').update({ registration_open: next }).eq('id', event.id)
+    setTogglingOpen(false)
+    if (error) { toast.error(error.message); return }
+    toast.success(next ? 'Registration open' : 'Registration turned off')
+    onUpdated()
+  }
 
   const regUrl = `${window.location.origin}/register/${event.league?.slug ?? leagueSlug}/${event.slug ?? event.id}`
 
@@ -4933,6 +4944,9 @@ function TabRegistrations({ event, onUpdated, orgId }) {
       <RegistrationCard
         url={regUrl}
         onCopy={() => { navigator.clipboard.writeText(regUrl); toast.success('Link copied!') }}
+        open={!!event.registration_open}
+        onToggleOpen={setRegistrationOpen}
+        toggling={togglingOpen}
         pendingCount={loading ? null : pending.length}
         notice={!event.venmo_handle && !event.paypal_link && !event.zelle_handle
           ? "No payment links set — players won't see a payment button after registering. Add a Venmo handle, Zelle, or PayPal link in Event Settings."

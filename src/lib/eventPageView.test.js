@@ -15,6 +15,10 @@ describe('registrationState', () => {
     expect(registrationState({ status: 'active', regUrl: reg, spotsLeft: 5 }).canRegister).toBe(false)
     expect(registrationState({ status: 'upcoming', regUrl: null, spotsLeft: 5 }).kind).toBe('closed')
   })
+  it('says nothing about registration when the admin has switched it off', () => {
+    expect(registrationState({ status: 'upcoming', regUrl: reg, spotsLeft: 5, open: false })).toEqual({ kind: 'none', canRegister: false, pill: null })
+    expect(registrationState({ status: 'complete', regUrl: reg, spotsLeft: 5, open: false }).kind).toBe('complete')
+  })
   it('complete never registers', () => {
     expect(registrationState({ status: 'complete', regUrl: reg, spotsLeft: 5 })).toMatchObject({ kind: 'complete', canRegister: false })
   })

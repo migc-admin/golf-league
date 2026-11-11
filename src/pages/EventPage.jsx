@@ -144,7 +144,7 @@ export default function EventPage() {
   const matchupsSet    = !hasMatchFormat || pairings.length > 0
   const showBetLink    = event.status === 'active' || (event.status === 'upcoming' && groupsSet && matchupsSet)
 
-  const reg        = registrationState({ status: event.status, regUrl, spotsLeft })
+  const reg        = registrationState({ status: event.status, regUrl, spotsLeft, open: event.registration_open !== false })
   const fee        = feeLabel(event.tournament_fee)
   const { tabs, registerLabel } = eventTabs({ hasMatchups: pairings.length > 0, canRegister: reg.canRegister, fee })
   const countdownTarget = event.status === 'complete' ? null : eventDateTime
@@ -155,7 +155,7 @@ export default function EventPage() {
       <EventHero
         clubName={event.league?.name}
         logoUrl={event.league?.logo_url}
-        pill={{ kind: reg.kind, label: reg.pill }}
+        pill={reg.pill ? { kind: reg.kind, label: reg.pill } : null}
         title={eventName}
         dateLabel={event.event_date ? longDate(event.event_date) : null}
         timeLabel={startLabel}
