@@ -35,6 +35,7 @@ import { useAuth } from '../hooks/useAuth'
 import { useOfflineQueue } from '../hooks/useOfflineQueue'
 import { getStrokesOnHole, getStrokeIndexForTee } from '../lib/engines/scoring'
 import { computeMatchStrokeMap } from '../lib/engines/matchPoints'
+import { splitHoleEntries, missingScoresMessage } from '../lib/scorecardSave'
 import toast from 'react-hot-toast'
 import LocalRulesNotice, { LocalRulesLink } from '../components/LocalRulesNotice'
 
@@ -339,16 +340,12 @@ export default function Scorecard() {
     if (!event || !course) return
     setSaving(true)
 
-    let allValid = true
+    let saveFailed = false
 
-    for (const ep of groupPlayers) {
-      const sc = getScore(ep.player_id, currentHole)
-      // Default: treat empty gross as 1
-      const gross = sc.gross === '' ? 1 : parseInt(sc.gross, 10)
-      if (!gross || gross < 1) { allValid = false; continue }
+    // A blank score is never saved as a number — only players with a real score are written
+    const { toSave, missing } = splitHoleEntries(groupPlayers, pid => getScore(pid, currentHole))
 
-      const putts = sc.putts !== '' ? parseInt(sc.putts, 10) : null
-
+    for (const { ep, gross, putts } of toSave) {
       const result = await saveScore({
         event_id:    event.id,
         player_id:   ep.player_id,
@@ -362,7 +359,7 @@ export default function Scorecard() {
 
       if (result?.error) {
         toast.error(`Save failed: ${result.error}`)
-        allValid = false
+        saveFailed = true
       } else if (result?.queued) {
         toast('Saved offline — will sync when connected', { icon: '📶', duration: 2000 })
       }
@@ -370,10 +367,17 @@ export default function Scorecard() {
 
     setSaving(false)
 
-    // Only clear dirty state if all saves succeeded
-    if (allValid) {
+    // Everything typed on this hole is now saved, so it is no longer "unsaved" — even when a
+    // player was left blank (e.g. they withdrew), which lets the scorer move on with the arrows
+    if (!saveFailed) {
       setDirtyHoles(prev => { const n = new Set(prev); n.delete(currentHole); return n })
     }
+
+    // Someone has no score: say who, and stay on this hole instead of advancing
+    if (missing.length > 0) {
+      toast.error(missingScoresMessage(missing, groupPlayers.length, currentHole), { duration: 6000 })
+    }
+    const allValid = !saveFailed && missing.length === 0
 
     const nh = event?.holes_played === 9 ? 9 : 18
     if (allValid && currentHole < nh) {
