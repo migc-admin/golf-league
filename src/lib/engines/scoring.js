@@ -309,6 +309,7 @@ export function computeLeaderboards(eventPlayers, allScores, course) {
     let grossF9 = 0, netF9 = 0
     let grossB9 = 0, netB9 = 0
     let totalPutts = 0
+    let puttHoles = 0   // holes with a putts value recorded
     let holesCompleted = 0
     let f9Holes = 0, b9Holes = 0
 
@@ -319,7 +320,7 @@ export function computeLeaderboards(eventPlayers, allScores, course) {
       gross18 += g
       net18   += n
       holesCompleted++
-      if (s.putts != null) totalPutts += s.putts
+      if (s.putts != null) { totalPutts += s.putts; puttHoles++ }
       if (h <= 9)  { grossF9 += g; netF9 += n; f9Holes++ }
       else         { grossB9 += g; netB9 += n; b9Holes++ }
     }
@@ -355,7 +356,10 @@ export function computeLeaderboards(eventPlayers, allScores, course) {
       grossVsPar: gross18 - parPlayed,
       grossF9VsPar: grossF9 - parF9,
       grossB9VsPar: grossB9 - parB9,
-      totalPutts: playerScores.length > 0 ? totalPutts : null,
+      // No putts recorded at all is "unknown", not zero — otherwise a player whose putts were
+      // never entered (or a no-show) would top the Low Putts board with 0. Imported rounds keep
+      // their round total on one hole, so a single recorded value still counts.
+      totalPutts: puttHoles > 0 ? totalPutts : null,
     }
   })
 

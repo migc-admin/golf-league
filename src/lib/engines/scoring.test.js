@@ -152,4 +152,39 @@ describe('computeLeaderboards', () => {
     expect(lb.full.A.find(p => p.player_id === 'p3')).toBeUndefined()
     expect(lb.full.B.find(p => p.player_id === 'p1')).toBeUndefined()
   })
+
+  // ─── Low Putts board ───────────────────────────────────────────────────────
+  describe('putts board (the "no putts entered wins Low Putts" bug)', () => {
+    const noPutts = (playerId, gross, enteredBy = null) =>
+      makeScores(playerId, gross).map(s => ({ ...s, putts: null, entered_by: enteredBy }))
+    const importedTotal = (playerId, gross, total) =>
+      makeScores(playerId, gross).map((s, i) => ({ ...s, putts: i === 0 ? total : null }))
+
+    it('leaves a player with no putts recorded off the board instead of ranking them first with 0', () => {
+      const lb = computeLeaderboards([playerA1, playerA2], [...makeScores('p1', 4), ...noPutts('p2', 5)], course)
+      expect(lb.putts.map(p => [p.player_id, p.totalPutts, p.rank])).toEqual([['p1', 36, 1]])
+    })
+
+    it('never lets a no-show (scores but no putts) win Low Putts', () => {
+      const lb = computeLeaderboards([playerA1, playerA2], [...makeScores('p1', 4), ...noPutts('p2', 9, 'no_show')], course)
+      expect(lb.putts.some(p => p.player_id === 'p2')).toBe(false)
+      expect(lb.putts[0].player_id).toBe('p1')
+    })
+
+    it('still counts an imported round, where the round total sits on one hole', () => {
+      const lb = computeLeaderboards([playerA1, playerA2], [...importedTotal('p1', 4, 31), ...importedTotal('p2', 5, 29)], course)
+      expect(lb.putts.map(p => [p.player_id, p.totalPutts, p.rank])).toEqual([['p2', 29, 1], ['p1', 31, 2]])
+    })
+
+    it('is empty when nobody recorded putts', () => {
+      const lb = computeLeaderboards([playerA1, playerA2], [...noPutts('p1', 4), ...noPutts('p2', 5)], course)
+      expect(lb.putts).toEqual([])
+    })
+
+    it('keeps a real zero-putt hole as zero', () => {
+      const chipIn = makeScores('p1', 4).map((s, i) => ({ ...s, putts: i === 0 ? 0 : 2 }))
+      const lb = computeLeaderboards([playerA1, playerA2], [...chipIn, ...makeScores('p2', 5)], course)
+      expect(lb.putts.map(p => [p.player_id, p.totalPutts])).toEqual([['p1', 34], ['p2', 36]])
+    })
+  })
 })
