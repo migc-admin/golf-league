@@ -36,15 +36,25 @@ serve(async (req) => {
     )
     if (authError || !user) return new Response('Unauthorized', { status: 401, headers: corsHeaders })
 
-    // Get org's stripe_customer_id
+    // Get the caller's org and confirm they may manage its billing
     const { data: profile } = await supabase
       .from('profiles')
-      .select('org_id')
+      .select('org_id, role, is_owner, is_platform_admin')
       .eq('id', user.id)
       .single()
 
     if (!profile?.org_id) {
       return new Response(JSON.stringify({ error: 'No org found' }), { status: 400, headers: corsHeaders })
+    }
+
+    // Only the club's admins (or the platform owner) can open the billing portal —
+    // players and scorekeepers in the same org must not be able to change or cancel the plan
+    const canManageBilling = profile.role === 'admin' || profile.is_owner || profile.is_platform_admin
+    if (!canManageBilling) {
+      console.warn(`[stripe-portal] forbidden user=${user.id} org=${profile.org_id} role=${profile.role}`)
+      return new Response(JSON.stringify({ error: 'Only club admins can manage billing' }), {
+        status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      })
     }
 
     const { data: org } = await supabase
