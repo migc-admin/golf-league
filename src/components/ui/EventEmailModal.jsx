@@ -84,17 +84,21 @@ export default function EventEmailModal({
     return () => { cancelled = true }
   }, [isPre, event.league_id, event.event_date])
 
-  // Season team standings: the league's other completed events up to this one. This event itself
+  // Season team standings: the league's other completed events in this event's season, up to this
+  // one. This event itself
   // comes from the page's live data, so the email is right even before the event is closed.
   useEffect(() => {
     if (isPre || tglTeams.length === 0 || !event.league_id) return
     let cancelled = false
     async function load() {
-      const { data: evs } = await supabase
+      let evQuery = supabase
         .from('events')
-        .select('id, name, event_number, event_date, status, course:courses(*)')
+        .select('id, name, event_number, event_date, status, season_year, course:courses(*)')
         .eq('league_id', event.league_id)
         .eq('status', 'complete')
+      const season = event.season_year ?? event.league?.season_year ?? null
+      if (season != null) evQuery = evQuery.eq('season_year', season)
+      const { data: evs } = await evQuery
       const others = (evs ?? []).filter(e => e.id !== event.id && (!event.event_date || !e.event_date || e.event_date <= event.event_date))
       const ids = others.map(e => e.id)
       if (ids.length === 0) { if (!cancelled) setSeasonData({ events: [], epsByEvent: {}, scoresByEvent: {}, selections: [] }); return }
@@ -118,7 +122,7 @@ export default function EventEmailModal({
     }
     load()
     return () => { cancelled = true }
-  }, [isPre, event.id, event.league_id, event.event_date, tglTeams.length])
+  }, [isPre, event.id, event.league_id, event.event_date, event.season_year, event.league?.season_year, tglTeams.length])
 
   const { subject, html } = useMemo(() => {
     const origin = publicOrigin()

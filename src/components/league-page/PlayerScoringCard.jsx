@@ -83,7 +83,8 @@ export default function PlayerScoringCard({ rows }) {
       </div>
 
       <div className="mb-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-[auto_1fr_1fr_auto]">
-        {(
+        {/* The page's season picker already narrows the rows; this only shows when they span seasons */}
+        {options.seasons.length > 1 && (
           <div>
             <label htmlFor="scoring-season" className="mb-1 block text-[11px] font-bold uppercase tracking-[0.08em] text-ink-muted">Season</label>
             <select
@@ -101,7 +102,7 @@ export default function PlayerScoringCard({ rows }) {
           <label htmlFor="scoring-event" className="mb-1 block text-[11px] font-bold uppercase tracking-[0.08em] text-ink-muted">Tournament</label>
           <select id="scoring-event" value={eventId} onChange={e => { setEventId(e.target.value); setShowAll(false) }} className={SELECT}>
             <option value="">All tournaments</option>
-            {options.events.filter(e => !season || String(e.date).startsWith(season)).map(e => <option key={e.id} value={e.id}>{e.label}</option>)}
+            {options.events.filter(e => !season || e.season === season).map(e => <option key={e.id} value={e.id}>{e.label}</option>)}
           </select>
         </div>
         <div>

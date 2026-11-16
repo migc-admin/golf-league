@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { supabase } from '../../lib/supabase'
 import { useSubdomainOrg } from '../../lib/SubdomainContext'
 import {
@@ -40,6 +40,8 @@ export default function LeagueHome({ orgSlug, leagueSlug, initialTab = 'events' 
   const [events,         setEvents]         = useState([])
   const [activeTab,      setActiveTab]      = useState(initialTab)
   const [bylaws,         setBylaws]         = useState(null)
+  const [season,         setSeason]         = useState(null) // season shown on every tab; starts at the league's current season
+  const loadedSeason = useRef(undefined)
   const [loading,        setLoading]        = useState(true)
   const [error,          setError]          = useState(null)
   const [nextCount,      setNextCount]      = useState(null)
@@ -63,6 +65,7 @@ export default function LeagueHome({ orgSlug, leagueSlug, initialTab = 'events' 
 
       if (leagueErr || !leagueData) { setError('League not found.'); setLoading(false); return }
       setLeague(leagueData)
+      setSeason(leagueData.season_year ?? null)
 
       // Rules & bylaws: shown only when the league has switched them on (the database
       // also hides unpublished bylaws from anyone outside the org).
@@ -90,7 +93,7 @@ export default function LeagueHome({ orgSlug, leagueSlug, initialTab = 'events' 
 
       const { data: eventsData } = await supabase
         .from('events')
-        .select('id, name, event_number, slug, status, event_date, registration_spots, registration_open, course:courses(name)')
+        .select('id, name, event_number, slug, status, event_date, season_year, registration_spots, registration_open, course:courses(name)')
         .eq('league_id', leagueData.id)
         .order('event_date', { ascending: false })
       setEvents(eventsData || [])
@@ -102,9 +105,10 @@ export default function LeagueHome({ orgSlug, leagueSlug, initialTab = 'events' 
   // Load standings data when tab is first opened
   useEffect(() => {
     if (activeTab === 'events' || activeTab === 'rules' || !league) return
-    if (standings.length > 0) return  // already loaded
-    loadStandings(league.id, league.standings_config)
-  }, [activeTab, league])
+    if (loadedSeason.current === season) return  // this season is already loaded
+    loadedSeason.current = season
+    loadStandings(league.id, league.standings_config, season)
+  }, [activeTab, league, season])
 
   const scoringRows = useMemo(() => playerScoringRows(eventData), [eventData])
   // Insights leave out guests and no-shows; the Player scoring tab still lists every round
@@ -157,7 +161,11 @@ export default function LeagueHome({ orgSlug, leagueSlug, initialTab = 'events' 
     )
   }
 
-  const past           = events.filter(e => e.status === 'complete')
+  // Only the chosen season's events (events saved before seasons existed count toward the league's season)
+  const seasonOf       = e => e.season_year ?? league.season_year ?? null
+  const seasonEvents   = season == null ? events : events.filter(e => seasonOf(e) === season)
+  const seasons        = [...new Set([league.season_year, ...events.map(seasonOf)].filter(y => y != null))].sort((a, b) => b - a)
+  const past           = seasonEvents.filter(e => e.status === 'complete')
   const moneyLeader    = standings[0]
   const skinsLeader    = [...sideGameStats].sort((a, b) => b.skinsWon - a.skinsWon)[0]
   const ctpLeader      = [...sideGameStats].filter(s => s.ctpWins > 0).sort((a, b) => b.ctpWins - a.ctpWins)[0]
@@ -167,7 +175,7 @@ export default function LeagueHome({ orgSlug, leagueSlug, initialTab = 'events' 
   const hasCTP         = sideGameStats.some(s => s.ctpWins > 0)
   const hasLD          = sideGameStats.some(s => s.ldWins > 0)
   const hasLP          = sideGameStats.some(s => s.lpWins > 0)
-  const upcoming       = events.filter(e => e.status === 'upcoming' || e.status === 'active')
+  const upcoming       = seasonEvents.filter(e => e.status === 'upcoming' || e.status === 'active')
 
   // Site header: the club's league gives it the display name and logo; the org is the fallback.
   const mainLeague = (league.logo_url ? league : null) ?? leagues.find(l => l.logo_url) ?? league
@@ -197,7 +205,7 @@ export default function LeagueHome({ orgSlug, leagueSlug, initialTab = 'events' 
 
   const onStandings = activeTab === 'standings'
   const latest = past[0]
-  const pill = league.season_year ? `Season ${league.season_year}` : null
+  const pill = season ? `Season ${season}` : null
   const onScoring = activeTab === 'scoring'
   const onInsights = activeTab === 'insights'
   const heroTitle = onStandings ? 'Season standings' : onScoring ? 'Player scoring' : onInsights ? 'Season insights' : league.name
@@ -236,7 +244,7 @@ export default function LeagueHome({ orgSlug, leagueSlug, initialTab = 'events' 
     <div className="flex min-h-screen flex-col bg-surface-dim">
       <TripSiteHeader name={clubName} logoUrl={clubLogo} links={[]} />
 
-      <SeasonHero pill={pill} title={heroTitle} meta={heroMeta} next={next} />
+      <SeasonHero pill={pill} title={heroTitle} meta={heroMeta} next={next} seasons={seasons} season={season} onSeason={setSeason} />
 
       <div id="league-tabs">
         <EventTabBar tabs={bylaws ? [...TABS, RULES_TAB] : TABS} value={activeTab} onChange={setActiveTab} ariaLabel="League sections" idPrefix="league-tab" />
@@ -247,8 +255,8 @@ export default function LeagueHome({ orgSlug, leagueSlug, initialTab = 'events' 
         {/* Events tab */}
         {activeTab === 'events' && (
           <div role="tabpanel" aria-labelledby="league-tab-events">
-            {events.length === 0 ? (
-              <p className="text-ink-muted">No events yet for this league.</p>
+            {seasonEvents.length === 0 ? (
+              <p className="text-ink-muted">{events.length === 0 ? 'No events yet for this league.' : `No events yet for the ${season} season.`}</p>
             ) : (
               <>
                 {upcoming.length > 0 && (

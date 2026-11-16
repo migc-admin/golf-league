@@ -1,4 +1,4 @@
-import { useState, Fragment } from 'react'
+import { useRef, useState, Fragment } from 'react'
 import { Link } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { computeLeaderboards, computeStableford, computeBlindPartners } from '../lib/engines/scoring'
@@ -21,17 +21,29 @@ export function useSeasonStandings() {
   const [standingsLoading, setStandingsLoading] = useState(false)
   // Raw per-event data the standings were built from (read by the Team Play season view)
   const [eventData,        setEventData]        = useState({ events: [], epsByEvent: {}, scoresByEvent: {}, sideGamesByEvent: {} })
+  const requestRef = useRef(0) // only the latest load may set state (switching seasons quickly)
 
-  async function loadStandings(leagueId, rawConfig) {
+  // `season` (optional): only that season's events count; leave it out for every event in the league.
+  async function loadStandings(leagueId, rawConfig, season = null) {
+    const request = ++requestRef.current
+    const isStale = () => request !== requestRef.current
     setStandingsLoading(true)
-    const { data: evs } = await supabase
+    let evQuery = supabase
       .from('events')
       .select('*, course:courses(*), imported_skins(*)')
       .eq('league_id', leagueId)
+    if (season != null) evQuery = evQuery.eq('season_year', season)
+    const { data: evs } = await evQuery
       .eq('status', 'complete')
       .order('event_number')
 
-    if (!evs?.length) { setStandingsLoading(false); return }
+    if (isStale()) return
+    if (!evs?.length) {
+      setStandings([]); setSideGameStats([])
+      setEventData({ events: [], epsByEvent: {}, scoresByEvent: {}, sideGamesByEvent: {} })
+      setStandingsLoading(false)
+      return
+    }
 
     const eventIds = evs.map(e => e.id)
     const [{ data: allEPs }, { data: allSideGames }] = await Promise.all([
@@ -125,6 +137,7 @@ export function useSeasonStandings() {
       } catch (err) { console.error('[Standings] error for event', ev.name, err) }
     }
 
+    if (isStale()) return
     setEventData({
       events: evs,
       epsByEvent: Object.fromEntries(evs.map(ev => [ev.id, (allEPs ?? []).filter(ep => ep.event_id === ev.id)])),

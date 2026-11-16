@@ -28,7 +28,8 @@ export function playerScoringRows({ events, epsByEvent, scoresByEvent }) {
         event: ev.name || `Event #${ev.event_number}`,
         course: ev.course?.name ?? null,
         date: ev.event_date ?? null,
-        season: ev.event_date ? String(ev.event_date).slice(0, 4) : null,
+        // The event's season; events saved before seasons existed fall back to the date's year
+        season: ev.season_year != null ? String(ev.season_year) : ev.event_date ? String(ev.event_date).slice(0, 4) : null,
         flight: p.flight ?? null,
         hcp: p.course_handicap ?? null,
         gross: p.gross18,
@@ -84,7 +85,7 @@ export function scoringRowsToCsv(rows) {
   return lines.join('\r\n') + '\r\n'
 }
 
-/** Apply the season, tournament and player filters ('' means all). A season is the year of the event date. */
+/** Apply the season, tournament and player filters ('' means all). A season is the event's season year. */
 export function filterScoringRows(rows, { season = '', eventId = '', playerId = '' } = {}) {
   return rows.filter(r => (!season || r.season === season) && (!eventId || r.eventId === eventId) && (!playerId || r.playerId === playerId))
 }
@@ -94,7 +95,7 @@ export function scoringFilterOptions(rows) {
   const players = new Map(), events = new Map()
   for (const r of rows) {
     players.set(r.playerId, r.player)
-    if (!events.has(r.eventId)) events.set(r.eventId, { id: r.eventId, label: r.event, date: r.date })
+    if (!events.has(r.eventId)) events.set(r.eventId, { id: r.eventId, label: r.event, date: r.date, season: r.season })
   }
   return {
     seasons: [...new Set(rows.map(r => r.season).filter(Boolean))].sort().reverse(),

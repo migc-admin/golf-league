@@ -39,7 +39,7 @@ export function LeagueDetailView({ leagueSlug, containerLabel = 'League', roundL
   async function load(slug, leagueId) {
     const { data: evData } = await supabase
       .from('events')
-      .select('id, event_number, name, slug, event_date, status, display_order, course:courses(name)')
+      .select('id, event_number, name, slug, event_date, status, season_year, display_order, course:courses(name)')
       .eq('league_id', leagueId)
       .order('display_order', { ascending: true, nullsFirst: false })
     setEvents(evData ?? [])
@@ -240,6 +240,9 @@ export function LeagueDetailView({ leagueSlug, containerLabel = 'League', roundL
                     </span>
                     {ev.course?.name && <span className="text-xs text-ink-muted hidden sm:inline">{ev.course.name}</span>}
                     <span className="text-xs text-ink-muted">{formatDate(ev.event_date)}</span>
+                    {new Set(events.map(e => e.season_year)).size > 1 && ev.season_year != null && (
+                      <span className="rounded-full bg-surface-high px-2 py-0.5 text-[11px] font-semibold text-ink-muted">{ev.season_year}</span>
+                    )}
                   </div>
                   <div className="flex items-center gap-3 flex-shrink-0">
                     <StatusBadge status={ev.status} />
@@ -374,9 +377,10 @@ function LeagueModal({ open, onClose, editing, orgId, orgSlug, onSaved }) {
           label="League Logo (optional)"
         />
         <Input label="League Name" value={name} onChange={e => setName(e.target.value)} placeholder="Tuesday Evening League" required />
-        <Select label="Season Year" value={year} onChange={e => setYear(e.target.value)}>
+        <Select label="Current season" value={year} onChange={e => setYear(e.target.value)}>
           {years.map(y => <option key={y} value={y}>{y}</option>)}
         </Select>
+        <p className="-mt-2 text-xs text-ink-muted">New events count toward this season. To start a new season, change the year: past events keep their season, and the public league page switches to the new one.</p>
         <Input label="Team Play Button Label (optional)" value={teamPlayLabel} onChange={e => setTeamPlayLabel(e.target.value)} placeholder="e.g. TGL Teams, Ryder Cup, Match Play…" />
         <div className="flex justify-end gap-3 pt-2">
           <Button type="button" variant="secondary" onClick={onClose}>Cancel</Button>

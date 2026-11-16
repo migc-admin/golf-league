@@ -33,6 +33,18 @@ describe('playerScoringRows', () => {
   })
 })
 
+describe('season', () => {
+  it("uses the event's season, so a January playoff can count toward last season", () => {
+    const r = playerScoringRows({
+      events: [{ ...ev('e9', 'Playoff Final', '2027-01-10'), season_year: 2026 }, ev('e8', 'Old event', '2025-05-01')],
+      epsByEvent: { e9: [ep('a', 'Ann', 'A')], e8: [ep('a', 'Ann', 'A')] },
+      scoresByEvent: { e9: scores, e8: scores },
+    })
+    expect(r.find(x => x.event === 'Playoff Final').season).toBe('2026')
+    expect(r.find(x => x.event === 'Old event').season).toBe('2025')
+  })
+})
+
 describe('sort and filter', () => {
   it('sorts numbers and text in either direction and keeps empty values last', () => {
     const r = rows()

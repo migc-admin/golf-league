@@ -39,7 +39,7 @@ export default function CreateEvent() {
         setOrgTier(isPrivileged ? 'club' : (org?.tier ?? 'free'))
       }
       const { data: lg } = await supabase
-        .from('leagues').select('id, name, slug, standings_config').eq('slug', leagueSlug).single()
+        .from('leagues').select('id, name, slug, season_year, standings_config').eq('slug', leagueSlug).single()
       if (!lg) { navigate('/admin/leagues'); return }
       setLeague(lg)
       setLoading(false)
@@ -66,6 +66,8 @@ function CreateEventForm({ league, orgTier, onDone }) {
   const [courseId,     setCourseId]     = useState('')
   const [eventDate,    setEventDate]    = useState('')
   const [eventNum,     setEventNum]     = useState(1)
+  // The season this event counts toward; defaults to the league's current season
+  const [seasonYear,   setSeasonYear]   = useState(String(league?.season_year ?? new Date().getFullYear()))
   const [eventName,    setEventName]    = useState('')
   const [entryFee,     setEntryFee]     = useState('20')
   const [payoutBasis,  setPayoutBasis]  = useState('per_player')
@@ -94,11 +96,18 @@ function CreateEventForm({ league, orgTier, onDone }) {
 
   useEffect(() => {
     supabase.from('courses').select('id, name').order('name').then(({ data }) => setCourses(data ?? []))
-    if (league) {
-      supabase.from('events').select('event_number').eq('league_id', league.id).order('event_number', { ascending: false }).limit(1)
-        .then(({ data }) => setEventNum(data?.[0]?.event_number ? data[0].event_number + 1 : 1))
-    }
   }, [league])
+
+  // Next event number within the chosen season (numbering restarts each season)
+  useEffect(() => {
+    const season = parseInt(seasonYear, 10)
+    if (!league || !season) return
+    let cancelled = false
+    supabase.from('events').select('event_number').eq('league_id', league.id).eq('season_year', season)
+      .order('event_number', { ascending: false }).limit(1)
+      .then(({ data }) => { if (!cancelled) setEventNum(data?.[0]?.event_number ? data[0].event_number + 1 : 1) })
+    return () => { cancelled = true }
+  }, [league, seasonYear])
 
   function toggleFormat(key) {
     setFormats(prev => { const next = new Set(prev); next.has(key) ? next.delete(key) : next.add(key); return next })
@@ -123,6 +132,7 @@ function CreateEventForm({ league, orgTier, onDone }) {
       course_id:              courseId,
       event_date:             eventDate,
       event_number:           parseInt(eventNum, 10),
+      season_year:            parseInt(seasonYear, 10) || league.season_year || null,
       name:                   eventName.trim() || null,
       entry_fee:              Math.round(parseFloat(entryFee) * 100) / 100,
       payout_basis:           payoutBasis,
@@ -170,9 +180,10 @@ function CreateEventForm({ league, orgTier, onDone }) {
         </h1>
 
         <form onSubmit={handleSave} className="space-y-4">
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-2 gap-4 sm:grid-cols-3">
+            <Input label="Season" type="number" min="2000" max="2100" value={seasonYear} onChange={e => setSeasonYear(e.target.value)} required />
             <Input label="Event #" type="number" min="1" value={eventNum} onChange={e => setEventNum(e.target.value)} required />
-            <Input label="Date" type="date" value={eventDate} onChange={e => setEventDate(e.target.value)} required />
+            <Input label="Date" type="date" value={eventDate} onChange={e => setEventDate(e.target.value)} required className="col-span-2 sm:col-span-1" />
           </div>
           <Input label="Event Name (optional)" value={eventName} onChange={e => setEventName(e.target.value)} placeholder="e.g. Spring Opener, Member-Guest…" />
           <div>

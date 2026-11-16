@@ -284,9 +284,10 @@ function EditLeagueModal({ league, orgSlug, onClose, onSaved }) {
           label="League Logo (optional)"
         />
         <Input label="League Name" value={name} onChange={e => setName(e.target.value)} required />
-        <Select label="Season Year" value={year} onChange={e => setYear(e.target.value)}>
+        <Select label="Current season" value={year} onChange={e => setYear(e.target.value)}>
           {years.map(y => <option key={y} value={y}>{y}</option>)}
         </Select>
+        <p className="-mt-2 text-xs text-ink-muted">New events count toward this season. To start a new season, change the year: past events keep their season, and the public league page switches to the new one.</p>
         <div className="flex justify-end gap-3 pt-2">
           <Button type="button" variant="secondary" onClick={onClose}>Cancel</Button>
           <Button type="submit" loading={saving}>Save Changes</Button>

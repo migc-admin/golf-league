@@ -257,9 +257,10 @@ export default function EventDetail() {
   useEffect(() => { load() }, [load])
 
   async function handleClone() {
-    const { data: numData } = await supabase
-      .from('events').select('event_number').eq('league_id', event.league_id)
-      .order('event_number', { ascending: false }).limit(1)
+    // The copy joins the league's current season; number it within that season
+    let numQuery = supabase.from('events').select('event_number').eq('league_id', event.league_id)
+    if (event.league?.season_year) numQuery = numQuery.eq('season_year', event.league.season_year)
+    const { data: numData } = await numQuery.order('event_number', { ascending: false }).limit(1)
     const nextNum = numData?.[0]?.event_number ? numData[0].event_number + 1 : 1
 
     const {
@@ -276,6 +277,7 @@ export default function EventDetail() {
       name: `${baseName} (Copy)`,
       status: 'upcoming',
       registration_open: false, // a copy starts closed, like any new event
+      season_year: null,        // takes the league's current season
     }).select('slug').single()
 
     if (error) { toast.error(error.message); return }
@@ -4157,6 +4159,7 @@ function EditEventModal({ open, onClose, event, onSaved }) {
   const [eventDate,     setEventDate]     = useState('')
   const [eventName,     setEventName]     = useState('')
   const [eventNumber,   setEventNumber]   = useState('')
+  const [seasonYear,    setSeasonYear]    = useState('')
   const [entryFee,      setEntryFee]      = useState('')
   const [tournamentFee, setTournamentFee] = useState('')
   const [venmoHandle,   setVenmoHandle]   = useState('')
@@ -4189,6 +4192,7 @@ function EditEventModal({ open, onClose, event, onSaved }) {
       setEventDate(event.event_date ?? '')
       setEventName(event.name ?? '')
       setEventNumber(event.event_number ?? '')
+      setSeasonYear(event.season_year != null ? String(event.season_year) : String(event.league?.season_year ?? ''))
       setEntryFee(event.entry_fee ?? '')
       setTournamentFee(event.tournament_fee ?? '')
       setVenmoHandle(event.venmo_handle ?? '')
@@ -4245,6 +4249,7 @@ function EditEventModal({ open, onClose, event, onSaved }) {
         event_date:             eventDate,
         name:                   eventName.trim() || null,
         event_number:           parseInt(eventNumber, 10),
+        season_year:            parseInt(seasonYear, 10) || event.season_year || null,
         entry_fee:              Math.round(parseFloat(entryFee) * 100) / 100,
         tournament_fee:         tournamentFee !== '' ? Math.round(parseFloat(tournamentFee) * 100) / 100 : null,
         start_time:             startTime || null,
@@ -4298,6 +4303,10 @@ function EditEventModal({ open, onClose, event, onSaved }) {
         <div className="grid grid-cols-2 gap-4">
           <Input label="Event Name (optional)" value={eventName} onChange={e => setEventName(e.target.value)} placeholder="e.g. Spring Opener…" />
           <Input label="Event #" type="number" min="1" value={eventNumber} onChange={e => setEventNumber(e.target.value)} required />
+        </div>
+        <div>
+          <Input label="Season" type="number" min="2000" max="2100" value={seasonYear} onChange={e => setSeasonYear(e.target.value)} required className="max-w-[160px]" />
+          <p className="mt-1 text-xs text-ink-muted">Which season this event counts toward in standings.</p>
         </div>
         <div className="grid grid-cols-2 gap-4">
           <Input label="Pot contribution ($)" type="number" step="0.01" min="0" value={entryFee} onChange={e => setEntryFee(e.target.value)} required />
