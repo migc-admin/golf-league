@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import { computeWagerSettlement } from './wagerSettlement'
-import { money, netOf, netText, makeNameResolver, matchesQuery, buildResultsModel, filterResults, oddsRows } from './wagerResultsView'
+import { money, netOf, netText, makeNameResolver, matchesQuery, buildResultsModel, filterResults, oddsRows, bettingClosed, publicBetRows } from './wagerResultsView'
 
 const course = { stroke_index: Array.from({ length: 18 }, (_, i) => i + 1), par_per_hole: Array.from({ length: 18 }, () => 4) }
 const ep = id => ({ player_id: id, course_handicap: 0, tee: null, flight: 'A', group_number: 1, player: { first_name: id, last_name: '' } })
@@ -187,6 +187,43 @@ describe('oddsRows', () => {
     expect(oddsRows(settlement, id => id.toUpperCase())).toEqual([
       { name: 'P1', winAmt: 5, winOdds: '33.00x', placeAmt: 10, placeOdds: '2.50x' },
       { name: 'P2', winAmt: 40, winOdds: '4.13x', placeAmt: 0, placeOdds: '—' },
+    ])
+  })
+})
+
+describe('bettingClosed', () => {
+  const tee = new Date('2026-11-15T08:00:00').getTime()
+  const ev = { status: 'upcoming', wagers_closed: false, event_date: '2026-11-15', start_time: '08:00:00' }
+  it('is open until 10 minutes before the tee time', () => {
+    expect(bettingClosed(ev, tee - 11 * 60 * 1000)).toBe(false)
+    expect(bettingClosed(ev, tee - 10 * 60 * 1000)).toBe(true)
+  })
+  it('is closed when the admin closes betting or the event is complete', () => {
+    expect(bettingClosed({ ...ev, wagers_closed: true }, tee - 86400000)).toBe(true)
+    expect(bettingClosed({ ...ev, status: 'complete', start_time: null }, 0)).toBe(true)
+  })
+  it('stays open with no tee time set', () => {
+    expect(bettingClosed({ status: 'upcoming', event_date: '2026-11-15', start_time: null }, tee)).toBe(false)
+    expect(bettingClosed(null)).toBe(false)
+  })
+})
+
+describe('publicBetRows', () => {
+  it('lists every bet by bettor with its type, pick and stake, and no payment details', () => {
+    const rows = publicBetRows({
+      active: [
+        { id: 'a', bettor_name: 'zed  smith', amount: '10', pick_1st: 'p1', payment_method: 'venmo' },
+        { id: 'b', bettor_name: 'Amy Lee', amount: '5', pick_2nd: 'p2' },
+        { id: 'c', bettor_name: 'Zed Smith', amount: '15.5', match_pairing_id: 'm3', pick_match: 'p3' },
+      ],
+      pairings: [{ id: 'm3', match_number: 3 }],
+      nameOf,
+      memberNames: ['Zed Smith'],
+    })
+    expect(rows).toEqual([
+      { id: 'b', bettor: 'Amy Lee', kind: 'place', tag: 'PLACE', pick: 'Paul Hsieh', amount: 5 },
+      { id: 'a', bettor: 'Zed Smith', kind: 'win', tag: 'WIN', pick: 'John Nothdurft', amount: 10 },
+      { id: 'c', bettor: 'Zed Smith', kind: 'match', tag: 'M3', pick: 'Daniel Lopez', amount: 15.5 },
     ])
   })
 })

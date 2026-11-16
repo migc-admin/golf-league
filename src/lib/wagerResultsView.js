@@ -183,3 +183,40 @@ export function filterResults(model, query) {
     matches: model.matches.map(m => ({ ...m, rows: keep(m.rows) })).filter(m => m.rows.length > 0),
   }
 }
+
+/**
+ * True once bets can no longer be placed: the event is complete, the admin closed betting, or it
+ * is within 10 minutes of the first tee time (the same rules the bet form uses).
+ */
+export function bettingClosed(event, now = Date.now()) {
+  if (!event) return false
+  if (event.status === 'complete' || event.wagers_closed) return true
+  if (!event.event_date || !event.start_time) return false
+  const tee = new Date(`${event.event_date}T${String(event.start_time).slice(0, 8)}`).getTime()
+  return Number.isFinite(tee) && now >= tee - 10 * 60 * 1000
+}
+
+/**
+ * Every active bet as a display row for the public "All bets" list, grouped by bettor
+ * (A to Z), each bettor's bets in the order they were placed. No payment details.
+ * kind: 'win' | 'place' | 'match'; tag: 'WIN' | 'PLACE' | 'M3' (match number).
+ */
+export function publicBetRows({ active, pairings = [], nameOf, memberNames = [] }) {
+  const resolver = makeNameResolver(memberNames)
+  const matchNo = Object.fromEntries(pairings.map(m => [m.id, m.match_number]))
+  return active
+    .map((w, i) => {
+      const kind = w.match_pairing_id ? 'match' : w.pick_1st ? 'win' : 'place'
+      return {
+        id: w.id ?? i,
+        order: i,
+        bettor: resolver.resolve(w.bettor_name),
+        kind,
+        tag: kind === 'match' ? `M${matchNo[w.match_pairing_id] ?? ''}` : kind.toUpperCase(),
+        pick: nameOf(w.pick_1st ?? w.pick_2nd ?? w.pick_match),
+        amount: cents(w.amount),
+      }
+    })
+    .sort((a, b) => a.bettor.localeCompare(b.bettor, undefined, { sensitivity: 'base' }) || a.order - b.order)
+    .map(({ order, ...row }) => row)
+}

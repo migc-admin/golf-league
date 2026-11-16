@@ -2,8 +2,10 @@
  * WagerResults.jsx — public, read-only page for an event's wagers.
  * Route: /wager/:eventId/results   (no login; the admin board links here too)
  *
- * While bets are open or the event is being played it shows pool sizes and live odds (no bettor
- * names). Once the event is final it shows the winners-only results.
+ * While bets are open it shows pool sizes and live odds (no bettor names). Once betting closes
+ * (admin closed it, 10 minutes before the tee time, or the event is complete) an "All bets"
+ * section lists every bet: bettor, type, pick and stake. Once the event is final it also shows
+ * the winners-only results.
  *
  * Same numbers as the board, the Excel export and the PNG: everything comes from
  * computeWagerSettlement, shaped for display by lib/wagerResultsView.js and
@@ -15,7 +17,7 @@ import { useParams, Link } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../hooks/useAuth'
 import { computeWagerSettlement } from '../lib/wagerSettlement'
-import { buildResultsModel } from '../lib/wagerResultsView'
+import { buildResultsModel, bettingClosed, publicBetRows } from '../lib/wagerResultsView'
 import { buildSummary, filterBettorRows, filterPoolCards, poolView } from '../lib/wagerSummaryView'
 import WagerPageHeader from '../components/wager/WagerPageHeader'
 import StatTiles from '../components/ui/StatTiles'
@@ -23,7 +25,7 @@ import Button from '../components/ui/Button'
 import { summaryTiles } from '../components/wager/WagerPayoutSummary'
 import PngWagerSummary from '../components/wager/PngWagerSummary'
 import { wagerPngFilename } from '../lib/wagerExport'
-import { ResultsToolbar, BettorView, PoolView } from '../components/wager/ResultsViews'
+import { ResultsToolbar, BettorView, PoolView, AllBetsPublicCard } from '../components/wager/ResultsViews'
 import { OddsCard, MatchPoolsCard } from '../components/wager/AdminBoard'
 import { money } from '../lib/wagerResultsView'
 
@@ -130,6 +132,13 @@ export default function WagerResults() {
     return buildResultsModel({ event, settlement, active: wagers, nameOf, memberNames: members })
   }, [event, settlement, wagers, nameOf, members])
 
+  // Every bet, listed publicly only once betting has closed.
+  const closed = bettingClosed(event)
+  const betRows = useMemo(
+    () => (closed ? publicBetRows({ active: wagers, pairings, nameOf, memberNames: members }) : []),
+    [closed, wagers, pairings, nameOf, members],
+  )
+
   if (loading) return <Notice>Loading…</Notice>
   if (error) return <Notice tone="text-red-600">{error}</Notice>
 
@@ -160,7 +169,7 @@ export default function WagerResults() {
           leagueName={event.league?.name}
           logoUrl={event.league?.logo_url}
           title={final ? 'Wager results' : 'Wager odds'}
-          pill={{ tone: final ? 'closed' : 'open', label: final ? 'Betting closed · Settled' : model.statusLabel }}
+          pill={{ tone: closed ? 'closed' : 'open', label: final ? 'Betting closed · Settled' : closed ? `Betting closed · ${model.statusLabel}` : model.statusLabel }}
           meta={meta}
           actions={
             <>
@@ -193,10 +202,14 @@ export default function WagerResults() {
             <OddsCard rows={model.odds} />
             <MatchPoolsCard cards={settlement.matchCards.filter(c => c.pool > 0)} playerName={nameOf} />
             <p className="text-sm text-ink-muted">
-              Odds update as bets come in and change until betting closes. Results are posted here once the event is final.
+              {closed
+                ? 'Betting is closed. Results are posted here once the event is final.'
+                : 'Odds update as bets come in and change until betting closes. Results are posted here once the event is final.'}
             </p>
           </>
         )}
+
+        {closed && <AllBetsPublicCard rows={betRows} />}
 
         <p className="text-sm text-ink-muted">
           Full pool paid to winner(s). If no one picks the winner, funds roll to the club. Halved matches refund stakes.

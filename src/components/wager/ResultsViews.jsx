@@ -6,10 +6,10 @@
  * scrolls sideways.
  */
 
-import { useId } from 'react'
+import { useId, useState } from 'react'
 import SegmentedToggle from '../ui/SegmentedToggle'
 import { Chip, StatusPill } from './WagerPayoutSummary'
-import { money, netText } from '../../lib/wagerResultsView'
+import { money, netText, matchesQuery } from '../../lib/wagerResultsView'
 
 export const VIEW_OPTIONS = [
   { value: 'bettor', label: 'By bettor' },
@@ -147,3 +147,87 @@ export function PoolView({ cards, searching }) {
 }
 
 export { StatusPill }
+
+// ─── All bets (public, read-only) ────────────────────────────────────────────
+
+const BET_FILTERS = [
+  { value: 'all', label: 'All' }, { value: 'win', label: 'Win' }, { value: 'place', label: 'Place' }, { value: 'match', label: 'Match' },
+]
+const BET_TAG = {
+  win:   'bg-status-active-bg text-status-active-text',
+  place: 'bg-status-upcoming-bg text-status-upcoming-text',
+  match: 'bg-surface-high text-ink-muted',
+}
+const BET_ROW = 'sm:grid-cols-[minmax(120px,1.2fr)_72px_minmax(120px,1.4fr)_88px]'
+const BETS_PAGE = 10
+
+/**
+ * Every bet placed on the event, shown once betting has closed: bettor, bet type, pick and
+ * stake. Read-only, with no payment details. Rows come from publicBetRows (lib/wagerResultsView).
+ * Filter by type or search a bettor; the first 10 show, the rest expand.
+ */
+export function AllBetsPublicCard({ rows }) {
+  const id = useId()
+  const [filter, setFilter] = useState('all')
+  const [query, setQuery] = useState('')
+  const [showAll, setShowAll] = useState(false)
+  const shown = rows.filter(r => (filter === 'all' || r.kind === filter) && matchesQuery(r.bettor, query))
+  const visible = showAll ? shown : shown.slice(0, BETS_PAGE)
+  const total = shown.reduce((t, r) => t + r.amount, 0)
+  const narrowed = filter !== 'all' || query.trim().length > 0
+
+  return (
+    <section className="overflow-hidden rounded-sm border border-surface-border bg-white" aria-labelledby={`${id}-title`}>
+      <header className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1 border-b border-surface-border px-4 py-3 sm:px-5">
+        <h2 id={`${id}-title`} className="text-lg font-bold text-ink">All bets</h2>
+        <p className="text-sm text-ink-muted">
+          {rows.length === 0 ? 'No bets were placed' : `${shown.length}${narrowed ? ` of ${rows.length}` : ''} bet${(narrowed ? rows.length : shown.length) === 1 ? '' : 's'} · ${money(total)}`}
+        </p>
+      </header>
+
+      {rows.length === 0 ? (
+        <p className="px-5 py-8 text-center text-sm text-ink-muted">No bets were placed on this event.</p>
+      ) : (
+        <>
+          <div className="flex flex-col gap-3 border-b border-surface-border px-4 py-3 sm:flex-row sm:items-center sm:justify-between sm:px-5">
+            <SegmentedToggle options={BET_FILTERS} value={filter} onChange={v => { setFilter(v); setShowAll(false) }} label="Filter bets by type" />
+            <input
+              type="search" value={query} onChange={e => { setQuery(e.target.value); setShowAll(false) }}
+              placeholder="Search by bettor" aria-label="Search bets by bettor" autoComplete="off"
+              className="h-11 w-full rounded-sm border border-surface-highest bg-white px-3 text-sm text-ink placeholder:text-ink-muted focus:border-fairway-700 focus:outline-none focus:ring-2 focus:ring-fairway-500 sm:max-w-[220px]"
+            />
+          </div>
+          <div className={`hidden gap-3 border-b border-surface-border px-5 py-2.5 sm:grid ${BET_ROW} ${HEAD}`}>
+            <span>Bettor</span><span>Type</span><span>Pick</span><span className="text-right">Stake</span>
+          </div>
+          {shown.length === 0 ? (
+            <p className="px-5 py-8 text-center text-sm text-ink-muted">No bets match.</p>
+          ) : (
+            <ul>
+              {visible.map(r => (
+                <li key={r.id} className={`flex flex-wrap items-center gap-x-3 gap-y-1 border-b border-surface-border px-4 py-3 last:border-b-0 sm:grid sm:px-5 ${BET_ROW}`}>
+                  <p className="w-full min-w-0 break-words text-[15px] font-bold text-ink sm:w-auto">{r.bettor}</p>
+                  <div><span className={`inline-flex rounded-full px-2 py-0.5 text-[11px] font-bold ${BET_TAG[r.kind]}`}>{r.tag}</span></div>
+                  <p className="min-w-0 flex-1 break-words text-sm text-ink">{r.pick}</p>
+                  <p className="text-sm font-bold tabular-nums text-ink sm:text-right">{money(r.amount)}</p>
+                </li>
+              ))}
+            </ul>
+          )}
+          {shown.length > BETS_PAGE && (
+            <div className="border-t border-surface-border px-4 py-2 text-center">
+              <button
+                type="button"
+                onClick={() => setShowAll(a => !a)}
+                aria-expanded={showAll}
+                className="min-h-[44px] rounded-sm px-4 text-sm font-semibold text-fairway-700 hover:bg-surface-dim focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-fairway-500"
+              >
+                {showAll ? 'Show fewer' : `Show all ${shown.length}`}
+              </button>
+            </div>
+          )}
+        </>
+      )}
+    </section>
+  )
+}

@@ -142,7 +142,8 @@ export default function EventPage() {
   const hasMatchFormat = formats.includes('match_points') || formats.includes('ryder_cup')
   const groupsSet      = eventPlayers.some(ep => ep.group_number != null)
   const matchupsSet    = !hasMatchFormat || pairings.length > 0
-  const showBetLink    = event.status === 'active' || (event.status === 'upcoming' && groupsSet && matchupsSet)
+  // Once shown, the wager link stays: completed events link to the wager results instead of the bet form.
+  const showBetLink    = event.status === 'active' || event.status === 'complete' || (event.status === 'upcoming' && groupsSet && matchupsSet)
 
   const reg        = registrationState({ status: event.status, regUrl, spotsLeft, open: event.registration_open !== false })
   const fee        = feeLabel(event.tournament_fee)
@@ -229,11 +230,18 @@ function OverviewTab({ event, pairings, eventPlayers, description, courseAddress
     <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_360px] lg:items-start">
       <div className="flex min-w-0 flex-col gap-6">
         {isMIGC && eventId && showBetLink && (
-          <a href={`/wager/${eventId}`} className="flex items-center justify-between rounded-sm bg-fairway-700 px-5 py-4 text-white no-underline">
-            <span>
-              <span className="block text-[15px] font-bold">Place a Bet</span>
-              <span className="block text-xs text-fairway-200">Parimutuel wager board · Venmo or cash</span>
-            </span>
+          <a href={event.status === 'complete' ? `/wager/${eventId}/results` : `/wager/${eventId}`} className="flex items-center justify-between rounded-sm bg-fairway-700 px-5 py-4 text-white no-underline">
+            {event.status === 'complete' ? (
+              <span>
+                <span className="block text-[15px] font-bold">Wager results</span>
+                <span className="block text-xs text-fairway-200">Every bet, winners and payouts</span>
+              </span>
+            ) : (
+              <span>
+                <span className="block text-[15px] font-bold">Place a Bet</span>
+                <span className="block text-xs text-fairway-200">Parimutuel wager board · Venmo or cash</span>
+              </span>
+            )}
             <span className="text-xl font-bold" aria-hidden="true">→</span>
           </a>
         )}
