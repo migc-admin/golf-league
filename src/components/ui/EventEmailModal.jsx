@@ -10,6 +10,7 @@ import { supabase } from '../../lib/supabase'
 import { buildPreRoundEmail, buildPostRoundEmail, copyRichHtml, preRoundIncludes } from '../../lib/eventEmails'
 import { buildResultsView, shortDateText } from '../../lib/resultsView'
 import { teamPlayExportView } from '../../lib/teamPlayExport'
+import { teamSeasonView } from '../../lib/teamSeason'
 
 const NONE = []
 const MIGC_ORG = import.meta.env.VITE_MIGC_ORG_ID
@@ -34,12 +35,12 @@ function htmlToPlainText(html) {
 function postRoundIncludes({ event, eventPlayers, allScores, course, sideGames, matchPairings, hasTeams, nextEvent }) {
   let view = null
   if (course) { try { view = buildResultsView({ event, eventPlayers, allScores, course, sideGames: sideGames ?? [], matchPairings }) } catch { view = null } }
-  const items = [{ label: 'Low net and total pot', missing: !view }]
+  const items = [{ label: 'Low net by flight', missing: !view }]
   if (view?.scoring) items.push({ label: 'Net stroke play by flight', missing: false })
   if (view?.skins) items.push({ label: 'Skins', missing: false })
   if (view?.ctp || view?.longDrive || view?.lowPutts) items.push({ label: 'Closest to pin, long drive, low putts', missing: false })
   if (view?.matchPlay) items.push({ label: 'Match play results', missing: false })
-  if (hasTeams) items.push({ label: 'Team play standings', missing: false })
+  if (hasTeams) items.push({ label: 'Team play standings (this event and season)', missing: false })
   items.push({ label: 'Next event', missing: !nextEvent, hint: 'none scheduled' })
   return items
 }
@@ -55,6 +56,7 @@ export default function EventEmailModal({
   const [note, setNote] = useState('')
   const [matchPairings, setMatchPairings] = useState([])
   const [nextEvent, setNextEvent] = useState(null)
+  const [seasonData, setSeasonData] = useState(null) // the league's other completed events, for season team standings
 
   useEffect(() => {
     if (!hasMatchPlay) return
@@ -82,6 +84,42 @@ export default function EventEmailModal({
     return () => { cancelled = true }
   }, [isPre, event.league_id, event.event_date])
 
+  // Season team standings: the league's other completed events up to this one. This event itself
+  // comes from the page's live data, so the email is right even before the event is closed.
+  useEffect(() => {
+    if (isPre || tglTeams.length === 0 || !event.league_id) return
+    let cancelled = false
+    async function load() {
+      const { data: evs } = await supabase
+        .from('events')
+        .select('id, name, event_number, event_date, status, course:courses(*)')
+        .eq('league_id', event.league_id)
+        .eq('status', 'complete')
+      const others = (evs ?? []).filter(e => e.id !== event.id && (!event.event_date || !e.event_date || e.event_date <= event.event_date))
+      const ids = others.map(e => e.id)
+      if (ids.length === 0) { if (!cancelled) setSeasonData({ events: [], epsByEvent: {}, scoresByEvent: {}, selections: [] }); return }
+      const [{ data: eps }, { data: sels }] = await Promise.all([
+        supabase.from('event_players').select('*, player:players(id, first_name, last_name, intended_role)').in('event_id', ids),
+        supabase.from('tgl_event_selections').select('*').in('event_id', ids),
+      ])
+      // Scores one event at a time (the server returns at most 1000 rows per request)
+      const scoresByEvent = {}
+      await Promise.all(ids.map(async id => {
+        const { data } = await supabase.from('scores').select('*').eq('event_id', id)
+        scoresByEvent[id] = data ?? []
+      }))
+      if (cancelled) return
+      setSeasonData({
+        events: others,
+        epsByEvent: Object.fromEntries(ids.map(id => [id, (eps ?? []).filter(ep => ep.event_id === id)])),
+        scoresByEvent,
+        selections: sels ?? [],
+      })
+    }
+    load()
+    return () => { cancelled = true }
+  }, [isPre, event.id, event.league_id, event.event_date, tglTeams.length])
+
   const { subject, html } = useMemo(() => {
     const origin = publicOrigin()
     const base = `${origin}/${orgSlug}/${leagueSlug}/${event.slug}`
@@ -100,16 +138,31 @@ export default function EventEmailModal({
     const teamRows = tglTeams.length > 0
       ? teamPlayExportView({ event, eventPlayers, allScores, course, tglTeams, tglMembers, tglSelections }).rows
       : []
+    let teamSeason = null
+    if (tglTeams.length > 0 && seasonData && course) {
+      const sv = teamSeasonView({
+        events: [...seasonData.events, { ...event, course }],
+        epsByEvent: { ...seasonData.epsByEvent, [event.id]: eventPlayers },
+        scoresByEvent: { ...seasonData.scoresByEvent, [event.id]: allScores },
+        tglTeams, tglMembers,
+        tglSelections: [...seasonData.selections, ...tglSelections.map(s => ({ ...s, event_id: s.event_id ?? event.id }))],
+      })
+      if (sv.scoredEventIds.length > 0) teamSeason = { rows: sv.season, eventCount: sv.scoredEventIds.length }
+    }
     const leaderboardUrl = `${base}/leaderboard?eid=${event.id}`
     return buildPostRoundEmail({
-      event, view, teamRows, leagueName, logoUrl, note,
+      event, view, teamRows, teamSeason, leagueName, logoUrl, note,
       leaderboardUrl, payoutsUrl: leaderboardUrl,
+      // Trips have no season standings page
+      standingsUrl: event.league?.is_trip_league ? null : `${origin}/${orgSlug}/${leagueSlug}/standings`,
+      // Wagers are a Mulligan's Island feature, same as the pre-round email's bet link
+      wagerUrl: event.league?.org_id === MIGC_ORG ? `${origin}/wager/${event.id}/results` : null,
       nextEvent: nextEvent ? {
         name: nextEvent.name, dateText: shortDateText(nextEvent.event_date),
         url: `${origin}/${orgSlug}/${leagueSlug}/${nextEvent.slug}/event`,
       } : null,
     })
-  }, [isPre, event, eventPlayers, allScores, course, sideGames, matchPairings, leagueName, logoUrl, orgSlug, leagueSlug, note, nextEvent, tglTeams, tglMembers, tglSelections])
+  }, [isPre, event, eventPlayers, allScores, course, sideGames, matchPairings, leagueName, logoUrl, orgSlug, leagueSlug, note, nextEvent, tglTeams, tglMembers, tglSelections, seasonData])
 
   async function copyEmail() {
     try {

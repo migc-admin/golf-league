@@ -99,14 +99,17 @@ function matchLine(r) {
  * @param {Object} p.event
  * @param {Object} p.view          buildResultsView(...) result
  * @param {Array}  [p.teamRows]    teamPlayExportView(...).rows when team play is enabled
+ * @param {Object} [p.teamSeason]  { rows, eventCount } from teamSeasonView(...).season, through this event
  * @param {Object} [p.nextEvent]   { name, dateText, url } for the "Next up" footer line
  * @param {string} p.leagueName
  * @param {string} [p.logoUrl]
  * @param {string} [p.leaderboardUrl]
  * @param {string} [p.payoutsUrl]
+ * @param {string} [p.standingsUrl] the league's public Season standings page (button)
+ * @param {string} [p.wagerUrl]     the event's public wager results page (button; MIGC only)
  * @param {string} [p.note]
  */
-export function buildPostRoundEmail({ event, view, teamRows = [], nextEvent = null, leagueName, logoUrl, leaderboardUrl, payoutsUrl, note }) {
+export function buildPostRoundEmail({ event, view, teamRows = [], teamSeason = null, nextEvent = null, leagueName, logoUrl, leaderboardUrl, payoutsUrl, standingsUrl, wagerUrl, note }) {
   const title = event?.name ?? (event?.event_number ? `Event #${event.event_number}` : 'Event')
 
   const dateLine = [view?.dateLong ? `<b style="color:${INK};">${esc(view.dateLong)}</b>` : '', view?.courseName ? esc(view.courseName) : ''].filter(Boolean).join(' &middot; ')
@@ -114,17 +117,16 @@ export function buildPostRoundEmail({ event, view, teamRows = [], nextEvent = nu
   const buttons = buttonsBlock([
     { label: 'View full leaderboard', href: leaderboardUrl, filled: true },
     { label: 'Payouts per player', href: payoutsUrl, filled: false },
+    { label: 'Season standings', href: standingsUrl, filled: false },
+    { label: 'Wager results', href: wagerUrl, filled: false },
   ])
 
   let body = ''
   if (view) {
     const t = view.tiles
-    const defs = [
-      ...t.lowNet.map(l => [l.flight ? `Low net · Flight ${l.flight}` : 'Low net', l.name, l.net != null ? `Net ${l.net}` : null, true]),
-      ['Total pot', money(t.pot.value), `${t.pot.paid} of ${t.pot.players} paid`, false],
-    ]
+    const defs = t.lowNet.map(l => [l.flight ? `Low net · Flight ${l.flight}` : 'Low net', l.name, l.net != null ? `Net ${l.net}` : null, true])
     const tiles = defs.map((d, i) => tile(...d, i, defs.length))
-    body += `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin-top:24px;table-layout:fixed;"><tr>${tiles.join('')}</tr></table>`
+    if (tiles.length > 0) body += `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin-top:24px;table-layout:fixed;"><tr>${tiles.join('')}</tr></table>`
 
     if (view.scoring) {
       body += section(view.scoring.title, twoCols(
@@ -199,11 +201,24 @@ export function buildPostRoundEmail({ event, view, teamRows = [], nextEvent = nu
   }
 
   if (teamRows.length > 0) {
-    body += section('Team play standings', rowsTable(teamRows.map(r => [
+    body += section(teamSeason?.rows?.length ? 'Team play standings · This event' : 'Team play standings', rowsTable(teamRows.map(r => [
       { html: r.rank != null ? `#${r.rank}` : '—', width: 30, color: MUTED },
       { html: `<span style="display:inline-block;width:9px;height:9px;border-radius:5px;background:${esc(r.team.color || GREEN)};margin-right:7px;"></span><b>${esc(r.team.name)}</b><div style="color:${MUTED};font-size:12px;padding-left:16px;">${r.players.map(p => `${esc(p.name)} ${esc(fmtPts(p.points))}`).join(' · ')}</div>` },
       { html: r.points != null ? `${esc(fmtPts(r.points))} pts` : '—', align: 'right', bold: true, nowrap: true },
     ])))
+  }
+
+  if (teamSeason?.rows?.length) {
+    const n = teamSeason.eventCount
+    body += section(`Season team standings · ${n} event${n === 1 ? '' : 's'}`, rowsTable(teamSeason.rows.map(r => {
+      const here = (r.events ?? []).find(e => e.eventId === event?.id)
+      const gained = here?.points != null ? `+${fmtPts(here.points)} pts this event` : 'No points this event'
+      return [
+        { html: r.rank != null ? `#${r.rank}` : '—', width: 30, color: MUTED },
+        { html: `<span style="display:inline-block;width:9px;height:9px;border-radius:5px;background:${esc(r.team.color || GREEN)};margin-right:7px;"></span><b>${esc(r.team.name)}</b><div style="color:${MUTED};font-size:12px;padding-left:16px;">${esc(gained)}</div>` },
+        { html: r.points != null ? `${esc(fmtPts(r.points))} pts` : '—', align: 'right', bold: true, nowrap: true },
+      ]
+    })))
   }
 
   const nextLine = nextEvent

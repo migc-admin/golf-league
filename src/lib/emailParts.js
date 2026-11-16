@@ -46,11 +46,14 @@ export function section(label, inner) {
     </table>`
 }
 
+// Every button in a row is the same width so they line up when they wrap.
+const PILL_WIDTH = 232
+
 export function pill(label, href, filled) {
   const style = filled
     ? `background:${GREEN};color:#ffffff;border:1px solid ${GREEN};`
     : `background:#ffffff;color:${GREEN};border:1px solid ${GREEN};`
-  return `<a href="${esc(href)}" style="display:inline-block;${style}font-family:${FONT};font-size:15px;font-weight:bold;text-decoration:none;padding:13px 24px;border-radius:8px;">${esc(label)}</a>`
+  return `<a href="${esc(href)}" style="display:inline-block;box-sizing:border-box;width:${PILL_WIDTH}px;max-width:100%;text-align:center;${style}font-family:${FONT};font-size:15px;line-height:20px;font-weight:bold;text-decoration:none;padding:13px 12px;border-radius:8px;">${esc(label)}</a>`
 }
 
 /** Centered header: logo (only with a public URL), league, optional status pill, title, gold bar, lines. */
@@ -72,12 +75,13 @@ export function headerBlock({ leagueName, logoUrl, statusPill, title, lines = []
 }
 
 /** Centered row of pill buttons: [{ label, href, filled }] (entries without a link are skipped). */
+/** Centered link buttons; they wrap onto a second line when the screen is too narrow. */
 export function buttonsBlock(buttons) {
   const real = buttons.filter(b => b.href)
   if (real.length === 0) return ''
   return `
-    <table role="presentation" cellpadding="0" cellspacing="0" border="0" align="center" style="margin:22px auto 0;">
-      <tr>${real.map(b => `<td style="padding:0 5px 8px;">${pill(b.label, b.href, b.filled)}</td>`).join('')}</tr>
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin:22px 0 0;">
+      <tr><td align="center" style="text-align:center;font-size:0;line-height:0;">${real.map(b => `<span style="display:inline-block;padding:0 5px 8px;">${pill(b.label, b.href, b.filled)}</span>`).join('')}</td></tr>
     </table>`
 }
 
