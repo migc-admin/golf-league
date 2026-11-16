@@ -31,11 +31,18 @@ describe('seasonInsights', () => {
     expect(card(t, 'low-gross').title).toBe('2 Tied — 80')
     expect(card(t, 'low-gross').sub).toBe('Ann, Bo')
   })
-  it('most tournaments attended and lowest average (two rounds minimum)', () => {
+  it('most tournaments attended', () => {
     expect(card(c, 'most-attended').title).toBe('Ann')
     expect(card(c, 'most-attended').sub).toBe('2 tournaments')
-    expect(card(c, 'low-avg-player').title).toBe('Ann')
-    expect(card(c, 'low-avg-player').sub).toBe('85 avg gross')
+  })
+  it('lowest average needs five rounds', () => {
+    expect(card(c, 'low-avg-player')).toBeUndefined()
+    const five = [80, 82, 84, 86, 88].map((g, i) => r('Ann', 'a', `e${i}`, 'X', 'A', g, g - 10))
+    const four = [70, 70, 70, 70].map((g, i) => r('Bo', 'b', `e${i}`, 'X', 'A', g, g - 10))
+    const c5 = seasonInsights([...five, ...four])
+    expect(card(c5, 'low-avg-player').label).toBe('Lowest avg gross — player (min 5 rounds)')
+    expect(card(c5, 'low-avg-player').title).toBe('Ann')
+    expect(card(c5, 'low-avg-player').sub).toBe('84 avg gross')
   })
   it('course averages and median net by flight', () => {
     expect(card(c, 'high-avg-course').title).toBe('Cross Creek')

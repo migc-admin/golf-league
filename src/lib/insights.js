@@ -3,6 +3,8 @@
 // Pure functions: rows in, a list of cards out. A card with no data behind it is left out.
 
 export const MAX_PLAUSIBLE_GROSS = 200
+// A player needs this many rounds to qualify for "Lowest avg gross — player".
+export const MIN_AVG_ROUNDS = 5
 const one = n => (Math.round(n * 10) / 10).toString()
 
 const sum = a => a.reduce((s, n) => s + n, 0)
@@ -70,14 +72,14 @@ export function seasonInsights(allRows, { ctpByFlight = null } = {}) {
     sub: top.length === 1 ? `${most} tournament${most === 1 ? '' : 's'}` : `${most} tournaments — ${top.slice(0, 4).join(', ')}${top.length > 4 ? '…' : ''}`,
   })
 
-  // Lowest average gross by player (at least two rounds)
-  const avgs = [...byPlayer.values()].filter(rs => rs.length >= 2).map(rs => ({ name: rs[0].player, avg: avg(rs.map(r => r.gross)) }))
+  // Lowest average gross by player (minimum rounds played)
+  const avgs = [...byPlayer.values()].filter(rs => rs.length >= MIN_AVG_ROUNDS).map(rs => ({ name: rs[0].player, avg: avg(rs.map(r => r.gross)) }))
   if (avgs.length) {
     const best = Math.min(...avgs.map(a => a.avg))
     const who = avgs.filter(a => a.avg === best)
     cards.push({
       key: 'low-avg-player',
-      label: 'Lowest avg gross — player (min 2 rounds)',
+      label: `Lowest avg gross — player (min ${MIN_AVG_ROUNDS} rounds)`,
       title: who.length === 1 ? who[0].name : `${who.length} Tied`,
       sub: `${one(best)} avg gross${who.length > 1 ? ` — ${who.map(w => w.name).join(', ')}` : ''}`,
     })
