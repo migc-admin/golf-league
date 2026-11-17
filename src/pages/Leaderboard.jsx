@@ -1,7 +1,9 @@
 /**
- * Live Leaderboard
+ * Live Leaderboard (public event page)
  * Auto-updates via Supabase Realtime on scores changes.
- * Tabs: 18-Hole | Front 9 | Back 9 | Low Putts | Skins
+ * Phone first: sticky header with the tab strip, content straight underneath.
+ * From 900px wide: wider header, two columns with an "At a glance" rail.
+ * Layout only — every number comes from the scoring engines, unchanged.
  */
 
 import { useEffect, useState, useRef } from 'react'
@@ -12,13 +14,47 @@ import { useAuth } from '../hooks/useAuth'
 import { computeLeaderboards, computeStableford, computeBlindPartners, blindPartnersMode, getStrokeIndexForTee } from '../lib/engines/scoring'
 import { computeAllSkins, computeSuperSkins } from '../lib/engines/skins'
 import { computeMatchPoints, computeTeamMatchPoints } from '../lib/engines/matchPoints'
-import { computePayouts, CATEGORY_LABELS, ctpLabel } from '../lib/engines/payouts'
+import { computePayouts } from '../lib/engines/payouts'
 import { computeTGLEventResults, assignTGLPoints } from '../lib/engines/tgl'
-import { FlightBadge, StatusBadge } from '../components/ui/Badge'
 import { useFeatures, useOrg } from '../lib/OrgContext'
 import { useSubdomainOrg } from '../lib/SubdomainContext'
+import SegmentedToggle from '../components/ui/SegmentedToggle'
+import { matchChip, skinsHoleRows, holeRange, payoutTag, finishLabel, toParText } from '../lib/leaderboardView'
 
-const ALL_TABS = ['18-Hole', 'Front 9', 'Back 9', 'Low Gross', 'Gross Front 9', 'Gross Back 9', 'Stableford', 'Stableford Gross', 'Nassau', 'Scramble', 'Match Points', 'Team Match', 'Low Putts', 'Skins', 'Super Skins', 'Blind Partners', 'Payouts', 'Team Play']
+const ALL_TABS = ['18-Hole', 'Front 9', 'Back 9', 'Low Gross', 'Gross Front 9', 'Gross Back 9', 'Stableford', 'Stableford Gross', 'Nassau', 'Scramble', 'Match Points', 'Team Match', 'Skins', 'Super Skins', 'Low Putts', 'Blind Partners', 'Team Play', 'Payouts']
+
+const TAB_LABEL = {
+  '18-Hole': '18-hole', 'Low Gross': 'Low gross', 'Gross Front 9': 'Gross front 9', 'Gross Back 9': 'Gross back 9',
+  'Stableford Gross': 'Stableford gross', 'Match Points': 'Match play', 'Team Match': 'Team match',
+  'Low Putts': 'Low putts', 'Super Skins': 'Super skins', 'Blind Partners': 'Blind partners', 'Team Play': 'Team play',
+}
+const tabLabel = tab => TAB_LABEL[tab] ?? tab
+
+// Desktop section heading for each tab
+const TAB_HEADING = {
+  '18-Hole': ['18-hole leaderboard', 'Net score to par. Tap a player for their scorecard.'],
+  'Front 9': ['Front 9', 'Net score to par on holes 1–9.'],
+  'Back 9': ['Back 9', 'Net score to par on holes 10–18.'],
+  'Low Gross': ['Low gross', 'Gross score to par.'],
+  'Gross Front 9': ['Gross front 9', 'Gross score to par on holes 1–9.'],
+  'Gross Back 9': ['Gross back 9', 'Gross score to par on holes 10–18.'],
+  'Stableford': ['Stableford', 'Net Stableford points, highest wins.'],
+  'Stableford Gross': ['Stableford gross', 'Gross Stableford points, highest wins.'],
+  'Nassau': ['Nassau', 'Front 9, back 9 and full 18, each its own bet.'],
+  'Scramble': ['Scramble', 'Team gross score to par.'],
+  'Match Points': ['Match play', 'Head-to-head net match play.'],
+  'Team Match': ['Team match', 'Best ball match play by group.'],
+  'Skins': ['Skins', 'Net skins. Ties carry to the next hole.'],
+  'Super Skins': ['Super skins', 'Opt-in skins game.'],
+  'Low Putts': ['Low putts', 'Fewest putts over 18 holes.'],
+  'Blind Partners': ['Blind partners', 'Pairs drawn after the round.'],
+  'Team Play': ['Team play', 'Team points from each pick’s finish.'],
+  'Payouts': ['Payouts', 'Prize money by player.'],
+}
+
+// Tabs that follow the page's Flight A | B switch
+const FLIGHT_TABS = ['18-Hole', 'Front 9', 'Back 9', 'Low Gross', 'Gross Front 9', 'Gross Back 9', 'Stableford', 'Stableford Gross', 'Nassau', 'Skins', 'Payouts']
+const SCORED_TABS = ['18-Hole', 'Front 9', 'Back 9', 'Low Gross', 'Gross Front 9', 'Gross Back 9', 'Stableford', 'Stableford Gross', 'Nassau', 'Scramble', 'Match Points', 'Team Match', 'Low Putts', 'Skins', 'Super Skins', 'Blind Partners']
 
 function visibleTabs(event, hasTGL = false) {
   if (!event) return ALL_TABS
@@ -49,18 +85,71 @@ function visibleTabs(event, hasTGL = false) {
   })
 }
 
-const FORMAT_LABELS = {
-  net_stroke:         'Net Stroke Play',
-  low_gross:          'Low Gross',
-  gross_stroke_front9: 'Gross Front 9',
-  gross_stroke_back9:  'Gross Back 9',
-  stableford:         'Stableford',
-  stableford_gross:   'Stableford (Gross)',
-  net_stroke_nassau:  'Nassau (Net)',
-  gross_stroke_nassau: 'Nassau (Gross)',
-  match_points:       'Match Play (Head-to-Head)',
-  team_match_play:    'Match Play (Team Best Ball)',
-  ryder_cup:          'Ryder Cup',
+// ─── Shared look ──────────────────────────────────────────────────
+const CARD = 'overflow-hidden rounded-sm border border-surface-border bg-white'
+const HEAD = 'bg-surface-dim text-[11px] font-semibold uppercase tracking-[0.08em] text-ink-muted'
+const LEADER = 'bg-status-active-bg shadow-[inset_4px_0_0_theme(colors.fairway.700)]'
+const ROW_BTN = 'w-full text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-fairway-500'
+const GREEN_TAG = 'bg-status-active-bg text-status-active-text'
+const AMBER_TAG = 'bg-status-upcoming-bg text-status-upcoming-text'
+const TAG = 'inline-flex items-center rounded-sm px-1.5 py-0.5 text-[11px] font-bold leading-none'
+// Match play sides: first listed (high seed) is forest green, second (low seed) is gold
+const SIDE = {
+  A: { dot: 'bg-fairway-700', fill: 'bg-fairway-700 text-white', tint: 'bg-status-active-bg text-status-active-text', text: 'text-fairway-700' },
+  B: { dot: 'bg-status-upcoming-text', fill: 'bg-status-upcoming-text text-white', tint: 'bg-status-upcoming-bg text-status-upcoming-text', text: 'text-status-upcoming-text' },
+}
+const CHIP_TONE = { winA: SIDE.A.fill, winB: SIDE.B.fill, leadA: SIDE.A.tint, leadB: SIDE.B.tint, even: 'bg-surface-high text-ink-muted' }
+
+const fullName = p => `${p?.first_name ?? ''} ${p?.last_name ?? ''}`.trim()
+const fmtPts = n => (n % 1 === 0 ? `${n}` : n.toFixed(1))
+const money = n => `$${Number(n).toFixed(2)}`
+
+function Empty({ title, children }) {
+  return (
+    <div className="px-4 py-12 text-center">
+      <p className="font-semibold text-ink">{title}</p>
+      {children && <p className="mx-auto mt-1 max-w-xs text-sm text-ink-muted">{children}</p>}
+    </div>
+  )
+}
+
+function CardHeader({ children, aside }) {
+  return (
+    <div className="flex items-baseline justify-between gap-3 border-b border-surface-border px-4 py-3">
+      <h3 className="text-[15px] font-bold text-ink">{children}</h3>
+      {aside && <span className="text-xs text-ink-muted">{aside}</span>}
+    </div>
+  )
+}
+
+function Chevron({ open, className = '' }) {
+  return (
+    <svg className={`h-4 w-4 text-ink-muted transition-transform ${open ? 'rotate-180' : ''} ${className}`} viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+      <path fillRule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 11.168l3.71-3.938a.75.75 0 111.08 1.04l-4.25 4.5a.75.75 0 01-1.08 0l-4.25-4.5a.75.75 0 01.02-1.06z" clipRule="evenodd" />
+    </svg>
+  )
+}
+
+function StatusPill({ status }) {
+  if (status === 'complete') return (
+    <span className="inline-flex items-center gap-1.5 rounded-full bg-status-active-bg px-2.5 py-1 text-xs font-semibold text-status-active-text">
+      <span className="h-1.5 w-1.5 rounded-full bg-fairway-700" aria-hidden="true" />Final
+    </span>
+  )
+  if (status === 'active') return <span className="inline-flex items-center rounded-full bg-status-active-bg px-2.5 py-1 text-xs font-semibold text-status-active-text">Live</span>
+  if (status === 'upcoming') return <span className="inline-flex items-center rounded-full bg-status-upcoming-bg px-2.5 py-1 text-xs font-semibold text-status-upcoming-text">Upcoming</span>
+  return <span className="inline-flex items-center rounded-full bg-surface-high px-2.5 py-1 text-xs font-semibold text-ink-muted">{status}</span>
+}
+
+function LeagueLogo({ url, name }) {
+  const initials = (name ?? '').split(/\s+/).filter(Boolean).map(w => w[0]).join('').replace(/[^A-Za-z0-9]/g, '').slice(0, 4).toUpperCase()
+  const size = 'h-10 w-10 min-[900px]:h-14 min-[900px]:w-14'
+  if (url) return <img src={url} alt={name ?? ''} className={`${size} shrink-0 rounded-full border border-surface-border bg-white object-contain`} />
+  return (
+    <span className={`${size} flex shrink-0 items-center justify-center rounded-full bg-fairway-700 text-xs font-bold text-white min-[900px]:text-sm`} aria-hidden="true">
+      {initials || 'G'}
+    </span>
+  )
 }
 
 export default function Leaderboard() {
@@ -75,7 +164,6 @@ export default function Leaderboard() {
   const hasFeature = useFeatures()
   const homeLink = isAdmin ? '/admin' : user ? '/home' : null
   const fromScorecard = location.state?.from === 'scorecard'
-  const scorecardEventId = location.state?.scorecardEventId ?? null
   const [event,        setEvent]        = useState(null)
   const [eventPlayers, setEventPlayers] = useState([])
   const [allScores,    setAllScores]    = useState([])
@@ -89,10 +177,12 @@ export default function Leaderboard() {
   const [tglMembers,    setTglMembers]    = useState([])
   const [tglSelections, setTglSelections] = useState([])
   const [tglLocked,     setTglLocked]     = useState(false)
-  const [orgLogo,       setOrgLogo]       = useState(org?.logo_url ?? null)
-  const [orgName,       setOrgName]       = useState(org?.name ?? null)
+  const [logoUrl,       setLogoUrl]       = useState(null)
+  const [copied,        setCopied]        = useState(false)
 
-  const subRef = useRef(null)
+  const subRef   = useRef(null)
+  const stripRef = useRef(null)
+  const tabRefs  = useRef({})
   const tabs   = event ? visibleTabs(event, hasFeature('tgl') && tglTeams.length > 0 && tglSelections.length > 0) : ALL_TABS
 
   async function loadScores(evId) {
@@ -141,14 +231,14 @@ export default function Leaderboard() {
       await loadScores(eventId)
       setLoading(false)
 
-      // Fetch org logo (falls back to league logo)
+      // League logo from league settings; the club's logo only when the league has none
       const leagueId = ev.league_id
-      supabase.from('leagues').select('org_id, logo_url, name').eq('id', leagueId).single().then(({ data: lg }) => {
-        if (lg?.logo_url) { setOrgLogo(lg.logo_url); setOrgName(lg.name) }
+      supabase.from('leagues').select('org_id, logo_url').eq('id', leagueId).single().then(({ data: lg }) => {
+        if (lg?.logo_url) { setLogoUrl(lg.logo_url); return }
+        if (org?.logo_url) { setLogoUrl(org.logo_url); return }
         if (lg?.org_id) {
-          supabase.from('organizations').select('name, logo_url').eq('id', lg.org_id).single().then(({ data: o }) => {
-            if (o?.logo_url) setOrgLogo(o.logo_url)
-            if (o?.name)     setOrgName(o.name)
+          supabase.from('organizations').select('logo_url').eq('id', lg.org_id).single().then(({ data: o }) => {
+            if (o?.logo_url) setLogoUrl(o.logo_url)
           })
         }
       })
@@ -189,9 +279,18 @@ export default function Leaderboard() {
     }
   }, [leagueSlug, eventSlug])
 
+  // Keep the active tab in view in the sideways-scrolling strip (on load and on tap)
+  useEffect(() => {
+    const strip = stripRef.current
+    const el = tabRefs.current[activeTab]
+    if (!strip || !el) return
+    const target = el.offsetLeft - (strip.clientWidth - el.offsetWidth) / 2
+    strip.scrollTo({ left: Math.max(0, target), behavior: 'smooth' })
+  }, [activeTab, loading, tabs.length])
+
   if (loading) return <LeaderboardSkeleton />
   if (!event)  return (
-    <div className="min-h-screen flex items-center justify-center" style={{ background: '#fbfaf8' }}>
+    <div className="flex min-h-screen items-center justify-center bg-surface">
       <p className="text-ink-muted">Event not found.</p>
     </div>
   )
@@ -235,6 +334,8 @@ export default function Leaderboard() {
   })()
 
   const playerMap  = Object.fromEntries(eventPlayers.map(ep => [ep.player_id, ep.player]))
+  const flightById = Object.fromEntries(eventPlayers.map(ep => [ep.player_id, ep.flight ?? null]))
+  const flightOf   = id => flightById[id] ?? null
   // Derive flight letters from player assignments first, fall back to event.num_flights config
   const assignedFlights = [...new Set(
     eventPlayers.filter(ep => !ep.is_guest && ep.flight).map(ep => ep.flight)
@@ -253,6 +354,27 @@ export default function Leaderboard() {
     ? `${event.league?.name ?? ''} — ${event.name ?? `Event #${event.event_number}`} Leaderboard | Scorify Golf`
     : 'Live Leaderboard | Scorify Golf'
 
+  const pairingsUrl = subdomainOrg
+    ? `/${event.league?.slug}/${event.slug}/schedule`
+    : `/${orgSlug}/${event.league?.slug}/${event.slug}/schedule`
+  const title = event.course?.name ?? event.name ?? `Event #${event.event_number}`
+  const showFlight = hasFlights && FLIGHT_TABS.includes(activeTab)
+  const [heading, caption] = TAB_HEADING[activeTab] ?? [tabLabel(activeTab), '']
+  const skinsFlight = hasFlights && skinsResults?.[activeFlight] ? activeFlight : 'A'
+
+  async function copyLink() {
+    try {
+      await navigator.clipboard.writeText(window.location.href)
+      setCopied(true)
+      setTimeout(() => setCopied(false), 2000)
+    } catch { /* clipboard blocked: nothing to do */ }
+  }
+  const go = (tab, flight) => { setActiveTab(tab); if (flight) setActiveFlight(flight) }
+
+  const glance = allGrouped && leaderboards
+    ? atAGlance({ tabs, flightLetters, hasFlights, leaderboards, matchData, event, skinsResults, tglData, playerMap })
+    : []
+
   return (
     <>
     <Helmet>
@@ -261,272 +383,295 @@ export default function Leaderboard() {
       <meta property="og:title" content={pageTitle} />
       <meta name="robots" content="noindex" />
     </Helmet>
-    <div className="leaderboard-shell min-h-screen" style={{ background: '#fbfaf8' }}>
-      {/* Back nav */}
-      <div className="px-4 py-2 flex items-center justify-between" style={{ background: '#fbfaf8' }}>
-        <button
-          onClick={() => navigate(-1)}
-          className="flex items-center gap-1.5 text-ink-muted hover:text-ink text-sm transition-colors font-medium"
-        >
-          ← {fromScorecard ? 'Back to Scoring' : 'Back'}
-        </button>
-        {homeLink && (
-          <Link to={homeLink} className="text-ink-muted hover:text-ink text-sm transition-colors flex items-center gap-1 font-medium">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"/></svg>
-            Home
-          </Link>
-        )}
-      </div>
+    <div className="leaderboard-shell min-h-screen bg-surface font-sans">
+      {/* Back nav — only for scorers and signed-in members */}
+      {(fromScorecard || homeLink) && (
+        <div className="mx-auto flex max-w-[1080px] items-center justify-between px-4 min-[900px]:px-6">
+          <button type="button" onClick={() => navigate(-1)} className="flex min-h-[44px] items-center text-sm font-medium text-ink-muted hover:text-ink">
+            ← {fromScorecard ? 'Back to Scoring' : 'Back'}
+          </button>
+          {homeLink && <Link to={homeLink} className="flex min-h-[44px] items-center text-sm font-medium text-ink-muted hover:text-ink">Home</Link>}
+        </div>
+      )}
 
-      {/* Header */}
-      <div className="sticky top-0 z-20" style={{ background: '#ffffff', borderBottom: '1px solid #ebe9e4' }}>
-        <div className="max-w-2xl mx-auto px-4 py-3 flex items-center justify-between gap-3">
-          {/* Logo */}
-          {orgLogo && (
-            <img src={orgLogo} alt={orgName ?? ''} className="w-9 h-9 object-contain rounded-sm shrink-0" />
-          )}
-          <div className="flex-1 min-w-0">
-            <div className="font-bold text-base text-ink truncate">{event.course?.name}</div>
-            <div className="text-xs text-ink-muted mt-0.5 truncate">
-              {event.league?.name} · Event #{event.event_number} · {formatDate(event.event_date)}
+      {/* Header + tabs: pinned on phones, part of the page on desktop */}
+      <header className="sticky top-0 z-20 border-b border-surface-border bg-white min-[900px]:static">
+        <div className="mx-auto max-w-[1080px] px-4 pt-3 min-[900px]:px-6 min-[900px]:pt-7">
+          <div className="flex items-start gap-3 min-[900px]:items-center min-[900px]:gap-4">
+            <LeagueLogo url={logoUrl} name={event.league?.name} />
+            <div className="min-w-0 flex-1">
+              <p className="truncate text-[11px] font-bold uppercase tracking-[0.06em] text-fairway-700 min-[900px]:text-xs">
+                {event.league?.name} · Event #{event.event_number}
+              </p>
+              <h1 className="truncate text-[17px] font-bold leading-tight text-ink min-[900px]:mt-0.5 min-[900px]:text-[28px]">{title}</h1>
+              <p className="truncate text-xs text-ink-muted min-[900px]:mt-1 min-[900px]:text-sm">
+                {shortDay(event.event_date)} · {eventPlayers.length} player{eventPlayers.length === 1 ? '' : 's'}
+              </p>
             </div>
-            {event.format && event.format !== 'net_stroke' && (() => {
-              const baseKey = event.format.replace(/_[a-z]$/, '')
-              const label = FORMAT_LABELS[baseKey] ?? FORMAT_LABELS[event.format]
-              return label ? <div className="text-xs text-ink-muted mt-0.5">{label}</div> : null
-            })()}
+            <div className="flex shrink-0 flex-col items-end gap-2 min-[900px]:flex-row min-[900px]:items-center min-[900px]:gap-3">
+              <StatusPill status={event.status} />
+              <button
+                type="button" onClick={copyLink}
+                className="min-h-[44px] rounded-sm border border-surface-highest bg-white px-3 text-sm font-semibold text-ink hover:bg-surface-dim focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-fairway-500 min-[900px]:hidden"
+              >
+                {copied ? 'Copied' : 'Share'}
+              </button>
+              <Link to={pairingsUrl} className="hidden min-h-[44px] items-center rounded-sm border border-surface-highest bg-white px-4 text-sm font-semibold text-ink hover:bg-surface-dim min-[900px]:inline-flex">
+                Pairings &amp; tee times
+              </Link>
+            </div>
           </div>
-          <div className="flex flex-col items-end gap-1.5 shrink-0">
-            <StatusBadge status={event.status} />
-            <Link
-              to={subdomainOrg
-                ? `/${event.league?.slug}/${event.slug}/schedule`
-                : `/${orgSlug}/${event.league?.slug}/${event.slug}/schedule`}
-              className="text-xs text-ink-muted hover:text-ink"
-            >
-              Pairings ↗
+        </div>
+
+        {/* Tab strip — scrolls sideways; the fade hints at more tabs */}
+        <div className="relative mx-auto mt-2 max-w-[1080px] min-[900px]:mt-5">
+          <div ref={stripRef} role="tablist" aria-label="Leaderboard sections" className="flex overflow-x-auto px-1 [scrollbar-width:none] min-[900px]:px-3 [&::-webkit-scrollbar]:hidden">
+            {tabs.map(tab => {
+              const on = activeTab === tab
+              return (
+                <button
+                  key={tab}
+                  ref={el => { tabRefs.current[tab] = el }}
+                  type="button" role="tab" aria-selected={on}
+                  onClick={() => setActiveTab(tab)}
+                  className={`min-h-[44px] flex-none whitespace-nowrap border-b-[3px] px-3 text-[15px] font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-fairway-500 ${
+                    on ? 'border-fairway-700 text-fairway-700' : 'border-transparent text-ink-muted hover:text-ink'
+                  }`}
+                >
+                  {tabLabel(tab)}
+                </button>
+              )
+            })}
+            <span className="w-8 flex-none" aria-hidden="true" />
+          </div>
+          <div className="pointer-events-none absolute inset-y-0 right-0 w-10 bg-gradient-to-l from-white to-transparent" aria-hidden="true" />
+        </div>
+      </header>
+
+      <div className="mx-auto max-w-[1080px] px-4 py-4 min-[900px]:grid min-[900px]:grid-cols-[minmax(0,1fr)_300px] min-[900px]:items-start min-[900px]:gap-6 min-[900px]:px-6 min-[900px]:py-6">
+        <main className="min-w-0 space-y-4">
+          {/* Desktop heading + the flight switch (the switch alone on phones) */}
+          <div className={`${showFlight ? 'flex' : 'hidden min-[900px]:flex'} flex-col gap-3 min-[900px]:flex-row min-[900px]:items-end min-[900px]:justify-between`}>
+            <div className="hidden min-w-0 min-[900px]:block">
+              <h2 className="text-xl font-bold text-ink">{heading}</h2>
+              {caption && <p className="mt-0.5 text-sm text-ink-muted">{caption}</p>}
+            </div>
+            {showFlight && (
+              <SegmentedToggle
+                options={flightLetters.map(f => ({ value: f, label: `Flight ${f}` }))}
+                value={activeFlight}
+                onChange={setActiveFlight}
+                label="Flight"
+                className="w-full shrink-0 [&>button]:flex-1 min-[900px]:w-auto min-[900px]:[&>button]:min-w-[110px]"
+              />
+            )}
+          </div>
+
+          {/* Gate: require all non-guest players to have a group before showing scored tabs */}
+          {!allGrouped && SCORED_TABS.includes(activeTab) && (
+            <div className={CARD}>
+              <Empty title="Pairings not yet finalized">The leaderboard will appear once every player has been assigned to a group.</Empty>
+            </div>
+          )}
+          {leaderboards && allGrouped && (
+            <>
+              {activeTab === '18-Hole' && (
+                <NetLeaderboard
+                  complete={leaderboards.full[activeFlight]}
+                  inProgress={leaderboards.full[`${activeFlight}InProgress`]}
+                  flight={activeFlight}
+                  vsParKey="netVsPar" grossKey="gross18" netKey="net18" handicapKey="course_handicap"
+                  progressHolesKey="holesCompleted" maxHoles={18}
+                  allScores={allScores} course={course} eventPlayers={eventPlayers}
+                />
+              )}
+              {activeTab === 'Front 9' && (
+                <NetLeaderboard
+                  complete={leaderboards.front9[activeFlight]}
+                  inProgress={leaderboards.front9[`${activeFlight}InProgress`]}
+                  flight={activeFlight} vsLabel="Out"
+                  vsParKey="f9VsPar" grossKey="grossF9" netKey="netF9" handicapKey="f9Handicap"
+                  progressHolesKey="f9Holes" maxHoles={9}
+                  allScores={allScores} course={course} eventPlayers={eventPlayers}
+                />
+              )}
+              {activeTab === 'Back 9' && (
+                <NetLeaderboard
+                  complete={leaderboards.back9[activeFlight]}
+                  inProgress={leaderboards.back9[`${activeFlight}InProgress`]}
+                  flight={activeFlight} vsLabel="In"
+                  vsParKey="b9VsPar" grossKey="grossB9" netKey="netB9" handicapKey="b9Handicap"
+                  progressHolesKey="b9Holes" maxHoles={9}
+                  allScores={allScores} course={course} eventPlayers={eventPlayers}
+                />
+              )}
+              {activeTab === 'Low Gross' && (
+                <NetLeaderboard
+                  complete={leaderboards.grossFull[activeFlight]}
+                  inProgress={leaderboards.grossFull[`${activeFlight}InProgress`]}
+                  flight={activeFlight}
+                  vsParKey="grossVsPar" grossKey="gross18" netKey="gross18" handicapKey="course_handicap"
+                  progressHolesKey="holesCompleted" maxHoles={18}
+                  allScores={allScores} course={course} eventPlayers={eventPlayers}
+                />
+              )}
+              {activeTab === 'Gross Front 9' && (
+                <NetLeaderboard
+                  complete={leaderboards.grossFront9[activeFlight]}
+                  inProgress={leaderboards.grossFront9[`${activeFlight}InProgress`]}
+                  flight={activeFlight} vsLabel="Out"
+                  vsParKey="grossF9VsPar" grossKey="grossF9" netKey="grossF9" handicapKey="f9Handicap"
+                  progressHolesKey="f9Holes" maxHoles={9}
+                  allScores={allScores} course={course} eventPlayers={eventPlayers}
+                />
+              )}
+              {activeTab === 'Gross Back 9' && (
+                <NetLeaderboard
+                  complete={leaderboards.grossBack9[activeFlight]}
+                  inProgress={leaderboards.grossBack9[`${activeFlight}InProgress`]}
+                  flight={activeFlight} vsLabel="In"
+                  vsParKey="grossB9VsPar" grossKey="grossB9" netKey="grossB9" handicapKey="b9Handicap"
+                  progressHolesKey="b9Holes" maxHoles={9}
+                  allScores={allScores} course={course} eventPlayers={eventPlayers}
+                />
+              )}
+              {activeTab === 'Low Putts' && (
+                <PuttLeaderboard data={leaderboards.putts} allScores={allScores} course={course} flightOf={flightOf} hasFlights={hasFlights} />
+              )}
+              {activeTab === 'Stableford' && stablefordData && (
+                <StablefordLeaderboard data={stablefordData} activeFlight={activeFlight} allScores={allScores} course={course} />
+              )}
+              {activeTab === 'Stableford Gross' && stablefordGrossData && (
+                <StablefordLeaderboard data={stablefordGrossData} activeFlight={activeFlight} allScores={allScores} course={course} />
+              )}
+              {activeTab === 'Nassau' && leaderboards && (
+                <NassauBoard leaderboards={leaderboards} event={event} activeFlight={activeFlight} />
+              )}
+              {activeTab === 'Match Points' && matchData && (
+                <MatchPointsBoard matchData={matchData} event={event} />
+              )}
+              {activeTab === 'Team Match' && teamMatchData && (
+                <TeamMatchBoard teamMatchData={teamMatchData} teamAName={teamMatchData.teamAName} teamBName={teamMatchData.teamBName} event={event} />
+              )}
+              {activeTab === 'Skins' && skinsResults && (
+                <SkinsView result={skinsResults[skinsFlight]} title={hasFlights ? `Skins won · Flight ${skinsFlight}` : 'Skins won'} playerMap={playerMap} />
+              )}
+              {activeTab === 'Super Skins' && (
+                <SuperSkinsBoard event={event} eventPlayers={eventPlayers} allScores={allScores} course={course} playerMap={playerMap} />
+              )}
+              {activeTab === 'Blind Partners' && (
+                <BlindPartnersLeaderboard event={event} eventPlayers={eventPlayers} allScores={allScores} course={course} />
+              )}
+              {activeTab === 'Scramble' && (
+                <ScrambleLeaderboard eventPlayers={eventPlayers} allScores={allScores} course={course} />
+              )}
+              {activeTab === 'Payouts' && (
+            <PayoutsBoard
+              event={event}
+              eventPlayers={eventPlayers}
+              leaderboards={leaderboards}
+              sideGames={sideGames}
+              skinsResults={skinsResults}
+              stablefordData={stablefordData}
+              stablefordGrossData={stablefordGrossData}
+              blindPartnersData={blindPartnersData}
+              superSkinsResult={superSkinsResult}
+              playerMap={playerMap}
+              flight={activeFlight}
+              hasFlights={hasFlights}
+              flightOf={flightOf}
+            />
+              )}
+              {activeTab === 'Team Play' && (
+                <TGLBoard tglData={tglData} locked={tglLocked} flightOf={flightOf} hasFlights={hasFlights} />
+              )}
+            </>
+          )}
+
+          <div className="flex justify-center min-[900px]:hidden">
+            <Link to={pairingsUrl} className="inline-flex min-h-[44px] items-center px-3 text-sm font-semibold text-fairway-700 hover:underline">
+              Pairings &amp; tee times →
             </Link>
           </div>
-        </div>
+        </main>
 
-        {/* Tabs — pill style */}
-        <div className="max-w-2xl mx-auto" style={{ borderTop: '1px solid #ebe9e4' }}>
-          <div className="flex overflow-x-auto px-3 py-2 gap-1">
-            {tabs.map(tab => (
-              <button
-                key={tab}
-                onClick={() => setActiveTab(tab)}
-                aria-label={`View ${tab} leaderboard`}
-                aria-pressed={activeTab === tab}
-                className={`flex-none px-3.5 py-1.5 text-xs font-semibold transition-colors whitespace-nowrap cursor-pointer rounded-full ${
-                  activeTab === tab
-                    ? 'bg-status-active-bg text-status-active-text'
-                    : 'text-ink-muted hover:text-ink hover:bg-surface-high'
-                }`}
-              >
-                {tab === 'Match Points' ? 'Match Play' : tab}
-              </button>
-            ))}
-          </div>
-        </div>
-      </div>
-
-      {event.course?.photo_url && (
-        <div className="w-full h-40 overflow-hidden">
-          <img src={event.course.photo_url} alt={event.course.name} className="w-full h-full object-cover opacity-80" />
-        </div>
-      )}
-
-      {/* Flight toggle — only shown when flights are in use. Super Skins has its
-          own internal flight toggle (it only applies when the game itself is
-          scoped per flight, unlike the rest of the event), so it's excluded here
-          to avoid showing two flight switchers on the same screen. Blind Partners
-          isn't flight-scoped in its results view (pairs can span flights), so it's
-          excluded too, consistent with Low Putts. */}
-      {hasFlights && !['Low Putts', 'Skins', 'Match Points', 'Team Match', 'Payouts', 'Scramble', 'Super Skins', 'Blind Partners'].includes(activeTab) && (
-        <div className="max-w-2xl mx-auto px-4 pt-4 flex gap-2">
-          {flightLetters.map(f => (
-            <button
-              key={f}
-              onClick={() => setActiveFlight(f)}
-              aria-label={`View Flight ${f}`}
-              aria-pressed={activeFlight === f}
-              className={`px-4 py-1.5 rounded-full text-sm font-semibold transition-colors cursor-pointer ${
-                activeFlight === f
-                  ? ['bg-blue-50 text-blue-700', 'bg-purple-50 text-purple-700', 'bg-emerald-50 text-emerald-700', 'bg-status-upcoming-bg text-status-upcoming-text'][flightLetters.indexOf(f)] ?? 'bg-surface-high text-ink'
-                  : 'text-ink-muted hover:text-ink hover:bg-surface-high'
-              }`}
-            >
-              Flight {f}
-            </button>
-          ))}
-        </div>
-      )}
-
-      {/* Content */}
-      <div className="max-w-2xl mx-auto px-4 py-4">
-        {/* Gate: require all non-guest players to have a group before showing scored tabs */}
-        {!allGrouped && ['18-Hole', 'Front 9', 'Back 9', 'Low Gross', 'Gross Front 9', 'Gross Back 9', 'Stableford', 'Stableford Gross', 'Nassau', 'Scramble', 'Match Points', 'Team Match', 'Low Putts', 'Skins', 'Super Skins', 'Blind Partners'].includes(activeTab) && (
-          <div className="flex flex-col items-center justify-center py-16 gap-3 text-center">
-            <div style={{ fontSize: 40 }}>⛳</div>
-            <div className="font-semibold text-ink text-base">Pairings Not Yet Finalized</div>
-            <div className="text-ink-muted text-sm max-w-xs">
-              Leaderboard will appear once all players have been assigned to groups.
+        {/* Right rail — desktop only */}
+        <aside className="hidden space-y-4 min-[900px]:sticky min-[900px]:top-6 min-[900px]:block">
+          {glance.length > 0 && (
+            <div className={CARD}>
+              <CardHeader>At a glance</CardHeader>
+              <ul className="divide-y divide-surface-border">
+                {glance.map(g => (
+                  <li key={g.key}>
+                    <button type="button" onClick={() => go(g.tab, g.flight)} className={`${ROW_BTN} block min-h-[44px] px-4 py-3 hover:bg-surface-dim`}>
+                      <span className="block text-[11px] font-semibold uppercase tracking-[0.08em] text-ink-muted">{g.label}</span>
+                      <span className="mt-0.5 flex items-baseline justify-between gap-2">
+                        <span className="min-w-0 break-words text-sm font-bold text-ink">{g.value}</span>
+                        {g.aside && <span className="shrink-0 text-sm font-semibold tabular-nums text-fairway-700">{g.aside}</span>}
+                      </span>
+                    </button>
+                  </li>
+                ))}
+              </ul>
             </div>
+          )}
+          <div className={`${CARD} p-4`}>
+            <h3 className="text-[15px] font-bold text-ink">Share</h3>
+            <p className="mt-1 text-sm text-ink-muted">Send the live leaderboard to your group.</p>
+            <button
+              type="button" onClick={copyLink}
+              className="mt-3 inline-flex min-h-[44px] w-full items-center justify-center rounded-sm bg-fairway-700 px-4 text-sm font-semibold text-white hover:bg-fairway-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-fairway-500 focus-visible:ring-offset-2"
+            >
+              {copied ? 'Link copied' : 'Copy leaderboard link'}
+            </button>
           </div>
-        )}
-        {leaderboards && allGrouped && (
-          <>
-            {activeTab === '18-Hole' && (
-              <NetLeaderboard
-                complete={leaderboards.full[activeFlight]}
-                inProgress={leaderboards.full[`${activeFlight}InProgress`]}
-                flight={activeFlight}
-                vsParKey="netVsPar"
-                grossKey="gross18"
-                netKey="net18"
-                handicapKey="course_handicap"
-                progressHolesKey="holesCompleted"
-                maxHoles={18}
-                allScores={allScores}
-                course={course}
-                eventPlayers={eventPlayers}
-              />
-            )}
-            {activeTab === 'Front 9' && (
-              <NetLeaderboard
-                complete={leaderboards.front9[activeFlight]}
-                inProgress={leaderboards.front9[`${activeFlight}InProgress`]}
-                flight={activeFlight}
-                vsParKey="f9VsPar"
-                grossKey="grossF9"
-                netKey="netF9"
-                handicapKey="f9Handicap"
-                progressHolesKey="f9Holes"
-                maxHoles={9}
-                allScores={allScores}
-                course={course}
-                eventPlayers={eventPlayers}
-              />
-            )}
-            {activeTab === 'Back 9' && (
-              <NetLeaderboard
-                complete={leaderboards.back9[activeFlight]}
-                inProgress={leaderboards.back9[`${activeFlight}InProgress`]}
-                flight={activeFlight}
-                vsParKey="b9VsPar"
-                grossKey="grossB9"
-                netKey="netB9"
-                handicapKey="b9Handicap"
-                progressHolesKey="b9Holes"
-                maxHoles={9}
-                allScores={allScores}
-                course={course}
-                eventPlayers={eventPlayers}
-              />
-            )}
-            {activeTab === 'Low Gross' && (
-              <NetLeaderboard
-                complete={leaderboards.grossFull[activeFlight]}
-                inProgress={leaderboards.grossFull[`${activeFlight}InProgress`]}
-                flight={activeFlight}
-                vsParKey="grossVsPar"
-                grossKey="gross18"
-                netKey="gross18"
-                handicapKey="course_handicap"
-                progressHolesKey="holesCompleted"
-                maxHoles={18}
-                allScores={allScores}
-                course={course}
-                eventPlayers={eventPlayers}
-              />
-            )}
-            {activeTab === 'Gross Front 9' && (
-              <NetLeaderboard
-                complete={leaderboards.grossFront9[activeFlight]}
-                inProgress={leaderboards.grossFront9[`${activeFlight}InProgress`]}
-                flight={activeFlight}
-                vsParKey="grossF9VsPar"
-                grossKey="grossF9"
-                netKey="grossF9"
-                handicapKey="f9Handicap"
-                progressHolesKey="f9Holes"
-                maxHoles={9}
-                allScores={allScores}
-                course={course}
-                eventPlayers={eventPlayers}
-              />
-            )}
-            {activeTab === 'Gross Back 9' && (
-              <NetLeaderboard
-                complete={leaderboards.grossBack9[activeFlight]}
-                inProgress={leaderboards.grossBack9[`${activeFlight}InProgress`]}
-                flight={activeFlight}
-                vsParKey="grossB9VsPar"
-                grossKey="grossB9"
-                netKey="grossB9"
-                handicapKey="b9Handicap"
-                progressHolesKey="b9Holes"
-                maxHoles={9}
-                allScores={allScores}
-                course={course}
-                eventPlayers={eventPlayers}
-              />
-            )}
-            {activeTab === 'Low Putts' && (
-              <PuttLeaderboard data={leaderboards.putts} playerMap={playerMap} allScores={allScores} course={course} />
-            )}
-            {activeTab === 'Stableford' && stablefordData && (
-              <StablefordLeaderboard data={stablefordData} activeFlight={activeFlight} allScores={allScores} course={course} />
-            )}
-            {activeTab === 'Stableford Gross' && stablefordGrossData && (
-              <StablefordLeaderboard data={stablefordGrossData} activeFlight={activeFlight} allScores={allScores} course={course} />
-            )}
-            {activeTab === 'Nassau' && leaderboards && (
-              <NassauBoard leaderboards={leaderboards} event={event} activeFlight={activeFlight} playerMap={playerMap} />
-            )}
-            {activeTab === 'Match Points' && matchData && (
-              <MatchPointsBoard matchData={matchData} event={event} />
-            )}
-            {activeTab === 'Team Match' && teamMatchData && (
-              <TeamMatchBoard teamMatchData={teamMatchData} teamAName={teamMatchData.teamAName} teamBName={teamMatchData.teamBName} event={event} />
-            )}
-            {activeTab === 'Skins' && skinsResults && (
-              <SkinsBoard skinsResults={skinsResults} playerMap={playerMap} />
-            )}
-            {activeTab === 'Super Skins' && (
-              <SuperSkinsBoard event={event} eventPlayers={eventPlayers} allScores={allScores} course={course} playerMap={playerMap} />
-            )}
-            {activeTab === 'Blind Partners' && (
-              <BlindPartnersLeaderboard event={event} eventPlayers={eventPlayers} allScores={allScores} course={course} />
-            )}
-            {activeTab === 'Scramble' && (
-              <ScrambleLeaderboard eventPlayers={eventPlayers} allScores={allScores} course={course} />
-            )}
-            {activeTab === 'Payouts' && (
-              <PayoutsBoard
-                event={event}
-                eventPlayers={eventPlayers}
-                leaderboards={leaderboards}
-                sideGames={sideGames}
-                skinsResults={skinsResults}
-                stablefordData={stablefordData}
-                stablefordGrossData={stablefordGrossData}
-                blindPartnersData={blindPartnersData}
-                superSkinsResult={superSkinsResult}
-                playerMap={playerMap}
-              />
-            )}
-            {activeTab === 'Team Play' && (
-              <TGLBoard tglData={tglData} locked={tglLocked} />
-            )}
-          </>
-        )}
+        </aside>
       </div>
     </div>
-
     </>
   )
+}
+
+// ─── At a glance (desktop rail) ───────────────────────────────────
+// Only the games this event has; each item opens its tab (and flight).
+function atAGlance({ tabs, flightLetters, hasFlights, leaderboards, matchData, event, skinsResults, tglData, playerMap }) {
+  const items = []
+  const flights = hasFlights ? flightLetters : ['A']
+  const tiedName = (names) => (names.length === 1 ? names[0] : `${names.length} tied`)
+  if (tabs.includes('18-Hole')) {
+    for (const f of flights) {
+      const list = [...(leaderboards.full[f] ?? []), ...(leaderboards.full[`${f}InProgress`] ?? [])].filter(p => p.netVsPar != null)
+      if (!list.length) continue
+      const best = Math.min(...list.map(p => p.netVsPar))
+      const top = list.filter(p => p.netVsPar === best)
+      items.push({ key: `net-${f}`, tab: '18-Hole', flight: f, label: hasFlights ? `Net leader · Flight ${f}` : 'Net leader', value: tiedName(top.map(p => fullName(p.player))), aside: toParText(best) })
+    }
+  }
+  if (tabs.includes('Match Points') && matchData?.pairings?.length && matchData.hasTeams) {
+    const names = event?.ryder_cup_teams ?? {}
+    const a = names.a?.trim() || 'Team A'
+    const b = names.b?.trim() || 'Team B'
+    items.push({ key: 'match', tab: 'Match Points', label: 'Match play', value: `${a} ${fmtPts(matchData.teamPoints.A)} – ${fmtPts(matchData.teamPoints.B)} ${b}` })
+  }
+  if (tabs.includes('Skins') && skinsResults) {
+    for (const f of flights) {
+      const counts = Object.entries(skinsResults[f]?.playerSkins ?? {}).filter(([, n]) => n > 0)
+      if (!counts.length) continue
+      const most = Math.max(...counts.map(([, n]) => n))
+      const who = counts.filter(([, n]) => n === most).map(([pid]) => fullName(playerMap[pid]))
+      items.push({ key: `skins-${f}`, tab: 'Skins', flight: f, label: hasFlights ? `Most skins · Flight ${f}` : 'Most skins', value: tiedName(who), aside: `${most} skin${most === 1 ? '' : 's'}` })
+    }
+  }
+  if (tabs.includes('Low Putts') && leaderboards.putts?.length) {
+    const best = Math.min(...leaderboards.putts.map(p => p.totalPutts))
+    const top = leaderboards.putts.filter(p => p.totalPutts === best)
+    items.push({ key: 'putts', tab: 'Low Putts', label: 'Low putts', value: tiedName(top.map(p => fullName(p.player))), aside: `${best}` })
+  }
+  if (tabs.includes('Team Play') && tglData?.teamResults?.length) {
+    const t = tglData.teamResults[0]
+    items.push({ key: 'tgl', tab: 'Team Play', label: 'Team play leader', value: t.team.name, aside: `${fmtPts(t.teamPoints)} pts` })
+  }
+  return items
 }
 
 // ─── Scramble Leaderboard ─────────────────────────────────────────
@@ -568,75 +713,44 @@ function ScrambleLeaderboard({ eventPlayers, allScores, course }) {
 
   const all = [...ranked, ...noScores.map(g => ({ ...g, rankLabel: '—' }))]
 
-  if (!all.length) {
-    return (
-      <div className="text-center py-12 text-ink-muted">
-        <p className="font-medium">No groups assigned yet</p>
-      </div>
-    )
-  }
+  if (!all.length) return <div className={CARD}><Empty title="No groups assigned yet" /></div>
 
+  const COLS = 'grid grid-cols-[2.25rem_minmax(0,1fr)_3.75rem_2.25rem] gap-x-2'
   return (
-    <div className="card overflow-hidden p-0">
-      <div className="grid grid-cols-[2.5rem_1fr_3.5rem_3rem] text-[10px] font-bold uppercase tracking-widest px-4 py-2.5" style={{ background: '#f4f3f0', color: '#86868b' }}>
-        <span>Pos</span>
-        <span>Team</span>
-        <span className="text-right">Gross</span>
-        <span className="text-right">Thru</span>
+    <div className={CARD}>
+      <div className={`${COLS} ${HEAD} px-4 py-2.5`}>
+        <span>Pos</span><span>Team</span><span className="text-right">To par</span><span className="text-right">Thru</span>
       </div>
-      {all.map((g, i) => {
-        const vs = g.grossVsPar
-        const vsDisplay = vs == null ? '—' : vs === 0 ? 'E' : `${vs > 0 ? '+' : ''}${vs}`
-        const vsColor = vs == null ? 'text-ink-muted' : vs < 0 ? 'text-status-active-text font-bold' : 'text-ink'
-        const isFirst = g.rank === 1
-        return (
-          <div
-            key={g.groupNum}
-            className="grid grid-cols-[2.5rem_1fr_3.5rem_3rem] items-center px-4 py-3"
-            style={{
-              background: i % 2 === 1 ? 'rgba(27,67,50,0.025)' : '#ffffff',
-              borderBottom: '1px solid #ebe9e4',
-              borderLeft: isFirst ? '3px solid #1B4332' : undefined,
-            }}
-          >
-            <span className="text-sm font-semibold text-ink-muted tabular-nums">{g.rankLabel}</span>
-            <div>
-              <div className="font-semibold text-sm text-ink leading-tight">{g.teamName}</div>
-              <div className="text-[10px] text-ink-muted mt-0.5">
-                {g.players.map(ep => `${ep.player?.first_name ?? ''} ${ep.player?.last_name ?? ''}`.trim()).join(', ')}
-              </div>
-            </div>
-            <span className={`text-sm tabular-nums text-right ${vsColor}`}>{vsDisplay}</span>
-            <span className="text-xs text-ink-muted text-right tabular-nums">
-              {g.holesPlayed === 18 ? 'F' : g.holesPlayed || '—'}
-            </span>
-          </div>
-        )
-      })}
+      <ul className="divide-y divide-surface-border">
+        {all.map(g => {
+          const vs = g.grossVsPar
+          return (
+            <li key={g.groupNum} className={`${COLS} items-center px-4 py-3 ${g.rank === 1 ? LEADER : ''}`}>
+              <span className="text-sm font-semibold tabular-nums text-ink-muted">{g.rankLabel}</span>
+              <span className="min-w-0">
+                <span className="block break-words text-[15px] font-bold text-ink">{g.teamName}</span>
+                <span className="block break-words text-xs text-ink-muted">{g.players.map(ep => fullName(ep.player)).join(', ')}</span>
+              </span>
+              <span className={`text-right text-xl font-bold tabular-nums ${vs == null ? 'text-ink-muted' : vs <= 0 ? 'text-fairway-700' : 'text-ink'}`}>{toParText(vs)}</span>
+              <span className="text-right text-sm tabular-nums text-ink-muted">{g.holesPlayed === 18 ? 'F' : g.holesPlayed || '—'}</span>
+            </li>
+          )
+        })}
+      </ul>
     </div>
   )
 }
 
 // ─── Net Leaderboard ──────────────────────────────────────────────
-function NetLeaderboard({ complete, inProgress, flight, vsParKey = 'netVsPar', grossKey = 'gross18', netKey = 'net18', handicapKey = 'course_handicap', progressHolesKey = 'holesCompleted', maxHoles = 18, allScores = [], course = null, eventPlayers = [] }) {
+// Phone: Pos | Player (CH · Gross · Net underneath) | To par | Thru.
+// Desktop: Pos | Player | CH | Gross | Net | To par | Thru.
+const SCORE_COLS = 'grid grid-cols-[2.25rem_minmax(0,1fr)_3.75rem_2.25rem] gap-x-2 min-[900px]:grid-cols-[3rem_minmax(0,1fr)_3.5rem_4rem_4rem_4.5rem_3rem] min-[900px]:gap-x-3'
+
+function NetLeaderboard({ complete, inProgress, flight, vsLabel = 'To par', vsParKey = 'netVsPar', grossKey = 'gross18', netKey = 'net18', handicapKey = 'course_handicap', progressHolesKey = 'holesCompleted', maxHoles = 18, allScores = [], course = null, eventPlayers = [] }) {
   const [scorecardPlayer, setScorecardPlayer] = useState(null)
 
   const allComplete = complete ?? []
-
-  function rankLabel(p) {
-    const tied = allComplete.filter(x => x.rank === p.rank).length > 1
-    return tied ? `T${p.rank}` : `${p.rank}`
-  }
-
-  function scoreDisplay(p) {
-    const vs = p[vsParKey]
-    return vs == null ? '—' : vs === 0 ? 'E' : `${vs > 0 ? '+' : ''}${vs}`
-  }
-
-  function scoreColor(p) {
-    const vs = p[vsParKey]
-    return vs < 0 ? 'text-status-active-text font-bold' : vs === 0 ? 'text-ink' : 'text-ink-muted'
-  }
+  const showNet = netKey !== grossKey
 
   // Detect no-show players: all their scores have entered_by === 'no_show'
   const noShowPlayerIds = new Set(
@@ -681,99 +795,100 @@ function NetLeaderboard({ complete, inProgress, flight, vsParKey = 'netVsPar', g
     return { ...p, mergedRank: rank, mergedRankLabel: tied ? `T${rank}` : `${rank}` }
   })
 
+  if (!withRanks.length && !noShows.length && !notStarted.length) {
+    return <div className={CARD}><Empty title="No scores yet" /></div>
+  }
+
+  const desk = 'hidden text-right text-sm tabular-nums text-ink min-[900px]:block'
   return (
-    <div className="card overflow-hidden p-0">
-      {/* Table header */}
-      <div className="grid grid-cols-[2.5rem_1fr_3.5rem_3rem] text-[10px] font-bold uppercase tracking-widest px-4 py-2.5" style={{ background: '#f4f3f0', color: '#86868b' }}>
-        <span>Pos</span>
-        <span>Player</span>
-        <span className="text-right">Score</span>
+    <div className={CARD}>
+      <div className={`${SCORE_COLS} ${HEAD} items-center px-4 py-2.5`}>
+        <span>Pos</span><span>Player</span>
+        <span className="hidden text-right min-[900px]:block">CH</span>
+        <span className="hidden text-right min-[900px]:block">Gross</span>
+        <span className="hidden text-right min-[900px]:block">Net</span>
+        <span className="text-right">{vsLabel}</span>
         <span className="text-right">Thru</span>
       </div>
 
-      {withRanks.map((p, i) => {
-        const holesThru = p.finished
-          ? (p.holesCompleted ?? p.f9Holes ?? p.b9Holes ?? 18)
-          : (p[progressHolesKey] ?? 0)
-        const isFirst = p.mergedRank === 1
-        return (
-          <div
-            key={p.player_id}
-            onClick={() => course && setScorecardPlayer(p)}
-            className="grid grid-cols-[2.5rem_1fr_3.5rem_3rem] items-center px-4 py-3 cursor-pointer transition-colors"
-            style={{
-              background: i % 2 === 1 ? 'rgba(27,67,50,0.025)' : '#ffffff',
-              borderBottom: '1px solid #ebe9e4',
-              borderLeft: isFirst ? '3px solid #1B4332' : undefined,
-            }}
-            onMouseEnter={e => e.currentTarget.style.background = '#f4f3f0'}
-            onMouseLeave={e => e.currentTarget.style.background = i % 2 === 1 ? 'rgba(27,67,50,0.025)' : '#ffffff'}
-          >
-            <span className="text-sm font-semibold text-ink-muted tabular-nums">{p.mergedRankLabel}</span>
-            <div>
-              <div className="font-semibold text-sm text-ink leading-tight">
-                {p.player?.first_name} {p.player?.last_name}
-              </div>
-              <div className="text-[10px] text-ink-muted mt-0.5">
-                CH {p[handicapKey] ?? p.course_handicap} · Gross {p[grossKey] ?? '—'}
-              </div>
-            </div>
-            <span className={`text-sm tabular-nums text-right ${scoreColor(p)}`}>
-              {scoreDisplay(p)}
-            </span>
-            <span className="text-xs text-ink-muted text-right tabular-nums">
-              {p.finished && holesThru === maxHoles ? 'F' : holesThru || '—'}
-            </span>
-          </div>
-        )
-      })}
+      <ul className="divide-y divide-surface-border">
+        {withRanks.map(p => {
+          const holesThru = p.finished
+            ? (p.holesCompleted ?? p.f9Holes ?? p.b9Holes ?? 18)
+            : (p[progressHolesKey] ?? 0)
+          const vs = p[vsParKey]
+          const ch = p[handicapKey] ?? p.course_handicap
+          const gross = p[grossKey] ?? '—'
+          const net = showNet ? (p[netKey] ?? '—') : '—'
+          const isFirst = p.mergedRank === 1
+          return (
+            <li key={p.player_id}>
+              <button
+                type="button"
+                onClick={() => course && setScorecardPlayer(p)}
+                aria-label={`${fullName(p.player)}, ${toParText(vs)}. Open scorecard`}
+                className={`${SCORE_COLS} ${ROW_BTN} min-h-[60px] items-center px-4 py-3 ${isFirst ? LEADER : 'bg-white hover:bg-surface-dim'}`}
+              >
+                <span className="text-sm font-semibold tabular-nums text-ink-muted">{p.mergedRankLabel}</span>
+                <span className="min-w-0">
+                  <span className="block break-words text-[15px] font-bold leading-snug text-ink">{fullName(p.player)}</span>
+                  <span className="block text-xs text-ink-muted min-[900px]:hidden">
+                    CH {ch ?? '—'} · Gross {gross}{showNet ? ` · Net ${net}` : ''}
+                  </span>
+                </span>
+                <span className={desk}>{ch ?? '—'}</span>
+                <span className={desk}>{gross}</span>
+                <span className={desk}>{net}</span>
+                <span className={`text-right text-xl font-bold tabular-nums ${vs == null ? 'text-ink-muted' : vs <= 0 ? 'text-fairway-700' : 'text-ink'}`}>
+                  {toParText(vs)}
+                </span>
+                <span className="text-right text-sm font-medium tabular-nums text-ink-muted">
+                  {p.finished && holesThru === maxHoles ? 'F' : holesThru || '—'}
+                </span>
+              </button>
+            </li>
+          )
+        })}
+      </ul>
+
       {/* No-show players — shown at bottom, outside competitive rankings */}
       {noShows.length > 0 && (
         <>
-          <div className="px-4 py-1.5 text-[10px] font-bold uppercase tracking-widest" style={{ background: '#fef9ec', color: '#92400e' }}>
-            No Show
-          </div>
-          {noShows.map((p, i) => (
-            <div
-              key={p.player_id}
-              className="grid grid-cols-[2.5rem_1fr_3.5rem_3rem] items-center px-4 py-3"
-              style={{ background: '#fffbeb', borderBottom: '1px solid #ebe9e4', opacity: 0.7 }}
-            >
-              <span className="text-xs text-status-upcoming-text font-semibold">—</span>
-              <div>
-                <div className="font-semibold text-sm text-ink leading-tight">
-                  {p.player?.first_name} {p.player?.last_name}
-                </div>
-                <div className="text-[10px] text-status-upcoming-text mt-0.5">No Show</div>
-              </div>
-              <span className="text-xs text-ink-muted text-right">—</span>
-              <span className="text-xs text-ink-muted text-right">—</span>
-            </div>
-          ))}
+          <div className={`px-4 py-1.5 text-[11px] font-semibold uppercase tracking-[0.08em] ${AMBER_TAG}`}>No show</div>
+          <ul className="divide-y divide-surface-border">
+            {noShows.map(p => (
+              <li key={p.player_id} className={`${SCORE_COLS} items-center px-4 py-3 text-ink-muted`}>
+                <span className="text-sm font-semibold">—</span>
+                <span className="min-w-0">
+                  <span className="block break-words text-[15px] font-semibold text-ink-muted">{fullName(p.player)}</span>
+                  <span className="block text-xs text-status-upcoming-text">No show</span>
+                </span>
+                <span className="hidden min-[900px]:block" /><span className="hidden min-[900px]:block" /><span className="hidden min-[900px]:block" />
+                <span className="text-right text-sm">—</span>
+                <span className="text-right text-sm">—</span>
+              </li>
+            ))}
+          </ul>
         </>
       )}
       {notStarted.length > 0 && (
         <>
-          <div className="px-4 py-1.5 text-[10px] font-bold uppercase tracking-widest" style={{ background: '#f4f3f0', color: '#86868b' }}>
-            Not Started
-          </div>
-          {notStarted.map(ep => (
-            <div
-              key={ep.player_id}
-              className="grid grid-cols-[2.5rem_1fr_3.5rem_3rem] items-center px-4 py-3"
-              style={{ background: '#f9f8f6', borderBottom: '1px solid #ebe9e4', opacity: 0.6 }}
-            >
-              <span className="text-xs text-ink-muted font-semibold">—</span>
-              <div>
-                <div className="font-semibold text-sm text-ink leading-tight">
-                  {ep.player?.first_name} {ep.player?.last_name}
-                </div>
-                <div className="text-[10px] text-ink-muted mt-0.5">CH {ep.course_handicap ?? '—'}</div>
-              </div>
-              <span className="text-xs text-ink-muted text-right">—</span>
-              <span className="text-xs text-ink-muted text-right">—</span>
-            </div>
-          ))}
+          <div className={`${HEAD} border-t border-surface-border px-4 py-1.5`}>Not started</div>
+          <ul className="divide-y divide-surface-border">
+            {notStarted.map(ep => (
+              <li key={ep.player_id} className={`${SCORE_COLS} items-center px-4 py-3`}>
+                <span className="text-sm font-semibold text-ink-muted">—</span>
+                <span className="min-w-0">
+                  <span className="block break-words text-[15px] font-semibold text-ink-muted">{fullName(ep.player)}</span>
+                  <span className="block text-xs text-ink-muted min-[900px]:hidden">CH {ep.course_handicap ?? '—'}</span>
+                </span>
+                <span className="hidden text-right text-sm tabular-nums text-ink-muted min-[900px]:block">{ep.course_handicap ?? '—'}</span>
+                <span className="hidden min-[900px]:block" /><span className="hidden min-[900px]:block" />
+                <span className="text-right text-sm text-ink-muted">—</span>
+                <span className="text-right text-sm text-ink-muted">—</span>
+              </li>
+            ))}
+          </ul>
         </>
       )}
       {scorecardPlayer && course && (
@@ -789,13 +904,12 @@ function NetLeaderboard({ complete, inProgress, flight, vsParKey = 'netVsPar', g
 }
 
 // ─── Putt Leaderboard ─────────────────────────────────────────────
-function PuttLeaderboard({ data, playerMap, allScores = [], course = null }) {
+const PUTTS_PAGE = 10
+
+function PuttLeaderboard({ data, allScores = [], course = null, flightOf, hasFlights }) {
   const [scorecardPlayer, setScorecardPlayer] = useState(null)
-  if (!data?.length) return (
-    <div className="text-center py-12 text-ink-muted">
-      <p>No complete rounds yet.</p>
-    </div>
-  )
+  const [showAll, setShowAll] = useState(false)
+  if (!data?.length) return <div className={CARD}><Empty title="No complete rounds yet" /></div>
 
   // Assign ranks with tie detection (lowest putts = best)
   const ranked = data.map((p, i, arr) => {
@@ -804,33 +918,45 @@ function PuttLeaderboard({ data, playerMap, allScores = [], course = null }) {
     const rankLabel = tiedWith.length > 1 ? `T${rank}` : `${rank}`
     return { ...p, rank, rankLabel }
   })
+  const visible = showAll ? ranked : ranked.slice(0, PUTTS_PAGE)
+  const COLS = 'grid grid-cols-[2.25rem_minmax(0,1fr)_3.5rem] gap-x-2'
 
   return (
-    <div className="card overflow-hidden p-0">
-      <div className="grid grid-cols-[2.5rem_1fr_3.5rem] text-[10px] font-bold uppercase tracking-widest px-4 py-2.5" style={{ background: '#f4f3f0', color: '#86868b' }}>
-        <span>Pos</span>
-        <span>Player</span>
-        <span className="text-right">Putts</span>
+    <div className={CARD}>
+      <div className={`${COLS} ${HEAD} px-4 py-2.5`}>
+        <span>Pos</span><span>Player</span><span className="text-right">Putts</span>
       </div>
-      {ranked.map((p, i) => (
-        <div key={p.player_id}
-          onClick={() => course && setScorecardPlayer(p)}
-          className="grid grid-cols-[2.5rem_1fr_3.5rem] items-center px-4 py-3 cursor-pointer transition-colors"
-          style={{
-            background: i % 2 === 1 ? 'rgba(27,67,50,0.025)' : '#ffffff',
-            borderBottom: '1px solid #ebe9e4',
-            borderLeft: p.rank === 1 ? '3px solid #1B4332' : undefined,
-          }}
-          onMouseEnter={e => e.currentTarget.style.background = '#f4f3f0'}
-          onMouseLeave={e => e.currentTarget.style.background = i % 2 === 1 ? 'rgba(27,67,50,0.025)' : '#ffffff'}
-        >
-          <span className="text-sm font-semibold text-ink-muted tabular-nums">{p.rankLabel}</span>
-          <div className="font-medium text-sm text-ink">
-            {p.player?.first_name} {p.player?.last_name}
-          </div>
-          <span className="text-sm font-black tabular-nums text-status-active-text text-right">{p.totalPutts}</span>
+      <ul className="divide-y divide-surface-border">
+        {visible.map(p => {
+          const fl = p.flight ?? flightOf(p.player_id)
+          return (
+            <li key={p.player_id}>
+              <button
+                type="button"
+                onClick={() => course && setScorecardPlayer(p)}
+                className={`${COLS} ${ROW_BTN} min-h-[52px] items-center px-4 py-3 ${p.rank === 1 ? LEADER : 'bg-white hover:bg-surface-dim'}`}
+              >
+                <span className="text-sm font-semibold tabular-nums text-ink-muted">{p.rankLabel}</span>
+                <span className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-0.5">
+                  <span className="break-words text-[15px] font-bold text-ink">{fullName(p.player)}</span>
+                  {hasFlights && fl && <span className={`${TAG} ${fl === 'A' ? GREEN_TAG : 'bg-surface-high text-ink-muted'}`}>{fl}</span>}
+                </span>
+                <span className="text-right text-xl font-bold tabular-nums text-ink">{p.totalPutts}</span>
+              </button>
+            </li>
+          )
+        })}
+      </ul>
+      {ranked.length > PUTTS_PAGE && (
+        <div className="border-t border-surface-border px-4 py-1 text-center">
+          <button
+            type="button" onClick={() => setShowAll(s => !s)} aria-expanded={showAll}
+            className="min-h-[44px] rounded-sm px-4 text-sm font-semibold text-fairway-700 hover:bg-surface-dim focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-fairway-500"
+          >
+            {showAll ? 'Show fewer' : `Show all ${ranked.length}`}
+          </button>
         </div>
-      ))}
+      )}
       {scorecardPlayer && course && (
         <PlayerScorecardModal
           player={scorecardPlayer}
@@ -843,15 +969,74 @@ function PuttLeaderboard({ data, playerMap, allScores = [], course = null }) {
   )
 }
 
-// ─── Skins Board ──────────────────────────────────────────────────
-// ─── Super Skins Leaderboard ──────────────────────────────────────────────────
+// ─── Skins (shared by Skins and Super Skins) ──────────────────────
+function SkinsView({ result, title, playerMap }) {
+  if (!result) return <div className={CARD}><Empty title="No skins yet" /></div>
+  const totals = Object.entries(result.playerSkins).filter(([, c]) => c > 0).sort(([, a], [, b]) => b - a)
+  const rows = skinsHoleRows(result.holes)
+  const nameOf = pid => (playerMap[pid] ? fullName(playerMap[pid]) : pid)
+
+  return (
+    <div className="space-y-4">
+      {result.carryoverToNext && (
+        <div className={`rounded-sm border border-surface-border px-4 py-3 text-sm font-medium ${AMBER_TAG}`}>
+          {result.carryoverAmount} skin{result.carryoverAmount !== 1 ? 's' : ''} carry to the next event (no winner this round)
+        </div>
+      )}
+      <div className="grid gap-4 min-[900px]:grid-cols-2 min-[900px]:items-start">
+        {totals.length > 0 && (
+          <div className={CARD}>
+            <CardHeader>{title}</CardHeader>
+            <ul className="divide-y divide-surface-border">
+              {totals.map(([pid, count]) => (
+                <li key={pid} className="flex min-h-[48px] items-center justify-between gap-3 px-4 py-3">
+                  <span className="min-w-0 break-words text-[15px] font-semibold text-ink">{nameOf(pid)}</span>
+                  <span className="shrink-0 text-[15px] font-bold tabular-nums text-fairway-700">{count} skin{count !== 1 ? 's' : ''}</span>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+        <div className={CARD}>
+          <CardHeader>Hole by hole</CardHeader>
+          {rows.length === 0 ? (
+            <p className="px-4 py-6 text-center text-sm text-ink-muted">No holes complete yet.</p>
+          ) : (
+            <ul className="divide-y divide-surface-border">
+              {rows.map(r => r.type === 'tied' ? (
+                <li key={`t${r.from}`} className="flex min-h-[48px] items-center gap-3 bg-status-upcoming-bg/60 px-4 py-3">
+                  <span className="w-12 shrink-0 text-sm font-semibold tabular-nums text-ink-muted">{holeRange(r.from, r.to)}</span>
+                  <span className="min-w-0 flex-1 text-sm text-ink-muted">Tied · carry</span>
+                  <span className={`${TAG} ${AMBER_TAG}`}>{r.carried} carried</span>
+                </li>
+              ) : (
+                <li key={`w${r.hole}`} className="flex min-h-[48px] items-center gap-3 px-4 py-3">
+                  <span className="w-12 shrink-0 text-sm font-semibold tabular-nums text-ink-muted">{r.hole}</span>
+                  <span className="min-w-0 flex-1">
+                    <span className="block break-words text-[15px] font-bold text-ink">{nameOf(r.winner)}</span>
+                    {r.parts.length > 0 && (
+                      <span className="block text-xs text-ink-muted">
+                        {r.parts.map((part, i) => <span key={i} className="whitespace-nowrap">{i > 0 ? ' + ' : ''}{part}</span>)}
+                      </span>
+                    )}
+                  </span>
+                  <span className={`${TAG} ${GREEN_TAG}`}>{r.skinsWon} skin{r.skinsWon !== 1 ? 's' : ''}</span>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// ─── Super Skins Leaderboard ──────────────────────────────────────
 function SuperSkinsBoard({ event, eventPlayers, allScores, course, playerMap }) {
   const [flight, setFlight] = useState('A')
   const allResults = computeSuperSkins(event, eventPlayers, allScores, course)
 
-  if (!allResults) {
-    return <p className="text-sm text-ink-muted text-center py-8">No players have opted in to Super Skins yet.</p>
-  }
+  if (!allResults) return <div className={CARD}><Empty title="No players have opted in to Super Skins yet" /></div>
 
   // Only show the flight toggle when Super Skins is actually scoped per flight
   // (independent pot per flight) — not merely because the event has flights.
@@ -860,98 +1045,21 @@ function SuperSkinsBoard({ event, eventPlayers, allScores, course, playerMap }) 
   const activeFlight = showFlightToggle ? flight : (allResults.A.entrantCount > 0 ? 'A' : 'B')
   const result = allResults[activeFlight]
 
-  const totalSkins = Object.values(result.playerSkins).reduce((a, b) => a + b, 0)
-
   return (
     <div className="space-y-4">
       {showFlightToggle && (
-        <div className="flex gap-2">
-          {['A', 'B'].map(f => (
-            <button
-              key={f}
-              onClick={() => setFlight(f)}
-              aria-label={`View Flight ${f} Super Skins`}
-              aria-pressed={activeFlight === f}
-              className={`px-4 py-1.5 rounded-full text-sm font-semibold transition-colors cursor-pointer ${
-                activeFlight === f
-                  ? f === 'A' ? 'bg-blue-600 text-white' : 'bg-purple-600 text-white'
-                  : 'bg-white text-ink-muted border border-surface-border'
-              }`}
-            >
-              Flight {f}
-            </button>
-          ))}
-        </div>
+        <SegmentedToggle
+          options={['A', 'B'].map(f => ({ value: f, label: `Flight ${f}` }))}
+          value={activeFlight} onChange={setFlight} label="Super skins flight"
+          className="w-full [&>button]:flex-1 min-[900px]:w-auto"
+        />
       )}
-
-      {result.carryoverToNext && (
-        <div className="bg-status-upcoming-bg border border-surface-border rounded-sm px-4 py-3 text-sm text-status-upcoming-text">
-          {result.carryoverAmount} skin{result.carryoverAmount !== 1 ? 's' : ''} carry to next event (no winner this round)
-        </div>
-      )}
-
-      {totalSkins > 0 && (
-        <div className="card overflow-hidden p-0">
-          <div className="px-4 py-3" style={{ borderBottom: '1px solid #ebe9e4', background: '#f4f3f0' }}>
-            <h3 className="font-semibold text-sm text-ink">Skins Won{showFlightToggle ? ` — Flight ${activeFlight}` : ''}</h3>
-          </div>
-          <div>
-            {Object.entries(result.playerSkins)
-              .filter(([, c]) => c > 0)
-              .sort(([, a], [, b]) => b - a)
-              .map(([pid, count]) => {
-                const p = playerMap[pid]
-                return (
-                  <div key={pid} className="flex items-center justify-between px-4 py-3" style={{ borderBottom: '1px solid #ebe9e4' }}>
-                    <span className="font-medium text-sm text-ink">
-                      {p ? `${p.first_name} ${p.last_name}` : pid}
-                    </span>
-                    <span className="font-black text-status-active-text text-lg">{count} skin{count !== 1 ? 's' : ''}</span>
-                  </div>
-                )
-              })}
-          </div>
-        </div>
-      )}
-
-      <div className="card overflow-hidden p-0">
-        <div className="px-4 py-3" style={{ borderBottom: '1px solid #ebe9e4', background: '#f4f3f0' }}>
-          <h3 className="font-semibold text-sm text-ink">Hole-by-Hole Skins</h3>
-        </div>
-        <div>
-          {result.holes.map(h => {
-            if (h.incomplete) return null
-            const winner = h.winner ? playerMap[h.winner] : null
-            return (
-              <div key={h.hole} className="flex items-center gap-3 px-4 py-2.5" style={{ borderBottom: '1px solid #ebe9e4' }}>
-                <span className="w-8 text-sm font-semibold text-ink-muted">#{h.hole}</span>
-                {h.tied && !h.winner && (
-                  <span className="text-xs text-status-upcoming-text font-medium">
-                    Tied — {h.carryoverIn + 1} skin{h.carryoverIn + 1 !== 1 ? 's' : ''} carried
-                  </span>
-                )}
-                {h.winner && (
-                  <>
-                    <span className="text-xs text-status-active-text font-semibold">
-                      {winner ? `${winner.first_name} ${winner.last_name}` : h.winner}
-                    </span>
-                    <span className="ml-auto text-xs font-bold text-ink-muted">
-                      {h.skinsWon} skin{h.skinsWon !== 1 ? 's' : ''}
-                      {h.carryoverIn > 0 && <span className="text-status-upcoming-text"> (+{h.carryoverIn} carry)</span>}
-                      {h.wraparound > 0 && <span className="text-purple-500"> (+{h.wraparound} wraparound)</span>}
-                    </span>
-                  </>
-                )}
-              </div>
-            )
-          })}
-        </div>
-      </div>
+      <SkinsView result={result} title={showFlightToggle ? `Skins won · Flight ${activeFlight}` : 'Skins won'} playerMap={playerMap} />
     </div>
   )
 }
 
-// ─── Blind Partners Leaderboard ───────────────────────────────────────────────
+// ─── Blind Partners Leaderboard ───────────────────────────────────
 function BlindPartnersLeaderboard({ event, eventPlayers, allScores, course }) {
   const pairs   = event?.side_game_entries?.blind_partner_pairs ?? []
   const parPerHole = course?.par_per_hole ?? []
@@ -969,142 +1077,44 @@ function BlindPartnersLeaderboard({ event, eventPlayers, allScores, course }) {
   const rankLabel = (pair) =>
     ranked.filter(x => x.rank === pair.rank).length > 1 ? `T${pair.rank}` : `${pair.rank}`
 
-  if (pairs.length === 0) {
-    return <p className="text-sm text-ink-muted text-center py-8">No pairs drawn yet.</p>
-  }
+  if (pairs.length === 0) return <div className={CARD}><Empty title="No pairs drawn yet" /></div>
 
   return (
-    <div className="space-y-2">
-      <p className="text-xs text-ink-muted mb-3">
+    <div className="space-y-3">
+      <p className="text-xs text-ink-muted">
         {isStableford
           ? 'Combined Stableford points per pair — highest wins.'
           : 'Combined net score per pair — lowest wins.'}
       </p>
-      {ranked.map(pair => {
-        const parTotal = parPerHole.reduce((a, b) => a + b, 0) * 2
-        const color = isStableford
-          ? 'text-status-active-text'
-          : pair.combinedScore < parTotal ? 'text-red-600'
-          : pair.combinedScore === parTotal ? 'text-ink'
-          : 'text-black'
-        return (
-          <div key={pair.idx} className="flex items-center justify-between bg-white rounded-sm px-4 py-3 shadow-sm border border-surface-border">
-            <div className="flex items-center gap-3">
-              <span className="text-sm font-bold text-ink-muted w-6">{rankLabel(pair)}</span>
-              <div>
-                <div className="text-sm font-semibold text-ink">{playerName(pair.p1)}</div>
-                {pair.p2
-                  ? <div className="text-sm font-semibold text-ink">{playerName(pair.p2)}</div>
-                  : pair.oddConfig?.type === 'ghost'
-                    ? <div className="text-xs text-status-upcoming-text italic">👻 Ghost ({pair.oddConfig.score ?? '?'} {isStableford ? 'pts' : 'net'})</div>
-                    : pair.oddConfig?.type === 'blind' && pair.oddConfig.player_id
-                      ? <div className="text-xs text-status-upcoming-text italic">🔀 {playerName(pair.oddConfig.player_id)}'s score</div>
-                      : <div className="text-xs text-ink-muted italic">no partner assigned</div>
-                }
-              </div>
-            </div>
-            <div className="text-right">
-              <div className={`text-lg font-bold tabular-nums ${color}`}>{pair.combinedScore}</div>
-              <div className="text-xs text-ink-muted">{pair.holesPlayed} holes</div>
-            </div>
-          </div>
-        )
-      })}
-    </div>
-  )
-}
-
-function SkinsBoard({ skinsResults, playerMap }) {
-  const [flight, setFlight] = useState('A')
-  const result = skinsResults[flight]
-
-  const totalSkins = Object.values(result.playerSkins).reduce((a, b) => a + b, 0)
-
-  return (
-    <div className="space-y-4">
-      <div className="flex gap-2">
-        {['A', 'B'].map(f => (
-          <button
-            key={f}
-            onClick={() => setFlight(f)}
-            aria-label={`View Flight ${f} skins`}
-            aria-pressed={flight === f}
-            className={`px-4 py-1.5 rounded-full text-sm font-semibold transition-colors cursor-pointer ${
-              flight === f
-                ? f === 'A' ? 'bg-blue-600 text-white' : 'bg-purple-600 text-white'
-                : 'bg-white text-ink-muted border border-surface-border'
-            }`}
-          >
-            Flight {f}
-          </button>
-        ))}
-      </div>
-
-      {result.carryoverToNext && (
-        <div className="bg-status-upcoming-bg border border-surface-border rounded-sm px-4 py-3 text-sm text-status-upcoming-text">
-          {result.carryoverAmount} skin{result.carryoverAmount !== 1 ? 's' : ''} carry to next event (no winner this round)
-        </div>
-      )}
-
-      {/* Player skin totals */}
-      {totalSkins > 0 && (
-        <div className="card overflow-hidden p-0">
-          <div className="px-4 py-3" style={{ borderBottom: '1px solid #ebe9e4', background: '#f4f3f0' }}>
-            <h3 className="font-semibold text-sm text-ink">Skins Won — Flight {flight}</h3>
-          </div>
-          <div>
-            {Object.entries(result.playerSkins)
-              .filter(([, c]) => c > 0)
-              .sort(([, a], [, b]) => b - a)
-              .map(([pid, count]) => {
-                const p = playerMap[pid]
-                return (
-                  <div key={pid} className="flex items-center justify-between px-4 py-3" style={{ borderBottom: '1px solid #ebe9e4' }}>
-                    <span className="font-medium text-sm text-ink">
-                      {p ? `${p.first_name} ${p.last_name}` : pid}
-                    </span>
-                    <span className="font-black text-status-active-text text-lg">{count} skin{count !== 1 ? 's' : ''}</span>
-                  </div>
-                )
-              })
-            }
-          </div>
-        </div>
-      )}
-
-      {/* Hole-by-hole */}
-      <div className="card overflow-hidden p-0">
-        <div className="px-4 py-3" style={{ borderBottom: '1px solid #ebe9e4', background: '#f4f3f0' }}>
-          <h3 className="font-semibold text-sm text-ink">Hole-by-Hole Skins</h3>
-        </div>
-        <div>
-          {result.holes.map(h => {
-            if (h.incomplete) return null
-            const winner = h.winner ? playerMap[h.winner] : null
+      <div className={CARD}>
+        <ul className="divide-y divide-surface-border">
+          {ranked.map(pair => {
+            const parTotal = parPerHole.reduce((a, b) => a + b, 0) * 2
+            const color = isStableford || pair.combinedScore <= parTotal ? 'text-fairway-700' : 'text-ink'
             return (
-              <div key={h.hole} className="flex items-center gap-3 px-4 py-2.5" style={{ borderBottom: '1px solid #ebe9e4' }}>
-                <span className="w-8 text-sm font-semibold text-ink-muted">#{h.hole}</span>
-                {h.tied && !h.winner && (
-                  <span className="text-xs text-status-upcoming-text font-medium">
-                    Tied — {h.carryoverIn + 1} skin{h.carryoverIn + 1 !== 1 ? 's' : ''} carried
-                  </span>
-                )}
-                {h.winner && (
-                  <>
-                    <span className="text-xs text-status-active-text font-semibold">
-                      {winner ? `${winner.first_name} ${winner.last_name}` : h.winner}
-                    </span>
-                    <span className="ml-auto text-xs font-bold text-ink-muted">
-                      {h.skinsWon} skin{h.skinsWon !== 1 ? 's' : ''}
-                      {h.carryoverIn > 0 && <span className="text-status-upcoming-text"> (+{h.carryoverIn} carry)</span>}
-                      {h.wraparound > 0 && <span className="text-purple-500"> (+{h.wraparound} wraparound)</span>}
-                    </span>
-                  </>
-                )}
-              </div>
+              <li key={pair.idx} className={`flex items-center justify-between gap-3 px-4 py-3 ${pair.rank === 1 ? LEADER : ''}`}>
+                <div className="flex min-w-0 items-center gap-3">
+                  <span className="w-7 shrink-0 text-sm font-semibold text-ink-muted">{rankLabel(pair)}</span>
+                  <div className="min-w-0">
+                    <div className="break-words text-[15px] font-bold text-ink">{playerName(pair.p1)}</div>
+                    {pair.p2
+                      ? <div className="break-words text-[15px] font-bold text-ink">{playerName(pair.p2)}</div>
+                      : pair.oddConfig?.type === 'ghost'
+                        ? <div className="text-xs italic text-status-upcoming-text">Ghost ({pair.oddConfig.score ?? '?'} {isStableford ? 'pts' : 'net'})</div>
+                        : pair.oddConfig?.type === 'blind' && pair.oddConfig.player_id
+                          ? <div className="text-xs italic text-status-upcoming-text">{playerName(pair.oddConfig.player_id)}'s score</div>
+                          : <div className="text-xs italic text-ink-muted">no partner assigned</div>
+                    }
+                  </div>
+                </div>
+                <div className="shrink-0 text-right">
+                  <div className={`text-xl font-bold tabular-nums ${color}`}>{pair.combinedScore}</div>
+                  <div className="text-xs text-ink-muted">{pair.holesPlayed} holes</div>
+                </div>
+              </li>
             )
           })}
-        </div>
+        </ul>
       </div>
     </div>
   )
@@ -1119,47 +1129,35 @@ function StablefordLeaderboard({ data, activeFlight, allScores = [], course = nu
   const rankLabel = (p) =>
     list.filter(x => x.rank === p.rank).length > 1 ? `T${p.rank}` : `${p.rank}`
 
-  if (!list.length) return (
-    <div className="text-center py-12 text-ink-muted">
-      <svg className="mx-auto mb-3 w-10 h-10 text-surface-outline" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.5"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="5"/><circle cx="12" cy="12" r="1" fill="currentColor"/></svg>
-      <p className="font-medium">No scores yet for Flight {activeFlight}</p>
-    </div>
-  )
+  if (!list.length) return <div className={CARD}><Empty title={`No scores yet for Flight ${activeFlight}`} /></div>
 
+  const COLS = 'grid grid-cols-[2.25rem_minmax(0,1fr)_3.5rem] gap-x-2'
   return (
     <div className="space-y-3">
-      <div className="card overflow-hidden p-0">
-        <div className="grid grid-cols-[2.5rem_1fr_3.5rem] text-[10px] font-bold uppercase tracking-widest px-4 py-2.5" style={{ background: '#f4f3f0', color: '#86868b' }}>
-          <span>Pos</span>
-          <span>Player</span>
-          <span className="text-right">Pts</span>
+      <div className={CARD}>
+        <div className={`${COLS} ${HEAD} px-4 py-2.5`}>
+          <span>Pos</span><span>Player</span><span className="text-right">Pts</span>
         </div>
-        {list.map((p, i) => (
-          <div key={p.player_id}
-            onClick={() => course && setScorecardPlayer(p)}
-            className="grid grid-cols-[2.5rem_1fr_3.5rem] items-center px-4 py-3 cursor-pointer transition-colors"
-            style={{
-              background: i % 2 === 1 ? 'rgba(27,67,50,0.025)' : '#ffffff',
-              borderBottom: '1px solid #ebe9e4',
-              borderLeft: p.rank === 1 ? '3px solid #1B4332' : undefined,
-            }}
-            onMouseEnter={e => e.currentTarget.style.background = '#f4f3f0'}
-            onMouseLeave={e => e.currentTarget.style.background = i % 2 === 1 ? 'rgba(27,67,50,0.025)' : '#ffffff'}
-          >
-            <span className="text-sm font-semibold text-ink-muted tabular-nums">{rankLabel(p)}</span>
-            <div>
-              <div className="font-semibold text-sm text-ink leading-tight">
-                {p.player?.first_name} {p.player?.last_name}
-              </div>
-              <div className="text-[10px] text-ink-muted mt-0.5">
-                CH {p.course_handicap} · {p.holesPlayed} holes
-              </div>
-            </div>
-            <span className="text-sm font-black tabular-nums text-status-active-text text-right">{p.totalPoints}</span>
-          </div>
-        ))}
+        <ul className="divide-y divide-surface-border">
+          {list.map(p => (
+            <li key={p.player_id}>
+              <button
+                type="button"
+                onClick={() => course && setScorecardPlayer(p)}
+                className={`${COLS} ${ROW_BTN} min-h-[60px] items-center px-4 py-3 ${p.rank === 1 ? LEADER : 'bg-white hover:bg-surface-dim'}`}
+              >
+                <span className="text-sm font-semibold tabular-nums text-ink-muted">{rankLabel(p)}</span>
+                <span className="min-w-0">
+                  <span className="block break-words text-[15px] font-bold text-ink">{fullName(p.player)}</span>
+                  <span className="block text-xs text-ink-muted">CH {p.course_handicap} · {p.holesPlayed} holes</span>
+                </span>
+                <span className="text-right text-xl font-bold tabular-nums text-fairway-700">{p.totalPoints}</span>
+              </button>
+            </li>
+          ))}
+        </ul>
       </div>
-      <p className="text-xs text-center text-ink-muted">Eagle=4 · Birdie=3 · Par=2 · Bogey=1 · DBL+=0 (net)</p>
+      <p className="text-center text-xs text-ink-muted">Eagle=4 · Birdie=3 · Par=2 · Bogey=1 · DBL+=0 (net)</p>
       {scorecardPlayer && course && (
         <PlayerScorecardModal
           player={scorecardPlayer}
@@ -1191,35 +1189,26 @@ function NassauBoard({ leaderboards, event, activeFlight }) {
   ])
 
   const anyScores = variants.some(v => betsFor(v.key).some(b => b.list.length > 0))
-  if (!anyScores) return (
-    <div className="text-center py-12 text-ink-muted">
-      <svg className="mx-auto mb-3 w-10 h-10 text-surface-outline" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.5"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="5"/><circle cx="12" cy="12" r="1" fill="currentColor"/></svg>
-      <p className="font-medium">No Nassau scores yet for Flight {activeFlight}</p>
-    </div>
-  )
+  if (!anyScores) return <div className={CARD}><Empty title={`No Nassau scores yet for Flight ${activeFlight}`} /></div>
 
   return (
     <div className="space-y-5">
       {variants.map(v => (
         <div key={v.key}>
           {variants.length > 1 && (
-            <h3 className="text-xs font-bold uppercase tracking-widest text-ink-muted mb-2">{v.label}</h3>
+            <h3 className="mb-2 text-[11px] font-semibold uppercase tracking-[0.08em] text-ink-muted">{v.label}</h3>
           )}
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
             {betsFor(v.key).map(bet => (
-              <div key={bet.label} className="card overflow-hidden p-0">
-                <div className="px-3 py-2 text-[10px] font-bold uppercase tracking-widest" style={{ background: '#f4f3f0', color: '#86868b' }}>
-                  {bet.label}
-                </div>
+              <div key={bet.label} className={CARD}>
+                <div className={`${HEAD} px-3 py-2`}>{bet.label}</div>
                 {bet.list.length === 0 ? (
-                  <div className="px-3 py-4 text-xs text-ink-muted text-center">No scores yet</div>
+                  <div className="px-3 py-4 text-center text-xs text-ink-muted">No scores yet</div>
                 ) : (
                   bet.list.filter(p => p.rank === 1).map(p => (
-                    <div key={p.player_id} className="px-3 py-2.5 border-b border-[#ebe9e4] last:border-0">
-                      <div className="font-semibold text-sm text-ink leading-tight">
-                        {p.player?.first_name} {p.player?.last_name}
-                      </div>
-                      <div className="text-[10px] text-ink-muted mt-0.5">{p[bet.scoreKey]} · leader</div>
+                    <div key={p.player_id} className="border-b border-surface-border px-3 py-2.5 last:border-0">
+                      <div className="text-sm font-bold leading-tight text-ink">{fullName(p.player)}</div>
+                      <div className="mt-0.5 text-xs text-ink-muted">{p[bet.scoreKey]} · leader</div>
                     </div>
                   ))
                 )}
@@ -1228,242 +1217,153 @@ function NassauBoard({ leaderboards, event, activeFlight }) {
           </div>
         </div>
       ))}
-      <p className="text-xs text-center text-ink-muted">Three independent bets — Front 9, Back 9, Full 18 — each scored and paid separately.</p>
+      <p className="text-center text-xs text-ink-muted">Three independent bets — Front 9, Back 9, Full 18 — each scored and paid separately.</p>
     </div>
   )
 }
 
-// Strip the redundant "(A)"/"(B)" leader tag from in-progress match status strings —
-// color/position in the UI already indicates which side is up.
-function shortStatus(status) {
-  return status.replace(/ \([AB]\)$/, '')
+// ─── Match play pieces (shared by Match play and Team match) ──────
+function MatchScoreCard({ labelA, labelB, a, b, complete, caption = 'Matches won' }) {
+  const leader = a > b ? labelA : b > a ? labelB : null
+  const verdict = leader ? `${leader} ${complete ? 'wins' : 'leads'}` : 'All square'
+  return (
+    <div className={`${CARD} grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-3 px-4 py-4`}>
+      <div className="min-w-0">
+        <p className="break-words text-sm font-bold text-fairway-700">{labelA}</p>
+        <p className="text-[40px] font-bold leading-none tabular-nums text-fairway-700">{fmtPts(a)}</p>
+      </div>
+      <div className="text-center">
+        <p className="text-xs text-ink-muted">{caption}</p>
+        <p className="text-sm font-bold text-ink">{verdict}</p>
+      </div>
+      <div className="min-w-0 text-right">
+        <p className="break-words text-sm font-bold text-status-upcoming-text">{labelB}</p>
+        <p className="text-[40px] font-bold leading-none tabular-nums text-status-upcoming-text">{fmtPts(b)}</p>
+      </div>
+    </div>
+  )
 }
 
-// Edge status text for the compact match row — blank for the trailing side,
-// margin (e.g. "1 UP") for the leading/winning side, "AS" for both sides when tied.
-function edgeStatus(side, entity) {
-  const { upBy, holesPlayed, winner, matchStatus } = entity
-  if (holesPlayed === 0) return ''
-  const leaderSide = upBy > 0 ? 'A' : upBy < 0 ? 'B' : null
-  if (winner != null) {
-    if (winner === 'halve') return 'AS'
-    return winner === side ? shortStatus(matchStatus) : ''
-  }
-  if (leaderSide === null) return 'AS'
-  return leaderSide === side ? shortStatus(matchStatus) : ''
+/**
+ * One match: phone stacks side A (green dot) over side B (gold dot) with the result chip on the
+ * right; desktop puts the two sides either side of the chip. The whole row toggles the detail.
+ */
+function MatchRow({ m, nameA, nameB, tagA = 0, tagB = 0, open, onToggle, children }) {
+  const chip = matchChip(m)
+  const decided = m.winner === 'A' || m.winner === 'B'
+  const lead = decided ? m.winner : m.holesPlayed > 0 && m.winner == null ? (m.upBy > 0 ? 'A' : m.upBy < 0 ? 'B' : null) : null
+  const inProgress = m.winner == null && m.holesPlayed > 0 && !m.needsWinner
+  const nameCls = side => decided
+    ? (m.winner === side ? 'font-bold text-ink' : 'font-medium text-ink-muted')
+    : lead === side ? 'font-bold text-ink' : 'font-semibold text-ink'
+  const Side = ({ side, name, tag, className }) => (
+    <span className={`flex min-w-0 items-center gap-2 ${className}`}>
+      <span className={`h-2 w-2 shrink-0 rounded-full ${SIDE[side].dot}`} aria-hidden="true" />
+      <span className={`min-w-0 break-words text-[15px] leading-snug ${nameCls(side)}`}>{name}</span>
+      {tag > 0 && <span className={`${TAG} ${GREEN_TAG} shrink-0`} title={`Receives ${tag} stroke${tag === 1 ? '' : 's'}`}>+{tag}</span>}
+    </span>
+  )
+  return (
+    <li>
+      <button
+        type="button" onClick={onToggle} aria-expanded={open}
+        className={`${ROW_BTN} grid min-h-[64px] grid-cols-[minmax(0,1fr)_auto_auto] items-center gap-x-3 gap-y-1.5 px-4 py-3 hover:bg-surface-dim min-[900px]:grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)_auto]`}
+      >
+        <Side side="A" name={nameA} tag={tagA} className="col-start-1 row-start-1 min-[900px]:justify-end" />
+        <Side side="B" name={nameB} tag={tagB} className="col-start-1 row-start-2 min-[900px]:col-start-3 min-[900px]:row-start-1" />
+        <span className="col-start-2 row-span-2 row-start-1 flex flex-col items-end gap-0.5 min-[900px]:row-span-1 min-[900px]:items-center">
+          <span className={`inline-flex min-w-[56px] justify-center rounded-sm px-2.5 py-1 text-sm font-bold ${CHIP_TONE[chip.tone]}`}>{chip.text}</span>
+          {inProgress && <span className="text-[11px] text-ink-muted">Thru {m.holesPlayed}</span>}
+        </span>
+        <Chevron open={open} className="col-start-3 row-span-2 row-start-1 min-[900px]:col-start-4 min-[900px]:row-span-1" />
+      </button>
+      {open && <div className="border-t border-surface-border bg-surface px-4 py-4">{children}</div>}
+    </li>
+  )
 }
 
-// Strong fill for the leading/winning side's name cell in the compact row, plain text otherwise.
-function compactSideColor(side, entity) {
-  const { upBy, winner } = entity
-  const leaderSide = upBy > 0 ? 'A' : upBy < 0 ? 'B' : null
-  const isWinner = winner === side
-  const isLeading = winner == null && leaderSide === side
-  if (side === 'A') {
-    if (isWinner) return 'bg-blue-700 text-white'
-    if (isLeading) return 'bg-blue-500 text-white'
-    return 'bg-blue-50 text-ink'
-  }
-  if (isWinner) return 'bg-red-700 text-white'
-  if (isLeading) return 'bg-red-500 text-white'
-  return 'bg-red-50 text-ink'
+/** 2 rows × 9 holes: green W = side A won, gold W = side B won, grey dash = halved, dashed = not played. */
+function HoleGrid({ holes, labelA, labelB }) {
+  return (
+    <div className="min-[900px]:mx-auto min-[900px]:max-w-[420px]">
+      <div className="grid grid-cols-9 gap-x-1 gap-y-2">
+        {holes.map(h => {
+          const played = h.status === 'played'
+          const cls = !played ? 'border border-dashed border-surface-outline bg-white'
+            : h.result === 'A' ? SIDE.A.fill
+            : h.result === 'B' ? SIDE.B.fill
+            : 'bg-surface-high text-ink-muted'
+          const mark = !played ? '' : h.result === 'A' || h.result === 'B' ? 'W' : '–'
+          const who = !played ? 'not played' : h.result === 'A' ? `${labelA} won` : h.result === 'B' ? `${labelB} won` : 'halved'
+          return (
+            <div key={h.hole} className="flex flex-col items-center gap-1">
+              <span className="text-[11px] tabular-nums text-ink-muted">{h.hole}</span>
+              <span className={`flex h-7 w-7 items-center justify-center rounded-full text-xs font-bold ${cls}`} title={`Hole ${h.hole}: ${who}`} aria-label={`Hole ${h.hole}: ${who}`}>{mark}</span>
+            </div>
+          )
+        })}
+      </div>
+      <p className="mt-3 text-xs text-ink-muted">Green = {labelA} won · Gold = {labelB} won · Grey = halved</p>
+    </div>
+  )
 }
 
-// Player name with match-play strokes (relative to the lower-handicap
-// opponent) shown in parentheses — omitted entirely when no strokes are given.
-function matchPlayerLabel(ep, relHandicap) {
-  const name = `${ep?.player?.first_name ?? ''} ${ep?.player?.last_name ?? ''}`.trim()
-  return relHandicap > 0 ? `${name} (${relHandicap})` : name
+function useToggleSet() {
+  const [open, setOpen] = useState(() => new Set())
+  const toggle = id => setOpen(prev => {
+    const next = new Set(prev)
+    if (next.has(id)) next.delete(id); else next.add(id)
+    return next
+  })
+  return [open, toggle]
 }
 
 // ─── Match Points Board ───────────────────────────────────────────
 function MatchPointsBoard({ matchData, event }) {
-  const { pairings, teamPoints, hasTeams, ranked } = matchData
-  const [expandedIds, setExpandedIds] = useState(() => new Set())
-  const toggle = (idx) => setExpandedIds(prev => {
-    const next = new Set(prev)
-    if (next.has(idx)) next.delete(idx); else next.add(idx)
-    return next
-  })
+  const { pairings, teamPoints, hasTeams } = matchData
+  const [expanded, toggle] = useToggleSet()
   const teamNames = event?.ryder_cup_teams ?? {}
-  // Optional labels set by the admin (Match Pairings → Team Names). Blank means no label —
-  // never default to "Flight A/B", since a match side is not the same as a scoring flight.
-  const teamALabel = teamNames.a?.trim() || null
-  const teamBLabel = teamNames.b?.trim() || null
+  // Optional labels set by the admin (Match Pairings → Team Names). Never default to
+  // "Flight A/B", since a match side is not the same as a scoring flight.
+  const labelA = teamNames.a?.trim() || 'Team A'
+  const labelB = teamNames.b?.trim() || 'Team B'
 
   if (!pairings.length) return (
-    <div className="text-center py-12 text-ink-muted">
-      <svg className="mx-auto mb-3 w-10 h-10 text-surface-outline" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.5"><path strokeLinecap="round" strokeLinejoin="round" d="M18 18.72a9.094 9.094 0 003.741-.479 3 3 0 00-4.682-2.72m.94 3.198l.001.031c0 .225-.012.447-.037.666A11.944 11.944 0 0112 21c-2.17 0-4.207-.576-5.963-1.584A6.062 6.062 0 016 18.719m12 0a5.971 5.971 0 00-.941-3.197m0 0A5.995 5.995 0 0012 12.75a5.995 5.995 0 00-5.058 2.772m0 0a3 3 0 00-4.681 2.72 8.986 8.986 0 003.74.477m.94-3.197a5.971 5.971 0 00-.94 3.197M15 6.75a3 3 0 11-6 0 3 3 0 016 0zm6 3a2.25 2.25 0 11-4.5 0 2.25 2.25 0 014.5 0zm-13.5 0a2.25 2.25 0 11-4.5 0 2.25 2.25 0 014.5 0z"/></svg>
-      <p className="font-medium">No match play pairings set up yet.</p>
-      <p className="text-sm mt-1">An admin can assign pairings in the event settings.</p>
-    </div>
+    <div className={CARD}><Empty title="No match play pairings set up yet">An admin can assign pairings in the event settings.</Empty></div>
   )
 
-  const teamLeader = teamPoints.A > teamPoints.B ? `${teamALabel ?? 'Team A'} leads` : teamPoints.B > teamPoints.A ? `${teamBLabel ?? 'Team B'} leads` : 'All Square'
   // Keyed off every individual pairing being decided (winner set), not event.status —
   // the round can still be "Live" while every match has already closed out.
   const isComplete = pairings.every(p => p.winner != null)
+  const started = pairings.some(p => p.holesPlayed > 0)
 
   return (
     <div className="space-y-4">
-      {/* Team banner — only when cross-flight (Ryder Cup style) */}
-      {hasTeams && teamPoints.A + teamPoints.B > 0 && (
-        <div className="bg-white rounded-sm border border-surface-border overflow-hidden">
-          <div className="bg-surface-container px-4 py-2 border-b border-surface-border">
-            <h3 className="text-xs font-semibold text-ink-muted uppercase tracking-wide">Team Score</h3>
-          </div>
-          <div className="flex">
-            <div className="flex-1 text-center py-4 bg-blue-50">
-              <div className="text-xs font-bold text-blue-600 mb-1">{teamALabel ?? 'Team A'}</div>
-              <div className="text-4xl font-black text-blue-700">{teamPoints.A}</div>
-              {isComplete && <div className="text-xs text-blue-400 mt-0.5">matches won</div>}
-            </div>
-            <div className="w-px bg-surface-high" />
-            <div className="flex-1 text-center py-4 bg-red-50">
-              <div className="text-xs font-bold text-red-600 mb-1">{teamBLabel ?? 'Team B'}</div>
-              <div className="text-4xl font-black text-red-700">{teamPoints.B}</div>
-              {isComplete && <div className="text-xs text-red-400 mt-0.5">matches won</div>}
-            </div>
-          </div>
-          {!isComplete && (
-            <div className="text-center py-2 border-t border-surface-border bg-status-upcoming-bg">
-              <span className="text-xs font-semibold text-status-upcoming-text">Matches are in Progress</span>
-            </div>
-          )}
-          <div className="text-center py-2 border-t border-surface-border">
-            <span className="text-xs font-semibold text-ink">{teamLeader}</span>
-          </div>
-        </div>
+      {hasTeams && started && (
+        <MatchScoreCard labelA={labelA} labelB={labelB} a={teamPoints.A} b={teamPoints.B} complete={isComplete} />
       )}
-
-      {/* Individual match cards */}
-      {pairings.map((pair, idx) => {
-        const leaderSide = pair.upBy > 0 ? 'A' : pair.upBy < 0 ? 'B' : null
-        const isFinished = pair.winner != null
-        // First side listed is always blue, second is always red
-        const stylesA = { label: 'text-blue-600', winner: 'text-blue-700', leading: 'text-blue-600', bg: 'bg-blue-50', status: { win: 'bg-blue-600 text-white', lead: 'bg-blue-100 text-blue-700' } }
-        const stylesB = { label: 'text-red-600', winner: 'text-red-700', leading: 'text-red-600', bg: 'bg-red-50', status: { win: 'bg-red-600 text-white', lead: 'bg-red-100 text-red-700' } }
-
-        const statusColor = isFinished
-          ? (pair.winner === 'A' ? stylesA.status.win : pair.winner === 'B' ? stylesB.status.win : 'bg-surface-high text-ink')
-          : (leaderSide === 'A' ? stylesA.status.lead : leaderSide === 'B' ? stylesB.status.lead : 'bg-surface-high text-ink')
-
-        // playerA is always side A, playerB always side B — show the team name only if one was set
-        const labelA = teamALabel
-        const labelB = teamBLabel
-        const isOpen = expandedIds.has(idx)
-        const middleLabel = pair.holesPlayed === 0 ? 'VS' : isFinished ? 'F' : `Thru ${pair.holesPlayed}`
-        const leftEdge = edgeStatus('A', pair)
-        const rightEdge = edgeStatus('B', pair)
-
-        return (
-          <div key={idx} className="bg-white rounded-sm border border-surface-border overflow-hidden">
-            {/* Compact row — click to expand */}
-            <button type="button" onClick={() => toggle(idx)} className="block w-full text-left cursor-pointer">
-              <div className="flex items-stretch">
-                <div className={`w-8 sm:w-14 flex-shrink-0 flex items-center justify-center text-xs font-bold ${compactSideColor('A', pair)}`}>
-                  {leftEdge}
-                </div>
-                <div className={`flex-1 min-w-0 px-2 sm:px-3 py-3 flex items-center justify-end text-right ${compactSideColor('A', pair)}`}>
-                  <span className="text-sm font-semibold break-words leading-tight">
-                    {matchPlayerLabel(pair.playerA, pair.relHandicapA)}
-                  </span>
-                </div>
-                <div className="flex items-center justify-center px-2 sm:px-3 bg-ink text-white text-xs font-bold whitespace-nowrap">
-                  {middleLabel}
-                </div>
-                <div className={`flex-1 min-w-0 px-2 sm:px-3 py-3 flex items-center justify-start text-left ${compactSideColor('B', pair)}`}>
-                  <span className="text-sm font-semibold break-words leading-tight">
-                    {matchPlayerLabel(pair.playerB, pair.relHandicapB)}
-                  </span>
-                </div>
-                <div className={`w-8 sm:w-14 flex-shrink-0 flex items-center justify-center text-xs font-bold ${compactSideColor('B', pair)}`}>
-                  {rightEdge}
-                </div>
-                <div className="flex items-center px-2 text-ink-muted flex-shrink-0">
-                  <svg className={`w-4 h-4 transition-transform ${isOpen ? 'rotate-180' : ''}`} viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 11.168l3.71-3.938a.75.75 0 111.08 1.04l-4.25 4.5a.75.75 0 01-1.08 0l-4.25-4.5a.75.75 0 01.02-1.06z" clipRule="evenodd" /></svg>
-                </div>
-              </div>
-            </button>
-
-            {isOpen && (
-              <div className="border-t border-surface-border">
-                {/* Match header */}
-                <div className="bg-surface-container px-4 py-2 border-b border-surface-border flex items-center justify-between">
-                  <span className="text-xs font-semibold text-ink">Match {idx + 1}</span>
-                  <span className={`text-xs font-bold px-2.5 py-1 rounded-full ${statusColor}`}>
-                    {pair.holesPlayed === 0 ? 'Not started' : shortStatus(pair.matchStatus)}
-                  </span>
-                </div>
-
-                {/* Players vs layout */}
-                <div className="flex items-stretch divide-x divide-surface-border">
-                  {/* Player A */}
-                  <div className={`flex-1 px-4 py-3 ${leaderSide === 'A' || pair.winner === 'A' ? stylesA.bg : ''}`}>
-                    {labelA && <div className={`text-xs font-bold ${stylesA.label} mb-0.5`}>{labelA}</div>}
-                    <div className="font-semibold text-sm text-ink leading-tight">
-                      {matchPlayerLabel(pair.playerA, pair.relHandicapA)}
-                    </div>
-                    <div className="text-xs text-ink-muted">CH {pair.playerA.course_handicap ?? '—'}</div>
-                    {pair.holesPlayed > 0 && (
-                      <div className={`text-lg font-black mt-1 ${pair.winner === 'A' ? stylesA.winner : pair.winner === 'B' ? 'text-surface-outline' : leaderSide === 'A' ? stylesA.leading : leaderSide === 'B' ? 'text-ink-muted' : 'text-ink-muted'}`}>
-                        {pair.winner === 'A' ? `W ${shortStatus(pair.matchStatus)}` : pair.winner === 'B' ? 'Lost' : pair.winner === 'halve' ? '½' : leaderSide === 'A' ? `↑ ${shortStatus(pair.matchStatus)}` : leaderSide === 'B' ? `↓ ${Math.abs(pair.upBy)} DN` : 'AS'}
-                      </div>
-                    )}
-                  </div>
-
-                  {/* VS divider */}
-                  <div className="flex items-center justify-center w-8 bg-surface-container text-xs text-ink-muted font-bold">vs</div>
-
-                  {/* Player B */}
-                  <div className={`flex-1 px-4 py-3 ${leaderSide === 'B' || pair.winner === 'B' ? stylesB.bg : ''}`}>
-                    {labelB && <div className={`text-xs font-bold ${stylesB.label} mb-0.5`}>{labelB}</div>}
-                    <div className="font-semibold text-sm text-ink leading-tight">
-                      {matchPlayerLabel(pair.playerB, pair.relHandicapB)}
-                    </div>
-                    <div className="text-xs text-ink-muted">CH {pair.playerB.course_handicap ?? '—'}</div>
-                    {pair.holesPlayed > 0 && (
-                      <div className={`text-lg font-black mt-1 ${pair.winner === 'B' ? stylesB.winner : pair.winner === 'A' ? 'text-surface-outline' : leaderSide === 'B' ? stylesB.leading : leaderSide === 'A' ? 'text-ink-muted' : 'text-ink-muted'}`}>
-                        {pair.winner === 'B' ? `W ${shortStatus(pair.matchStatus)}` : pair.winner === 'A' ? 'Lost' : pair.winner === 'halve' ? '½' : leaderSide === 'B' ? `↑ ${shortStatus(pair.matchStatus)}` : leaderSide === 'A' ? `↓ ${Math.abs(pair.upBy)} DN` : 'AS'}
-                      </div>
-                    )}
-                  </div>
-                </div>
-
-                {/* Hole-by-hole dots — colored by who won the hole, tooltip shows running state */}
-                {pair.holesPlayed > 0 && (
-                  <div className="px-4 py-3 border-t border-surface-border overflow-x-auto">
-                    <div className="flex gap-1 min-w-0">
-                      {pair.holes.map(h => {
-                        if (h.status === 'pending' || h.status === 'conceded') return (
-                          <div key={h.hole} className={`w-7 h-7 rounded-full flex flex-col items-center justify-center text-xs ${h.status === 'conceded' ? 'bg-surface-container text-surface-highest' : 'bg-surface-high text-ink-muted'}`}>
-                            {h.hole}
-                          </div>
-                        )
-                        const bg = h.result === 'A' ? 'bg-blue-500' : h.result === 'B' ? 'bg-red-500' : 'bg-surface-high'
-                        const textCol = h.result === 'halve' ? 'text-ink-muted' : 'text-white'
-                        const stateLabel = h.upByAfter === 0 ? 'AS' : `${Math.abs(h.upByAfter)} UP`
-                        return (
-                          <div key={h.hole} title={`Hole ${h.hole} — A net ${h.netA}, B net ${h.netB} — ${stateLabel}`}
-                            className={`w-7 h-7 rounded-full ${bg} ${textCol} flex items-center justify-center text-xs font-bold`}
-                          >
-                            {h.hole}
-                          </div>
-                        )
-                      })}
-                    </div>
-                    <div className="mt-1.5 flex gap-3 text-xs text-ink-muted">
-                      <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-full bg-blue-500 inline-block"/> A wins hole</span>
-                      <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-full bg-red-500 inline-block"/> B wins hole</span>
-                      <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-full bg-surface-high inline-block"/> Halved</span>
-                    </div>
-                  </div>
-                )}
-              </div>
-            )}
-          </div>
-        )
-      })}
+      <ul className={`${CARD} divide-y divide-surface-border`}>
+        {pairings.map((pair, idx) => (
+          <MatchRow
+            key={pair.pairingId ?? idx}
+            m={pair}
+            nameA={fullName(pair.playerA.player)}
+            nameB={fullName(pair.playerB.player)}
+            tagA={pair.relHandicapA}
+            tagB={pair.relHandicapB}
+            open={expanded.has(idx)}
+            onToggle={() => toggle(idx)}
+          >
+            <p className="mb-3 text-xs font-semibold text-ink-muted">
+              Match {pair.groupNumber ?? idx + 1}{pair.tiebreak || pair.needsWinner ? ` · ${pair.matchStatus}` : ''}
+            </p>
+            {pair.holesPlayed > 0
+              ? <HoleGrid holes={pair.holes} labelA={labelA} labelB={labelB} />
+              : <p className="text-sm text-ink-muted">Not started yet.</p>}
+          </MatchRow>
+        ))}
+      </ul>
+      <p className="text-center text-xs text-ink-muted">Tap a match for hole by hole · +N = strokes received</p>
     </div>
   )
 }
@@ -1471,182 +1371,76 @@ function MatchPointsBoard({ matchData, event }) {
 // ─── Team Match Board ─────────────────────────────────────────────
 function TeamMatchBoard({ teamMatchData, teamAName = 'Team A', teamBName = 'Team B', event }) {
   const { groupMatches, totalA, totalB } = teamMatchData
-  const [expandedIds, setExpandedIds] = useState(() => new Set())
-  const toggle = (idx) => setExpandedIds(prev => {
-    const next = new Set(prev)
-    if (next.has(idx)) next.delete(idx); else next.add(idx)
-    return next
-  })
+  const [expanded, toggle] = useToggleSet()
 
   if (!groupMatches.length) return (
-    <div className="text-center py-12 text-ink-muted">
-      <p className="font-medium">No team match results yet.</p>
-      <p className="text-sm mt-1">Assign players to teams in the Team Play tab on the event admin page.</p>
-    </div>
+    <div className={CARD}><Empty title="No team match results yet">Assign players to teams in the Team Play tab on the event admin page.</Empty></div>
   )
-
-  const totalLeader = totalA > totalB ? `${teamAName} leads` : totalB > totalA ? `${teamBName} leads` : 'All Square'
-  const matchesLabel = event?.status === 'complete' ? 'matches won' : 'matches in progress'
 
   return (
     <div className="space-y-4">
-      {/* Overall team score */}
       {totalA + totalB > 0 && (
-        <div className="bg-white rounded-sm border border-surface-border overflow-hidden">
-          <div className="bg-surface-container px-4 py-2 border-b border-surface-border">
-            <h3 className="text-xs font-semibold text-ink-muted uppercase tracking-wide">Team Best Ball — Overall</h3>
-          </div>
-          <div className="flex">
-            <div className="flex-1 text-center py-4 bg-blue-50">
-              <div className="text-xs font-bold text-blue-600 mb-1">{teamAName}</div>
-              <div className="text-4xl font-black text-blue-700">{totalA}</div>
-              <div className="text-xs text-blue-400 mt-0.5">{matchesLabel}</div>
-            </div>
-            <div className="w-px bg-surface-high" />
-            <div className="flex-1 text-center py-4 bg-red-50">
-              <div className="text-xs font-bold text-red-600 mb-1">{teamBName}</div>
-              <div className="text-4xl font-black text-red-700">{totalB}</div>
-              <div className="text-xs text-red-400 mt-0.5">{matchesLabel}</div>
-            </div>
-          </div>
-          <div className="text-center py-2 border-t border-surface-border">
-            <span className="text-xs font-semibold text-ink">{totalLeader}</span>
-          </div>
-        </div>
+        <MatchScoreCard
+          labelA={teamAName} labelB={teamBName} a={totalA} b={totalB}
+          complete={event?.status === 'complete'}
+          caption={event?.status === 'complete' ? 'Matches won' : 'Matches in progress'}
+        />
       )}
-
-      {/* Per-group match cards */}
-      {groupMatches.map((match, idx) => {
-        const leaderSide = match.upBy > 0 ? 'A' : match.upBy < 0 ? 'B' : null
-        const isFinished = match.winner != null
-        const statusColor = isFinished
-          ? (match.winner === 'A' ? 'bg-blue-600 text-white' : match.winner === 'B' ? 'bg-red-600 text-white' : 'bg-surface-high text-ink')
-          : (leaderSide === 'A' ? 'bg-blue-100 text-blue-700' : leaderSide === 'B' ? 'bg-red-100 text-red-700' : 'bg-surface-high text-ink')
-
-        const isOpen = expandedIds.has(idx)
-        const namesA = match.teamA.map(ep => ep.player?.last_name).filter(Boolean).join(' + ')
-        const namesB = match.teamB.map(ep => ep.player?.last_name).filter(Boolean).join(' + ')
-        const middleLabel = match.holesPlayed === 0 ? 'VS' : `Thru ${match.holesPlayed}`
-        const leftEdge = edgeStatus('A', match)
-        const rightEdge = edgeStatus('B', match)
-
-        return (
-          <div key={idx} className="bg-white rounded-sm border border-surface-border overflow-hidden">
-            {/* Compact row — click to expand */}
-            <button type="button" onClick={() => toggle(idx)} className="block w-full text-left cursor-pointer">
-              <div className="flex items-stretch">
-                <div className={`w-8 sm:w-14 flex-shrink-0 flex items-center justify-center text-xs font-bold ${compactSideColor('A', match)}`}>
-                  {leftEdge}
+      <ul className={`${CARD} divide-y divide-surface-border`}>
+        {groupMatches.map((match, idx) => (
+          <MatchRow
+            key={idx}
+            m={match}
+            nameA={match.teamA.map(ep => ep.player?.last_name).filter(Boolean).join(' + ')}
+            nameB={match.teamB.map(ep => ep.player?.last_name).filter(Boolean).join(' + ')}
+            open={expanded.has(idx)}
+            onToggle={() => toggle(idx)}
+          >
+            <p className="mb-3 text-xs font-semibold text-ink-muted">Group {match.groupNumber} · Best ball</p>
+            <div className="mb-3 grid grid-cols-2 gap-3">
+              {[['A', teamAName, match.teamA], ['B', teamBName, match.teamB]].map(([side, label, team]) => (
+                <div key={side} className="min-w-0">
+                  <p className={`text-xs font-bold ${SIDE[side].text}`}>{label}</p>
+                  {team.map(ep => (
+                    <p key={ep.player_id} className="flex flex-wrap items-center gap-1.5 text-sm text-ink">
+                      {fullName(ep.player)}
+                      {match.relCH[ep.player_id] > 0 && <span className={`${TAG} ${GREEN_TAG}`}>+{match.relCH[ep.player_id]}</span>}
+                    </p>
+                  ))}
                 </div>
-                <div className={`flex-1 min-w-0 px-2 sm:px-3 py-3 flex items-center justify-end text-right ${compactSideColor('A', match)}`}>
-                  <span className="text-sm font-semibold break-words leading-tight">
-                    {namesA}
-                  </span>
+              ))}
+            </div>
+            {match.holesPlayed > 0 && (
+              <>
+                <p className="mb-2 text-[11px] font-semibold uppercase tracking-[0.08em] text-ink-muted">Best ball by hole</p>
+                <div className="flex flex-wrap gap-1.5">
+                  {match.holes.filter(h => h.status === 'played').map(h => {
+                    const tone = h.result === 'A' ? SIDE.A.tint : h.result === 'B' ? SIDE.B.tint : 'bg-surface-high text-ink-muted'
+                    const contributor = h.result === 'A' ? h.contributorA : h.result === 'B' ? h.contributorB : null
+                    const initials = contributor
+                      ? `${contributor.player?.first_name?.[0] ?? ''}${contributor.player?.last_name?.[0] ?? ''}`
+                      : '½'
+                    return (
+                      <span key={h.hole} className={`rounded-sm px-2 py-1 text-xs font-bold ${tone}`} title={contributor ? fullName(contributor.player) : 'Halved'}>
+                        #{h.hole} {initials}
+                      </span>
+                    )
+                  })}
                 </div>
-                <div className="flex items-center justify-center px-2 sm:px-3 bg-ink text-white text-xs font-bold whitespace-nowrap">
-                  {middleLabel}
-                </div>
-                <div className={`flex-1 min-w-0 px-2 sm:px-3 py-3 flex items-center justify-start text-left ${compactSideColor('B', match)}`}>
-                  <span className="text-sm font-semibold break-words leading-tight">
-                    {namesB}
-                  </span>
-                </div>
-                <div className={`w-8 sm:w-14 flex-shrink-0 flex items-center justify-center text-xs font-bold ${compactSideColor('B', match)}`}>
-                  {rightEdge}
-                </div>
-                <div className="flex items-center px-2 text-ink-muted flex-shrink-0">
-                  <svg className={`w-4 h-4 transition-transform ${isOpen ? 'rotate-180' : ''}`} viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 11.168l3.71-3.938a.75.75 0 111.08 1.04l-4.25 4.5a.75.75 0 01-1.08 0l-4.25-4.5a.75.75 0 01.02-1.06z" clipRule="evenodd" /></svg>
-                </div>
-              </div>
-            </button>
-
-            {isOpen && (
-              <div className="border-t border-surface-border">
-                <div className="bg-surface-container px-4 py-2 border-b border-surface-border flex items-center justify-between">
-                  <span className="text-xs font-semibold text-ink">Group {match.groupNumber} — Best Ball</span>
-                  <span className={`text-xs font-bold px-2.5 py-1 rounded-full ${statusColor}`}>
-                    {match.holesPlayed === 0 ? 'Not started' : shortStatus(match.matchStatus)}
-                  </span>
-                </div>
-
-                <div className="flex items-stretch divide-x divide-surface-border">
-                  {/* Team A */}
-                  <div className={`flex-1 px-4 py-3 ${leaderSide === 'A' || match.winner === 'A' ? 'bg-blue-50' : ''}`}>
-                    <div className="text-xs font-bold text-blue-600 mb-1">{teamAName}</div>
-                    {match.teamA.map(ep => (
-                      <div key={ep.player_id} className="text-sm text-ink leading-snug">
-                        {ep.player?.first_name} {ep.player?.last_name}
-                        {match.relCH[ep.player_id] > 0 && (
-                          <span className="text-xs text-ink-muted ml-1">({match.relCH[ep.player_id]})</span>
-                        )}
-                      </div>
-                    ))}
-                    {match.holesPlayed > 0 && (
-                      <div className={`text-lg font-black mt-2 ${match.winner === 'A' ? 'text-blue-700' : match.winner === 'B' ? 'text-surface-outline' : leaderSide === 'A' ? 'text-blue-600' : leaderSide === 'B' ? 'text-ink-muted' : 'text-ink-muted'}`}>
-                        {match.winner === 'A' ? `W ${shortStatus(match.matchStatus)}` : match.winner === 'B' ? 'Lost' : match.winner === 'halve' ? '½' : leaderSide === 'A' ? `↑ ${shortStatus(match.matchStatus)}` : leaderSide === 'B' ? `↓ ${Math.abs(match.upBy)} DN` : 'AS'}
-                      </div>
-                    )}
-                  </div>
-
-                  <div className="flex items-center justify-center w-8 bg-surface-container text-xs text-ink-muted font-bold">vs</div>
-
-                  {/* Team B */}
-                  <div className={`flex-1 px-4 py-3 ${leaderSide === 'B' || match.winner === 'B' ? 'bg-red-50' : ''}`}>
-                    <div className="text-xs font-bold text-red-600 mb-1">{teamBName}</div>
-                    {match.teamB.map(ep => (
-                      <div key={ep.player_id} className="text-sm text-ink leading-snug">
-                        {ep.player?.first_name} {ep.player?.last_name}
-                        {match.relCH[ep.player_id] > 0 && (
-                          <span className="text-xs text-ink-muted ml-1">({match.relCH[ep.player_id]})</span>
-                        )}
-                      </div>
-                    ))}
-                    {match.holesPlayed > 0 && (
-                      <div className={`text-lg font-black mt-2 ${match.winner === 'B' ? 'text-red-700' : match.winner === 'A' ? 'text-surface-outline' : leaderSide === 'B' ? 'text-red-600' : leaderSide === 'A' ? 'text-ink-muted' : 'text-ink-muted'}`}>
-                        {match.winner === 'B' ? `W ${shortStatus(match.matchStatus)}` : match.winner === 'A' ? 'Lost' : match.winner === 'halve' ? '½' : leaderSide === 'B' ? `↑ ${shortStatus(match.matchStatus)}` : leaderSide === 'A' ? `↓ ${Math.abs(match.upBy)} DN` : 'AS'}
-                      </div>
-                    )}
-                  </div>
-                </div>
-
-                {/* Hole-by-hole contributor summary */}
-                {match.holesPlayed > 0 && (
-                  <div className="px-4 py-3 border-t border-surface-border bg-surface-container">
-                    <p className="text-xs font-semibold text-ink-muted mb-2 uppercase tracking-wide">Best Ball by Hole</p>
-                    <div className="flex flex-wrap gap-1.5">
-                      {match.holes.filter(h => h.status === 'played').map(h => {
-                        const bgColor = h.result === 'A' ? 'bg-blue-100 text-blue-700' : h.result === 'B' ? 'bg-red-100 text-red-700' : 'bg-surface-high text-ink-muted'
-                        const contributor = h.result === 'A' ? h.contributorA : h.result === 'B' ? h.contributorB : null
-                        const initials = contributor
-                          ? `${contributor.player?.first_name?.[0] ?? ''}${contributor.player?.last_name?.[0] ?? ''}`
-                          : '½'
-                        return (
-                          <div key={h.hole} className={`text-xs font-bold px-2 py-1 rounded-sm ${bgColor}`} title={contributor ? `${contributor.player?.first_name} ${contributor.player?.last_name}` : 'Halved'}>
-                            #{h.hole} {initials}
-                          </div>
-                        )
-                      })}
-                    </div>
-                  </div>
-                )}
-              </div>
+              </>
             )}
-          </div>
-        )
-      })}
+          </MatchRow>
+        ))}
+      </ul>
+      <p className="text-center text-xs text-ink-muted">Tap a match for hole by hole · +N = strokes received</p>
     </div>
   )
 }
 
 // ─── Payouts Board ────────────────────────────────────────────────
-function PayoutsBoard({ event, eventPlayers, leaderboards, sideGames, skinsResults, stablefordData, stablefordGrossData, blindPartnersData, superSkinsResult, playerMap }) {
+function PayoutsBoard({ event, eventPlayers, leaderboards, sideGames, skinsResults, stablefordData, stablefordGrossData, blindPartnersData, superSkinsResult, playerMap, flight, hasFlights, flightOf }) {
   if (!event?.payout_config || eventPlayers.length === 0) {
-    return (
-      <div className="text-center py-12 text-ink-muted">
-        <div className="text-4xl mb-3">💰</div>
-        <p>No payout configuration set for this event.</p>
-      </div>
-    )
+    return <div className={CARD}><Empty title="No payout configuration set for this event" /></div>
   }
 
   const payingPlayers = eventPlayers.filter(ep => !ep.is_guest)
@@ -1687,89 +1481,157 @@ function PayoutsBoard({ event, eventPlayers, leaderboards, sideGames, skinsResul
   }
   const sortedCategories = [...byCategory].sort((a, b) => categorySortKey(a.key) - categorySortKey(b.key))
 
+  // Players paid in the selected flight (everyone when the event has no flights), biggest first
+  const rows = byPlayer
+    .filter(r => !hasFlights || flightOf(r.playerId) === flight)
+    .sort((a, b) => b.total - a.total)
+  const totalPaid = rows.reduce((s, r) => s + r.total, 0)
+  const rankOf = r => rows.filter(x => x.total > r.total + 0.001).length + 1
+  const isTied = r => rows.filter(x => Math.abs(x.total - r.total) < 0.001).length > 1
+  const COLS = 'grid grid-cols-[2.25rem_minmax(0,1fr)_auto] gap-x-3'
+
   return (
     <div className="space-y-4">
-      {/* Summary banner */}
-      <div className="card p-4 flex items-center justify-between" style={{ background: '#1d1d1f', border: 'none', color: '#ffffff' }}>
-        <div>
-          <div className="text-xs font-medium" style={{ color: '#86868b' }}>Total Pot</div>
-          <div className="text-3xl font-black">${totalPot.toFixed(2)}</div>
-          <div className="text-xs mt-0.5" style={{ color: '#86868b' }}>
-            {eventPlayers.length} players × ${event.entry_fee}
-            {buyInPotTotal > 0 && <> + ${buyInPotTotal.toFixed(2)} separate buy-ins</>}
-          </div>
+      <div className={CARD}>
+        <div className={`${COLS} ${HEAD} px-4 py-2.5`}>
+          <span>Pos</span><span>Player</span><span className="text-right">Total</span>
         </div>
-        <div className="text-right">
-          <div className="text-xs font-medium" style={{ color: '#86868b' }}>Allocated</div>
-          <div className="text-2xl font-bold">${totalAllocated.toFixed(2)}</div>
+        {rows.length === 0 ? (
+          <p className="px-4 py-6 text-center text-sm text-ink-muted">No payouts{hasFlights ? ` in Flight ${flight}` : ''} yet.</p>
+        ) : (
+          <ul className="divide-y divide-surface-border">
+            {rows.map(r => {
+              const rank = rankOf(r)
+              return (
+                <li key={r.playerId} className={`${COLS} items-start px-4 py-3 ${rank === 1 ? LEADER : ''}`}>
+                  <span className="pt-0.5 text-sm font-semibold tabular-nums text-ink-muted">{isTied(r) ? `T${rank}` : rank}</span>
+                  <span className="min-w-0">
+                    <span className="block break-words text-[15px] font-bold text-ink">{playerMap[r.playerId] ? fullName(playerMap[r.playerId]) : '—'}</span>
+                    <span className="mt-1.5 flex flex-wrap gap-1">
+                      {r.items.map((item, i) => (
+                        <span key={i} className={`${TAG} ${rank === 1 ? 'bg-white text-status-active-text' : GREEN_TAG}`} title={`${item.category}: ${money(item.amount)}`}>{payoutTag(item.category)}</span>
+                      ))}
+                    </span>
+                  </span>
+                  <span className="text-right text-[17px] font-bold tabular-nums text-fairway-700">{money(r.total)}</span>
+                </li>
+              )
+            })}
+          </ul>
+        )}
+        <div className="flex items-center justify-between gap-3 border-t border-surface-border bg-surface-dim px-4 py-3 text-sm font-semibold text-ink">
+          <span>Total paid{hasFlights ? ` · Flight ${flight}` : ''}</span>
+          <span className="tabular-nums">{money(totalPaid)}</span>
         </div>
       </div>
 
-      {/* By category (games played) */}
-      <div className="card overflow-hidden p-0">
-        <div className="px-4 py-3" style={{ borderBottom: '1px solid #ebe9e4', background: '#f4f3f0' }}>
-          <h3 className="font-semibold text-sm text-ink">Games Played</h3>
-        </div>
-        <div>
+      {/* Every prize by game — tucked away, opens in place */}
+      <details className={`group ${CARD}`}>
+        <summary className="flex min-h-[48px] cursor-pointer list-none items-center justify-between gap-3 px-4 py-3 [&::-webkit-details-marker]:hidden">
+          <span>
+            <span className="block text-[15px] font-bold text-ink">Payouts by game</span>
+            <span className="block text-xs text-ink-muted">
+              Pot {money(totalPot)} ({eventPlayers.length} × ${event.entry_fee}{buyInPotTotal > 0 ? ` + ${money(buyInPotTotal)} buy-ins` : ''}) · {money(totalAllocated)} allocated
+            </span>
+          </span>
+          <Chevron open={false} className="shrink-0 group-open:rotate-180" />
+        </summary>
+        <ul className="divide-y divide-surface-border border-t border-surface-border">
           {sortedCategories.map(cat => {
             const winners = (cat.playerIds ?? (cat.playerId ? [cat.playerId] : []))
               .map(pid => playerMap[pid])
               .filter(Boolean)
             return (
-              <div key={cat.key} className="flex items-center justify-between px-4 py-2.5" style={{ borderBottom: '1px solid #ebe9e4' }}>
-                <div>
-                  <div className="text-sm text-ink">{cat.label}</div>
-                  <div className="text-xs text-ink-muted">
-                    {winners.length > 0
-                      ? winners.map(p => `${p.first_name} ${p.last_name}`).join(' · ')
-                      : '— Unresolved'}
-                  </div>
-                </div>
-                <span className="font-bold text-ink">${cat.amount.toFixed(2)}</span>
-              </div>
+              <li key={cat.key} className="flex items-center justify-between gap-3 px-4 py-2.5">
+                <span className="min-w-0">
+                  <span className="block text-sm text-ink">{cat.label}</span>
+                  <span className="block text-xs text-ink-muted">{winners.length > 0 ? winners.map(fullName).join(' · ') : 'Unresolved'}</span>
+                </span>
+                <span className="shrink-0 text-sm font-bold tabular-nums text-ink">{money(cat.amount)}</span>
+              </li>
             )
           })}
-          {sortedCategories.length === 0 && (
-            <p className="px-4 py-4 text-sm text-ink-muted">No payouts resolved yet.</p>
-          )}
-        </div>
-      </div>
-
-      {/* By player */}
-      {byPlayer.length > 0 && (
-        <div className="card overflow-hidden p-0">
-          <div className="px-4 py-3" style={{ borderBottom: '1px solid #ebe9e4', background: '#f4f3f0' }}>
-            <h3 className="font-semibold text-sm text-ink">Payouts by Player</h3>
-          </div>
-          <div>
-            {byPlayer.map(({ playerId, total, items }) => {
-              const p = playerMap[playerId]
-              return (
-                <div key={playerId} className="px-4 py-3" style={{ borderBottom: '1px solid #ebe9e4' }}>
-                  <div className="flex items-center justify-between">
-                    <span className="font-semibold text-ink">
-                      {p ? `${p.first_name} ${p.last_name}` : '—'}
-                    </span>
-                    <span className="font-black text-status-active-text text-lg">${total.toFixed(2)}</span>
-                  </div>
-                  <div className="mt-1 space-y-0.5">
-                    {items.map((item, i) => (
-                      <div key={i} className="flex justify-between text-xs text-ink-muted">
-                        <span>{item.category}</span>
-                        <span>${item.amount.toFixed(2)}</span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )
-            })}
-          </div>
-        </div>
-      )}
+          {sortedCategories.length === 0 && <li className="px-4 py-4 text-sm text-ink-muted">No payouts resolved yet.</li>}
+        </ul>
+      </details>
     </div>
   )
 }
 
+// ─── TGL Board (Team play) ────────────────────────────────────────
+function TGLBoard({ tglData, locked, flightOf, hasFlights }) {
+  if (!tglData) {
+    return <div className={CARD}><Empty title="No Team Play data yet">Assign team selections in the admin Team Play tab, then scores will appear here.</Empty></div>
+  }
+
+  const { teamResults, playerPoints } = tglData
+  const leaderPts = Math.max(0, ...teamResults.map(t => t.teamPoints))
+
+  return (
+    <div className="space-y-4">
+      {!locked && (
+        <div className={`rounded-sm border border-surface-border px-4 py-3 text-sm font-medium ${AMBER_TAG}`}>
+          Selections not yet submitted. Results may change until the admin locks this event.
+        </div>
+      )}
+      <ul className={`${CARD} divide-y divide-surface-border`}>
+        {teamResults.map(tr => (
+          <li key={tr.team.id} className="px-4 py-4">
+            <div className="flex items-center gap-3">
+              <span className="w-5 shrink-0 text-sm font-semibold tabular-nums text-ink-muted">{tr.rank}</span>
+              <span className="h-3 w-3 shrink-0 rounded-full" style={{ backgroundColor: tr.team.color }} aria-hidden="true" />
+              <span className="min-w-0 flex-1 break-words text-[15px] font-bold text-ink">{tr.team.name}</span>
+              <span className="shrink-0 text-right">
+                <span className="text-[22px] font-bold tabular-nums text-ink">{fmtPts(tr.teamPoints)}</span>
+                <span className="ml-1 text-xs text-ink-muted">pts</span>
+              </span>
+            </div>
+            <div className="ml-8 mt-2 h-1.5 overflow-hidden rounded-full bg-surface-high" aria-hidden="true">
+              <div className="h-full rounded-full" style={{ width: `${leaderPts > 0 ? Math.max(0, (tr.teamPoints / leaderPts) * 100) : 0}%`, backgroundColor: tr.team.color }} />
+            </div>
+            {tr.selectedPlayers.length === 0 ? (
+              <p className="ml-8 mt-2 text-sm text-ink-muted">No players selected</p>
+            ) : (
+              <ul className="ml-8 mt-2 space-y-1">
+                {tr.selectedPlayers.map(p => {
+                  const fl = flightOf(p.player_id)
+                  const finish = finishLabel(p.player_id, p.rank, playerPoints, flightOf)
+                  return (
+                    <li key={p.player_id} className="flex items-baseline justify-between gap-3 text-sm">
+                      <span className="min-w-0 break-words text-ink">
+                        {p.name}
+                        <span className="text-ink-muted">{hasFlights && fl ? ` · Flight ${fl}` : ''} · {finish === '—' ? 'no finish' : `Finish ${finish}`}</span>
+                      </span>
+                      <span className="shrink-0 tabular-nums text-ink-muted">{fmtPts(p.points)}</span>
+                    </li>
+                  )
+                })}
+              </ul>
+            )}
+          </li>
+        ))}
+      </ul>
+      <p className="text-center text-xs text-ink-muted">Points: field size − finishing position + 1 · ties split equally</p>
+    </div>
+  )
+}
+
+function LeaderboardSkeleton() {
+  return (
+    <div className="min-h-screen bg-surface">
+      <div className="h-28 animate-pulse bg-surface-high" />
+      <div className="mx-auto max-w-[1080px] space-y-3 px-4 py-4">
+        {[0, 1, 2, 3].map(i => <div key={i} className="h-16 animate-pulse rounded-sm bg-surface-high" />)}
+      </div>
+    </div>
+  )
+}
+
+// "Sun, Nov 15"
+function shortDay(d) {
+  if (!d) return ''
+  return new Date(d + 'T00:00:00').toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })
+}
 
 // ─── Player Scorecard Modal ───────────────────────────────────────
 function PlayerScorecardModal({ player, allScores, course, onClose }) {
@@ -1910,80 +1772,4 @@ function PlayerScorecardModal({ player, allScores, course, onClose }) {
       </div>
     </div>
   )
-}
-
-// ─── TGL Board ────────────────────────────────────────────────────────────────
-function TGLBoard({ tglData, locked }) {
-  if (!tglData) {
-    return (
-      <div className="text-center py-12 text-ink-muted">
-        <p className="font-medium">No Team Play data yet</p>
-        <p className="text-sm mt-1">Assign team selections in the admin Team Play tab, then scores will appear here.</p>
-      </div>
-    )
-  }
-
-  const { teamResults, playerPoints } = tglData
-
-  return (
-    <div className="space-y-4">
-      {!locked && (
-        <div className="bg-status-upcoming-bg border border-surface-border rounded-sm px-4 py-2 text-xs text-status-upcoming-text font-medium">
-          ⚠ Selections not yet submitted — results may change until admin locks this event.
-        </div>
-      )}
-      {/* Team scores */}
-      <div className="space-y-2">
-        {teamResults.map((tr, i) => (
-          <div
-            key={tr.team.id}
-            className="rounded-sm overflow-hidden border border-surface-border"
-            style={{ borderLeftWidth: 4, borderLeftColor: tr.team.color }}
-          >
-            <div className="flex items-center justify-between px-4 py-3 bg-white">
-              <div className="flex items-center gap-3">
-                <span className="text-lg font-bold text-ink-muted w-6">#{tr.rank}</span>
-                <div>
-                  <div className="flex items-center gap-2">
-                    <span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: tr.team.color }} />
-                    <span className="font-bold text-ink">{tr.team.name}</span>
-                  </div>
-                  <div className="text-xs text-ink-muted mt-0.5 pl-4">
-                    {tr.selectedPlayers.length === 0
-                      ? 'No players selected'
-                      : tr.selectedPlayers.map(p => `${p.name} (#${p.rank ?? '?'})`).join(' · ')}
-                  </div>
-                </div>
-              </div>
-              <div className="text-right">
-                <div className="text-xl font-bold text-status-active-text">
-                  {tr.teamPoints % 1 === 0 ? tr.teamPoints : tr.teamPoints.toFixed(1)}
-                </div>
-                <div className="text-xs text-ink-muted">pts</div>
-              </div>
-            </div>
-          </div>
-        ))}
-      </div>
-
-      <p className="text-xs text-ink-muted text-center pt-1">
-        Points: field size − finishing position + 1 · ties split equally
-      </p>
-    </div>
-  )
-}
-
-function LeaderboardSkeleton() {
-  return (
-    <div className="min-h-screen" style={{ background: '#fbfaf8' }}>
-      <div className="h-24 animate-pulse" style={{ background: '#eceae5' }} />
-      <div className="max-w-2xl mx-auto px-4 py-4 space-y-3">
-        {[0,1,2,3].map(i => <div key={i} className="h-16 rounded-sm animate-pulse" style={{ background: '#eceae5' }} />)}
-      </div>
-    </div>
-  )
-}
-
-function formatDate(d) {
-  return new Date(d + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
 }
