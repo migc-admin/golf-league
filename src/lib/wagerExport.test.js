@@ -88,6 +88,20 @@ describe('wager Excel export', () => {
     expect(bb.getCell('C2').value.formula).toContain("'All Bets'!")
   })
 
+  it('pre-fills "Payment Received?" for bets confirmed on the board', async () => {
+    const confirmed = wagers.map(w => (w.id === 'a' || w.id === 'ccc' ? { ...w, payment_confirmed: true } : w))
+    const wb = await roundTrip({ wagers: confirmed })
+    const ab = wb.getWorksheet('All Bets')
+    expect(ab.getRows(2, wagers.length).map(r => r.getCell(9).value ?? '')).toEqual(['Yes', '', 'Yes', '', ''])
+    const collected = []
+    wb.getWorksheet('Summary').eachRow(r => { if (r.getCell(1).value === 'Collected so far') collected.push(r.getCell(2).value.result) })
+    expect(collected).toEqual([40])                          // Alex $10 + Blair $30
+    const bb = wb.getWorksheet('By Bettor')
+    expect(bb.getCell('G2').value.result).toBe(10)           // Alex collected
+    expect(bb.getCell('H2').value.result).toBe(20)           // Alex still owes $20
+    expect(bb.getCell('G4').value.result).toBe(40)           // total row
+  })
+
   it('adds a provisional note only when the event is not complete', async () => {
     const done = (await roundTrip()).getWorksheet('Summary')
     const live = (await roundTrip({ event: { ...event, status: 'active' } })).getWorksheet('Summary')

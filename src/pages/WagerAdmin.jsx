@@ -169,6 +169,15 @@ export default function WagerAdmin() {
     setActing(null)
   }
 
+  async function setPaymentConfirmed(id, confirmed) {
+    setActing(id)
+    setWagers(prev => prev.map(w => (w.id === id ? { ...w, payment_confirmed: confirmed } : w)))
+    const { error: upErr } = await supabase.from('wagers').update({ payment_confirmed: confirmed }).eq('id', id)
+    if (upErr) alert('Could not save payment confirmation: ' + upErr.message)
+    setWagers(await fetchWagers(eventId))
+    setActing(null)
+  }
+
   async function softDelete(id) {
     if (!window.confirm('Remove this bet? It will be saved and can be restored.')) return
     setActing(id)
@@ -368,6 +377,7 @@ export default function WagerAdmin() {
               playerName={playerName}
               acting={acting}
               onPayment={setPaymentMethod}
+              onConfirm={setPaymentConfirmed}
               onDelete={softDelete}
               onClearAll={clearAll}
               onCopyLink={() => navigator.clipboard?.writeText(betFormUrl)}

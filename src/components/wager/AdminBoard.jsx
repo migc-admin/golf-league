@@ -66,9 +66,28 @@ function PaidBy({ w, acting, onChange, removed }) {
   )
 }
 
-const ROW = 'sm:grid-cols-[minmax(120px,1.2fr)_64px_minmax(100px,1.2fr)_72px_116px_84px]'
+/** Admin's tick once the money has actually arrived (separate from how the bettor said they'd pay). */
+function Confirmed({ w, acting, onConfirm, removed }) {
+  const on = !!w.payment_confirmed
+  if (removed) return on ? <span className="text-xs font-semibold text-status-active-text">Confirmed</span> : null
+  return (
+    <label className="flex min-h-[44px] cursor-pointer items-center gap-2 sm:justify-center">
+      <input
+        type="checkbox"
+        checked={on}
+        disabled={acting === w.id}
+        onChange={e => onConfirm(w.id, e.target.checked)}
+        aria-label={`Payment confirmed, ${w.bettor_name} ${fmt(w.amount)}`}
+        className="h-5 w-5 shrink-0 accent-fairway-700"
+      />
+      <span className={`text-xs font-semibold sm:hidden ${on ? 'text-status-active-text' : 'text-ink-muted'}`}>Payment confirmed</span>
+    </label>
+  )
+}
 
-function BetLine({ w, pairings, playerName, acting, onPayment, onDelete, onRestore, removed = false }) {
+const ROW = 'sm:grid-cols-[minmax(120px,1.2fr)_64px_minmax(100px,1.2fr)_72px_116px_80px_84px]'
+
+function BetLine({ w, pairings, playerName, acting, onPayment, onConfirm, onDelete, onRestore, removed = false }) {
   return (
     <li className={`flex flex-col gap-2 border-b border-surface-border px-4 py-3 last:border-b-0 sm:grid sm:items-center sm:gap-3 ${ROW} ${removed ? 'opacity-70' : ''}`}>
       <div className="min-w-0">
@@ -79,6 +98,7 @@ function BetLine({ w, pairings, playerName, acting, onPayment, onDelete, onResto
       <p className="min-w-0 break-words text-sm text-ink">{playerName(w.pick_1st ?? w.pick_2nd ?? w.pick_match)}</p>
       <p className="text-sm font-bold tabular-nums text-ink sm:text-right">{fmt(w.amount)}</p>
       <div><PaidBy w={w} acting={acting} onChange={onPayment} removed={removed} /></div>
+      <div><Confirmed w={w} acting={acting} onConfirm={onConfirm} removed={removed} /></div>
       <div className="sm:text-right">
         {removed
           ? <Button size="sm" variant="secondary" disabled={acting === w.id} onClick={() => onRestore(w.id)}>{acting === w.id ? '…' : 'Restore'}</Button>
@@ -93,17 +113,28 @@ const FILTERS = [
 ]
 const kindOf = w => (w.match_pairing_id ? 'match' : w.pick_1st ? 'win' : 'place')
 
-export function AllBetsCard({ bets, pairings, playerName, acting, onPayment, onDelete, onClearAll, onCopyLink }) {
+export function AllBetsCard({ bets, pairings, playerName, acting, onPayment, onConfirm, onDelete, onClearAll, onCopyLink }) {
   const [filter, setFilter] = useState('all')
   const [query, setQuery] = useState('')
   const [showAll, setShowAll] = useState(false)
   const shown = bets.filter(w => (filter === 'all' || kindOf(w) === filter) && matchesQuery(w.bettor_name, query))
   const visible = showAll ? shown : shown.slice(0, 10)
+  const confirmed = bets.filter(w => w.payment_confirmed)
+  const staked = bets.reduce((t, w) => t + parseFloat(w.amount), 0)
+  const received = confirmed.reduce((t, w) => t + parseFloat(w.amount), 0)
+  const allIn = bets.length > 0 && confirmed.length === bets.length
 
   return (
     <section className="overflow-hidden rounded-sm border border-surface-border bg-white">
       <header className="flex flex-wrap items-center justify-between gap-3 border-b border-surface-border px-4 py-3">
-        <h2 className="text-lg font-bold text-ink">All bets</h2>
+        <div className="min-w-0">
+          <h2 className="text-lg font-bold text-ink">All bets</h2>
+          {bets.length > 0 && (
+            <p className={`text-xs font-semibold ${allIn ? 'text-status-active-text' : 'text-ink-muted'}`}>
+              {confirmed.length} of {bets.length} payment{bets.length === 1 ? '' : 's'} confirmed · {fmt(received)} of {fmt(staked)}
+            </p>
+          )}
+        </div>
         {bets.length > 0 && <Button size="sm" variant="secondary" className={DANGER_OUTLINE} onClick={onClearAll}>Remove all</Button>}
       </header>
 
@@ -123,11 +154,11 @@ export function AllBetsCard({ bets, pairings, playerName, acting, onPayment, onD
             />
           </div>
           <div className={`hidden gap-3 border-b border-surface-border px-4 py-2 sm:grid ${ROW} ${HEAD}`}>
-            <span>Bettor</span><span>Type</span><span>Pick</span><span className="text-right">Stake</span><span>Paid by</span><span />
+            <span>Bettor</span><span>Type</span><span>Pick</span><span className="text-right">Stake</span><span>Paid by</span><span className="text-center">Confirmed</span><span />
           </div>
           {shown.length === 0
             ? <p className="px-4 py-8 text-center text-sm text-ink-muted">No bets match.</p>
-            : <ul>{visible.map(w => <BetLine key={w.id} w={w} pairings={pairings} playerName={playerName} acting={acting} onPayment={onPayment} onDelete={onDelete} />)}</ul>}
+            : <ul>{visible.map(w => <BetLine key={w.id} w={w} pairings={pairings} playerName={playerName} acting={acting} onPayment={onPayment} onConfirm={onConfirm} onDelete={onDelete} />)}</ul>}
           {shown.length > 10 && (
             <div className="border-t border-surface-border px-4 py-2 text-center">
               <Button variant="ghost" onClick={() => setShowAll(a => !a)}>{showAll ? 'Show fewer' : `Show all ${shown.length}`}</Button>

@@ -4,8 +4,9 @@
  *
  * Sheets
  *   Summary    — event info and money totals (live formulas)
- *   All Bets   — one row per bet, including removed bets; you fill in "Payment
- *                Received?" and "Payout Sent?" (Yes/No) as money moves
+ *   All Bets   — one row per bet, including removed bets. "Payment Received?" is
+ *                pre-filled Yes for bets ticked Payment confirmed on the board; fill in
+ *                the rest, and "Payout Sent?" (Yes/No), as money moves
  *   By Bettor  — one row per bettor: staked, collected, still to collect, payout
  *                owed, payout sent, still to pay out (live formulas off All Bets)
  *   Pools      — WIN, PLACE and each match: money in, payouts, what the club keeps
@@ -80,7 +81,7 @@ export function buildWagerWorkbook(ExcelJS, d) {
       match: w.match_pairing_id ? matchLabel(w.match_pairing_id) : '',
       amount: money(parseFloat(w.amount)),
       method: w.payment_method ? cap(w.payment_method) : '',
-      received: '',
+      received: w.payment_confirmed ? 'Yes' : '',
       result: removed ? 'Removed' : o ? `${o.result}${o.provisional ? ' (provisional)' : ''}` : 'Pending',
       payout: removed || !o ? 0 : money(o.payout),
       sent: '',
@@ -117,12 +118,13 @@ export function buildWagerWorkbook(ExcelJS, d) {
   const top = sm.rowCount            // header row; first money row is top + 1
   const at = k => `B${top + k}`      // k-th money row (1-based)
   const staked = sum(() => true, 'amount')
+  const collected = sum(r => r.received === 'Yes', 'amount')
   const owedAll = sum(() => true, 'payout')
   const totals = [
     ['Bets (active)', { formula: `COUNTIFS(${R('M')},"Active")`, result: active.length }, 'Removed bets are excluded from every total', '0'],
     ['Total staked', { formula: `SUMIFS(${R('G')},${R('M')},"Active")`, result: staked }, 'All active bets', MONEY],
-    ['Collected so far', { formula: `SUMIFS(${R('G')},${R('M')},"Active",${R('I')},"Yes")`, result: 0 }, 'Bets where "Payment Received?" = Yes', MONEY],
-    ['Still to collect', { formula: `${at(2)}-${at(3)}`, result: staked }, 'Total staked minus collected', MONEY],
+    ['Collected so far', { formula: `SUMIFS(${R('G')},${R('M')},"Active",${R('I')},"Yes")`, result: collected }, 'Bets where "Payment Received?" = Yes (pre-filled from Payment confirmed on the wager board)', MONEY],
+    ['Still to collect', { formula: `${at(2)}-${at(3)}`, result: money(staked - collected) }, 'Total staked minus collected', MONEY],
     ['Payouts owed to bettors', { formula: `SUMIFS(${R('K')},${R('M')},"Active")`, result: owedAll }, final ? 'From final results' : 'Provisional until the event is complete', MONEY],
     ['Payouts sent', { formula: `SUMIFS(${R('K')},${R('M')},"Active",${R('L')},"Yes")`, result: 0 }, 'Bets where "Payout Sent?" = Yes', MONEY],
     ['Payouts still to send', { formula: `${at(5)}-${at(6)}`, result: owedAll }, 'Payouts owed minus sent', MONEY],
@@ -184,11 +186,13 @@ export function buildWagerWorkbook(ExcelJS, d) {
   ]
   styleHeader(bb.getRow(1))
   const bettors = [...new Set(active.map(r => r.bettor))].sort((a, b) => a.localeCompare(b))
-  const colTotals = { count: 0, staked: 0, venmo: 0, cash: 0, unset: 0, owed: 0 }
+  const colTotals = { count: 0, staked: 0, venmo: 0, cash: 0, unset: 0, collected: 0, owed: 0 }
   bettors.forEach((name, i) => {
     const n = i + 2
     const mine = r => r.bettor.toLowerCase() === name.toLowerCase()
     const staked = sum(mine, 'amount')
+    const got = sum(r => mine(r) && r.received === 'Yes', 'amount')
+    colTotals.collected += got
     const byMethod = m => money(active.filter(r => mine(r) && r.method === m).reduce((s, r) => s + r.amount, 0))
     const owed = sum(mine, 'payout')
     colTotals.count += active.filter(mine).length
@@ -202,8 +206,8 @@ export function buildWagerWorkbook(ExcelJS, d) {
       { formula: `SUMIFS(${R('G')},${cond},${R('H')},"Venmo")`, result: byMethod('Venmo') },
       { formula: `SUMIFS(${R('G')},${cond},${R('H')},"Cash")`, result: byMethod('Cash') },
       { formula: `C${n}-D${n}-E${n}`, result: money(staked - byMethod('Venmo') - byMethod('Cash')) },
-      { formula: `SUMIFS(${R('G')},${cond},${R('I')},"Yes")`, result: 0 },
-      { formula: `C${n}-G${n}`, result: staked },
+      { formula: `SUMIFS(${R('G')},${cond},${R('I')},"Yes")`, result: got },
+      { formula: `C${n}-G${n}`, result: money(staked - got) },
       { formula: `SUMIFS(${R('K')},${cond})`, result: owed },
       { formula: `SUMIFS(${R('K')},${cond},${R('L')},"Yes")`, result: 0 },
       { formula: `I${n}-J${n}`, result: owed },
@@ -219,7 +223,7 @@ export function buildWagerWorkbook(ExcelJS, d) {
       { formula: `SUM(B2:B${lastB})`, result: colTotals.count },
       ...[
         ['C', colTotals.staked], ['D', colTotals.venmo], ['E', colTotals.cash], ['F', colTotals.unset],
-        ['G', 0], ['H', colTotals.staked], ['I', colTotals.owed], ['J', 0], ['K', colTotals.owed],
+        ['G', colTotals.collected], ['H', colTotals.staked - colTotals.collected], ['I', colTotals.owed], ['J', 0], ['K', colTotals.owed],
         ['L', colTotals.owed - colTotals.staked],
       ].map(([col, result]) => ({ formula: `SUM(${col}2:${col}${lastB})`, result: money(result) })),
     ])
