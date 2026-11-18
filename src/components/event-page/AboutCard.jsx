@@ -8,10 +8,10 @@ export function aboutHtml(text) {
   return DOMPurify.sanitize(markdownToHtml(text), { ALLOWED_TAGS: ['strong', 'em', 'br'], ALLOWED_ATTR: [] })
 }
 
-export default function AboutCard({ text }) {
+export default function AboutCard({ text, title = 'About this event' }) {
   if (!text?.trim()) return null
   return (
-    <EventCard title="About this event">
+    <EventCard title={title}>
       <div
         className="max-w-[68ch] break-words text-base leading-[1.65] text-ink"
         dangerouslySetInnerHTML={{ __html: aboutHtml(text) }}

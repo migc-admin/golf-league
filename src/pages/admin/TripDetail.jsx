@@ -13,6 +13,7 @@ import TripHeader from '../../components/trip/TripHeader'
 import TripItineraryCard from '../../components/trip/TripItineraryCard'
 import TripRoundsCard from '../../components/trip/TripRoundsCard'
 import { TripCostsCard, TripRegistrationCard } from '../../components/trip/TripRegistration'
+import TripOverviewCard from '../../components/trip/TripOverviewCard'
 import { StayingCard, GettingThereCard, TripStandingsCard, DeleteTripBox } from '../../components/trip/TripSideCards'
 import { buildItinerary } from '../../lib/tripItinerary'
 import { tripTiles } from '../../lib/tripView'
@@ -143,6 +144,7 @@ export default function TripDetail() {
 
       <div className="grid gap-5 lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)] lg:items-start">
         <div className="min-w-0 space-y-5">
+          <TripOverviewCard trip={trip} onSaved={load} />
           <TripItineraryCard days={days} onAddItem={() => setInfoModal(true)} />
           {league && (
             <TripRoundsCard league={league} tripSlug={tripSlug} rounds={rounds} setRounds={setRounds} orgSlug={orgSlug} orgTier={orgTier} />
@@ -369,7 +371,6 @@ function ScheduledEntryEditor({ label, entries, setEntries, addLabel, nameLabel 
 
 function EditTripModal({ open, onClose, trip, onSaved }) {
   const [name,        setName]        = useState('')
-  const [description, setDescription] = useState('')
   const [startDate,   setStartDate]   = useState('')
   const [endDate,      setEndDate]     = useState('')
   const [location,    setLocation]    = useState('')
@@ -379,7 +380,6 @@ function EditTripModal({ open, onClose, trip, onSaved }) {
   useEffect(() => {
     if (trip && open) {
       setName(trip.name ?? '')
-      setDescription(trip.description ?? '')
       setStartDate(trip.start_date ?? '')
       setEndDate(trip.end_date ?? '')
       setLocation(trip.location ?? '')
@@ -393,7 +393,6 @@ function EditTripModal({ open, onClose, trip, onSaved }) {
     setSaving(true)
     const { error } = await supabase.from('trips').update({
       name: name.trim(),
-      description: description.trim() || null,
       start_date: startDate || null,
       end_date: endDate || null,
       location: location.trim() || null,
@@ -421,7 +420,6 @@ function EditTripModal({ open, onClose, trip, onSaved }) {
           <Input label="End Date" type="date" value={endDate} onChange={e => setEndDate(e.target.value)} />
         </div>
         <Input label="Location (optional)" value={location} onChange={e => setLocation(e.target.value)} />
-        <Input label="Description (optional)" value={description} onChange={e => setDescription(e.target.value)} />
         <div className="flex justify-end gap-3 pt-2">
           <Button type="button" variant="secondary" onClick={onClose}>Cancel</Button>
           <Button type="submit" loading={saving}>Save Changes</Button>

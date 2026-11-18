@@ -13,6 +13,7 @@ import TripSiteHeader from '../../components/trip-page/TripSiteHeader'
 import TripHero from '../../components/trip-page/TripHero'
 import EventTabBar from '../../components/event-page/EventTabBar'
 import PageCard from '../../components/event-page/EventCard'
+import AboutCard from '../../components/event-page/AboutCard'
 import { RoundsCard, ScheduleCard, StayingCard, GettingThereCard, WhosGoingCard } from '../../components/trip-page/TripPageCards'
 import { buildItinerary, time12 } from '../../lib/tripItinerary'
 import { tripStatus, heroFacts, dayOfTrip } from '../../lib/tripView'
@@ -180,6 +181,7 @@ export default function TripHome({ orgSlug, tripSlug, initialTab = 'overview' })
         {activeTab === 'overview' && (
           <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_360px] lg:items-start">
             <div className="flex min-w-0 flex-col gap-6">
+              <AboutCard text={trip.description} title="About this trip" />
               <RoundsCard rounds={events} leagueSlug={trip.league.slug} orgSlug={eventLinkOrgSlug} onStandings={() => goTab('standings')} />
               <ScheduleCard days={days} roundHref={roundHref} />
             </div>
