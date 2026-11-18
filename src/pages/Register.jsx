@@ -11,7 +11,7 @@
  */
 
 import { useEffect, useRef, useState } from 'react'
-import { useParams, Link } from 'react-router-dom'
+import { useParams, Link, useNavigate } from 'react-router-dom'
 import { Helmet } from 'react-helmet-async'
 import { supabase } from '../lib/supabase'
 import LeagueMark from '../components/ui/LeagueMark'
@@ -20,15 +20,15 @@ import Button from '../components/ui/Button'
 import { scheduleEntries, time12 } from '../lib/eventPageView'
 import { cityOf, feeText, firstTeeTime, missingMessage } from '../lib/registerView'
 
-const GOLD = '#C9A84C' // same gold the league initials mark uses
+export const GOLD = '#C9A84C' // same gold the league initials mark uses
 const PAY_BTN = 'flex min-h-[52px] w-full items-center justify-center gap-3 rounded-sm px-4 text-[15px] font-bold text-white no-underline transition-opacity hover:opacity-90'
-const HINT = 'text-center text-xs text-ink-muted'
+export const HINT = 'text-center text-xs text-ink-muted'
 
 function isMobile() {
   return /android|iphone|ipad|ipod/i.test(navigator.userAgent)
 }
 
-function VenmoButton({ handle, amount, note }) {
+export function VenmoButton({ handle, amount, note }) {
   const encoded = encodeURIComponent(note)
   const webUrl  = `https://venmo.com/${handle}?txn=pay&amount=${amount}&note=${encoded}`
   const appUrl  = `venmo://paycharge?txn=pay&recipients=${handle}&amount=${amount}&note=${encoded}`
@@ -71,7 +71,7 @@ function VenmoButton({ handle, amount, note }) {
   )
 }
 
-function ZelleButton({ handle, amount, note }) {
+export function ZelleButton({ handle, amount, note }) {
   const isPhone = /^\+?[\d\s\-().]{7,}$/.test(handle)
   // Zelle deeplink only works on mobile in the Zelle or bank app
   const appUrl  = `zelle://payment?amount=${amount}&message=${encodeURIComponent(note)}&recipient=${encodeURIComponent(handle)}`
@@ -107,7 +107,7 @@ function ZelleButton({ handle, amount, note }) {
   )
 }
 
-function PayPalButton({ link, amount, note }) {
+export function PayPalButton({ link, amount, note }) {
   const url = new URL(link)
   // Append amount to paypal.me links if not already present
   if (!url.pathname.match(/\/\d+$/)) url.pathname += `/${amount}`
@@ -124,11 +124,11 @@ function PayPalButton({ link, amount, note }) {
   )
 }
 
-const INPUT = 'block w-full rounded-[10px] border bg-white px-3.5 text-base text-ink placeholder:text-ink-muted/70 focus:outline-none focus:ring-2 focus:ring-fairway-500'
-const inputTone = bad => (bad ? 'border-red-600' : 'border-surface-highest')
+export const INPUT = 'block w-full rounded-[10px] border bg-white px-3.5 text-base text-ink placeholder:text-ink-muted/70 focus:outline-none focus:ring-2 focus:ring-fairway-500'
+export const inputTone = bad => (bad ? 'border-red-600' : 'border-surface-highest')
 
 /** One labelled field. `error` shows the red "Required" line and wires aria-invalid / aria-describedby. */
-function Field({ id, label, optional, error, children }) {
+export function Field({ id, label, optional, error, children }) {
   return (
     <div>
       <label htmlFor={id} className="mb-1.5 block text-sm font-bold text-ink">
@@ -140,7 +140,7 @@ function Field({ id, label, optional, error, children }) {
   )
 }
 
-function Shell({ children }) {
+export function Shell({ children }) {
   return <div className="min-h-screen bg-surface-dim font-sans text-ink">{children}</div>
 }
 
@@ -160,17 +160,21 @@ export default function Register() {
   const [customAnswers,  setCustomAnswers]  = useState(['', ''])
   const [missing,        setMissing]        = useState(null) // { ids: Set, message } after a submit with gaps
   const formRef = useRef(null)
+  const navigate = useNavigate()
 
   useEffect(() => {
     supabase
       .from('events')
-      .select('id, name, slug, event_number, event_date, entry_fee, tournament_fee, status, venmo_handle, paypal_link, zelle_handle, registration_open, custom_questions, schedule_items, course:courses(name, address), league:leagues(name, slug, logo_url, org:organizations(logo_url, slug)), use_flights')
+      .select('id, name, slug, event_number, event_date, entry_fee, tournament_fee, status, venmo_handle, paypal_link, zelle_handle, registration_open, custom_questions, schedule_items, course:courses(name, address), league:leagues(name, slug, logo_url, is_trip_league, trips(slug), org:organizations(logo_url, slug)), use_flights')
       .eq('slug', eventSlug)
       .eq('league.slug', leagueSlug)
       .single()
       .then(({ data, error }) => {
-        if (error || !data) setError('Event not found.')
-        else setEvent(data)
+        if (error || !data) { setError('Event not found.'); setLoading(false); return }
+        // A trip's round has no sign-up of its own: send people to the trip's sign-up page.
+        const trip = data.league?.is_trip_league ? [].concat(data.league.trips ?? [])[0] : null
+        if (trip?.slug && data.league?.org?.slug) { navigate(`/${data.league.org.slug}/trip/${trip.slug}/register`, { replace: true }); return }
+        setEvent(data)
         setLoading(false)
       })
   }, [leagueSlug, eventSlug])

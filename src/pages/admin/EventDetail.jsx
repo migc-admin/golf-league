@@ -209,7 +209,7 @@ export default function EventDetail() {
       { data: allP },
       { data: cf },
     ] = await Promise.all([
-      supabase.from('events').select('*, league:leagues(*), course:courses(*), imported_skins(*)').eq('id', id).single(),
+      supabase.from('events').select('*, league:leagues(*, trips(slug, name)), course:courses(*), imported_skins(*)').eq('id', id).single(),
       supabase.from('event_players').select('*, player:players(*)').eq('event_id', id).order('flight').order('adjusted_handicap_index'),
       supabase.from('scores').select('*').eq('event_id', id),
       supabase.from('side_games').select('*, winner:players(first_name,last_name)').eq('event_id', id),
@@ -296,13 +296,25 @@ export default function EventDetail() {
     : { players: [], totalPot: 0, buyInPotTotal: 0 }
   const payoutsByPlayer = payoutSummary.players
 
+  // A trip's round lives under its trip, not under Leagues.
+  const tripRel    = event.league?.trips
+  const parentTrip = event.league?.is_trip_league ? (Array.isArray(tripRel) ? tripRel[0] : tripRel) ?? null : null
+
   return (
     <div className="space-y-5">
       {/* Breadcrumb */}
       <nav className="text-sm text-ink-muted flex items-center gap-1.5">
         <Link to="/admin" className="hover:text-ink">Home</Link>
         <span>/</span>
-        <Link to="/admin/leagues" className="hover:text-ink">Leagues</Link>
+        {parentTrip ? (
+          <>
+            <Link to="/admin/trips" className="hover:text-ink">Trips</Link>
+            <span>/</span>
+            <Link to={`/admin/trips/${parentTrip.slug}`} className="hover:text-ink">{parentTrip.name}</Link>
+          </>
+        ) : (
+          <Link to="/admin/leagues" className="hover:text-ink">Leagues</Link>
+        )}
         <span>/</span>
         <button type="button" onClick={() => setActiveTab('Overview')} className="hover:text-ink">{event.name ?? `Event #${event.event_number}`}</button>
         <span>/</span>
@@ -378,7 +390,13 @@ export default function EventDetail() {
           setAddModal={setAddPlayerOpen}
           upgradePrompt={playerLimitOpen}
           setUpgradePrompt={setPlayerLimitOpen}
-          registrationSlot={hasFeature('registration') ? (
+          registrationSlot={parentTrip ? (
+            // A trip's rounds take no sign-ups of their own: people register for the trip.
+            <div className="flex flex-wrap items-center justify-between gap-3 rounded-sm border border-surface-border bg-white px-4 py-3 text-sm">
+              <span className="text-ink-muted">People sign up for <span className="font-semibold text-ink">{parentTrip.name}</span>, not for this round. Add golfers to this round from the roster below.</span>
+              <Link to={`/admin/trips/${parentTrip.slug}#trip-registration`} className="inline-flex min-h-[44px] items-center font-semibold text-fairway-700 hover:underline">Trip registration →</Link>
+            </div>
+          ) : hasFeature('registration') ? (
             <TabRegistrations event={event} onUpdated={load} orgId={org?.id} />
           ) : (
             <div className="flex items-center gap-3 px-4 py-3 rounded-sm text-sm" style={{ background: '#eff6ff', border: '1px solid #bfdbfe' }}>
@@ -963,6 +981,8 @@ function EventPublicFields({ event, onUpdated }) {
 
       {/* Registration spots + Sponsors */}
       <div className="grid gap-5 sm:grid-cols-[1fr_2fr]">
+        {!event.league?.is_trip_league && (
+<>
         <div id="spots-field">
           <Input
             label="Registration spots"
@@ -973,6 +993,8 @@ function EventPublicFields({ event, onUpdated }) {
             onChange={e => setSpots(e.target.value)}
           />
         </div>
+</>
+        )}
 
         <div>
           <label className="label">Sponsors</label>
@@ -3174,7 +3196,7 @@ function TabPayoutConfig({ event, eventPlayers, course, onUpdated, onGoToOvervie
         />
       )}
 
-      <StandingsLegend keys={activePayoutKeys(event)} config={event.league?.standings_config} overrides={event.standings_overrides} leagueName={event.league?.name} />
+      <StandingsLegend keys={activePayoutKeys(event)} config={event.league?.standings_config} overrides={event.standings_overrides} leagueName={event.league?.name} tripName={event.league?.is_trip_league ? ([].concat(event.league?.trips ?? [])[0]?.name ?? event.league?.name) : null} />
 
       <PotAndHolesCard
         locked={locked}
@@ -4156,6 +4178,7 @@ const EDIT_FORMAT_OPTIONS = [
 
 
 function EditEventModal({ open, onClose, event, onSaved }) {
+  const isTripRound = !!event?.league?.is_trip_league
   const [eventDate,     setEventDate]     = useState('')
   const [eventName,     setEventName]     = useState('')
   const [eventNumber,   setEventNumber]   = useState('')
@@ -4302,18 +4325,23 @@ function EditEventModal({ open, onClose, event, onSaved }) {
         </div>
         <div className="grid grid-cols-2 gap-4">
           <Input label="Event Name (optional)" value={eventName} onChange={e => setEventName(e.target.value)} placeholder="e.g. Spring Opener…" />
-          <Input label="Event #" type="number" min="1" value={eventNumber} onChange={e => setEventNumber(e.target.value)} required />
+          <Input label={isTripRound ? 'Round #' : 'Event #'} type="number" min="1" value={eventNumber} onChange={e => setEventNumber(e.target.value)} required />
         </div>
-        <div>
-          <Input label="Season" type="number" min="2000" max="2100" value={seasonYear} onChange={e => setSeasonYear(e.target.value)} required className="max-w-[160px]" />
-          <p className="mt-1 text-xs text-ink-muted">Which season this event counts toward in standings.</p>
-        </div>
+        {/* Trips have no seasons: a round always counts toward its own trip. */}
+        {!isTripRound && (
+          <div>
+            <Input label="Season" type="number" min="2000" max="2100" value={seasonYear} onChange={e => setSeasonYear(e.target.value)} required className="max-w-[160px]" />
+            <p className="mt-1 text-xs text-ink-muted">Which season this event counts toward in standings.</p>
+          </div>
+        )}
         <div className="grid grid-cols-2 gap-4">
           <Input label="Pot contribution ($)" type="number" step="0.01" min="0" value={entryFee} onChange={e => setEntryFee(e.target.value)} required />
-          <Input label="Entry fee ($)" type="number" step="0.01" min="0" value={tournamentFee} onChange={e => setTournamentFee(e.target.value)} placeholder="Charged at registration" />
+          {!isTripRound && <Input label="Entry fee ($)" type="number" step="0.01" min="0" value={tournamentFee} onChange={e => setTournamentFee(e.target.value)} placeholder="Charged at registration" />}
         </div>
-        <p className="text-xs text-ink-muted -mt-2">Pot contribution is per player, toward winnings, and drives payouts. Entry fee is what each player pays to register.</p>
+        <p className="text-xs text-ink-muted -mt-2">{isTripRound ? 'Pot contribution is per player, toward winnings, and drives payouts. What people pay for the trip is set in the trip\'s Costs.' : 'Pot contribution is per player, toward winnings, and drives payouts. Entry fee is what each player pays to register.'}</p>
 
+        {!isTripRound && (
+<>
         {/* Payment links */}
         <div className="space-y-3 bg-surface-container rounded-sm px-4 py-3">
           <p className="text-xs font-semibold text-ink-muted uppercase tracking-wide">Payment Links (shown after registration)</p>
@@ -4351,6 +4379,8 @@ function EditEventModal({ open, onClose, event, onSaved }) {
             />
           </div>
         </div>
+</>
+        )}
 
         {/* Schedule of Events */}
         <div className="space-y-3 bg-surface-container rounded-sm px-4 py-3">
@@ -4391,6 +4421,8 @@ function EditEventModal({ open, onClose, event, onSaved }) {
           </button>
         </div>
 
+        {!isTripRound && (
+<>
         {/* Custom Registration Questions */}
         <div className="space-y-2 bg-surface-container rounded-sm px-4 py-3">
           <p className="text-xs font-semibold text-ink-muted uppercase tracking-wide">Registration Questions <span className="normal-case text-ink-muted font-normal">(shown on registration form)</span></p>
@@ -4420,6 +4452,8 @@ function EditEventModal({ open, onClose, event, onSaved }) {
             + Add item
           </button>
         </div>
+</>
+)}
 
         {/* Number of Flights */}
         <div className="bg-surface-container rounded-sm px-4 py-3">
@@ -4495,7 +4529,7 @@ function EditEventModal({ open, onClose, event, onSaved }) {
         <div>
           <div className="mb-1.5 flex flex-wrap items-center gap-x-3 gap-y-1">
             <label className="label !mb-0">Scoring Formats</label>
-            <StandingsBadge bucket="scoring" config={event.league?.standings_config} overrides={standingsOverrides} onToggle={b => setStandingsOverrides(prev => toggleOverride(prev, b, event.league?.standings_config))} />
+            <StandingsBadge isTrip={isTripRound} bucket="scoring" config={event.league?.standings_config} overrides={standingsOverrides} onToggle={b => setStandingsOverrides(prev => toggleOverride(prev, b, event.league?.standings_config))} />
           </div>
           <div className="bg-surface-container rounded-sm px-4 py-3 space-y-3">
             {EDIT_FORMAT_OPTIONS.map(group => (
@@ -4573,7 +4607,7 @@ function EditEventModal({ open, onClose, event, onSaved }) {
                   <label className="flex items-center gap-2.5 cursor-pointer">
                     <input type="checkbox" checked={checked} onChange={() => toggleSideGame(opt.key)} className="accent-fairway-600 w-4 h-4" />
                     <span className="text-sm text-ink">{opt.label}</span>
-                    <StandingsBadge gameKey={opt.key} config={event.league?.standings_config} overrides={standingsOverrides} onToggle={b => setStandingsOverrides(prev => toggleOverride(prev, b, event.league?.standings_config))} />
+                    <StandingsBadge isTrip={isTripRound} gameKey={opt.key} config={event.league?.standings_config} overrides={standingsOverrides} onToggle={b => setStandingsOverrides(prev => toggleOverride(prev, b, event.league?.standings_config))} />
                   </label>
                   {checked && isPerFlight && numFlights > 0 && (
                     <div className="ml-6 mt-1.5 flex gap-4">
@@ -4665,7 +4699,7 @@ function EditEventModal({ open, onClose, event, onSaved }) {
 
 function DeleteEventModal({ open, onClose, event }) {
   const [saving, setSaving] = useState(false)
-  const navigate = Link // placeholder — we'll use window.history
+  const navigate = useNavigate()
 
   async function handleDelete() {
     setSaving(true)
@@ -4673,7 +4707,12 @@ function DeleteEventModal({ open, onClose, event }) {
     setSaving(false)
     if (error) { toast.error(error.message); return }
     toast.success('Event deleted')
-    window.history.back()
+    // Go to the event's parent: its trip for a trip round, otherwise its league.
+    const t = event.league?.trips
+    const trip = event.league?.is_trip_league ? (Array.isArray(t) ? t[0] : t) : null
+    if (trip?.slug) navigate(`/admin/trips/${trip.slug}`, { replace: true })
+    else if (event.league?.slug) navigate(`/admin/leagues/${event.league.slug}`, { replace: true })
+    else window.history.back()
   }
 
   return (

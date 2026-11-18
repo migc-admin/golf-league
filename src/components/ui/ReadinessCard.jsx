@@ -18,7 +18,8 @@ export function buildReadiness({ event, eventPlayers }) {
   const count = nonGuests.length
   const items = []
 
-  items.push({
+  // A trip's round takes no sign-ups of its own (people register for the trip), so no spots.
+  if (!event?.league?.is_trip_league) items.push({
     key: 'spots',
     title: 'Set registration spots',
     detail: 'Caps sign-ups on the event page',

@@ -12,6 +12,7 @@ import TripTravelersRooms from '../../components/TripTravelers'
 import TripHeader from '../../components/trip/TripHeader'
 import TripItineraryCard from '../../components/trip/TripItineraryCard'
 import TripRoundsCard from '../../components/trip/TripRoundsCard'
+import { TripCostsCard, TripRegistrationCard } from '../../components/trip/TripRegistration'
 import { StayingCard, GettingThereCard, TripStandingsCard, DeleteTripBox } from '../../components/trip/TripSideCards'
 import { buildItinerary } from '../../lib/tripItinerary'
 import { tripTiles } from '../../lib/tripView'
@@ -144,8 +145,10 @@ export default function TripDetail() {
         <div className="min-w-0 space-y-5">
           <TripItineraryCard days={days} onAddItem={() => setInfoModal(true)} />
           {league && (
-            <TripRoundsCard league={league} rounds={rounds} setRounds={setRounds} orgSlug={orgSlug} orgTier={orgTier} />
+            <TripRoundsCard league={league} tripSlug={tripSlug} rounds={rounds} setRounds={setRounds} orgSlug={orgSlug} orgTier={orgTier} />
           )}
+          <TripCostsCard trip={trip} rounds={rounds} onSaved={load} />
+          <TripRegistrationCard trip={trip} rounds={rounds} orgSlug={orgSlug} onTripSaved={load} onTravelersChanged={() => loadTravelers(trip)} />
           <TripTravelersRooms trip={trip} travelers={travelers} roster={roster} onReload={() => loadTravelers(trip)} />
         </div>
 
@@ -185,7 +188,7 @@ const EMPTY_ITINERARY_ENTRY = { date: '', text: '' }
 const EMPTY_AIRPORT         = { code: '', name: '', distance: '' }
 const EMPTY_SCHEDULED_ENTRY = { date: '', time: '', name: '', venue: '', location: '' }
 const EMPTY_LODGING = {
-  name: '', address: '', booking_company: '',
+  type: '', name: '', address: '', booking_company: '',
   checkin_date: '', checkin_time: '', checkout_date: '', checkout_time: '',
 }
 
@@ -293,6 +296,13 @@ function TripInfoModal({ open, onClose, trip, onSaved }) {
 
         <div className="space-y-3">
           <label className="label">Base Camp (Lodging)</label>
+          {/* A rental (non-hotel) makes the sign-up form ask who is staying in it; only they pay the lodging share. */}
+          <select className="input" value={lodging.type ?? ''} onChange={e => setLodging(l => ({ ...l, type: e.target.value }))} aria-label="Lodging type">
+            <option value="">Lodging type…</option>
+            <option value="hotel">Hotel / resort</option>
+            <option value="rental">Rental property (non-hotel)</option>
+          </select>
+          {lodging.type === 'rental' && <p className="text-xs text-ink-muted">The sign-up form will ask "Are you staying in the rental property?" and charge the lodging share only to those who say Yes.</p>}
           <Input placeholder="Resort or house rental name" value={lodging.name} onChange={e => setLodging(l => ({ ...l, name: e.target.value }))} />
           <Input placeholder="Address" value={lodging.address} onChange={e => setLodging(l => ({ ...l, address: e.target.value }))} />
           <Input placeholder="Booking company (Airbnb, Expedia, Marriott, etc.)" value={lodging.booking_company} onChange={e => setLodging(l => ({ ...l, booking_company: e.target.value }))} />

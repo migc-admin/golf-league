@@ -89,10 +89,16 @@ export function LeagueDetailView({ leagueSlug, containerLabel = 'League', roundL
 
       const { data: lg } = await supabase
         .from('leagues')
-        .select('id, name, slug, season_year, logo_url, team_play_label, standings_config')
+        .select('id, name, slug, season_year, logo_url, team_play_label, standings_config, is_trip_league, trips(slug)')
         .eq('slug', leagueSlug)
         .single()
       if (!lg) { navigate('/admin/leagues'); return }
+      // A trip's hidden league is managed only from its trip page, never as a league.
+      if (lg.is_trip_league) {
+        const t = [].concat(lg.trips ?? [])[0]
+        navigate(t?.slug ? `/admin/trips/${t.slug}` : '/admin/trips', { replace: true })
+        return
+      }
       setLeague(lg)
       await load(org.slug, lg.id)
       setLoading(false)

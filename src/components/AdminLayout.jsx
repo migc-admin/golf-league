@@ -69,8 +69,9 @@ const EVENT_TABS = [
 function useEventRoute() {
   const location = useLocation()
   const parts = location.pathname.replace(/^\/admin\//, '').split('/')
-  // event route has exactly 3 segments: orgSlug / leagueSlug / eventSlug
-  if (parts.length === 3 && parts[0] && parts[1] && parts[2]) {
+  // event route has exactly 3 segments: orgSlug / leagueSlug / eventSlug.
+  // leagues/:slug/new-event and trips/:slug/new-round are also 3 segments but aren't events.
+  if (parts.length === 3 && parts[0] && parts[1] && parts[2] && !['leagues', 'trips'].includes(parts[0])) {
     return { isEventRoute: true, orgSlug: parts[0], leagueSlug: parts[1], eventSlug: parts[2], basePath: location.pathname }
   }
   return { isEventRoute: false }
@@ -216,7 +217,7 @@ function GlobalSidebar({ org, user, profile, tier, isOwner, onSignOut, onClose }
 }
 
 // ─── Event context sidebar ────────────────────────────────────────────────────
-function EventSidebar({ org, eventName, eventStatus, hasMatchPlay = false, sideGameOptions = [], basePath, wagersHref = null, activeKey = null, onClose, onSignOut, user, profile }) {
+function EventSidebar({ org, trip = null, eventName, eventStatus, hasMatchPlay = false, sideGameOptions = [], basePath, wagersHref = null, activeKey = null, onClose, onSignOut, user, profile }) {
   const [searchParams, setSearchParams] = useSearchParams()
   const navigate  = useNavigate()
   // `activeKey` is set when the sidebar is shown on a page that is not the event's own admin page
@@ -245,13 +246,14 @@ function EventSidebar({ org, eventName, eventStatus, hasMatchPlay = false, sideG
     <div className="flex flex-col h-full bg-white border-r" style={{ borderColor: '#ebe9e4' }}>
       {/* Back + org */}
       <div className="relative px-4 pt-4 pb-3 border-b" style={{ borderColor: '#ebe9e4' }}>
-        <Link to="/admin"
+        {/* A trip's round goes back to its trip; a league event goes back to admin home. */}
+        <Link to={trip ? `/admin/trips/${trip.slug}` : '/admin'}
           className="flex items-center gap-1.5 text-ink-muted hover:text-ink text-xs font-semibold mb-3 transition-colors"
           onClick={onClose}>
           <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
           </svg>
-          {org?.name ?? 'Home'}
+          {trip?.name ?? org?.name ?? 'Home'}
         </Link>
         <div className="text-ink font-semibold text-sm leading-snug truncate">{eventName}</div>
         {eventStatus && (
@@ -412,11 +414,11 @@ export default function AdminLayout({ children, eventContext = null }) {
     if (!isEventRoute || !eventSlug) { setEventMeta(null); return }
     supabase
       .from('events')
-      .select('id, name, event_number, status, side_game_options, formats, format, league:leagues(org_id)')
+      .select('id, name, event_number, status, side_game_options, formats, format, league:leagues(org_id, is_trip_league, trips(slug, name))')
       .eq('slug', eventSlug)
       .single()
       .then(({ data }) => {
-        if (data) setEventMeta({ id: data.id, isMigc: data.league?.org_id === import.meta.env.VITE_MIGC_ORG_ID, name: data.name ?? `Event #${data.event_number}`, status: data.status, sideGameOptions: data.side_game_options ?? [], hasMatchPlay: [...(data.formats ?? (data.format ? [data.format] : []))].some(f => f === 'match_points' || f === 'ryder_cup') })
+        if (data) setEventMeta({ id: data.id, trip: data.league?.is_trip_league ? ([].concat(data.league.trips ?? [])[0] ?? null) : null, isMigc: data.league?.org_id === import.meta.env.VITE_MIGC_ORG_ID, name: data.name ?? `Event #${data.event_number}`, status: data.status, sideGameOptions: data.side_game_options ?? [], hasMatchPlay: [...(data.formats ?? (data.format ? [data.format] : []))].some(f => f === 'match_points' || f === 'ryder_cup') })
       })
   }, [isEventRoute, eventSlug])
 
@@ -436,11 +438,11 @@ export default function AdminLayout({ children, eventContext = null }) {
   const sharedProps = { org, user, profile, onSignOut: handleSignOut }
 
   const sidebarContent = isEventRoute
-    ? <EventSidebar {...sharedProps} eventName={eventMeta?.name ?? '…'} eventStatus={eventMeta?.status} hasMatchPlay={eventMeta?.hasMatchPlay ?? false} sideGameOptions={eventMeta?.sideGameOptions ?? []} basePath={basePath} wagersHref={wagersHref} activeKey={activeKey} onClose={() => setDrawerOpen(false)} />
+    ? <EventSidebar {...sharedProps} trip={eventMeta?.trip ?? null} eventName={eventMeta?.name ?? '…'} eventStatus={eventMeta?.status} hasMatchPlay={eventMeta?.hasMatchPlay ?? false} sideGameOptions={eventMeta?.sideGameOptions ?? []} basePath={basePath} wagersHref={wagersHref} activeKey={activeKey} onClose={() => setDrawerOpen(false)} />
     : <GlobalSidebar {...sharedProps} tier={tier} isOwner={isOwner} onClose={() => setDrawerOpen(false)} />
 
   const sidebarDesktop = isEventRoute
-    ? <EventSidebar {...sharedProps} eventName={eventMeta?.name ?? '…'} eventStatus={eventMeta?.status} hasMatchPlay={eventMeta?.hasMatchPlay ?? false} sideGameOptions={eventMeta?.sideGameOptions ?? []} basePath={basePath} wagersHref={wagersHref} activeKey={activeKey} />
+    ? <EventSidebar {...sharedProps} trip={eventMeta?.trip ?? null} eventName={eventMeta?.name ?? '…'} eventStatus={eventMeta?.status} hasMatchPlay={eventMeta?.hasMatchPlay ?? false} sideGameOptions={eventMeta?.sideGameOptions ?? []} basePath={basePath} wagersHref={wagersHref} activeKey={activeKey} />
     : <GlobalSidebar {...sharedProps} tier={tier} isOwner={isOwner} />
 
   return (

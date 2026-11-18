@@ -43,10 +43,10 @@ export function RoundsCard({ rounds, leagueSlug, orgSlug, onStandings }) {
   )
 }
 
-export function ScheduleCard({ days }) {
+export function ScheduleCard({ days, roundHref = null }) {
   return (
     <EventCard title="Schedule">
-      <ItineraryDays days={days} emptyText="Nothing scheduled yet." />
+      <ItineraryDays days={days} emptyText="Nothing scheduled yet." roundHref={roundHref} />
     </EventCard>
   )
 }

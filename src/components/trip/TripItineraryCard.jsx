@@ -6,6 +6,7 @@
  *
  * Presentational: the days come from buildItinerary (lib/tripItinerary.js).
  */
+import { Link } from 'react-router-dom'
 import SectionCard from '../ui/SectionCard'
 import { ActionButton } from '../ui/Button'
 import { time12 } from '../../lib/tripItinerary'
@@ -46,7 +47,9 @@ function dayParts(date) {
   }
 }
 
-function Row({ item }) {
+function Row({ item, roundHref }) {
+  // A golf item links to its round's page when the caller says where rounds live.
+  const href = item.tag === 'GOLF' && item.roundSlug && roundHref ? roundHref(item.roundSlug) : null
   return (
     <li className="flex flex-wrap items-start gap-x-3 gap-y-1 py-2">
       <span className={`w-[76px] shrink-0 pt-px text-sm font-semibold tabular-nums ${item.time ? 'text-fairway-700' : 'text-ink-muted font-medium'}`}>
@@ -54,7 +57,9 @@ function Row({ item }) {
       </span>
       <span className="pt-px">{item.tag ? <TypeTag tag={item.tag} /> : <span className="inline-block w-[58px]" aria-hidden="true" />}</span>
       <span className="min-w-[140px] flex-1">
-        <span className="block text-sm font-bold text-ink">{item.title}</span>
+        {href
+          ? <Link to={href} className="block text-sm font-bold text-fairway-700 underline decoration-fairway-200 underline-offset-2 hover:decoration-fairway-700">{item.title} <span aria-hidden="true">→</span></Link>
+          : <span className="block text-sm font-bold text-ink">{item.title}</span>}
         {item.sub && <span className="block text-xs text-ink-muted">{item.sub}</span>}
       </span>
     </li>
@@ -62,7 +67,7 @@ function Row({ item }) {
 }
 
 /** The day-by-day timeline itself, read-only. Shared by the admin card and the public trip page. */
-export function ItineraryDays({ days, emptyText }) {
+export function ItineraryDays({ days, emptyText, roundHref = null }) {
   if (days.length === 0) return <p className="text-sm text-ink-muted">{emptyText}</p>
   return (
     <div className="divide-y divide-surface-border">
@@ -84,7 +89,7 @@ export function ItineraryDays({ days, emptyText }) {
             <div className="min-w-0 border-l-2 border-fairway-200 pl-3 sm:pl-4">
               {day.items.length === 0
                 ? <p className="py-2 text-sm text-ink-muted">Nothing scheduled</p>
-                : <ul>{day.items.map(item => <Row key={item.key} item={item} />)}</ul>}
+                : <ul>{day.items.map(item => <Row key={item.key} item={item} roundHref={roundHref} />)}</ul>}
             </div>
           </section>
         )

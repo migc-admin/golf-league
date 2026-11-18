@@ -19,11 +19,14 @@ import { StandingsBadge } from '../../components/ui/StandingsBadge'
 import { toggleOverride } from '../../lib/standingsBuckets'
 
 export default function CreateEvent() {
-  const { leagueSlug } = useParams()
+  // Reached as /admin/leagues/:leagueSlug/new-event, or from a trip as
+  // /admin/trips/:tripSlug/new-round (a trip's rounds are events of its hidden league).
+  const { leagueSlug, tripSlug } = useParams()
   const { user } = useAuth()
   const navigate = useNavigate()
 
   const [league,  setLeague]  = useState(null)
+  const [trip,    setTrip]    = useState(null) // { slug, name } when the league is a trip's
   const [orgTier, setOrgTier] = useState('free')
   const [loading, setLoading] = useState(true)
 
@@ -38,14 +41,19 @@ export default function CreateEvent() {
         const isPrivileged = profile?.is_owner || profile?.is_platform_admin
         setOrgTier(isPrivileged ? 'club' : (org?.tier ?? 'free'))
       }
-      const { data: lg } = await supabase
-        .from('leagues').select('id, name, slug, season_year, standings_config').eq('slug', leagueSlug).single()
-      if (!lg) { navigate('/admin/leagues'); return }
+      const cols = 'id, name, slug, season_year, standings_config, is_trip_league, trips(slug, name)'
+      const { data: lg } = tripSlug
+        ? await supabase.from('trips').select(`league:leagues(${cols})`).eq('slug', tripSlug).single()
+            .then(({ data }) => ({ data: data?.league ?? null }))
+        : await supabase.from('leagues').select(cols).eq('slug', leagueSlug).single()
+      if (!lg) { navigate(tripSlug ? '/admin/trips' : '/admin/leagues'); return }
       setLeague(lg)
+      const t = Array.isArray(lg.trips) ? lg.trips[0] : lg.trips
+      setTrip(lg.is_trip_league && t ? t : null)
       setLoading(false)
     }
     init()
-  }, [user, leagueSlug])
+  }, [user, leagueSlug, tripSlug])
 
   if (loading) {
     return (
@@ -56,10 +64,12 @@ export default function CreateEvent() {
     )
   }
 
-  return <CreateEventForm league={league} orgTier={orgTier} onDone={() => navigate(-1)} />
+  // A trip's round always returns to its trip, never to the league pages.
+  const onDone = trip ? () => navigate(`/admin/trips/${trip.slug}`, { replace: true }) : () => navigate(-1)
+  return <CreateEventForm league={league} trip={trip} orgTier={orgTier} onDone={onDone} />
 }
 
-function CreateEventForm({ league, orgTier, onDone }) {
+function CreateEventForm({ league, trip = null, orgTier, onDone }) {
   const canUsePro = checkFeature(orgTier ?? 'free', 'side_games')
 
   const [courses,      setCourses]      = useState([])
@@ -165,24 +175,25 @@ function CreateEventForm({ league, orgTier, onDone }) {
     })
     setSaving(false)
     if (error) toast.error(error.message)
-    else { toast.success('Event created'); onDone() }
+    else { toast.success(trip ? 'Round added' : 'Event created'); onDone() }
   }
 
   return (
     <div className="max-w-2xl mx-auto space-y-6">
       <div>
-        <Button variant="ghost" size="sm" onClick={onDone}>← Back</Button>
+        <Button variant="ghost" size="sm" onClick={onDone}>{trip ? `← ${trip.name}` : '← Back'}</Button>
       </div>
 
       <div className="card p-5 sm:p-6">
         <h1 className="text-xl font-bold text-ink mb-5" style={{ letterSpacing: '-0.02em' }}>
-          New Event — {league?.name ?? ''}
+          {trip ? `New Round — ${trip.name}` : `New Event — ${league?.name ?? ''}`}
         </h1>
 
         <form onSubmit={handleSave} className="space-y-4">
           <div className="grid grid-cols-2 gap-4 sm:grid-cols-3">
-            <Input label="Season" type="number" min="2000" max="2100" value={seasonYear} onChange={e => setSeasonYear(e.target.value)} required />
-            <Input label="Event #" type="number" min="1" value={eventNum} onChange={e => setEventNum(e.target.value)} required />
+            {/* Trips have no seasons: a round always takes the trip's own year. */}
+            {!trip && <Input label="Season" type="number" min="2000" max="2100" value={seasonYear} onChange={e => setSeasonYear(e.target.value)} required />}
+            <Input label={trip ? 'Round #' : 'Event #'} type="number" min="1" value={eventNum} onChange={e => setEventNum(e.target.value)} required />
             <Input label="Date" type="date" value={eventDate} onChange={e => setEventDate(e.target.value)} required className="col-span-2 sm:col-span-1" />
           </div>
           <Input label="Event Name (optional)" value={eventName} onChange={e => setEventName(e.target.value)} placeholder="e.g. Spring Opener, Member-Guest…" />
@@ -267,7 +278,7 @@ function CreateEventForm({ league, orgTier, onDone }) {
           <div>
             <div className="mb-1.5 flex flex-wrap items-center gap-x-3 gap-y-1">
             <label className="label !mb-0">Scoring Formats</label>
-            <StandingsBadge bucket="scoring" config={league?.standings_config} overrides={standingsOverrides} onToggle={b => setStandingsOverrides(prev => toggleOverride(prev, b, league?.standings_config))} />
+            <StandingsBadge isTrip={!!trip} bucket="scoring" config={league?.standings_config} overrides={standingsOverrides} onToggle={b => setStandingsOverrides(prev => toggleOverride(prev, b, league?.standings_config))} />
           </div>
             <div className="bg-surface-container rounded-sm px-4 py-3 space-y-3">
               {FORMAT_OPTIONS.map(group => (
@@ -343,7 +354,7 @@ function CreateEventForm({ league, orgTier, onDone }) {
                         onChange={() => !locked && toggleSideGame(opt.key)}
                         disabled={locked} className="accent-fairway-600 w-4 h-4" />
                       <span className="text-sm text-ink">{opt.label}</span>
-                      <StandingsBadge gameKey={opt.key} config={league?.standings_config} overrides={standingsOverrides} onToggle={b => setStandingsOverrides(prev => toggleOverride(prev, b, league?.standings_config))} />
+                      <StandingsBadge isTrip={!!trip} gameKey={opt.key} config={league?.standings_config} overrides={standingsOverrides} onToggle={b => setStandingsOverrides(prev => toggleOverride(prev, b, league?.standings_config))} />
                       {locked && <span className="text-xs font-semibold px-1.5 py-0.5 rounded-full bg-status-active-bg text-status-active-text">Pro</span>}
                     </label>
                     {checked && isPerFlight && numFlights > 0 && (
@@ -430,8 +441,11 @@ function CreateEventForm({ league, orgTier, onDone }) {
               <Input className="mt-2" label="Fixed Pot Total ($)" type="number" step="0.01" min="0" value={payoutFixed} onChange={e => setPayoutFixed(e.target.value)} placeholder="e.g. 500" />
             )}
           </div>
-          <Input label="Entry fee ($)" type="number" step="0.01" min="0" value={tournamentFee} onChange={e => setTournamentFee(e.target.value)} placeholder="e.g. 25.00 (shown on registration page)" />
+          {/* A trip round has no sign-up of its own: entry fee, payment links and questions live on the trip. */}
+          {!trip && <Input label="Entry fee ($)" type="number" step="0.01" min="0" value={tournamentFee} onChange={e => setTournamentFee(e.target.value)} placeholder="e.g. 25.00 (shown on registration page)" />}
 
+          {!trip && (
+<>
           <div className="space-y-3">
             <div className="text-xs font-semibold text-ink-muted uppercase tracking-wide">Payment Links (optional)</div>
             <div>
@@ -459,6 +473,8 @@ function CreateEventForm({ league, orgTier, onDone }) {
               />
             </div>
           </div>
+</>
+          )}
 
           {/* Schedule of Events */}
           <div className="space-y-3 bg-surface-container rounded-sm px-4 py-3">
@@ -495,6 +511,8 @@ function CreateEventForm({ league, orgTier, onDone }) {
             </Button>
           </div>
 
+          {!trip && (
+<>
           {/* Custom Registration Questions */}
           <div className="space-y-2 bg-surface-container rounded-sm px-4 py-3">
             <p className="text-xs font-semibold text-ink-muted uppercase tracking-wide">Registration Questions <span className="normal-case text-ink-muted font-normal">(shown on registration form)</span></p>
@@ -520,6 +538,8 @@ function CreateEventForm({ league, orgTier, onDone }) {
               + Add item
             </Button>
           </div>
+</>
+          )}
 
           <div className="flex justify-end gap-3 pt-2">
             <Button type="button" variant="secondary" onClick={onDone}>Cancel</Button>

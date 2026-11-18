@@ -21,6 +21,7 @@ import CreateEvent    from './pages/admin/CreateEvent'
 import Trips          from './pages/admin/Trips'
 import TripDetail     from './pages/admin/TripDetail'
 import TripHome       from './pages/trip/TripHome'
+import TripRegister   from './pages/trip/TripRegister'
 import Courses        from './pages/admin/Courses'
 import Players        from './pages/admin/Players'
 import EventDetail    from './pages/admin/EventDetail'
@@ -92,6 +93,11 @@ function LeagueStandingsRoute({ initialTab = 'standings' }) {
   return <OrgProvider orgSlug={orgSlug}><LeagueHome orgSlug={orgSlug} leagueSlug={leagueSlug} initialTab={initialTab} /></OrgProvider>
 }
 
+function TripRegisterRoute({ orgSlug: fixedOrgSlug }) {
+  const { orgSlug: paramOrgSlug, tripSlug } = useParams()
+  return <TripRegister orgSlug={fixedOrgSlug ?? paramOrgSlug} tripSlug={tripSlug} />
+}
+
 function TripHomeRoute({ orgSlug: fixedOrgSlug, initialTab }) {
   const { orgSlug: paramOrgSlug, tripSlug } = useParams()
   return <TripHome orgSlug={fixedOrgSlug ?? paramOrgSlug} tripSlug={tripSlug} initialTab={initialTab} />
@@ -113,6 +119,8 @@ export default function App() {
             <Route path="/:leagueSlug/standings" element={<LeagueHomeRoute orgSlug={subdomainSlug} initialTab="standings" />} />
             <Route path="/:leagueSlug/rules" element={<LeagueHomeRoute orgSlug={subdomainSlug} initialTab="rules" />} />
             <Route path="/trip/:tripSlug" element={<TripHomeRoute orgSlug={subdomainSlug} />} />
+            <Route path="/trip/:tripSlug/standings" element={<TripHomeRoute orgSlug={subdomainSlug} initialTab="standings" />} />
+            <Route path="/trip/:tripSlug/register" element={<TripRegisterRoute orgSlug={subdomainSlug} />} />
             <Route path="/:leagueSlug/:eventSlug" element={<EventPage />} />
             <Route path="/:leagueSlug/:eventSlug/leaderboard" element={<OrgProvider orgSlug={subdomainSlug}><Leaderboard /></OrgProvider>} />
             <Route path="/:leagueSlug/:eventSlug/scorecard"   element={<OrgProvider orgSlug={subdomainSlug}><Scorecard /></OrgProvider>} />
@@ -128,6 +136,7 @@ export default function App() {
               <Route path="leagues/:leagueSlug/new-event" element={<CreateEvent />} />
               <Route path="trips"                      element={<Trips />} />
               <Route path="trips/:tripSlug"            element={<TripDetail />} />
+              <Route path="trips/:tripSlug/new-round"  element={<CreateEvent />} />
               <Route path="courses"                    element={<Courses />} />
               <Route path="players"                    element={<Players />} />
               <Route path="import"                     element={<Import />} />
@@ -166,6 +175,7 @@ export default function App() {
           <Route path="leagues/:leagueSlug/new-event" element={<CreateEvent />} />
           <Route path="trips"                      element={<Trips />} />
           <Route path="trips/:tripSlug"            element={<TripDetail />} />
+          <Route path="trips/:tripSlug/new-round"  element={<CreateEvent />} />
           <Route path="courses"                    element={<Courses />} />
           <Route path="players"                    element={<Players />} />
           <Route path="import"                     element={<Import />} />
@@ -206,6 +216,8 @@ export default function App() {
 
         {/* Generic slug-based routes — must be LAST to avoid conflicts */}
         <Route path="/:orgSlug/trip/:tripSlug"                     element={<TripHomeRoute />} />
+        <Route path="/:orgSlug/trip/:tripSlug/standings"           element={<TripHomeRoute initialTab="standings" />} />
+        <Route path="/:orgSlug/trip/:tripSlug/register"            element={<TripRegisterRoute />} />
         <Route path="/:orgSlug/:leagueSlug/standings"              element={<LeagueStandingsRoute />} />
         <Route path="/:orgSlug/:leagueSlug/rules"                  element={<LeagueStandingsRoute initialTab="rules" />} />
         <Route path="/:orgSlug/:leagueSlug/:eventSlug/event"       element={<EventPage />} />

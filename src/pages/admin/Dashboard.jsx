@@ -38,7 +38,8 @@ export default function Dashboard() {
         { data: leagueRows,   error: e3 },
       ] = await Promise.all([
         supabase.from('players').select('*', { count: 'exact', head: true }).eq('org_id', profile.org_id),
-        supabase.from('events').select('*', { count: 'exact', head: true }),
+        // League events only; trip rounds stay on the Trips page.
+        supabase.from('events').select('id, league:leagues!inner(is_trip_league)', { count: 'exact', head: true }).eq('league.is_trip_league', false),
         supabase
           .from('leagues')
           .select('id, name, slug, season_year')

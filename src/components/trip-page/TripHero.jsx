@@ -12,6 +12,7 @@
  * Presentational. The countdown reuses getRemaining (the event page's tick logic).
  */
 import { useEffect, useState } from 'react'
+import { Link } from 'react-router-dom'
 import { getRemaining } from '../Countdown'
 import Button from '../ui/Button'
 import { FactRow, CalendarIcon } from '../event-page/EventHero'
@@ -84,7 +85,7 @@ function Cover({ src, alt, fallback }) {
 
 export default function TripHero({
   title, status, facts, coverUrl, targetDate, progress, goingCount, checkIn,
-  onDirections, onSeeSchedule, onSeeStandings,
+  onDirections, onSeeSchedule, onSeeStandings, registerHref = null,
 }) {
   const st = STATUS[status] ?? STATUS.upcoming
   return (
@@ -139,7 +140,10 @@ export default function TripHero({
                   <div className="text-[15px] font-bold text-ink">{goingCount} golfer{goingCount === 1 ? '' : 's'} going</div>
                   {checkIn && <div className="text-sm text-ink-muted">{checkIn}</div>}
                 </div>
-                <Button type="button" size="lg" className="w-full sm:w-auto" onClick={onSeeSchedule}>See the schedule</Button>
+                {/* While the trip takes sign-ups, Register is the main action. */}
+                {registerHref
+                  ? <Button as={Link} to={registerHref} size="lg" className="w-full sm:w-auto">Register for the trip</Button>
+                  : <Button type="button" size="lg" className="w-full sm:w-auto" onClick={onSeeSchedule}>See the schedule</Button>}
               </div>
             </div>
           )}

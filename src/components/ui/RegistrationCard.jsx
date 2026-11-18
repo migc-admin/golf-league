@@ -21,15 +21,20 @@
 import { useId } from 'react'
 import { ActionButton } from './Button'
 
-export default function RegistrationCard({ id = 'registration', url, onCopy, open = true, onToggleOpen, toggling = false, pendingCount = 0, notice = null, children, className = '' }) {
+export default function RegistrationCard({ id = 'registration', url, onCopy, open = true, onToggleOpen, toggling = false, pendingCount = 0, notice = null, place = 'event', headerAction = null, children, className = '' }) {
   const inputId = useId()
+  // `place` is the public page people sign up from: 'event' (a golf event) or 'trip' (a trip).
+  const trip = place === 'trip'
   const switchId = useId()
 
   return (
     <section id={id} className={`rounded-sm border border-surface-border bg-white p-5 sm:p-6 ${className}`.trim()}>
-      <header className="mb-4">
-        <h2 className="text-lg font-bold text-ink">Registration</h2>
-        <p className="mt-0.5 text-sm text-ink-muted">Share this link so players can sign up and pay.</p>
+      <header className="mb-4 flex items-start justify-between gap-3">
+        <div>
+          <h2 className="text-lg font-bold text-ink">Registration</h2>
+          <p className="mt-0.5 text-sm text-ink-muted">{trip ? 'Share this link so people can sign up for the trip.' : 'Share this link so players can sign up and pay.'}</p>
+        </div>
+        {headerAction}
       </header>
 
       {onToggleOpen && (
@@ -55,8 +60,8 @@ export default function RegistrationCard({ id = 'registration', url, onCopy, ope
             <span className="block text-sm font-semibold leading-tight text-ink">{open ? 'Registration open' : 'Registration off'}</span>
             <span className="mt-0.5 block text-xs text-ink-muted">
               {open
-                ? 'Players can sign up from the event page and this link.'
-                : 'The event page stays public, but there is no Register button and the link below will not accept sign-ups.'}
+                ? (trip ? 'People can sign up from the trip page and this link.' : 'Players can sign up from the event page and this link.')
+                : `The ${trip ? 'trip' : 'event'} page stays public, but there is no Register button and the link below will not accept sign-ups.`}
             </span>
           </label>
         </div>
@@ -72,8 +77,8 @@ export default function RegistrationCard({ id = 'registration', url, onCopy, ope
       <div className="mt-5 border-t border-surface-border pt-4">
         <div className="flex items-start justify-between gap-4">
           <div>
-            <h3 className="text-sm font-semibold text-ink">Pending payments</h3>
-            <p className="text-xs text-ink-muted">Registered but payment not yet confirmed</p>
+            <h3 className="text-sm font-semibold text-ink">{trip ? 'Pending sign-ups' : 'Pending payments'}</h3>
+            <p className="text-xs text-ink-muted">{trip ? 'Signed up, waiting for you to confirm them as travelers' : 'Registered but payment not yet confirmed'}</p>
           </div>
           <span className="shrink-0 text-sm font-semibold text-ink-muted">
             {pendingCount == null ? 'Loading…' : pendingCount > 0 ? `${pendingCount} pending` : 'None'}

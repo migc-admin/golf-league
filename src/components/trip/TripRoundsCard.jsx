@@ -31,7 +31,7 @@ function HandleIcon() {
   )
 }
 
-export default function TripRoundsCard({ league, rounds, setRounds, orgSlug, orgTier }) {
+export default function TripRoundsCard({ league, tripSlug, rounds, setRounds, orgSlug, orgTier }) {
   const [tglOpen, setTglOpen] = useState(false)
   const dragItem = useRef(null)
 
@@ -56,17 +56,17 @@ export default function TripRoundsCard({ league, rounds, setRounds, orgSlug, org
       subtitle={`${rounds.length} round${rounds.length === 1 ? '' : 's'}`}
       headerAction={
         <div className="flex flex-wrap items-center gap-2">
-          <Button as={Link} variant="ghost" to={`/${orgSlug}/${league.slug}/standings`}>Standings</Button>
+          <Button as={Link} variant="ghost" to={`/${orgSlug}/trip/${tripSlug}/standings`}>Standings</Button>
           {hasFeature(orgTier, 'tgl')
             ? <ActionButton variant="ghost" onClick={() => setTglOpen(true)}>{teamPlayLabel}</ActionButton>
             : <span className="rounded-full bg-surface-high px-3 py-1 text-xs text-ink-muted">Team play — Club</span>}
-          <Button as={Link} to={`/admin/leagues/${league.slug}/new-event`}>+ Add round</Button>
+          <Button as={Link} to={`/admin/trips/${tripSlug}/new-round`}>+ Add round</Button>
         </div>
       }
     >
       {rounds.length === 0 ? (
         <p className="text-sm text-ink-muted">
-          No rounds yet. <Link to={`/admin/leagues/${league.slug}/new-event`} className="font-semibold text-fairway-700 hover:underline">Add the first round</Link>
+          No rounds yet. <Link to={`/admin/trips/${tripSlug}/new-round`} className="font-semibold text-fairway-700 hover:underline">Add the first round</Link>
         </p>
       ) : (
         <ul className="-mx-1 border-t border-surface-border">

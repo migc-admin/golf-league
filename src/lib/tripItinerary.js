@@ -3,7 +3,7 @@
  * (rounds, meals, social events, lodging check-in / check-out and the free-text day-by-day lines).
  * Nothing is stored or changed; this only re-arranges what the trip already has.
  *
- * Item: { key, tag: 'GOLF' | 'MEAL' | 'SOCIAL' | 'STAY' | null, time: 'HH:MM' | '', title, sub }
+ * Item: { key, tag: 'GOLF' | 'MEAL' | 'SOCIAL' | 'STAY' | null, time: 'HH:MM' | '', title, sub, roundSlug? }
  * Day:  { date: 'YYYY-MM-DD' | null, items: [Item] }
  */
 import { enumerateDays } from './tripSchedule'
@@ -39,6 +39,7 @@ export function itineraryItems({ trip, rounds = [] }) {
 
   rounds.forEach(r => add(r.event_date, {
     tag: 'GOLF', time: clean(r.start_time), title: r.name || `Round ${r.event_number ?? ''}`.trim(), sub: r.course?.name ?? '',
+    roundSlug: r.slug ?? null,
   }))
 
   ;(Array.isArray(trip.meals) ? trip.meals : []).forEach(m => {

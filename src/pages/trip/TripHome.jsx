@@ -47,7 +47,7 @@ export default function TripHome({ orgSlug, tripSlug, initialTab = 'overview' })
 
       const { data: tripData, error: tripErr } = await supabase
         .from('trips')
-        .select('id, name, slug, description, start_date, end_date, location, logo_url, org_id, itinerary, nearest_airports, lodging, meals, social_events, travel_info, room_labels, league:leagues(id, slug, standings_config)')
+        .select('id, name, slug, description, start_date, end_date, location, logo_url, org_id, itinerary, nearest_airports, lodging, meals, social_events, travel_info, room_labels, registration_open, registration_spots, league:leagues(id, slug, standings_config)')
         .eq('slug', tripSlug)
         .single()
 
@@ -124,6 +124,13 @@ export default function TripHome({ orgSlug, tripSlug, initialTab = 'overview' })
   const airports    = Array.isArray(trip.nearest_airports) ? trip.nearest_airports : []
   const facts       = heroFacts({ trip, rounds: events })
   const days        = buildItinerary({ trip, rounds: events })
+  // Same round-page address the Rounds card uses (subdomain vs path-based).
+  // Sign-ups happen on the trip (never on its rounds): open, not started, and spots left.
+  const spotsFull   = trip.registration_spots != null && travelers.length >= trip.registration_spots
+  const registerHref = trip.registration_open && status === 'upcoming' && !spotsFull
+    ? (eventLinkOrgSlug ? `/${eventLinkOrgSlug}/trip/${trip.slug}/register` : `/trip/${trip.slug}/register`)
+    : null
+  const roundHref   = slug => eventLinkOrgSlug ? `/${eventLinkOrgSlug}/${trip.league.slug}/${slug}/event` : `/${trip.league.slug}/${slug}`
   const names       = [...travelers].sort((a, b) => travelerName(a).localeCompare(travelerName(b))).map(travelerName)
 
   // The club's main league gives the site header its display name and logo; the org is the fallback.
@@ -162,10 +169,11 @@ export default function TripHome({ orgSlug, tripSlug, initialTab = 'overview' })
         onDirections={showDirections}
         onSeeSchedule={() => goTab('schedule')}
         onSeeStandings={() => goTab('standings')}
+        registerHref={registerHref}
       />
 
       <div id="trip-tabs" className="scroll-mt-0">
-        <EventTabBar tabs={TABS} value={activeTab} onChange={setActiveTab} ariaLabel="Trip sections" idPrefix="trip-tab" />
+        <EventTabBar tabs={TABS} value={activeTab} onChange={setActiveTab} ariaLabel="Trip sections" idPrefix="trip-tab" registerLabel={registerHref ? 'Register' : null} registerHref={registerHref} />
       </div>
 
       <main className="mx-auto w-full max-w-[1100px] flex-1 px-4 py-6 sm:px-6 lg:py-8">
@@ -173,7 +181,7 @@ export default function TripHome({ orgSlug, tripSlug, initialTab = 'overview' })
           <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_360px] lg:items-start">
             <div className="flex min-w-0 flex-col gap-6">
               <RoundsCard rounds={events} leagueSlug={trip.league.slug} orgSlug={eventLinkOrgSlug} onStandings={() => goTab('standings')} />
-              <ScheduleCard days={days} />
+              <ScheduleCard days={days} roundHref={roundHref} />
             </div>
             <div className="flex min-w-0 flex-col gap-6">
               <StayingCard lodging={lodging} />
@@ -183,7 +191,7 @@ export default function TripHome({ orgSlug, tripSlug, initialTab = 'overview' })
           </div>
         )}
 
-        {activeTab === 'schedule' && <ScheduleCard days={days} />}
+        {activeTab === 'schedule' && <ScheduleCard days={days} roundHref={roundHref} />}
 
         {activeTab === 'travelers' && (
           <div className="flex flex-col gap-6">

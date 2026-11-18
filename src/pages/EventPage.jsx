@@ -145,7 +145,8 @@ export default function EventPage() {
   // Once shown, the wager link stays: completed events link to the wager results instead of the bet form.
   const showBetLink    = event.status === 'active' || event.status === 'complete' || (event.status === 'upcoming' && groupsSet && matchupsSet)
 
-  const reg        = registrationState({ status: event.status, regUrl, spotsLeft, open: event.registration_open !== false })
+  // A trip's round never takes sign-ups (people register for the trip), so say nothing about registration.
+  const reg        = registrationState({ status: event.status, regUrl, spotsLeft, open: event.registration_open !== false && !event.league?.is_trip_league })
   const fee        = feeLabel(event.tournament_fee)
   const { tabs, registerLabel } = eventTabs({ hasMatchups: pairings.length > 0, canRegister: reg.canRegister, fee })
   const countdownTarget = event.status === 'complete' ? null : eventDateTime

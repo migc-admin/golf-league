@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { supabase } from '../../lib/supabase'
 import { useSubdomainOrg } from '../../lib/SubdomainContext'
 import {
@@ -46,6 +47,7 @@ export default function LeagueHome({ orgSlug, leagueSlug, initialTab = 'events' 
   const [error,          setError]          = useState(null)
   const [nextCount,      setNextCount]      = useState(null)
   const subdomainOrg = useSubdomainOrg()
+  const navigate = useNavigate()
   // On a subdomain the event route is /:leagueSlug/:eventSlug; otherwise it's
   // /:orgSlug/:leagueSlug/:eventSlug/event — EventCard needs orgSlug for the latter.
   const eventLinkOrgSlug = subdomainOrg ? null : orgSlug
@@ -59,11 +61,17 @@ export default function LeagueHome({ orgSlug, leagueSlug, initialTab = 'events' 
 
       const { data: leagueData, error: leagueErr } = await supabase
         .from('leagues')
-        .select('id, name, slug, season_year, org_id, standings_config, logo_url')
+        .select('id, name, slug, season_year, org_id, standings_config, logo_url, is_trip_league, trips(slug)')
         .eq('slug', leagueSlug)
         .single()
 
       if (leagueErr || !leagueData) { setError('League not found.'); setLoading(false); return }
+      // A trip's hidden league has no league page: send visitors to the trip's own standings.
+      if (leagueData.is_trip_league) {
+        const t = [].concat(leagueData.trips ?? [])[0]
+        if (t?.slug) { navigate(subdomainOrg ? `/trip/${t.slug}/standings` : `/${orgSlug}/trip/${t.slug}/standings`, { replace: true }); return }
+        setError('League not found.'); setLoading(false); return
+      }
       setLeague(leagueData)
       setSeason(leagueData.season_year ?? null)
 

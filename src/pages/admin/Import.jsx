@@ -166,7 +166,8 @@ function ImportPlayers() {
   useEffect(() => {
     supabase
       .from('events')
-      .select('id, event_number, event_date, status, league:leagues(name), course:courses(name, slope, rating, par)')
+      .select('id, event_number, event_date, status, league:leagues!inner(name, is_trip_league), course:courses(name, slope, rating, par)')
+      .eq('league.is_trip_league', false) // league events only; trip rounds aren't imported here
       .order('event_date', { ascending: false })
       .then(({ data }) => setEvents(data ?? []))
     async function fetchOrgId() {
@@ -681,7 +682,8 @@ function ImportRoster() {
   useEffect(() => {
     supabase
       .from('events')
-      .select('id, event_number, event_date, status, league:leagues(name), course:courses(name, slope, rating, par)')
+      .select('id, event_number, event_date, status, league:leagues!inner(name, is_trip_league), course:courses(name, slope, rating, par)')
+      .eq('league.is_trip_league', false) // league events only; trip rounds aren't imported here
       .order('event_date', { ascending: false })
       .then(({ data }) => setEvents(data ?? []))
   }, [])
