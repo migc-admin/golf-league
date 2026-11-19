@@ -4,6 +4,7 @@ const MENU_ITEMS = [
   {
     title: 'Product',
     links: [
+      { text: 'Golf League Software', url: '/golf-league-software' },
       { text: 'Features',  url: '/#features' },
       { text: 'Pricing',   url: '/#pricing'  },
       { text: 'Demo',      url: '/#demo'     },

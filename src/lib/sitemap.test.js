@@ -14,6 +14,10 @@ describe('sitemap.xml', () => {
     }
   })
 
+  it('lists the golf league software landing page', () => {
+    expect(locs).toContain('https://www.scorifygolf.com/golf-league-software')
+  })
+
   it('only uses final https://www. URLs', () => {
     for (const loc of locs) expect(loc.startsWith('https://www.scorifygolf.com/')).toBe(true)
   })

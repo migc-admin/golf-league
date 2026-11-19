@@ -37,6 +37,7 @@ Built by Kevin Vargas, who helps run a monthly 40-player golf league and got tir
 ## Key pages
 
 - [Homepage](https://www.scorifygolf.com/): Overview, features, and pricing
+- [Golf League Software](https://www.scorifygolf.com/golf-league-software): What Scorify does for a league season, formats and side games, spreadsheets vs. league software, pricing, and FAQ
 - [FAQ](https://www.scorifygolf.com/faq): Common questions about plans, scoring, and setup
 - [Help & Setup Guide](https://www.scorifygolf.com/help): Step-by-step setup for leagues, events, players, and scoring
 - [Roadmap](https://www.scorifygolf.com/roadmap): What is coming next

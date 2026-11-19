@@ -7,6 +7,10 @@
 // browser tab) and metaDescription (<= 160 chars). They fall back to title/excerpt.
 //
 // content blocks: { type: 'p', text } | { type: 'h2', text } | { type: 'ul', items: string[] }
+//
+// In-body links: inside any p text or ul item, write [link text](/blog/other-slug).
+// Link to other posts where the topic comes up naturally; blogPosts.test.js fails
+// if a /blog/ link points at a slug that doesn't exist.
 
 export const BLOG_POSTS = [
   {
@@ -20,13 +24,13 @@ export const BLOG_POSTS = [
     content: [
       { type: 'p', text: 'A skins game is simple in theory: whoever has the lowest score on a hole wins that hole\'s "skin." If two or more players tie for low score, the skin carries over to the next hole, growing the pot. In practice, most disputes come from ambiguity that was never resolved before the round started — not from the format itself.' },
       { type: 'h2', text: 'Decide gross or net before you tee off' },
-      { type: 'p', text: 'Playing skins on gross score rewards your lowest-handicap players and can shut out higher handicappers from ever winning a hole. Playing net (applying handicap strokes on a hole-by-hole basis) levels the field, but requires everyone to know their course handicap and stroke allocation ahead of time. Most weekly leagues use net skins for exactly this reason — it keeps the game competitive for the whole field, not just the scratch players.' },
+      { type: 'p', text: 'Playing skins on gross score rewards your lowest-handicap players and can shut out higher handicappers from ever winning a hole. Playing net (applying handicap strokes on a hole-by-hole basis) levels the field, but requires everyone to know their [course handicap and stroke allocation](/blog/golf-handicaps-for-league-play) ahead of time. Most weekly leagues use net skins for exactly this reason — it keeps the game competitive for the whole field, not just the scratch players.' },
       { type: 'h2', text: 'Decide how ties and carryovers work' },
       { type: 'p', text: 'The most common format is "ties carry" — if two players tie for low score on a hole, no one wins it, and the value rolls into the next hole. Some groups instead split the skin between tied players rather than carrying it. Either is fine, but pick one before the round; switching mid-round after a controversial tie is where most arguments start.' },
       { type: 'h2', text: 'Set the buy-in and payout structure in advance' },
-      { type: 'p', text: 'Common structures: a flat per-player buy-in with the full pot split among skin winners, or a fixed dollar value per skin with any leftover carryover skins paid out at the 18th hole. If you\'re running a larger group split into flights, decide whether skins are computed within each flight separately or across the full field — this changes the competitive dynamic significantly.' },
+      { type: 'p', text: 'Common structures: a flat per-player buy-in with the full pot split among skin winners, or a fixed dollar value per skin with any leftover carryover skins paid out at the 18th hole. If you\'re running a larger group [split into flights](/blog/flights-vs-full-field), decide whether skins are computed within each flight separately or across the full field — this changes the competitive dynamic significantly. For a full worked example, see [how one league splits side game money across skins, CTP, and payouts](/blog/golf-league-side-games-skins-ctp-payouts).' },
       { type: 'h2', text: 'Track it digitally to kill disputes before they start' },
-      { type: 'p', text: 'The single biggest source of skins-game disputes is a handwritten scorecard with an ambiguous number, discovered after everyone has already left the course. Digital, hole-by-hole scoring — where every player\'s score is entered and visible in real time — removes the ambiguity entirely and settles the skins table automatically the moment the last group finishes.' },
+      { type: 'p', text: 'The single biggest source of skins-game disputes is a handwritten scorecard with an ambiguous number, discovered after everyone has already left the course. [Digital, hole-by-hole scoring](/blog/digital-vs-paper-golf-scoring) — where every player\'s score is entered and visible in real time — removes the ambiguity entirely and settles the skins table automatically the moment the last group finishes.' },
     ],
   },
   {
@@ -40,13 +44,13 @@ export const BLOG_POSTS = [
     content: [
       { type: 'p', text: 'One of the first decisions a new league admin faces is whether to run the whole field as one competition or split players into flights by handicap. Both are valid — the right choice depends on the size and skill spread of your group.' },
       { type: 'h2', text: 'When a full field makes sense' },
-      { type: 'p', text: 'If your league is small (under roughly 16-20 players) or has a fairly tight handicap spread, a single full-field leaderboard is usually simpler and more fun — everyone is chasing the same standings, and net scoring already handles most of the fairness concerns. Extra flights on a small group can leave you with a "flight" of two or three players, which feels more like an arbitrary label than real competition.' },
+      { type: 'p', text: 'If your league is small (under roughly 16-20 players) or has a fairly tight handicap spread, a single full-field leaderboard is usually simpler and more fun — everyone is chasing the same standings, and [net scoring](/blog/golf-handicaps-for-league-play) already handles most of the fairness concerns. Extra flights on a small group can leave you with a "flight" of two or three players, which feels more like an arbitrary label than real competition.' },
       { type: 'h2', text: 'When flights make sense' },
-      { type: 'p', text: 'Once your league grows past that range, or if you have a wide handicap spread (say, players ranging from scratch to 30+), flights keep the competition meaningful. A typical setup is two or three flights (A/B/C) based on handicap index, each with its own leaderboard, payouts, and season standings. This way a higher-handicap player is competing against others at a similar skill level rather than chasing scores they realistically can\'t catch.' },
+      { type: 'p', text: 'Once your league grows past that range, or if you have a wide handicap spread (say, players ranging from scratch to 30+), flights keep the competition meaningful. A typical setup is two or three flights (A/B/C) based on handicap index, each with its own leaderboard, payouts, and [season standings](/blog/season-long-golf-league-standings). This way a higher-handicap player is competing against others at a similar skill level rather than chasing scores they realistically can\'t catch.' },
       { type: 'h2', text: 'Re-evaluate flight cutoffs each season' },
       { type: 'p', text: 'Handicaps move. A player who started the season in Flight B might legitimately belong in Flight A by mid-season. Most leagues set flight cutoffs once per season (at signup) rather than recalculating mid-season, which keeps standings stable — but it\'s worth revisiting the cutoff handicaps each new season rather than reusing last year\'s numbers by default.' },
       { type: 'h2', text: 'Don\'t forget side games when you flight the field' },
-      { type: 'p', text: 'If you\'re running flights, decide whether side games — skins, closest-to-the-pin, long drive — are scored within each flight or across the whole field. Flighted skins games in particular tend to feel fairer to higher-handicap players, since they\'re not just feeding skins to the lowest-handicap flight every week.' },
+      { type: 'p', text: 'If you\'re running flights, decide whether side games — skins, closest-to-the-pin, long drive — are scored within each flight or across the whole field. [Flighted skins games](/blog/golf-league-side-games-skins-ctp-payouts) in particular tend to feel fairer to higher-handicap players, since they\'re not just feeding skins to the lowest-handicap flight every week.' },
     ],
   },
   {
@@ -62,9 +66,9 @@ export const BLOG_POSTS = [
       { type: 'h2', text: 'Handicap Index vs. Course Handicap' },
       { type: 'p', text: 'A player\'s Handicap Index is a portable number that follows them between courses — it reflects their general skill level. Their Course Handicap is that index converted for the specific course and tees being played that day, based on the course\'s slope and rating. In league play, what actually determines strokes given on the scorecard is the Course Handicap, not the raw Handicap Index — so the same player will have a different Course Handicap at a harder course than an easier one.' },
       { type: 'h2', text: 'Where the strokes actually go' },
-      { type: 'p', text: 'Course Handicap strokes are distributed across holes according to that course\'s stroke index (sometimes called the handicap rating) for each hole — printed on the scorecard, typically 1 through 18 in order of difficulty. A player with a Course Handicap of 9 gets one extra stroke on the nine hardest-rated holes. This is what makes net scoring possible on a hole-by-hole basis, which matters for side games like net skins.' },
+      { type: 'p', text: 'Course Handicap strokes are distributed across holes according to that course\'s stroke index (sometimes called the handicap rating) for each hole — printed on the scorecard, typically 1 through 18 in order of difficulty. A player with a Course Handicap of 9 gets one extra stroke on the nine hardest-rated holes. This is what makes net scoring possible on a hole-by-hole basis, which matters for side games like [net skins](/blog/how-to-run-a-fair-skins-game).' },
       { type: 'h2', text: 'GHIN numbers and posting scores' },
-      { type: 'p', text: 'Players who maintain an official Handicap Index typically do so through their state or regional golf association using a GHIN number, and are expected to post eligible scores after each round so their index stays current. Casual leagues that don\'t require an official GHIN can still run a simplified in-house handicap — usually an average of recent net-of-par scores — which is easier to manage but won\'t be portable outside the league.' },
+      { type: 'p', text: 'Players who maintain an official Handicap Index typically do so through their state or regional golf association using a GHIN number, and are expected to post eligible scores after each round so their index stays current. Casual leagues that don\'t require an official GHIN can still run a simplified in-house handicap — usually an average of recent net-of-par scores — which is easier to manage but won\'t be portable outside the league. If you\'re deciding whether to require an official index, the [commissioner\'s handbook](/blog/running-a-golf-league-commissioners-handbook) explains why our league builds the GHIN fee into annual dues.' },
       { type: 'h2', text: 'Keep it current, not perfect' },
       { type: 'p', text: 'The most common mistake in league play isn\'t using the wrong handicap formula — it\'s letting handicaps go stale for an entire season. A player who improves significantly over a summer but keeps their early-season handicap will have an unfair edge in net competitions. Whatever system you use, revisit and update handicaps periodically rather than setting them once and forgetting them.' },
     ],
@@ -90,9 +94,9 @@ export const BLOG_POSTS = [
       ] },
       { type: 'p', text: 'Prices and features above reflect each provider\'s public site as of this post\'s publish date and are subject to change — always confirm current details directly with each provider before deciding.' },
       { type: 'h2', text: 'Setup and configuration' },
-      { type: 'p', text: 'Golf League Tracker has been around a long time and has grown to support an enormous range of formats — it publishes more than 250 configuration settings, covering everything from simulator leagues to disc golf. That flexibility is real, but it comes with a learning curve: a new admin has to work through a lot of screens before their first event is ready to go. Scorify Golf takes the opposite approach — it\'s opinionated by design, with sensible defaults for the formats a typical weekly or seasonal league actually uses (stroke play, net skins, match play, Team Play), so a league director can build their tee sheet and go live the same day.' },
+      { type: 'p', text: 'Golf League Tracker has been around a long time and has grown to support an enormous range of formats — it publishes more than 250 configuration settings, covering everything from simulator leagues to disc golf. That flexibility is real, but it comes with a learning curve: a new admin has to work through a lot of screens before their first event is ready to go. [Scorify Golf](/golf-league-software) takes the opposite approach — it\'s opinionated by design, with sensible defaults for the formats a typical weekly or seasonal league actually uses (stroke play, net skins, match play, Team Play), so a league director can build their tee sheet and go live the same day.' },
       { type: 'h2', text: 'Live scoring experience' },
-      { type: 'p', text: 'Both platforms support mobile score entry so players aren\'t handing a paper card to one overworked scorer at the end of the round. Scorify is built mobile-first from the ground up — players scan a QR code or follow a link and start entering scores hole-by-hole with no app download and no login required, and the leaderboard updates in real time as groups finish holes. Tap any screen below to see it full-size.' },
+      { type: 'p', text: 'Both platforms support mobile score entry so players aren\'t [handing a paper card to one overworked scorer](/blog/digital-vs-paper-golf-scoring) at the end of the round. Scorify is built mobile-first from the ground up — players scan a QR code or follow a link and start entering scores hole-by-hole with no app download and no login required, and the leaderboard updates in real time as groups finish holes. Tap any screen below to see it full-size.' },
       { type: 'liveScoring' },
       { type: 'h2', text: 'Live leaderboard, example' },
       { type: 'p', text: 'Here\'s what a live leaderboard looks like mid-round, using sample data — no real players or scores.' },
@@ -104,7 +108,7 @@ export const BLOG_POSTS = [
         { rank: 5, name: 'R. Foster', thru: 12, score: '+1' },
       ] },
       { type: 'h2', text: 'Side games and team formats' },
-      { type: 'p', text: 'Golf League Tracker covers the standard stroke play, match play, Stableford, and best-ball formats you\'d expect from a mature platform, plus skins contests and sub-request tracking. Scorify adds a few things purpose-built for the "regular weekly group" use case: automatic gross and net skins, printable cart signs and Closest to the Pin signs for round day, and Team Play — a season-long team points format for leagues that split players into teams and track standings across a full season — something that isn\'t a standard part of most league platforms.' },
+      { type: 'p', text: 'Golf League Tracker covers the standard stroke play, match play, Stableford, and best-ball formats you\'d expect from a mature platform, plus skins contests and sub-request tracking. Scorify adds a few things purpose-built for the "regular weekly group" use case: [automatic gross and net skins](/blog/golf-league-side-games-skins-ctp-payouts), printable cart signs and Closest to the Pin signs for round day, and [Team Play](/blog/season-long-golf-league-standings) — a season-long team points format for leagues that split players into teams and track standings across a full season — something that isn\'t a standard part of most league platforms.' },
       { type: 'p', text: 'Round-day print assets are built in and ready before the first tee time — examples below use sample data.' },
       { type: 'printAssets' },
       { type: 'h2', text: 'Pricing and getting started' },
@@ -145,7 +149,7 @@ export const BLOG_POSTS = [
       ] },
       { type: 'p', text: 'Three to four weeks of notice gives players enough time to plan around work and family, without the event drifting so far out that people forget to sign up.' },
       { type: 'h3', text: 'Where the Time Used to Go' },
-      { type: 'p', text: 'Before we moved to digital scoring, tournament day ended with someone stuck at a table entering scorecards by hand. That took close to 90 minutes, while everyone else was socializing. Final results and payouts then took three to four days to sort out. Today, the same work is finished by the next morning.' },
+      { type: 'p', text: 'Before we [moved to digital scoring](/blog/digital-vs-paper-golf-scoring), tournament day ended with someone stuck at a table entering scorecards by hand. That took close to 90 minutes, while everyone else was socializing. Final results and payouts then took three to four days to sort out. Today, the same work is finished by the next morning.' },
 
       { type: 'h2', text: 'Keep the Playing Field Even With Flights and Handicaps' },
       { type: 'p', text: 'An even playing field is one of the reasons people keep coming back. If the same low handicappers win every month, the rest of the league eventually loses interest.' },
@@ -153,18 +157,18 @@ export const BLOG_POSTS = [
       { type: 'p', text: "Handicap monitoring is a must. Every player in our league is required to have an active GHIN handicap index. We build the cost of a GHIN membership into annual dues, unless a player already has one through another club." },
       { type: 'p', text: "This removes the guesswork. Everyone's handicap is official, posted, and updated, so nobody has to take anyone's word for it." },
       { type: 'h3', text: 'Split Flights by Handicap Index Only' },
-      { type: 'p', text: 'We split players into Flight A and Flight B based strictly on handicap index. No exceptions and no judgment calls. That keeps the process simple and hard to argue with.' },
+      { type: 'p', text: 'We split players into Flight A and Flight B based strictly on handicap index. No exceptions and no judgment calls. That keeps the process simple and hard to argue with. If you are still deciding whether to flight your league at all, see [flights vs. full field](/blog/flights-vs-full-field).' },
       { type: 'p', text: 'We also assign different tees by flight. This creates a detail that surprises some players: once course handicaps are calculated from different tees, the top of Flight B can end up with a lower course handicap than the bottom of Flight A.' },
-      { type: 'p', text: 'We have not had real complaints about fairness, and I think that is because we explain this upfront. Flights are split by handicap index first, before course handicaps come into play. When players understand the order of operations, the numbers make sense.' },
+      { type: 'p', text: 'We have not had real complaints about fairness, and I think that is because we explain this upfront. Flights are split by handicap index first, before [course handicaps](/blog/golf-handicaps-for-league-play) come into play. When players understand the order of operations, the numbers make sense.' },
 
       { type: 'h2', text: 'Handle the Money Before Anyone Tees Off' },
       { type: 'p', text: 'Money is where leagues get messy, so we keep it simple: everything is prepaid. Players register online and pay through Venmo before the event. For day-of side competitions, we also accept cash.' },
       { type: 'h3', text: 'The Competitions We Run Every Month' },
       { type: 'p', text: 'Side games are a big part of what makes league day fun. Each month, we pay out on:' },
-      { type: 'ul', items: ['Overall Net', 'Front 9 Net', 'Back 9 Net', 'Skins', 'Closest to the Pin', 'Long Drive', 'Fewest Putts'] },
+      { type: 'ul', items: ['Overall Net', 'Front 9 Net', 'Back 9 Net', '[Skins](/blog/how-to-run-a-fair-skins-game)', 'Closest to the Pin', 'Long Drive', 'Fewest Putts'] },
       { type: 'h3', text: 'Payout Math Was the Biggest Headache' },
       { type: 'p', text: 'Our biggest money headache was always calculating payouts. With seven competitions across two flights and 30 players, working out who won what by hand took a long time and left room for mistakes. With Scorify, that calculation is now automatic and easy.' },
-      { type: 'p', text: 'If you are starting out, decide your payout structure before the season begins and write it down. Players care much less about the exact split than about knowing it is consistent every month.' },
+      { type: 'p', text: 'If you are starting out, [decide your payout structure](/blog/golf-league-side-games-skins-ctp-payouts) before the season begins and write it down. Players care much less about the exact split than about knowing it is consistent every month.' },
 
       { type: 'h2', text: 'Put Your Rules in Writing' },
       { type: 'p', text: 'Every league needs bylaws, and every player should see them before the season starts. We share ours with the full league before each season begins. We have made very few changes since the league started, which tells me that getting them right early pays off for years.' },
@@ -186,7 +190,7 @@ export const BLOG_POSTS = [
       { type: 'h3', text: 'Give Players Something to Play For All Year' },
       { type: 'p', text: 'A single round is fun. A season with stakes is what keeps people coming back every month. We layer several competitions on top of each event:' },
       { type: 'ul', items: [
-        'Season-long standings that update after every tournament',
+        '[Season-long standings](/blog/season-long-golf-league-standings) that update after every tournament',
         'A team play competition that runs across the full season',
         'Playoffs at the end of the year for the top 8 money winners',
       ] },
@@ -202,7 +206,7 @@ export const BLOG_POSTS = [
       { type: 'p', text: 'I tried a couple of popular golf scoring apps, but both had serious limitations for how our league runs. The biggest one was that every player had to download an app to score live. In a group of 30 golfers, someone always has trouble with the download, the login, or their phone.' },
       { type: 'p', text: 'A frustrating user experience in one of those apps was the final push. I wanted something simpler for our players and our admins, so I built Scorify Golf.' },
       { type: 'h3', text: 'What to Look for in League Software' },
-      { type: 'p', text: 'Whatever tool you choose, here is what I would look for based on running our league:' },
+      { type: 'p', text: 'Whatever tool you choose, here is what I would look for in [golf league software](/golf-league-software) based on running our league:' },
       { type: 'ul', items: [
         "No app download for players. Scoring should work from any phone's web browser.",
         'Online registration with payment links, so entry fees are collected before the round.',
@@ -211,7 +215,7 @@ export const BLOG_POSTS = [
         'Flight support and season-long standings.',
         'Handicap tracking built in.',
       ] },
-      { type: 'p', text: 'The right tool should give time back to the people running the league. For us, that meant going from 90 minutes at the scoring table and three to four days of follow-up to final results by the next morning.' },
+      { type: 'p', text: 'The right tool should give time back to the people running the league. For us, that meant going from 90 minutes at the scoring table and three to four days of follow-up to final results by the next morning. If you are comparing platforms, here is [how Scorify compares to Golf League Tracker](/blog/scorify-vs-golf-league-tracker).' },
 
       { type: 'h2', text: 'Lessons Learned the Hard Way' },
       { type: 'h3', text: 'Think Twice Before Letting Guests Into Side Games' },
@@ -258,7 +262,7 @@ export const BLOG_POSTS = [
       { type: 'h2', text: 'How We Structure Side Game Money' },
       { type: 'p', text: "For our regular monthly events, side games are included in the entry fee. Nobody has to decide whether to buy in on the first tee, and nobody gets left out of a pot. Each player's side game money is split into two buckets: about 86% goes to flight pots and about 14% goes to full-field contests." },
       { type: 'h3', text: 'Flight Pots: About 86% of Side Game Money' },
-      { type: 'p', text: "Most of the money stays within each flight, so players compete against others at a similar handicap level. Both flights use the same split. Here is how each flight's pot is divided:" },
+      { type: 'p', text: "Most of the money stays within each flight, so players [compete against others at a similar handicap level](/blog/flights-vs-full-field). Both flights use the same split. Here is how each flight's pot is divided:" },
       { type: 'ul', items: [
         '18-Hole Net: about 14% for 1st, 8% for 2nd, 6% for 3rd',
         'Front 9 Net: about 6% for 1st, 3% for 2nd',
@@ -278,9 +282,9 @@ export const BLOG_POSTS = [
       { type: 'p', text: 'We wanted an amount that felt fair and kept the whole group involved. Spreading the money across several games and several places keeps side games accessible to everyone, including the high handicappers. That is also why skins gets the biggest share.' },
 
       { type: 'h2', text: 'How to Run Net Skins' },
-      { type: 'p', text: 'Skins is by far the most exciting game in our league. It is the one where even the highest handicappers in the group can go home with money, because a single great net score on one hole can win a skin.' },
+      { type: 'p', text: 'Skins is by far the most exciting game in our league. It is the one where even the highest handicappers in the group can go home with money, because a single great net score on one hole can win a skin. If you are new to the format, start with [how to run a fair skins game](/blog/how-to-run-a-fair-skins-game); this section covers how our league runs it.' },
       { type: 'h3', text: 'Net Skins by Flight' },
-      { type: 'p', text: 'We play net skins within each flight. A player wins a skin by posting the lowest net score on a hole, outright. If two or more players tie for the low net score, nobody wins that hole and it carries over.' },
+      { type: 'p', text: 'We play net skins within each flight. A player wins a skin by posting the lowest [net score](/blog/golf-handicaps-for-league-play) on a hole, outright. If two or more players tie for the low net score, nobody wins that hole and it carries over.' },
       { type: 'h3', text: 'Every Skin Is Worth the Same' },
       { type: 'p', text: "At the end of the round, we divide the flight's skins pot by the total number of skins won. Each skin is worth the same amount. If six skins are won, each one pays one-sixth of the flight's skins pot." },
       { type: 'h3', text: 'Wraparound Carryovers' },
@@ -321,7 +325,7 @@ export const BLOG_POSTS = [
         'Every other contest: if there is any chance of a tie, settle the rule in advance.',
       ] },
       { type: 'h3', text: 'Letting Guests Into the Pots Without a Policy' },
-      { type: 'p', text: 'We have allowed guests to play in our side games, and a few guests have taken home substantial winnings. Some members were understandably disappointed, since they pay into the league all season. We still allow it today, but we are reviewing whether to keep that policy next season. Whatever you choose, put it in your bylaws before it becomes an issue.' },
+      { type: 'p', text: 'We have allowed guests to play in our side games, and a few guests have taken home substantial winnings. Some members were understandably disappointed, since they pay into the league all season. We still allow it today, but we are reviewing whether to keep that policy next season. Whatever you choose, put it in your [league bylaws](/blog/running-a-golf-league-commissioners-handbook) before it becomes an issue.' },
 
       { type: 'h2', text: 'A Simple Way to Start' },
       { type: 'p', text: 'If you are adding side games to your league for the first time, the simplest path is to use software that already supports them. Scorify Golf includes the formats we use every month, so you can choose your games when you set up the event and let payouts calculate automatically as scores come in.' },
@@ -389,7 +393,7 @@ export const BLOG_POSTS = [
       { type: 'p', text: "Each group picks one designated scorer, who enters the group's scores after every hole. Every group has its own access code printed right on its scorecard, so there is no login and no account to create." },
       { type: 'image', src: '/images/blog/scorify-hole-score-entry.webp', alt: 'Scorify Golf hole-by-hole score entry screen showing four players with gross score, net score, and handicap strokes' },
       { type: 'h3', text: 'Custom Scorecards Still Matter' },
-      { type: 'p', text: 'Going digital did not mean getting rid of printed scorecards. Each group now gets a custom scorecard with player names, handicaps, and course information, including which holes have closest to the pin and long drive. Players have everything they need in their hands before they tee off.' },
+      { type: 'p', text: 'Going digital did not mean getting rid of printed scorecards. Each group now gets a custom scorecard with player names, handicaps, and course information, including which holes have [closest to the pin and long drive](/blog/golf-league-side-games-skins-ctp-payouts). Players have everything they need in their hands before they tee off.' },
       { type: 'image', src: '/images/blog/scorify-custom-scorecard.webp', alt: 'Custom printed Scorify Golf scorecard with player names, flights, handicaps, QR code, group access code, and closest to the pin and long drive holes' },
 
       { type: 'h2', text: 'Keeping Digital Scores Accurate' },
@@ -417,7 +421,7 @@ export const BLOG_POSTS = [
 
       { type: 'h2', text: 'When Is Digital Scoring Worth It?' },
       { type: 'p', text: 'My rule of thumb: digital scoring becomes worth investing in once your normal group is bigger than two foursomes. Below that, paper is manageable. Above it, the data entry, the mistakes, and the wait for results start to add up quickly.' },
-      { type: 'p', text: 'It is also worth remembering that scoring is only one piece of running a league. For us, digital scoring is a feature, not the whole point. Organizing groups and creating scorecards are just as important, and the right tool should handle those too.' },
+      { type: 'p', text: 'It is also worth remembering that scoring is only one piece of [running a league](/blog/running-a-golf-league-commissioners-handbook). For us, digital scoring is a feature, not the whole point. Organizing groups and creating scorecards are just as important, and the right tool should handle those too.' },
 
       { type: 'h2', text: 'How to Make the Switch' },
       { type: 'p', text: 'Running a trial round before your first official event is always a good idea. It gives players a low-pressure chance to try it, and it gives you a chance to work out any questions. That said, the simpler the tool, the less onboarding you need. Simplicity was the main thing I designed Scorify around.' },
@@ -427,7 +431,7 @@ export const BLOG_POSTS = [
         'Cost: league budgets are tight, so price should be a primary factor.',
         'User experience: if players struggle to use it on the first tee, nothing else matters. A poor user experience in the tools I tried is what led me to build Scorify.',
       ] },
-      { type: 'p', text: 'Beyond those two, look for scoring that works in a web browser with no app download or account, and that keeps working when the cell signal drops.' },
+      { type: 'p', text: 'Beyond those two, look for scoring that works in a web browser with no app download or account, and that keeps working when the cell signal drops. For a side-by-side example, see [Scorify Golf vs. Golf League Tracker](/blog/scorify-vs-golf-league-tracker).' },
 
       { type: 'h2', text: 'Frequently Asked Questions' },
       { type: 'h3', text: 'Is digital scoring better than paper for a golf league?' },
@@ -475,7 +479,7 @@ export const BLOG_POSTS = [
       ] },
 
       { type: 'h2', text: 'The Season-Long Money List' },
-      { type: 'p', text: 'Our individual standings are a money list. Each month, players win money across several categories, and those winnings accumulate over the season. We exclude skins from the money list for fairness, so the standings reflect full-round performance.' },
+      { type: 'p', text: 'Our individual standings are a money list. Each month, players win money across several categories, and those winnings accumulate over the season. We exclude [skins](/blog/golf-league-side-games-skins-ctp-payouts) from the money list for fairness, so the standings reflect full-round performance.' },
       { type: 'h3', text: 'One Great Tournament Can Change Everything' },
       { type: 'p', text: 'The money list keeps people engaged all year. One strong finish in a tournament with a big field can catapult a player up the standings, so nobody is ever fully out of it. It also keeps the friendly banter going from month to month.' },
 
@@ -490,7 +494,7 @@ export const BLOG_POSTS = [
       { type: 'h3', text: 'Drafting Teams at the Banquet' },
       { type: 'p', text: 'Teams are drafted at our January banquet, and participation is optional. This season, each team has eight players, and every player must play in at least one tournament during the year.' },
       { type: 'h3', text: 'How Teams Earn Points' },
-      { type: 'p', text: "For each tournament, the team captain chooses two players whose results count for the team. Those players earn points based on where they finish within their flight:" },
+      { type: 'p', text: "For each tournament, the team captain chooses two players whose results count for the team. Those players earn points based on where they finish [within their flight](/blog/flights-vs-full-field):" },
       { type: 'ul', items: [
         'The winner earns points equal to the number of players in the flight.',
         'Each place below that earns one point less.',
@@ -505,7 +509,7 @@ export const BLOG_POSTS = [
       { type: 'h3', text: 'Seeding and Brackets' },
       { type: 'p', text: 'Players are seeded by their winnings from tournaments 1 through 9, January through September. The top eight players compete in the championship bracket, and players seeded 9 through 16 compete in a consolation bracket. That means 16 players have something to play for in the fall, not just the leaders.' },
       { type: 'h3', text: 'Net Match Play Alongside Regular Events' },
-      { type: 'p', text: 'Playoff matches are head-to-head net match play, with full handicap strokes given off the lower handicap. We do not schedule separate playoff days. Matches are played alongside our regular monthly tournaments:' },
+      { type: 'p', text: 'Playoff matches are head-to-head net match play, with [full handicap strokes](/blog/golf-handicaps-for-league-play) given off the lower handicap. We do not schedule separate playoff days. Matches are played alongside our regular monthly tournaments:' },
       { type: 'ul', items: [
         'October: first round',
         'November: second round',
@@ -532,7 +536,7 @@ export const BLOG_POSTS = [
       { type: 'p', text: "Today we share updates on our league's Instagram page, and players can check the current standings in Scorify Golf at any time. Making the standings easy to find matters as much as keeping them accurate, because a standings race only builds excitement if players can see it." },
 
       { type: 'h2', text: 'How to Add Season-Long Competition to Your League' },
-      { type: 'p', text: 'If you are starting from scratch, here is the order I would recommend:' },
+      { type: 'p', text: 'If you are starting from scratch, the [commissioner\'s handbook](/blog/running-a-golf-league-commissioners-handbook) covers booking, money, and bylaws. For season-long competition, here is the order I would recommend:' },
       { type: 'ul', items: [
         'Start with a money list. It is the easiest to set up because you are already tracking winnings. Consider leaving skins out so the standings reflect full-round performance.',
         'Consider points instead of money if your field sizes vary a lot from month to month, so one big event does not decide the season.',
@@ -579,4 +583,17 @@ export function getRelatedPosts(post, count = 3) {
     ...newestFirst,
   ]
   return [...new Map(ordered.map(p => [p.slug, p])).values()].slice(0, count)
+}
+
+/**
+ * Posts for the homepage guides section: the pillar handbook as the featured
+ * guide, then the newest other posts.
+ */
+export function getHomepageGuides(count = 6) {
+  const featured = BLOG_POSTS.find(p => p.slug === PILLAR_SLUG)
+  const rest = BLOG_POSTS
+    .filter(p => p.slug !== PILLAR_SLUG)
+    .sort((a, b) => new Date(b.date) - new Date(a.date))
+    .slice(0, count)
+  return { featured, rest }
 }

@@ -2,6 +2,7 @@ import { Link, useParams, Navigate } from 'react-router-dom'
 import { Helmet } from 'react-helmet-async'
 import Footer from '../components/ui/Footer'
 import { getBlogPost, getRelatedPosts } from '../lib/blogPosts'
+import { parseInlineLinks } from '../lib/inlineLinks'
 import ComparisonTable from '../components/blog/ComparisonTable'
 import LeaderboardPreview from '../components/blog/LeaderboardPreview'
 import PrintAssetGallery from '../components/blog/PrintAssetGallery'
@@ -14,6 +15,17 @@ function formatDate(dateStr) {
   return new Date(dateStr + 'T00:00:00').toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })
 }
 
+// Renders a content string, turning [text](/path) into links.
+function RichText({ text }) {
+  return parseInlineLinks(text).map((seg, i) => {
+    if (!seg.href) return seg.text
+    if (seg.href.startsWith('/')) {
+      return <Link key={i} to={seg.href} className="font-semibold underline underline-offset-2" style={{ color: GREEN }}>{seg.text}</Link>
+    }
+    return <a key={i} href={seg.href} target="_blank" rel="noopener noreferrer" className="font-semibold underline underline-offset-2" style={{ color: GREEN }}>{seg.text}</a>
+  })
+}
+
 function Block({ block }) {
   if (block.type === 'h2') {
     return <h2 className="text-xl font-bold mt-8 mb-3" style={{ color: INK }}>{block.text}</h2>
@@ -24,7 +36,7 @@ function Block({ block }) {
   if (block.type === 'pLink') {
     return (
       <p className="text-sm leading-relaxed mb-4" style={{ color: '#374151' }}>
-        {block.text}{' '}
+        <RichText text={block.text} />{' '}
         <Link to={block.href} className="font-semibold" style={{ color: GREEN }}>{block.linkText}</Link>
         {block.after ?? ''}
       </p>
@@ -33,7 +45,7 @@ function Block({ block }) {
   if (block.type === 'ul') {
     return (
       <ul className="list-disc pl-5 space-y-1 text-sm leading-relaxed" style={{ color: '#374151' }}>
-        {block.items.map((item, i) => <li key={i}>{item}</li>)}
+        {block.items.map((item, i) => <li key={i}><RichText text={item} /></li>)}
       </ul>
     )
   }
@@ -62,7 +74,7 @@ function Block({ block }) {
       </figure>
     )
   }
-  return <p className="text-sm leading-relaxed mb-4" style={{ color: '#374151' }}>{block.text}</p>
+  return <p className="text-sm leading-relaxed mb-4" style={{ color: '#374151' }}><RichText text={block.text} /></p>
 }
 
 export default function BlogPost() {

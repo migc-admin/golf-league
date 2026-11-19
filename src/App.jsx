@@ -42,6 +42,7 @@ import ResetPassword  from './pages/ResetPassword'
 import FAQ            from './pages/FAQ'
 import Blog           from './pages/Blog'
 import BlogPost       from './pages/BlogPost'
+import GolfLeagueSoftware from './pages/GolfLeagueSoftware'
 import Help           from './pages/Help'
 import Privacy        from './pages/Privacy'
 import RefundPolicy   from './pages/RefundPolicy'
@@ -203,6 +204,7 @@ export default function App() {
         {/* Public event registration — no auth required */}
         <Route path="/register/:leagueSlug/:eventSlug" element={<Register />} />
         <Route path="/reset-password" element={<ResetPassword />} />
+        <Route path="/golf-league-software" element={<GolfLeagueSoftware />} />
         <Route path="/faq"            element={<FAQ />} />
         <Route path="/blog"           element={<Blog />} />
         <Route path="/blog/:slug"     element={<BlogPost />} />

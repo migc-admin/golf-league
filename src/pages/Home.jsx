@@ -8,6 +8,10 @@ import Pricing from '../components/ui/Pricing'
 import HeroCentered from '../components/ui/HeroCentered'
 import TestimonialsScroll from '../components/ui/TestimonialsScroll'
 import ThumbnailCarousel from '../components/ui/ThumbnailCarousel'
+import { getHomepageGuides } from '../lib/blogPosts'
+import { PLANS, ONE_TIME } from '../lib/plans'
+
+const GUIDES = getHomepageGuides(6)
 
 const GREEN  = '#1B4332'
 const GOLD   = '#D4AF37'
@@ -107,95 +111,6 @@ const PRODUCT_SCREENS = [
   { key: 'tee_sheet', label: 'Tee Sheet', src: '/blog/print-assets/tee-sheet.webp', caption: 'Groups, tee times, and starting holes — printed for the pro shop or starter.' },
   { key: 'cart_sign', label: 'Cart Sign', src: '/blog/print-assets/cart-sign.webp', caption: 'One per cart — group number and player names, ready to slide into the holder.' },
   { key: 'ctp_sign', label: 'Closest to the Pin Sign', src: '/blog/print-assets/ctp-sign.webp', caption: 'Posted at the tee box — hole number and a sign-in sheet for the side game.' },
-]
-
-const PLANS = [
-  {
-    name: 'Starter',
-    price: 0,
-    yearlyPrice: 0,
-    isPopular: false,
-    features: [
-      '1 league',
-      'Up to 16 players',
-      'Digital scoring & leaderboards',
-      'Season standings',
-      'Printable scorecards',
-    ],
-    buttonText: 'Get started free',
-    href: '/login',
-    description: 'Perfect for small groups just getting started.',
-  },
-  {
-    name: 'Pro',
-    price: 29,
-    yearlyPrice: 199,
-    isPopular: true,
-    features: [
-      'Up to 2 leagues',
-      'Unlimited players',
-      'Everything in Starter',
-      'Flights A & B',
-      'Skins, CTP & side games',
-      'Score export (CSV)',
-      'Priority support',
-    ],
-    buttonText: 'Start free trial',
-    href: '/login',
-    description: 'Most popular for established weekly leagues.',
-  },
-  {
-    name: 'Club',
-    price: 79,
-    yearlyPrice: 549,
-    isPopular: false,
-    features: [
-      'Everything in Pro',
-      'Multiple admins',
-      'Team Play scoring',
-      'Custom branding',
-      'Online registration',
-      'Dedicated onboarding',
-    ],
-    buttonText: 'Start free trial',
-    href: '/login',
-    description: 'For clubs and multi-league organizations.',
-  },
-]
-
-const ONE_TIME = [
-  {
-    name: 'Tournament',
-    price: 'Starting at $49',
-    sub: 'one-time · assisted setup',
-    description: 'Perfect for a single event — set up scoring, groups, leaderboard, and printable scorecards for one tournament.',
-    features: [
-      'One event, unlimited players',
-      'Digital scoring & QR access',
-      'Live leaderboard',
-      'Printable scorecards',
-      'Skins & side games',
-    ],
-    cta: 'Contact Us',
-    ctaTo: 'mailto:admin@scorifygolf.com',
-  },
-  {
-    name: 'Golf Trip',
-    price: 'Starting at $249',
-    sub: 'one-time · assisted setup',
-    description: 'We set it up for you. Submit your itinerary, players, and courses — we handle the rest. Up to 7 rounds across multiple courses.',
-    features: [
-      'Up to 7 rounds / courses',
-      'Unlimited players',
-      'Everything in Tournament',
-      'Cross-round standings',
-      'Skins per round',
-      'Email consultation available',
-      'Data available for 90 days',
-    ],
-    cta: 'Contact Us',
-    ctaTo: 'mailto:admin@scorifygolf.com',
-  },
 ]
 
 // ─── Main Component ───────────────────────────────────────────────────────────
@@ -535,6 +450,11 @@ export default function Home() {
                 </div>
               ))}
             </div>
+            <div className="mt-10 text-center">
+              <Link to="/golf-league-software" className="text-sm font-semibold" style={{ color: GREEN }}>
+                See everything our golf league software does →
+              </Link>
+            </div>
           </div>
         </section>
 
@@ -669,6 +589,47 @@ export default function Home() {
             </div>
             <div className="mt-8 text-center">
               <a href="/faq" className="text-sm font-semibold" style={{ color: GREEN }}>See all FAQs →</a>
+            </div>
+          </div>
+        </section>
+
+        {/* ── Guides ─────────────────────────────────────────────────── */}
+        <section id="guides" className="py-24" style={{ background: '#ffffff' }}>
+          <div className="max-w-6xl mx-auto px-6">
+            <div className="text-center mb-12">
+              <p className="text-xs font-bold uppercase tracking-widest mb-3" style={{ color: GREEN }}>Guides</p>
+              <h2 className="text-3xl md:text-4xl font-bold" style={{ fontFamily: "'Manrope', sans-serif", color: INK }}>
+                Guides for golf league directors
+              </h2>
+              <p className="mt-4 text-base max-w-xl mx-auto" style={{ color: '#6b7280' }}>
+                What we've learned running a 40-player monthly league: formats, side games, handicaps, and season standings.
+              </p>
+            </div>
+
+            <Link to={`/blog/${GUIDES.featured.slug}`}
+              className="group block rounded-2xl p-7 md:p-9 mb-6 transition-transform hover:-translate-y-0.5"
+              style={{ background: `linear-gradient(135deg, #0b2318, ${GREEN})` }}>
+              <p className="text-xs font-bold uppercase tracking-widest mb-3" style={{ color: GOLD }}>Start here · {GUIDES.featured.category}</p>
+              <h3 className="text-xl md:text-2xl font-bold text-white mb-3" style={{ letterSpacing: '-0.01em' }}>{GUIDES.featured.title}</h3>
+              <p className="text-sm leading-relaxed max-w-3xl mb-5" style={{ color: 'rgba(255,255,255,0.75)' }}>{GUIDES.featured.excerpt}</p>
+              <span className="text-sm font-bold" style={{ color: GOLD }}>Read the handbook →</span>
+            </Link>
+
+            <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-6">
+              {GUIDES.rest.map(p => (
+                <Link key={p.slug} to={`/blog/${p.slug}`}
+                  className="flex flex-col rounded-2xl p-6 transition-shadow hover:shadow-md"
+                  style={{ background: '#fbfaf8', border: '1px solid #ebe9e4' }}>
+                  <p className="text-xs font-bold uppercase tracking-widest mb-2" style={{ color: GREEN }}>{p.category}</p>
+                  <h3 className="font-bold text-base mb-2" style={{ color: INK }}>{p.title}</h3>
+                  <p className="text-sm leading-relaxed line-clamp-3 mb-4" style={{ color: '#6b7280' }}>{p.excerpt}</p>
+                  <span className="mt-auto text-sm font-semibold" style={{ color: GREEN }}>Read guide →</span>
+                </Link>
+              ))}
+            </div>
+
+            <div className="mt-10 text-center">
+              <Link to="/blog" className="text-sm font-semibold" style={{ color: GREEN }}>See all guides →</Link>
             </div>
           </div>
         </section>

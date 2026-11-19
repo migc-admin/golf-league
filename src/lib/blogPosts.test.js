@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import { readFileSync } from 'node:fs'
-import { BLOG_POSTS, getRelatedPosts } from './blogPosts'
+import { BLOG_POSTS, getRelatedPosts, getHomepageGuides } from './blogPosts'
+import { parseInlineLinks, inlineLinkHrefs } from './inlineLinks'
 
 describe('blog post SEO fields', () => {
   it('has unique slugs', () => {
@@ -32,6 +33,61 @@ describe('getRelatedPosts', () => {
     for (const p of BLOG_POSTS.filter(x => x.slug !== handbook)) {
       expect(getRelatedPosts(p).map(r => r.slug)).toContain(handbook)
     }
+  })
+})
+
+describe('in-body links', () => {
+  const textsOf = p => p.content.flatMap(b => [b.text, ...(b.items ?? [])]).filter(t => typeof t === 'string')
+  const slugs = new Set(BLOG_POSTS.map(p => p.slug))
+
+  it('only links to blog posts that exist, and never to the post itself', () => {
+    for (const p of BLOG_POSTS) {
+      for (const href of textsOf(p).flatMap(inlineLinkHrefs)) {
+        if (!href.startsWith('/blog/')) continue
+        const target = href.slice('/blog/'.length)
+        expect(slugs.has(target), `${p.slug} links to missing ${href}`).toBe(true)
+        expect(target, `${p.slug} links to itself`).not.toBe(p.slug)
+      }
+    }
+  })
+
+  it('gives every post at least two links from other posts', () => {
+    const inbound = Object.fromEntries([...slugs].map(s => [s, 0]))
+    for (const p of BLOG_POSTS) {
+      for (const href of new Set(textsOf(p).flatMap(inlineLinkHrefs))) {
+        const target = href.replace(/^\/blog\//, '')
+        if (target in inbound) inbound[target]++
+      }
+    }
+    for (const [slug, n] of Object.entries(inbound)) expect(n, `${slug} inbound links`).toBeGreaterThanOrEqual(2)
+  })
+
+  it('leaves no unparsed link markup behind', () => {
+    for (const p of BLOG_POSTS) {
+      for (const t of textsOf(p)) {
+        const plain = parseInlineLinks(t).filter(s => !s.href).map(s => s.text).join('')
+        expect(plain, p.slug).not.toMatch(/\]\(/)
+      }
+    }
+  })
+})
+
+describe('parseInlineLinks', () => {
+  it('splits text around links and keeps plain text intact', () => {
+    expect(parseInlineLinks('See [the guide](/blog/x) now.')).toEqual([
+      { text: 'See ' }, { text: 'the guide', href: '/blog/x' }, { text: ' now.' },
+    ])
+    expect(parseInlineLinks('No links (just parens).')).toEqual([{ text: 'No links (just parens).' }])
+    expect(parseInlineLinks('[bad](javascript:alert(1))')).toEqual([{ text: '[bad](javascript:alert(1))' }])
+  })
+})
+
+describe('getHomepageGuides', () => {
+  it('features the handbook and lists the newest other posts', () => {
+    const { featured, rest } = getHomepageGuides(6)
+    expect(featured.slug).toBe('running-a-golf-league-commissioners-handbook')
+    expect(rest).toHaveLength(6)
+    expect(rest.map(p => p.slug)).not.toContain(featured.slug)
   })
 })
 
