@@ -8,6 +8,7 @@ import Pricing from '../components/ui/Pricing'
 import HeroCentered from '../components/ui/HeroCentered'
 import TestimonialsScroll from '../components/ui/TestimonialsScroll'
 import ThumbnailCarousel from '../components/ui/ThumbnailCarousel'
+import ScoringDemo from '../components/ui/ScoringDemo'
 import { getHomepageGuides } from '../lib/blogPosts'
 import { PLANS, ONE_TIME } from '../lib/plans'
 
@@ -410,6 +411,9 @@ export default function Home() {
             </div>
           </div>
         </section>
+
+        {/* ── Try it: interactive scoring demo ─────────────────────────── */}
+        <ScoringDemo />
 
         {/* ── See it in action ──────────────────────────────────────── */}
         <section id="screenshots" className="py-24" style={{ background: '#ffffff' }}>
