@@ -9,7 +9,8 @@
     "build": "vite build && vite build --ssr src/entry-server.jsx --outDir .prerender --emptyOutDir && node scripts/prerender.mjs",
     "preview": "vite preview",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "seo:index": "node scripts/seo-index-check.mjs"
   },
   "dependencies": {
     "@dnd-kit/core": "^6.3.1",
