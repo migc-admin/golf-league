@@ -38,6 +38,8 @@ Built by Kevin Vargas, who helps run a monthly 40-player golf league and got tir
 
 - [Homepage](https://www.scorifygolf.com/): Overview, features, and pricing
 - [Golf League Software](https://www.scorifygolf.com/golf-league-software): What Scorify does for a league season, formats and side games, spreadsheets vs. league software, pricing, and FAQ
+- [Golf Tournament Software](https://www.scorifygolf.com/golf-tournament-software): Charity scrambles, member-guests, and club events: event page, groups and shotgun starts, phone scoring, live leaderboard, payouts, and the one-time Tournament package
+- [Golf Trip App](https://www.scorifygolf.com/golf-trip-app): Buddies and Ryder Cup golf trips: trip page with itinerary, lodging, and rooms, sign-ups with split costs, scoring every round, skins, and trip standings
 - [FAQ](https://www.scorifygolf.com/faq): Common questions about plans, scoring, and setup
 - [Help & Setup Guide](https://www.scorifygolf.com/help): Step-by-step setup for leagues, events, players, and scoring
 - [Roadmap](https://www.scorifygolf.com/roadmap): What is coming next

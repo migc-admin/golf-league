@@ -6,6 +6,7 @@ import { supabase } from '../lib/supabase'
 import Footer from '../components/ui/Footer'
 import Pricing from '../components/ui/Pricing'
 import HeroLeague from '../components/ui/HeroLeague'
+import SolutionRouter from '../components/ui/SolutionRouter'
 import TestimonialsScroll from '../components/ui/TestimonialsScroll'
 import ThumbnailCarousel from '../components/ui/ThumbnailCarousel'
 import ScoringDemo from '../components/ui/ScoringDemo'
@@ -358,6 +359,9 @@ export default function Home() {
 
         {/* ── Hero ───────────────────────────────────────────────────── */}
         <HeroLeague />
+
+        {/* ── Built for: leagues / tournaments / trips ───────────────── */}
+        <SolutionRouter />
 
         {/* ── How it works ───────────────────────────────────────────── */}
         <section className="py-20" style={{ background: '#ffffff' }}>

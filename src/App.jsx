@@ -43,6 +43,8 @@ import FAQ            from './pages/FAQ'
 import Blog           from './pages/Blog'
 import BlogPost       from './pages/BlogPost'
 import GolfLeagueSoftware from './pages/GolfLeagueSoftware'
+import GolfTournamentSoftware from './pages/GolfTournamentSoftware'
+import GolfTripApp from './pages/GolfTripApp'
 import Help           from './pages/Help'
 import Privacy        from './pages/Privacy'
 import RefundPolicy   from './pages/RefundPolicy'
@@ -205,6 +207,8 @@ export default function App() {
         <Route path="/register/:leagueSlug/:eventSlug" element={<Register />} />
         <Route path="/reset-password" element={<ResetPassword />} />
         <Route path="/golf-league-software" element={<GolfLeagueSoftware />} />
+        <Route path="/golf-tournament-software" element={<GolfTournamentSoftware />} />
+        <Route path="/golf-trip-app" element={<GolfTripApp />} />
         <Route path="/faq"            element={<FAQ />} />
         <Route path="/blog"           element={<Blog />} />
         <Route path="/blog/:slug"     element={<BlogPost />} />
