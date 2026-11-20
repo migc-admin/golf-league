@@ -5,7 +5,7 @@ import { useAuth } from '../hooks/useAuth'
 import { supabase } from '../lib/supabase'
 import Footer from '../components/ui/Footer'
 import Pricing from '../components/ui/Pricing'
-import HeroCentered from '../components/ui/HeroCentered'
+import HeroLeague from '../components/ui/HeroLeague'
 import TestimonialsScroll from '../components/ui/TestimonialsScroll'
 import ThumbnailCarousel from '../components/ui/ThumbnailCarousel'
 import ScoringDemo from '../components/ui/ScoringDemo'
@@ -357,17 +357,7 @@ export default function Home() {
       <main className="flex-1">
 
         {/* ── Hero ───────────────────────────────────────────────────── */}
-        <HeroCentered
-          logo={{ url: '/logo.png', alt: 'Scorify Golf', text: 'Scorify Golf' }}
-          slogan="Golf league management software"
-          title={<>The simplest way to<br />run a <span style={{ color: GOLD }}>golf event.</span></>}
-          subtitle="Set up in minutes — online registration, digital scorecards, live leaderboards, and payouts. Free to start, no credit card required."
-          primaryCta={{ text: 'Get started free', href: '/login' }}
-          secondaryCta={{ text: 'See features →', href: '#features' }}
-          contactInfo={[
-            { label: 'scorifygolf.com' },
-          ]}
-        />
+        <HeroLeague />
 
         {/* ── How it works ───────────────────────────────────────────── */}
         <section className="py-20" style={{ background: '#ffffff' }}>
