@@ -7,6 +7,7 @@ import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { Helmet } from 'react-helmet-async'
 import Footer from '../components/ui/Footer'
+import SiteHeader from '../components/ui/SiteHeader'
 
 const GREEN = '#1B4332'
 const GOLD  = '#D4AF37'
@@ -165,7 +166,7 @@ You can also override the course handicap for a specific event from the Players 
 Use guests for one-off participants who are not part of your regular league roster.`,
       },
       {
-        q: 'Online registration (Club plan)',
+        q: 'Online registration (Pro and Club plans)',
         a: `Each event has a public registration link you can share with players. Go to the event Overview tab to find the registration URL.
 
 Players fill out their name, email, and any notes, then submit. You'll see their registration in the Players tab → Registrations section, with status Pending.
@@ -442,25 +443,7 @@ export default function Help() {
 
       <div className="min-h-screen flex flex-col" style={{ background: '#fbfaf8', color: INK }}>
 
-        {/* Header */}
-        <header className="sticky top-0 z-50 bg-white" style={{ borderBottom: '1px solid #ebe9e4' }}>
-          <div className="max-w-6xl mx-auto px-6 h-14 flex items-center justify-between">
-            <Link to="/" className="flex items-center gap-2.5">
-              <img src="/logo.png" alt="Scorify Golf" className="w-8 h-8 object-contain" />
-              <span className="font-bold text-base" style={{ letterSpacing: '-0.02em', color: INK }}>Scorify Golf</span>
-            </Link>
-            <div className="flex items-center gap-3">
-              <Link to="/faq" className="text-sm font-medium" style={{ color: '#6b7280' }}>FAQ</Link>
-              <Link
-                to="/login"
-                className="text-sm font-bold px-4 py-1.5 rounded-full text-white transition-opacity hover:opacity-90"
-                style={{ background: GREEN }}
-              >
-                Get started
-              </Link>
-            </div>
-          </div>
-        </header>
+        <SiteHeader />
 
         <main className="flex-1">
 

@@ -38,6 +38,25 @@
 
 @layer components {
 
+  /* ── Homepage hero: white fade over the full-bleed photo (HeroLeague.jsx) ──
+     Tablet: solid white behind the text (to ~62%), then fades out.
+     Desktop: follows the spec's 0% → 36% → 52% → 66% curve, but each stop
+     never lands before the text column ends (~50% + 88px), so body text
+     always sits on near-solid white and passes WCAG AA. */
+  .hero-fade {
+    background: linear-gradient(90deg,
+      #fff 0%, #fff 62%, rgba(255,255,255,0.7) 70%, rgba(255,255,255,0) 84%);
+  }
+  @media (min-width: 1024px) {
+    .hero-fade {
+      background: linear-gradient(90deg,
+        #fff 0%,
+        rgba(255,255,255,0.96) max(36%, calc(50% + 100px)),
+        rgba(255,255,255,0.55) max(52%, calc(50% + 200px)),
+        rgba(255,255,255,0) max(66%, calc(50% + 360px)));
+    }
+  }
+
   /* ── Buttons — pill shape, one primary per screen ── */
   .btn {
     @apply inline-flex items-center justify-center font-semibold transition-all duration-150 focus:outline-none focus:ring-2 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed;

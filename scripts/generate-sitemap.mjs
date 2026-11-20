@@ -17,6 +17,7 @@ const HEAD_PAGES = [
   { path: '/golf-league-software', changefreq: 'monthly', priority: '0.9' },
   { path: '/golf-tournament-software', changefreq: 'monthly', priority: '0.8' },
   { path: '/golf-trip-app', changefreq: 'monthly', priority: '0.8' },
+  { path: '/pricing', changefreq: 'monthly', priority: '0.8' },
   { path: '/faq',  changefreq: 'monthly', priority: '0.8' },
   { path: '/blog', changefreq: 'weekly',  priority: '0.8' },
 ]

@@ -3,6 +3,7 @@
 // /golf-league-software so the three read as one family.
 import { Link } from 'react-router-dom'
 import { SOLUTIONS } from '../../lib/solutions'
+import SiteHeader from '../ui/SiteHeader'
 
 export const GREEN = '#1B4332'
 export const GOLD  = '#D4AF37'
@@ -32,21 +33,7 @@ export function TextLink({ to, children }) {
 
 export function LandingHeader() {
   return (
-    <header className="sticky top-0 z-50 bg-white" style={{ borderBottom: `1px solid ${LINE}` }}>
-      <div className="max-w-6xl mx-auto px-4 sm:px-6 h-14 flex items-center justify-between">
-        <Link to="/" className="flex items-center gap-2.5">
-          <img src="/logo.png" alt="Scorify Golf" className="w-8 h-8 object-contain" />
-          <span className="font-bold text-base" style={{ letterSpacing: '-0.02em', color: INK }}>Scorify Golf</span>
-        </Link>
-        <div className="flex items-center gap-3 sm:gap-4">
-          <a href="#pricing" className="hidden sm:inline text-sm font-medium" style={{ color: MUTED }}>Pricing</a>
-          <Link to="/blog" className="text-sm font-medium" style={{ color: MUTED }}>Guides</Link>
-          <Link to="/login" className="text-sm font-bold px-4 py-1.5 rounded-full text-white transition-opacity hover:opacity-90" style={{ background: GREEN }}>
-            Get started
-          </Link>
-        </div>
-      </div>
-    </header>
+    <SiteHeader />
   )
 }
 
@@ -176,7 +163,7 @@ export function OtherSolutions({ current }) {
   const others = SOLUTIONS.filter(s => s.key !== current)
   return (
     <section className="pb-4">
-      <div className="max-w-5xl mx-auto px-4 sm:px-6 grid sm:grid-cols-2 gap-4">
+      <div className={`max-w-5xl mx-auto px-4 sm:px-6 grid gap-4 ${others.length > 2 ? 'md:grid-cols-3' : 'sm:grid-cols-2'}`}>
         {others.map(s => (
           <Link key={s.key} to={s.path} className="group block bg-white rounded-2xl p-6 transition-shadow hover:shadow-md" style={{ border: `1px solid ${LINE}` }}>
             <p className="text-xs font-bold uppercase tracking-widest mb-2" style={{ color: GREEN }}>Also on Scorify</p>

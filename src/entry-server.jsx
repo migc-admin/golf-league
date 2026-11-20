@@ -16,6 +16,7 @@ import FAQ from './pages/FAQ'
 import GolfLeagueSoftware from './pages/GolfLeagueSoftware'
 import GolfTournamentSoftware from './pages/GolfTournamentSoftware'
 import GolfTripApp from './pages/GolfTripApp'
+import PricingPage from './pages/PricingPage'
 import Blog from './pages/Blog'
 import BlogPost from './pages/BlogPost'
 import Roadmap from './pages/Roadmap'
@@ -29,6 +30,7 @@ export const PRERENDER_ROUTES = [
   '/golf-league-software',
   '/golf-tournament-software',
   '/golf-trip-app',
+  '/pricing',
   '/faq',
   '/blog',
   ...BLOG_POSTS.map(p => `/blog/${p.slug}`),
@@ -57,6 +59,7 @@ export function render(url) {
             <Route path="/golf-league-software" element={<GolfLeagueSoftware />} />
             <Route path="/golf-tournament-software" element={<GolfTournamentSoftware />} />
             <Route path="/golf-trip-app" element={<GolfTripApp />} />
+            <Route path="/pricing" element={<PricingPage />} />
             <Route path="/faq"           element={<FAQ />} />
             <Route path="/blog"          element={<Blog />} />
             <Route path="/blog/:slug"    element={<BlogPost />} />

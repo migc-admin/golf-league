@@ -1,6 +1,7 @@
 import { Link } from 'react-router-dom'
 import { Helmet } from 'react-helmet-async'
 import Footer from '../components/ui/Footer'
+import SiteHeader from '../components/ui/SiteHeader'
 
 const GREEN = '#1B4332'
 const INK   = '#1d1d1f'
@@ -26,19 +27,7 @@ export default function Terms() {
       </Helmet>
 
       <div className="min-h-screen" style={{ background: '#fbfaf8' }}>
-        {/* Nav */}
-        <header className="sticky top-0 z-50 border-b" style={{ background: '#fbfaf8', borderColor: '#ebe9e4' }}>
-          <div className="max-w-4xl mx-auto px-6 h-14 flex items-center justify-between">
-            <Link to="/" className="flex items-center gap-2">
-              <img src="/logo.png" alt="Scorify Golf" className="w-7 h-7 object-contain" loading="lazy" />
-              <span className="font-bold text-sm" style={{ color: INK }}>Scorify Golf</span>
-            </Link>
-            <Link to="/login" className="text-xs font-semibold px-4 py-2 rounded-lg"
-              style={{ background: GREEN, color: '#fff' }}>
-              Sign in
-            </Link>
-          </div>
-        </header>
+        <SiteHeader />
 
         {/* Body */}
         <main className="max-w-3xl mx-auto px-6 py-14">

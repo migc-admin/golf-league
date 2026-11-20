@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { Helmet } from 'react-helmet-async'
 import Footer from '../components/ui/Footer'
+import SiteHeader from '../components/ui/SiteHeader'
 
 const GREEN = '#1B4332'
 const GOLD  = '#D4AF37'
@@ -12,7 +13,6 @@ const PLANNED = [
   'Sponsor logos on print assets, cart signs, and leaderboard carousel',
   'Stripe-powered online payment and registration fees',
   'Text message scoring reminders and event notifications',
-  'Multi-day / multi-round trip scoring across courses',
   'Public event website with live leaderboard for spectators',
   'Score export to USGA-compatible handicap systems',
   'Stableford and Ryder Cup format improvements',
@@ -43,20 +43,7 @@ export default function Roadmap() {
       </Helmet>
       <div className="min-h-screen flex flex-col" style={{ background: '#fbfaf8', color: INK }}>
 
-        {/* Nav */}
-        <header className="sticky top-0 z-50 bg-white" style={{ borderBottom: '1px solid #ebe9e4' }}>
-          <div className="max-w-5xl mx-auto px-6 h-14 flex items-center justify-between">
-            <Link to="/" className="flex items-center gap-2.5">
-              <img src="/logo.png" alt="Scorify Golf" className="w-8 h-8 object-contain" />
-              <span className="font-bold text-base" style={{ letterSpacing: '-0.02em', color: INK }}>Scorify Golf</span>
-            </Link>
-            <Link to="/login"
-              className="text-sm font-bold px-4 py-1.5 rounded-full text-white transition-opacity hover:opacity-90"
-              style={{ background: GREEN }}>
-              Get started
-            </Link>
-          </div>
-        </header>
+        <SiteHeader />
 
         <main className="flex-1 max-w-3xl mx-auto px-6 py-16 w-full">
 

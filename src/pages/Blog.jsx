@@ -2,6 +2,7 @@ import { Link } from 'react-router-dom'
 import { Helmet } from 'react-helmet-async'
 import Footer from '../components/ui/Footer'
 import { BLOG_POSTS } from '../lib/blogPosts'
+import SiteHeader from '../components/ui/SiteHeader'
 
 const GREEN = '#1B4332'
 const GOLD  = '#D4AF37'
@@ -26,25 +27,7 @@ export default function Blog() {
 
       <div className="min-h-screen flex flex-col" style={{ background: '#fbfaf8', color: INK }}>
 
-        {/* Header */}
-        <header className="sticky top-0 z-50 bg-white" style={{ borderBottom: '1px solid #ebe9e4' }}>
-          <div className="max-w-6xl mx-auto px-6 h-14 flex items-center justify-between">
-            <Link to="/" className="flex items-center gap-2.5">
-              <img src="/logo.png" alt="Scorify Golf" className="w-8 h-8 object-contain" />
-              <span className="font-bold text-base" style={{ letterSpacing: '-0.02em', color: INK }}>Scorify Golf</span>
-            </Link>
-            <div className="flex items-center gap-3">
-              <Link to="/faq" className="text-sm font-medium" style={{ color: '#6b7280' }}>FAQ</Link>
-              <Link
-                to="/login"
-                className="text-sm font-bold px-4 py-1.5 rounded-full text-white transition-opacity hover:opacity-90"
-                style={{ background: GREEN }}
-              >
-                Get started
-              </Link>
-            </div>
-          </div>
-        </header>
+        <SiteHeader />
 
         <main className="flex-1">
 

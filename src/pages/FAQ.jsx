@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { Helmet } from 'react-helmet-async'
 import Footer from '../components/ui/Footer'
+import SiteHeader from '../components/ui/SiteHeader'
 
 const GREEN = '#1B4332'
 const GOLD  = '#D4AF37'
@@ -116,7 +117,7 @@ const FAQS = [
       },
       {
         q: 'What is the difference between Pro and Club?',
-        a: 'Pro adds unlimited players, up to 2 leagues, flights, skins and side games, and score export. Club adds everything in Pro plus multiple admins, Team Play scoring, custom branding, and online player registration.',
+        a: 'Pro adds unlimited players, up to 2 leagues, flights, skins and side games, online player registration, and score export. Club adds everything in Pro plus unlimited leagues, multiple admins, Team Play scoring, custom branding, and unlimited golf trips.',
       },
       {
         q: 'Is there a one-time option for a single tournament or golf trip?',
@@ -197,7 +198,7 @@ Scoring methods available:
 
 Season standings track cumulative team points across all events. The Team Play label can be renamed in league settings to match your format ("Ryder Cup," "TGL Teams," "League Cup," etc.).
 
-Team Play is available on Pro and Club plans.`,
+Team Play is available on the Club plan.`,
       },
       {
         q: 'Closest to the Pin (CTP)',
@@ -218,7 +219,7 @@ Similar to CTP, the admin designates which holes have a Long Drive contest. A pr
     items: [
       {
         q: 'Can players register for events online?',
-        a: 'Yes, on the Club plan. Each event gets a public registration link you can share with players. They fill out their details, and you\'ll see their registration in your admin panel. Payment can be collected via Venmo or PayPal.',
+        a: 'Yes, on the Pro and Club plans. Each event gets a public registration link you can share with players. They fill out their details, and you\'ll see their registration in your admin panel. Payment can be collected via Venmo or PayPal.',
       },
       {
         q: 'How does payment work for online registration?',
@@ -285,23 +286,7 @@ export default function FAQ() {
 
       <div className="min-h-screen flex flex-col" style={{ background: '#fbfaf8', color: INK }}>
 
-        {/* Header */}
-        <header className="sticky top-0 z-50 bg-white" style={{ borderBottom: '1px solid #ebe9e4' }}>
-          <div className="max-w-6xl mx-auto px-6 h-14 flex items-center justify-between">
-            <Link to="/" className="flex items-center gap-2.5">
-              <img src="/logo.png" alt="Scorify Golf" className="w-8 h-8 object-contain" />
-              <span className="font-bold text-base" style={{ letterSpacing: '-0.02em', color: INK }}>Scorify Golf</span>
-            </Link>
-            <div className="flex items-center gap-3">
-              <Link to="/#pricing" className="text-sm font-medium" style={{ color: '#6b7280' }}>Pricing</Link>
-              <Link to="/login"
-                className="text-sm font-bold px-4 py-1.5 rounded-full text-white transition-opacity hover:opacity-90"
-                style={{ background: GREEN }}>
-                Get started
-              </Link>
-            </div>
-          </div>
-        </header>
+        <SiteHeader />
 
         <main className="flex-1">
 

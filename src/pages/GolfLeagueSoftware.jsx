@@ -5,6 +5,7 @@ import { Link } from 'react-router-dom'
 import { Helmet } from 'react-helmet-async'
 import Footer from '../components/ui/Footer'
 import { PLANS, ONE_TIME } from '../lib/plans'
+import SiteHeader from '../components/ui/SiteHeader'
 
 const GREEN = '#1B4332'
 const GOLD  = '#D4AF37'
@@ -29,7 +30,7 @@ const SEASON = [
       { title: 'Roster and handicaps', body: 'Import your roster, store each player\'s Handicap Index, and assign flights. Course handicaps are calculated for the tees you play.' },
       { title: 'Groups and tee sheet', body: 'Build groups by handicap, by flight, or at random in one click. Shotgun starts are supported.' },
       { title: 'Print-ready round day', body: 'Tee sheet, cart signs, Closest to the Pin and long drive cards, and scorecards with each group\'s QR code.' },
-      { title: 'Online registration', body: 'Share one registration link per event. Players sign up and pay through your own Venmo or PayPal link (Club plan).' },
+      { title: 'Online registration', body: 'Share one registration link per event. Players sign up and pay through your own Venmo or PayPal link (Pro and Club plans).' },
     ],
   },
   {
@@ -174,22 +175,7 @@ export default function GolfLeagueSoftware() {
 
       <div className="min-h-screen flex flex-col" style={{ background: '#fbfaf8', color: INK }}>
 
-        {/* Header */}
-        <header className="sticky top-0 z-50 bg-white" style={{ borderBottom: `1px solid ${LINE}` }}>
-          <div className="max-w-6xl mx-auto px-4 sm:px-6 h-14 flex items-center justify-between">
-            <Link to="/" className="flex items-center gap-2.5">
-              <img src="/logo.png" alt="Scorify Golf" className="w-8 h-8 object-contain" />
-              <span className="font-bold text-base" style={{ letterSpacing: '-0.02em', color: INK }}>Scorify Golf</span>
-            </Link>
-            <div className="flex items-center gap-3 sm:gap-4">
-              <a href="#pricing" className="hidden sm:inline text-sm font-medium" style={{ color: MUTED }}>Pricing</a>
-              <Link to="/blog" className="text-sm font-medium" style={{ color: MUTED }}>Guides</Link>
-              <Link to="/login" className="text-sm font-bold px-4 py-1.5 rounded-full text-white transition-opacity hover:opacity-90" style={{ background: GREEN }}>
-                Get started
-              </Link>
-            </div>
-          </div>
-        </header>
+        <SiteHeader />
 
         <main className="flex-1">
 

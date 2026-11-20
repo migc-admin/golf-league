@@ -21,7 +21,7 @@ export const TIER_LIMITS = {
     leagues:     Infinity,
     players:     Infinity,
     admins:      3,
-    trips:       1,
+    trips:       Infinity,
   },
 }
 
@@ -34,7 +34,7 @@ export const FEATURE_MIN_TIER = {
   csv_export:        'pro',
   tgl:               'club',
   custom_branding:   'club',
-  registration:      'club',
+  registration:      'pro',
   multiple_admins:   'club',
 }
 

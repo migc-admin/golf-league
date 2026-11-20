@@ -13,7 +13,7 @@ Scorify Golf is a web application that helps golf league directors run their lea
 - **Printable assets**: Scorecards with QR codes, cart signs, and side game (CTP/long drive) signs
 - **Payout tracking**: Calculate and track winnings for every event (Scorify does not process payments; organizers collect dues through their own Venmo or PayPal)
 - **Flights, side games and skins** (Pro plan and up): Split leagues into flights; run skins, closest to the pin, long drive, and low putts with automatic payouts
-- **Online registration, team play and season standings** (Club plan): Registration pages, TGL-style team points, and standings across a full season
+- **Online registration** (Pro and Club plans), **team play** (Club plan), and **season standings**: Registration pages, TGL-style team points, and standings across a full season
 
 ## Who uses Scorify
 
@@ -21,7 +21,7 @@ Independent golf league directors and organizers running weekly, monthly, or sea
 
 ## Pricing
 
-A free Starter plan is available with no credit card: 1 league, up to 16 players per event. Pro adds unlimited players, flights, side games and skins, and CSV export. Club adds online registration, team play, custom branding, multiple admins, and golf trips. There are no per-player fees and no transaction fees. See the pricing section on the homepage for current plans: https://www.scorifygolf.com/#pricing
+A free Starter plan is available with no credit card: 1 league, up to 16 players per event. Pro adds unlimited players, flights, side games and skins, online registration, and CSV export. Club adds unlimited leagues, team play, custom branding, multiple admins, and unlimited golf trips. There are no per-player fees and no transaction fees. See current plans and a full comparison: https://www.scorifygolf.com/pricing
 
 ## Key differentiators
 
@@ -40,6 +40,7 @@ Built by Kevin Vargas, who helps run a monthly 40-player golf league and got tir
 - [Golf League Software](https://www.scorifygolf.com/golf-league-software): What Scorify does for a league season, formats and side games, spreadsheets vs. league software, pricing, and FAQ
 - [Golf Tournament Software](https://www.scorifygolf.com/golf-tournament-software): Charity scrambles, member-guests, and club events: event page, groups and shotgun starts, phone scoring, live leaderboard, payouts, and the one-time Tournament package
 - [Golf Trip App](https://www.scorifygolf.com/golf-trip-app): Buddies and Ryder Cup golf trips: trip page with itinerary, lodging, and rooms, sign-ups with split costs, scoring every round, skins, and trip standings
+- [Pricing](https://www.scorifygolf.com/pricing): Free Starter plan, Pro and Club monthly or yearly plans, and one-time Tournament and Golf Trip packages, with pricing FAQs
 - [FAQ](https://www.scorifygolf.com/faq): Common questions about plans, scoring, and setup
 - [Help & Setup Guide](https://www.scorifygolf.com/help): Step-by-step setup for leagues, events, players, and scoring
 - [Roadmap](https://www.scorifygolf.com/roadmap): What is coming next

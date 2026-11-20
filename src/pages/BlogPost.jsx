@@ -7,6 +7,7 @@ import ComparisonTable from '../components/blog/ComparisonTable'
 import LeaderboardPreview from '../components/blog/LeaderboardPreview'
 import PrintAssetGallery from '../components/blog/PrintAssetGallery'
 import LiveScoringGallery from '../components/blog/LiveScoringGallery'
+import SiteHeader from '../components/ui/SiteHeader'
 
 const GREEN = '#1B4332'
 const INK   = '#1d1d1f'
@@ -112,25 +113,7 @@ export default function BlogPost() {
 
       <div className="min-h-screen flex flex-col" style={{ background: '#fbfaf8', color: INK }}>
 
-        {/* Header */}
-        <header className="sticky top-0 z-50 bg-white" style={{ borderBottom: '1px solid #ebe9e4' }}>
-          <div className="max-w-6xl mx-auto px-6 h-14 flex items-center justify-between">
-            <Link to="/" className="flex items-center gap-2.5">
-              <img src="/logo.png" alt="Scorify Golf" className="w-8 h-8 object-contain" />
-              <span className="font-bold text-base" style={{ letterSpacing: '-0.02em', color: INK }}>Scorify Golf</span>
-            </Link>
-            <div className="flex items-center gap-3">
-              <Link to="/blog" className="text-sm font-medium" style={{ color: '#6b7280' }}>Blog</Link>
-              <Link
-                to="/login"
-                className="text-sm font-bold px-4 py-1.5 rounded-full text-white transition-opacity hover:opacity-90"
-                style={{ background: GREEN }}
-              >
-                Get started
-              </Link>
-            </div>
-          </div>
-        </header>
+        <SiteHeader />
 
         <main className="flex-1">
           <article className="max-w-3xl mx-auto px-6 py-14">

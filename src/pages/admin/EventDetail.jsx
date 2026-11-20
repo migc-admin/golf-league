@@ -405,8 +405,8 @@ export default function EventDetail() {
                 <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0110 0v4"/>
               </svg>
               <span style={{ color: '#1e40af' }}>
-                <strong>Online Registration</strong> is a Club plan feature.{' '}
-                <a href="/onboarding" className="underline font-semibold">Upgrade to Club →</a>
+                <strong>Online Registration</strong> is a Pro plan feature.{' '}
+                <a href="/onboarding" className="underline font-semibold">Upgrade to Pro →</a>
               </span>
             </div>
           )}

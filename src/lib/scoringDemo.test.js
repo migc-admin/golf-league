@@ -1,5 +1,8 @@
 import { describe, it, expect } from 'vitest'
-import { DEMO_GROUP, DEMO_HOLES, demoLeaderboard, demoSkins, strokesOn, formatToPar } from './scoringDemo'
+import {
+  DEMO_GROUP, DEMO_HOLES, DEMO_SEASON, demoLeaderboard, demoSkins, strokesOn, formatToPar,
+  buildGroups, roundComplete, demoPayouts, demoStandings,
+} from './scoringDemo'
 
 const all = (h1, h2, h3) => Object.fromEntries(DEMO_GROUP.map((p, i) => [p.id, { 1: h1[i], 2: h2[i], 3: h3[i] }]))
 
@@ -15,7 +18,7 @@ describe('scoring demo', () => {
 
   it('shows the other group on the board before anything is entered', () => {
     const rows = demoLeaderboard({})
-    expect(rows.filter(r => r.thru === 3)).toHaveLength(3)
+    expect(rows.filter(r => r.thru === 3)).toHaveLength(4)
     expect(rows.slice(-4).every(r => r.netToPar == null)).toBe(true)
   })
 
@@ -50,5 +53,47 @@ describe('scoring demo', () => {
 
   it('formats to-par values', () => {
     expect([formatToPar(-2), formatToPar(0), formatToPar(3), formatToPar(null)]).toEqual(['-2', 'E', '+3', '—'])
+  })
+})
+
+describe('round demo: groups, payouts, standings', () => {
+  const full = () => all([5, 4, 4, 6], [3, 3, 4, 3], [6, 5, 6, 5])
+
+  it('builds two foursomes with all 8 players in every mode', () => {
+    for (const mode of ['flight', 'mixed', 'random']) {
+      const g = buildGroups(mode, () => 0.42)
+      expect(g).toHaveLength(2)
+      expect(new Set(g.flatMap(x => x.players.map(p => p.id))).size).toBe(8)
+    }
+    expect(buildGroups('flight')[0].players.every(p => p.flight === 'A')).toBe(true)
+  })
+
+  it('mixed groups put the scoring demo foursome together as Group 2', () => {
+    const g2 = buildGroups('mixed')[1].players.map(p => p.id).sort()
+    expect(g2).toEqual(DEMO_GROUP.map(p => p.id).sort())
+  })
+
+  it('is complete only when every player has every hole', () => {
+    expect(roundComplete({ sam: { 1: 4 } })).toBe(false)
+    expect(roundComplete(full())).toBe(true)
+  })
+
+  it('pays out exactly the whole pot', () => {
+    const { paid, pot } = demoPayouts(full())
+    expect(paid).toBe(pot)
+  })
+
+  it('splits net prizes between tied players', () => {
+    // Everyone in the group makes gross par, which creates net ties in both flights.
+    const { rows, paid, pot } = demoPayouts(all([4, 4, 4, 4], [3, 3, 3, 3], [5, 5, 5, 5]))
+    expect(paid).toBe(pot)
+    expect(rows.every(r => r.total >= 0)).toBe(true)
+  })
+
+  it('updates the money list from tonight\'s winnings, excluding skins', () => {
+    const rows = demoStandings(full())
+    const pay = demoPayouts(full()).rows.find(r => r.id === 'tony')
+    expect(rows.find(r => r.id === 'tony').amount).toBe(DEMO_SEASON.tony + pay.net + pay.ctp + pay.longDrive)
+    expect(rows.reduce((s, r) => s + r.moved, 0)).toBe(0)
   })
 })

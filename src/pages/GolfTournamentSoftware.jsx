@@ -24,7 +24,7 @@ const STAGES = [
     stage: 'Before the event',
     items: [
       { title: 'An event page players check', body: 'Schedule, format, local rules, directions, and your sponsors on one shareable page, with a countdown to the first tee.' },
-      { title: 'Registration', body: 'Players sign up from a link and pay through your own Venmo or PayPal link. You confirm payments in the admin (Club plan).' },
+      { title: 'Registration', body: 'Players sign up from a link and pay through your own Venmo or PayPal link. You confirm payments in the admin (Pro and Club plans).' },
       { title: 'Groups and shotgun starts', body: 'Build groups by handicap, by flight, or at random. Turn on Shotgun Start and assign each group a starting hole.' },
       { title: 'Print-ready event day', body: 'Tee sheet for the starter, cart signs for every group, Closest to the Pin and long drive cards, and scorecards with a QR code.' },
     ],

@@ -3,6 +3,7 @@ import { readFileSync } from 'node:fs'
 import * as league from './GolfLeagueSoftware'
 import * as tournament from './GolfTournamentSoftware'
 import * as trip from './GolfTripApp'
+import * as pricing from './PricingPage'
 import { PRERENDER_ROUTES } from '../entry-server'
 import { SOLUTIONS } from '../lib/solutions'
 import { ONE_TIME } from '../lib/plans'
@@ -11,10 +12,11 @@ const PAGES = [
   { path: '/golf-league-software', keyword: 'golf league software', mod: league },
   { path: '/golf-tournament-software', keyword: 'golf tournament software', mod: tournament },
   { path: '/golf-trip-app', keyword: 'golf trip app', mod: trip },
+  { path: '/pricing', keyword: 'pricing', mod: pricing, notInRouter: true },
 ]
 const sitemap = readFileSync(new URL('../../public/sitemap.xml', import.meta.url), 'utf8')
 
-describe.each(PAGES)('$path', ({ path, keyword, mod }) => {
+describe.each(PAGES)('$path', ({ path, keyword, mod, notInRouter }) => {
   it('keeps the search title within 60 characters and the description within 160', () => {
     expect(mod.PAGE_TITLE.length).toBeLessThanOrEqual(60)
     expect(mod.PAGE_DESCRIPTION.length).toBeLessThanOrEqual(160)
@@ -24,7 +26,7 @@ describe.each(PAGES)('$path', ({ path, keyword, mod }) => {
   it('is prerendered, in the sitemap, and linked from the homepage router', () => {
     expect(PRERENDER_ROUTES).toContain(path)
     expect(sitemap).toContain(`<loc>https://www.scorifygolf.com${path}</loc>`)
-    expect(SOLUTIONS.map(s => s.path)).toContain(path)
+    if (!notInRouter) expect(SOLUTIONS.map(s => s.path)).toContain(path)
   })
 })
 
@@ -32,5 +34,13 @@ describe('solutions', () => {
   it('quotes one-time prices from plans.js', () => {
     const text = SOLUTIONS.flatMap(s => s.points).join(' ')
     for (const o of ONE_TIME) expect(text).toContain(o.price.replace('Starting at ', ''))
+  })
+})
+
+describe('site header', () => {
+  it('links only to pages that are prerendered, so every link works from any page', async () => {
+    const { NAV_LINKS } = await import('../components/ui/SiteHeader')
+    for (const l of NAV_LINKS) expect(PRERENDER_ROUTES, l.label).toContain(l.to)
+    expect(NAV_LINKS.length).toBeLessThanOrEqual(5)
   })
 })

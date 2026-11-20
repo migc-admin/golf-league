@@ -1,17 +1,15 @@
-import { useEffect, useState } from 'react'
+import { useEffect } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { Helmet } from 'react-helmet-async'
 import { useAuth } from '../hooks/useAuth'
-import { supabase } from '../lib/supabase'
 import Footer from '../components/ui/Footer'
-import Pricing from '../components/ui/Pricing'
+import PricingSection from '../components/ui/PricingSection'
 import HeroLeague from '../components/ui/HeroLeague'
 import SolutionRouter from '../components/ui/SolutionRouter'
 import TestimonialsScroll from '../components/ui/TestimonialsScroll'
-import ThumbnailCarousel from '../components/ui/ThumbnailCarousel'
-import ScoringDemo from '../components/ui/ScoringDemo'
+import TryIt from '../components/try-it/TryIt'
 import { getHomepageGuides } from '../lib/blogPosts'
-import { PLANS, ONE_TIME } from '../lib/plans'
+import SiteHeader from '../components/ui/SiteHeader'
 
 const GUIDES = getHomepageGuides(6)
 
@@ -104,28 +102,11 @@ const FEATURES = [
   },
 ]
 
-// ─── Pricing ─────────────────────────────────────────────────────────────────
-// ─── "See it in action" screens (real product UI, sample data) ───────────────
-const PRODUCT_SCREENS = [
-  { key: 'entry', label: 'Score Entry', src: '/blog/live-scoring/score-entry.webp', caption: 'Players tap their score hole-by-hole — no app download, no login.' },
-  { key: 'scorecard', label: 'Full Scorecard', src: '/blog/live-scoring/scorecard.webp', caption: 'Every hole, every player, gross and net — visible to the whole group in real time.' },
-  { key: 'leaderboard', label: 'Live Leaderboard', src: '/blog/live-scoring/leaderboard.webp', caption: 'Standings update automatically as scores come in, split by flight.' },
-  { key: 'tee_sheet', label: 'Tee Sheet', src: '/blog/print-assets/tee-sheet.webp', caption: 'Groups, tee times, and starting holes — printed for the pro shop or starter.' },
-  { key: 'cart_sign', label: 'Cart Sign', src: '/blog/print-assets/cart-sign.webp', caption: 'One per cart — group number and player names, ready to slide into the holder.' },
-  { key: 'ctp_sign', label: 'Closest to the Pin Sign', src: '/blog/print-assets/ctp-sign.webp', caption: 'Posted at the tee box — hole number and a sign-in sheet for the side game.' },
-]
 
 // ─── Main Component ───────────────────────────────────────────────────────────
 export default function Home() {
-  const { user, profile, signOut, loading, profileLoading } = useAuth()
+  const { user, profile, loading, profileLoading } = useAuth()
   const navigate = useNavigate()
-  const [events,   setEvents]   = useState([])
-  const [fetching, setFetching] = useState(false)
-  const [menuOpen, setMenuOpen] = useState(false)
-
-  const isAdmin       = profile?.role === 'admin'
-  const isScorekeeper = profile?.role === 'scorekeeper'
-  const isLoggedIn    = !loading && !profileLoading && !!user
 
   // Auto-redirect based on profile state
   useEffect(() => {
@@ -137,55 +118,7 @@ export default function Home() {
       }
       return
     }
-    loadEvents()
   }, [user, profile, loading, profileLoading])
-
-  async function loadEvents() {
-    setFetching(true)
-    try {
-      if (isAdmin) {
-        const { data } = await supabase
-          .from('events')
-          .select('id, name, slug, event_number, event_date, status, league:leagues(slug, org:organizations(slug))')
-          .in('status', ['active', 'upcoming'])
-          .order('event_date', { ascending: true })
-          .limit(10)
-        setEvents(data ?? [])
-      } else if (isScorekeeper) {
-        const { data: playerRows } = await supabase
-          .from('players').select('id').eq('email', user.email).limit(1)
-        const playerId = playerRows?.[0]?.id
-        if (playerId) {
-          const { data: entries } = await supabase
-            .from('event_players')
-            .select('event_id, events(id, name, slug, event_number, event_date, status, league:leagues(slug, org:organizations(slug)))')
-            .eq('player_id', playerId)
-          const active = (entries ?? [])
-            .map(e => e.events)
-            .filter(ev => ev && ['active', 'upcoming'].includes(ev.status))
-            .sort((a, b) => new Date(a.event_date) - new Date(b.event_date))
-          setEvents(active)
-        }
-      }
-    } finally {
-      setFetching(false)
-    }
-  }
-
-  async function handleSignOut() {
-    await signOut()
-    navigate('/login', { replace: true })
-  }
-
-  const NAV_LINKS = [
-    { label: 'Features', href: '#features' },
-    { label: 'Pricing',  href: '#pricing'  },
-    { label: 'Roadmap',  href: '#roadmap'  },
-    { label: 'FAQ',      href: '#faq'      },
-    { label: 'Blog',     href: '/blog'     },
-    { label: 'Contact',  href: '#contact'  },
-    { label: 'About',    href: '#about'    },
-  ]
 
   return (
     <>
@@ -224,136 +157,7 @@ export default function Home() {
     </Helmet>
     <div className="min-h-screen flex flex-col" style={{ background: '#fbfaf8', color: INK }}>
 
-      {/* ── Public nav ─────────────────────────────────────────────── */}
-      <header className="sticky top-0 z-50 bg-white" style={{ borderBottom: '1px solid #ebe9e4' }}>
-        <div className="max-w-6xl mx-auto px-6 h-14 flex items-center justify-between">
-          {/* Brand */}
-          <a href="#" className="flex items-center gap-2.5">
-            <img src="/logo.png" alt="Scorify Golf" className="w-8 h-8 object-contain" />
-            <span className="font-bold text-base" style={{ letterSpacing: '-0.02em', color: INK }}>Scorify Golf</span>
-          </a>
-
-          {/* Desktop nav */}
-          <nav className="hidden md:flex items-center gap-6">
-            {NAV_LINKS.map(l => (
-              <a key={l.label} href={l.href} className="text-sm font-medium transition-colors" style={{ color: '#6b7280' }}
-                onMouseEnter={e => e.currentTarget.style.color = INK}
-                onMouseLeave={e => e.currentTarget.style.color = '#6b7280'}>
-                {l.label}
-              </a>
-            ))}
-          </nav>
-
-          {/* Right side */}
-          <div className="flex items-center gap-3">
-            {isLoggedIn ? (
-              <>
-                {isAdmin && (
-                  <Link to="/admin" className="hidden sm:inline text-sm font-semibold px-3 py-1.5 rounded-full transition-colors"
-                    style={{ color: GREEN }}
-                    onMouseEnter={e => e.currentTarget.style.background = '#f0fdf4'}
-                    onMouseLeave={e => e.currentTarget.style.background = ''}>
-                    Admin ↗
-                  </Link>
-                )}
-                <button onClick={handleSignOut}
-                  className="text-sm font-semibold px-4 py-1.5 rounded-full border transition-colors"
-                  style={{ borderColor: '#d1d5db', color: '#6b7280' }}
-                  onMouseEnter={e => { e.currentTarget.style.borderColor = INK; e.currentTarget.style.color = INK }}
-                  onMouseLeave={e => { e.currentTarget.style.borderColor = '#d1d5db'; e.currentTarget.style.color = '#6b7280' }}>
-                  Sign out
-                </button>
-              </>
-            ) : (
-              <>
-                <Link to="/login" className="text-sm font-medium transition-colors" style={{ color: '#6b7280' }}
-                  onMouseEnter={e => e.currentTarget.style.color = INK}
-                  onMouseLeave={e => e.currentTarget.style.color = '#6b7280'}>
-                  Sign in
-                </Link>
-                <Link to="/login"
-                  className="text-sm font-bold px-4 py-1.5 rounded-full text-white transition-opacity hover:opacity-90"
-                  style={{ background: GREEN }}>
-                  Get started
-                </Link>
-              </>
-            )}
-
-            {/* Mobile hamburger */}
-            <button className="md:hidden p-1.5 rounded-full" onClick={() => setMenuOpen(v => !v)}
-              style={{ color: '#6b7280' }}>
-              <svg width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
-                {menuOpen
-                  ? <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-                  : <path strokeLinecap="round" strokeLinejoin="round" d="M4 6h16M4 12h16M4 18h16" />}
-              </svg>
-            </button>
-          </div>
-        </div>
-
-        {/* Mobile menu */}
-        {menuOpen && (
-          <nav className="md:hidden px-6 py-4 flex flex-col gap-3" style={{ borderTop: '1px solid #ebe9e4' }}>
-            {NAV_LINKS.map(l => (
-              <a key={l.label} href={l.href} onClick={() => setMenuOpen(false)}
-                className="text-sm font-medium py-1" style={{ color: '#6b7280' }}>
-                {l.label}
-              </a>
-            ))}
-            {isAdmin && <Link to="/admin" className="text-sm font-semibold" style={{ color: GREEN }}>Admin ↗</Link>}
-          </nav>
-        )}
-      </header>
-
-      {/* ── Logged-in dashboard strip ──────────────────────────────── */}
-      {isLoggedIn && (
-        <div className="bg-white" style={{ borderBottom: '1px solid #ebe9e4' }}>
-          <div className="max-w-6xl mx-auto px-6 py-4 flex flex-col sm:flex-row sm:items-center gap-4">
-            <div className="flex-1">
-              <p className="text-xs text-gray-400">Signed in as</p>
-              <p className="text-sm font-semibold text-gray-900">{profile?.full_name || user?.email}</p>
-            </div>
-
-            {/* No org set up yet — prompt onboarding */}
-            {!profile?.org_id && (
-              <Link to="/onboarding"
-                className="shrink-0 text-sm font-bold px-5 py-2.5 rounded-full text-white transition-opacity hover:opacity-90"
-                style={{ background: GREEN }}>
-                Set up your league →
-              </Link>
-            )}
-
-            {(isAdmin || isScorekeeper) && (
-              <div className="flex-1">
-                <p className="text-xs text-gray-400 mb-2">{isAdmin ? 'Active & Upcoming Events' : 'Your Events'}</p>
-                {fetching ? (
-                  <div className="h-8 rounded-lg animate-pulse bg-gray-100 w-48" />
-                ) : events.length === 0 ? (
-                  <p className="text-xs text-gray-400">No active events.</p>
-                ) : (
-                  <div className="flex flex-wrap gap-2">
-                    {events.map(ev => (
-                      <Link key={ev.id}
-                        to={`/${ev.league?.org?.slug}/${ev.league?.slug}/${ev.slug}/scorecard`}
-                        className="text-xs font-semibold px-3 py-1.5 rounded-full text-white transition-opacity hover:opacity-80"
-                        style={{ background: GREEN }}>
-                        {ev.name || `Event #${ev.event_number}`}
-                      </Link>
-                    ))}
-                  </div>
-                )}
-              </div>
-            )}
-            {isAdmin && (
-              <Link to="/admin"
-                className="shrink-0 text-sm font-bold px-4 py-2 rounded-full text-white transition-opacity hover:opacity-90"
-                style={{ background: GREEN }}>
-                Go to Admin →
-              </Link>
-            )}
-          </div>
-        </div>
-      )}
+      <SiteHeader />
 
       <main className="flex-1">
 
@@ -406,25 +210,8 @@ export default function Home() {
           </div>
         </section>
 
-        {/* ── Try it: interactive scoring demo ─────────────────────────── */}
-        <ScoringDemo />
-
-        {/* ── See it in action ──────────────────────────────────────── */}
-        <section id="screenshots" className="py-24" style={{ background: '#ffffff' }}>
-          <div className="max-w-5xl mx-auto px-6">
-            <div className="text-center mb-10">
-              <p className="text-xs font-bold uppercase tracking-widest mb-3" style={{ color: GREEN }}>See it in action</p>
-              <h2 className="text-3xl md:text-4xl font-bold" style={{ fontFamily: "'Manrope', sans-serif", color: INK }}>
-                The real app, not a mockup
-              </h2>
-              <p className="mt-4 text-base max-w-xl mx-auto" style={{ color: '#6b7280' }}>
-                From score entry on the course to live leaderboards and printable signage — here's what players and admins actually see.
-              </p>
-            </div>
-            <ThumbnailCarousel slides={PRODUCT_SCREENS} />
-            <p className="text-xs text-center mt-2" style={{ color: '#9ca3af' }}>Sample data for illustration — not a real event.</p>
-          </div>
-        </section>
+        {/* ── Try it: a sample league night in five steps ──────────────── */}
+        <TryIt />
 
         {/* ── Features ───────────────────────────────────────────────── */}
         <section id="features" className="py-24" style={{ background: '#fbfaf8' }}>
@@ -459,62 +246,10 @@ export default function Home() {
         {/* ── Pricing ────────────────────────────────────────────────── */}
         <section id="pricing" className="py-24" style={{ background: '#ffffff' }}>
           <div className="max-w-5xl mx-auto px-6">
-            <div className="text-center mb-2">
-              <p className="text-xs font-bold uppercase tracking-widest mb-3" style={{ color: GREEN }}>Pricing</p>
-            </div>
-            <Pricing
-              plans={PLANS}
-              title="Simple, transparent pricing"
-              description={'Start free. Upgrade when your league grows.'}
-            />
-
-            {/* One-time options */}
-            <div style={{ borderTop: '1px solid #ebe9e4', paddingTop: '3rem', marginTop: '4rem' }}>
-              <div className="text-center mb-8">
-                <p className="text-xs font-bold uppercase tracking-widest mb-2" style={{ color: '#9ca3af' }}>One-Time Purchases</p>
-                <h3 className="text-2xl font-bold" style={{ fontFamily: "'Manrope', sans-serif", color: INK }}>
-                  Just need it for one event?
-                </h3>
-                <p className="text-sm mt-2" style={{ color: '#6b7280' }}>No subscription. Pay once, use it for your event.</p>
-              </div>
-              <div className="grid md:grid-cols-2 gap-6">
-                {ONE_TIME.map(opt => (
-                  <div key={opt.name} className="rounded-2xl p-7 flex flex-col" style={{ border: '1px solid #ebe9e4', background: '#fbfaf8' }}>
-                    <div className="mb-4">
-                      <p className="text-xs font-bold uppercase tracking-widest mb-1" style={{ color: '#9ca3af' }}>{opt.name}</p>
-                      <div className="flex flex-col">
-                        <span className="text-3xl font-bold" style={{ color: INK, fontFamily: "'Manrope', sans-serif" }}>{opt.price}</span>
-                        <span className="text-sm font-semibold mt-1" style={{ color: '#92611a' }}>{opt.sub}</span>
-                      </div>
-                    </div>
-                    <p className="text-sm mb-4 leading-relaxed" style={{ color: '#6b7280' }}>{opt.description}</p>
-                    <ul className="space-y-2 mb-6 flex-1">
-                      {opt.features.map(f => (
-                        <li key={f} className="flex items-start gap-2.5 text-sm" style={{ color: '#4b5563' }}>
-                          <svg className="mt-0.5 shrink-0" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24" style={{ color: GREEN }}>
-                            <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-                          </svg>
-                          {f}
-                        </li>
-                      ))}
-                    </ul>
-                    {opt.ctaTo.startsWith('mailto') ? (
-                      <a href={opt.ctaTo}
-                        className="block text-center py-3 rounded-full font-bold text-sm transition-opacity hover:opacity-90"
-                        style={{ background: GREEN, color: '#fff' }}>
-                        {opt.cta}
-                      </a>
-                    ) : (
-                      <Link to={opt.ctaTo}
-                        className="block text-center py-3 rounded-full font-bold text-sm transition-opacity hover:opacity-90"
-                        style={{ background: GREEN, color: '#fff' }}>
-                        {opt.cta}
-                      </Link>
-                    )}
-                  </div>
-                ))}
-              </div>
-            </div>
+            <PricingSection />
+            <p className="text-sm text-center mt-10">
+              <Link to="/pricing" className="font-semibold" style={{ color: GREEN }}>Compare plans and pricing FAQs →</Link>
+            </p>
           </div>
         </section>
 
@@ -537,7 +272,6 @@ export default function Home() {
               {[
                 { label: 'Stripe-powered online payment collection', status: 'planned' },
                 { label: 'Text message scoring reminders (Twilio)', status: 'planned' },
-                { label: 'Multi-day trip scoring across multiple courses', status: 'planned' },
                 { label: 'USGA integration', status: 'planned' },
               ].map(item => (
                 <div key={item.label} className="flex items-start gap-3 rounded-xl p-4" style={{ background: '#fbfaf8', border: '1px solid #ebe9e4' }}>

@@ -23,10 +23,11 @@ const PLAN_FEATURES = [
   { label: 'Flights A & B',        free: false,           pro: true,          club: true          },
   { label: 'Skins & side games',   free: false,           pro: true,          club: true          },
   { label: 'Score export (CSV)',    free: false,           pro: true,          club: true          },
+  { label: 'Online registration',  free: false,           pro: true,          club: true          },
   { label: 'Multiple admins',      free: false,           pro: false,         club: 'Up to 3'     },
   { label: 'Team Play scoring',     free: false,           pro: false,         club: true          },
   { label: 'Custom branding',      free: false,           pro: false,         club: true          },
-  { label: 'Online registration',  free: false,           pro: false,         club: true          },
+  { label: 'Golf trips',           free: false,           pro: false,         club: 'Unlimited'   },
 ]
 
 function AccountDropdown({ user, profile, org, tier, isOwner, onSignOut }) {
