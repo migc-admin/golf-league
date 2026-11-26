@@ -8,6 +8,9 @@
 
 const cents = n => Math.round(Number(n) * 100) / 100
 
+/** Shown on the public wager pages when the admin has turned wagers off for the event. */
+export const WAGERS_OFF = "Wagers aren't offered for this event."
+
 export function money(n) {
   const v = Number(n)
   return `$${(Number.isFinite(v) ? v : 0).toFixed(2)}`

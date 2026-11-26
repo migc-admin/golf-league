@@ -28,7 +28,7 @@ const GOLD  = '#C9A84C'
 const GREEN = '#1B4332'
 const bg = { background: 'linear-gradient(150deg,#0b2318 0%,#1B4332 45%,#1f5c3e 100%)', fontFamily: "'Manrope', sans-serif" }
 
-const EVENT_FIELDS = 'id, name, event_number, event_date, start_time, status, slug, shotgun_start, tee_time_interval_mins, group_hole_assignments, course:courses(*), league:leagues(slug, name, org_id, org:organizations(slug))'
+const EVENT_FIELDS = 'id, name, event_number, event_date, start_time, status, slug, wagers_enabled, shotgun_start, tee_time_interval_mins, group_hole_assignments, course:courses(*), league:leagues(slug, name, org_id, org:organizations(slug))'
 
 function prettyDate(d) {
   if (!d) return ''

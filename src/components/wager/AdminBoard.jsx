@@ -13,6 +13,41 @@ export const fmt = n => `$${Number(n).toFixed(2)}`
 const HEAD = 'text-[11px] font-semibold uppercase tracking-[0.08em] text-ink-muted'
 const DANGER_OUTLINE = '!border-red-300 !text-red-600 hover:!bg-red-50'
 
+// ─── Wagers on/off for the event ─────────────────────────────────────────────
+
+/** Turns the whole wager board on or off for this event (bet form, results page and every wager link). */
+export function WagersSwitch({ on, saving, onChange }) {
+  return (
+    <section className={`flex items-start gap-3 rounded-sm border px-4 py-3 ${on ? 'border-surface-border bg-white' : 'border-surface-border bg-status-upcoming-bg'}`}>
+      <button
+        id="wagers-enabled"
+        type="button"
+        role="switch"
+        aria-checked={on}
+        aria-label="Wagers for this event"
+        disabled={saving}
+        onClick={() => onChange(!on)}
+        className="relative mt-0.5 inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-fairway-500 disabled:opacity-60"
+      >
+        <span className={`block h-5 w-9 rounded-full transition-colors ${on ? 'bg-fairway-700' : 'bg-surface-highest'}`} aria-hidden="true" />
+        <span
+          className="absolute left-1 top-1/2 h-4 w-4 -translate-y-1/2 rounded-full bg-white shadow transition-transform"
+          style={{ transform: `translate(${on ? 18 : 2}px, -50%)` }}
+          aria-hidden="true"
+        />
+      </button>
+      <label htmlFor="wagers-enabled" className="min-w-0 cursor-pointer pt-2.5">
+        <span className="block text-sm font-semibold leading-tight text-ink">{on ? 'Wagers on for this event' : 'Wagers off for this event'}</span>
+        <span className={`mt-0.5 block text-xs ${on ? 'text-ink-muted' : 'text-status-upcoming-text'}`}>
+          {on
+            ? 'Players see the bet form, the wager results page and the wager links on the event page and in emails.'
+            : 'Players don’t see the bet form or any wager links, and the bet form won’t take new bets. Bets already placed stay here.'}
+        </span>
+      </label>
+    </section>
+  )
+}
+
 // ─── Betting status bar ──────────────────────────────────────────────────────
 
 export function BettingStatusBar({ open, count, note, canToggle, toggling, onToggle }) {

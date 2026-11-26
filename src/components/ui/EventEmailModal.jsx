@@ -128,7 +128,7 @@ export default function EventEmailModal({
     const origin = publicOrigin()
     const base = `${origin}/${orgSlug}/${leagueSlug}/${event.slug}`
     if (isPre) {
-      const isMIGC = event.league?.org_id === MIGC_ORG
+      const isMIGC = event.league?.org_id === MIGC_ORG && event.wagers_enabled !== false
       return buildPreRoundEmail({
         event, eventPlayers, matchPairings, leagueName, logoUrl, note,
         eventUrl: `${base}/event`,
@@ -159,8 +159,8 @@ export default function EventEmailModal({
       leaderboardUrl, payoutsUrl: leaderboardUrl,
       // Trips have no season standings page
       standingsUrl: event.league?.is_trip_league ? null : `${origin}/${orgSlug}/${leagueSlug}/standings`,
-      // Wagers are a Mulligan's Island feature, same as the pre-round email's bet link
-      wagerUrl: event.league?.org_id === MIGC_ORG ? `${origin}/wager/${event.id}/results` : null,
+      // Wagers are a Mulligan's Island feature, same as the pre-round email's bet link, and only when on for this event
+      wagerUrl: event.league?.org_id === MIGC_ORG && event.wagers_enabled !== false ? `${origin}/wager/${event.id}/results` : null,
       nextEvent: nextEvent ? {
         name: nextEvent.name, dateText: shortDateText(nextEvent.event_date),
         url: `${origin}/${orgSlug}/${leagueSlug}/${nextEvent.slug}/event`,

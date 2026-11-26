@@ -11,6 +11,7 @@ import { useParams, Link } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { computeWagerSettlement, wagerOutcomes } from '../lib/wagerSettlement'
 import { groupTickets, buildTicketView } from '../lib/wagerTicket'
+import { WAGERS_OFF } from '../lib/wagerResultsView'
 import { useEmbeddedLogo } from '../lib/useEmbeddedLogo'
 import WagerTicket from '../components/wager/WagerTicket'
 import TicketActions from '../components/wager/TicketActions'
@@ -53,6 +54,7 @@ export default function WagerTicketPage() {
         .eq('id', eventId).single()
       if (cancelled) return
       if (!ev || ev.league?.org_id !== MIGC_ORG) { setError('This ticket is not available.'); setLoading(false); return }
+      if (ev.wagers_enabled === false) { setError(WAGERS_OFF); setLoading(false); return }
       setEvent(ev)
 
       const [{ data: eps }, ws, sc, { data: mp }] = await Promise.all([
@@ -121,7 +123,7 @@ export default function WagerTicketPage() {
   const { logo, ready } = useEmbeddedLogo(event?.league?.logo_url)
 
   if (loading) return <Notice>Loading…</Notice>
-  if (error)   return <Notice tone="text-red-600">{error}</Notice>
+  if (error)   return <Notice tone={error === WAGERS_OFF ? 'text-ink' : 'text-red-600'}>{error}</Notice>
   if (!view) {
     return (
       <Notice tone="text-ink">

@@ -25,7 +25,7 @@ import PngWagerSummary from '../components/wager/PngWagerSummary'
 import { wagerPngFilename } from '../lib/wagerExport'
 import { PoolView } from '../components/wager/ResultsViews'
 import {
-  BettingStatusBar, AllBetsCard, RemovedBetsCard, ManualBetCard, PaymentsCard, OddsCard, MatchPoolsCard, Card, fmt,
+  WagersSwitch, BettingStatusBar, AllBetsCard, RemovedBetsCard, ManualBetCard, PaymentsCard, OddsCard, MatchPoolsCard, Card, fmt,
 } from '../components/wager/AdminBoard'
 
 const MIGC_ORG = import.meta.env.VITE_MIGC_ORG_ID
@@ -60,6 +60,7 @@ export default function WagerAdmin() {
   const [acting,      setActing]      = useState(null)
   const [showDeleted, setShowDeleted] = useState(false)
   const [toggling,    setToggling]    = useState(false)
+  const [savingOnOff, setSavingOnOff] = useState(false)
   const [exporting,   setExporting]   = useState(false)
   const [exportingPng, setExportingPng] = useState(false)
   const shareRef = useRef(null)
@@ -151,6 +152,16 @@ export default function WagerAdmin() {
     if (insErr) { alert('Could not save the bet: ' + insErr.message); return false }
     setWagers(await fetchWagers(eventId))
     return true
+  }
+
+  // Wagers on/off for the whole event: hides the bet form and every wager link when off
+  async function setWagersEnabled(next) {
+    if (!next && !window.confirm('Turn wagers off for this event? Players won’t see the bet form or any wager links. Bets already placed stay on this board.')) return
+    setSavingOnOff(true)
+    const { error: upErr } = await supabase.from('events').update({ wagers_enabled: next }).eq('id', eventId)
+    setSavingOnOff(false)
+    if (upErr) { alert('Could not save: ' + upErr.message); return }
+    setEvent(prev => ({ ...prev, wagers_enabled: next }))
   }
 
   async function toggleBettingClosed() {
@@ -289,7 +300,8 @@ export default function WagerAdmin() {
 
   const showResults = event.status === 'complete' || event.status === 'active'
   const autoClosed  = isTeeTimePast(event)
-  const bettingOpen = !event.wagers_closed && !autoClosed && event.status !== 'complete'
+  const wagersOn    = event.wagers_enabled !== false
+  const bettingOpen = wagersOn && !event.wagers_closed && !autoClosed && event.status !== 'complete'
 
   const eventDate = event.event_date
     ? new Date(event.event_date + 'T00:00:00').toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' })
@@ -330,7 +342,7 @@ export default function WagerAdmin() {
           leagueName={event.league?.name}
           logoUrl={event.league?.logo_url}
           title="Wagers"
-          pill={{ tone: bettingOpen ? 'open' : 'closed', label: bettingOpen ? 'Betting open' : settled ? 'Betting closed · Settled' : 'Betting closed' }}
+          pill={{ tone: bettingOpen ? 'open' : 'closed', label: !wagersOn ? 'Wagers off' : bettingOpen ? 'Betting open' : settled ? 'Betting closed · Settled' : 'Betting closed' }}
           meta={meta}
           actions={
             <>
@@ -349,16 +361,20 @@ export default function WagerAdmin() {
           }
         />
 
+        <WagersSwitch on={wagersOn} saving={savingOnOff} onChange={setWagersEnabled} />
+
         <StatTiles tiles={tiles} />
 
-        <BettingStatusBar
-          open={bettingOpen}
-          count={active.length}
-          note={betNote}
-          canToggle={!settled && !autoClosed}
-          toggling={toggling}
-          onToggle={toggleBettingClosed}
-        />
+        {wagersOn && (
+          <BettingStatusBar
+            open={bettingOpen}
+            count={active.length}
+            note={betNote}
+            canToggle={!settled && !autoClosed}
+            toggling={toggling}
+            onToggle={toggleBettingClosed}
+          />
+        )}
 
         {(Object.keys(orphanPicks).length > 0 || orphanMatches.length > 0) && (
           <AmberBanner title="Some bets are on players who are no longer in this event.">

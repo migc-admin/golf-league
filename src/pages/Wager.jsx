@@ -20,6 +20,7 @@ import { Card } from '../components/wager/AdminBoard'
 import WagerTicket from '../components/wager/WagerTicket'
 import TicketActions from '../components/wager/TicketActions'
 import { groupTickets, latestTicketFor, buildTicketView } from '../lib/wagerTicket'
+import { WAGERS_OFF } from '../lib/wagerResultsView'
 import { useEmbeddedLogo } from '../lib/useEmbeddedLogo'
 import { PickCard, PickTypeToggle, AmountStepper, selectClass, labelClass } from '../components/wager/BetFormParts'
 
@@ -78,6 +79,7 @@ export default function Wager() {
         setLoading(false)
         return
       }
+      if (ev.wagers_enabled === false) { setError(WAGERS_OFF); setLoading(false); return }
       setEvent(ev)
 
       // Load field
@@ -235,7 +237,7 @@ export default function Wager() {
     <div className={`flex min-h-screen items-center justify-center bg-surface-dim px-4 text-center font-sans ${tone}`}>{children}</div>
   )
   if (loading) return <Notice>Loading…</Notice>
-  if (error)   return <Notice tone="text-red-600">{error}</Notice>
+  if (error)   return <Notice tone={error === WAGERS_OFF ? 'text-ink' : 'text-red-600'}>{error}</Notice>
 
   const eventDate = event.event_date
     ? new Date(event.event_date + 'T00:00:00').toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' })

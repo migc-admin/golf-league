@@ -111,4 +111,8 @@ describe('eventUrls', () => {
     expect(eventUrls(event, 'OTHER').wager).toBeNull()
     expect(eventUrls({ ...event, status: 'complete' }, 'ORG').wager).toBeNull()
   })
+  it('leaves the wager link out when wagers are off for the event', () => {
+    expect(eventUrls({ ...event, wagers_enabled: false }, 'ORG').wager).toBeNull()
+    expect(eventUrls({ ...event, wagers_enabled: true }, 'ORG').wager).toBe('/wager/e1')
+  })
 })

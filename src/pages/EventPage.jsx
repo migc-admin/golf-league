@@ -221,7 +221,7 @@ export default function EventPage() {
 
 // ─── Overview Tab ──────────────────────────────────────────────────────────
 function OverviewTab({ event, pairings, eventPlayers, description, courseAddress, mapsUrl, eventId, showBetLink, startLabel, sponsors, onSeePairings }) {
-  const isMIGC = event.league?.org_id === MIGC_ORG
+  const isMIGC = event.league?.org_id === MIGC_ORG && event.wagers_enabled !== false
   const formats = event.formats ?? (event.format ? [event.format] : [])
   const teams = event.ryder_cup_teams
   const matchSubtitle = formats.includes('ryder_cup') ? `${teams?.a || 'Team A'} vs ${teams?.b || 'Team B'}` : null

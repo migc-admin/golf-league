@@ -278,6 +278,7 @@ export default function EventDetail() {
       name: `${baseName} (Copy)`,
       status: 'upcoming',
       registration_open: false, // a copy starts closed, like any new event
+      wagers_enabled: false,    // ...and with wagers off, like any new event
       season_year: null,        // takes the league's current season
     }).select('slug').single()
 

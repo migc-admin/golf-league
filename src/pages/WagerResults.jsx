@@ -27,7 +27,7 @@ import PngWagerSummary from '../components/wager/PngWagerSummary'
 import { wagerPngFilename } from '../lib/wagerExport'
 import { ResultsToolbar, BettorView, PoolView, AllBetsPublicCard } from '../components/wager/ResultsViews'
 import { OddsCard, MatchPoolsCard } from '../components/wager/AdminBoard'
-import { money } from '../lib/wagerResultsView'
+import { money, WAGERS_OFF } from '../lib/wagerResultsView'
 
 const MIGC_ORG = import.meta.env.VITE_MIGC_ORG_ID
 
@@ -71,6 +71,7 @@ export default function WagerResults() {
         .eq('id', eventId).single()
       if (cancelled) return
       if (!ev || ev.league?.org_id !== MIGC_ORG) { setError('This wager page is not available.'); setLoading(false); return }
+      if (ev.wagers_enabled === false) { setError(WAGERS_OFF); setLoading(false); return }
       setEvent(ev)
 
       const [{ data: eps }, ws, sc, { data: mp }, { data: orgPlayers }] = await Promise.all([
@@ -140,7 +141,7 @@ export default function WagerResults() {
   )
 
   if (loading) return <Notice>Loading…</Notice>
-  if (error) return <Notice tone="text-red-600">{error}</Notice>
+  if (error) return <Notice tone={error === WAGERS_OFF ? 'text-ink' : 'text-red-600'}>{error}</Notice>
 
   const final = model.final
   const summary = final ? buildSummary(model) : null

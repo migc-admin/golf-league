@@ -113,6 +113,6 @@ export function eventUrls(event, migcOrgId) {
   return {
     leaderboard: `${base}/leaderboard?eid=${event.id}`,
     scorecard:   `${base}/scorecard?eid=${event.id}`,
-    wager:       migcOrgId && event.league?.org_id === migcOrgId && event.status !== 'complete' ? `/wager/${event.id}` : null,
+    wager:       migcOrgId && event.league?.org_id === migcOrgId && event.wagers_enabled !== false && event.status !== 'complete' ? `/wager/${event.id}` : null,
   }
 }
