@@ -55,7 +55,7 @@ const FAQS = [
   },
   {
     q: 'What if Scorify isn\'t a fit after I pay?',
-    a: 'Pro and Club start with a 21-day free trial, so you can run real rounds before you pay. You can cancel anytime; your plan stays active through the end of the period you paid for. If you are charged by mistake, ask within 24 hours for a full refund. On a yearly plan, cancel within the first 3 months (not counting the trial) and get 50% of the yearly price back. Monthly charges are not refunded once a billing period has started. If Scorify does not work as documented, you may get a refund or account credit regardless. The refund policy has the full terms.',
+    a: 'Pro and Club start with a 21-day free trial, so you can run real rounds before you pay. Cancel anytime, and your plan stays active through the end of the period you paid for. A charge made by mistake is fully refunded if you ask within 24 hours. A yearly plan cancelled within the first 3 months (not counting the trial) gets 50% of the yearly price back, while monthly charges are not refunded once a billing period has started. If Scorify does not work as documented, you may get a refund or account credit regardless. The refund policy has the full terms.',
   },
   {
     q: 'Can I switch plans later?',

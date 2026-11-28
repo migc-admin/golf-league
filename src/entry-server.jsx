@@ -19,6 +19,8 @@ import GolfTripApp from './pages/GolfTripApp'
 import PricingPage from './pages/PricingPage'
 import Blog from './pages/Blog'
 import BlogPost from './pages/BlogPost'
+import AuthorPage from './pages/AuthorPage'
+import { AUTHOR_PATH } from './lib/author'
 import Roadmap from './pages/Roadmap'
 import Help from './pages/Help'
 import Privacy from './pages/Privacy'
@@ -34,6 +36,7 @@ export const PRERENDER_ROUTES = [
   '/faq',
   '/blog',
   ...BLOG_POSTS.map(p => `/blog/${p.slug}`),
+  AUTHOR_PATH,
   '/roadmap',
   '/help',
   '/privacy',
@@ -63,6 +66,7 @@ export function render(url) {
             <Route path="/faq"           element={<FAQ />} />
             <Route path="/blog"          element={<Blog />} />
             <Route path="/blog/:slug"    element={<BlogPost />} />
+            <Route path="/author/:slug"  element={<AuthorPage />} />
             <Route path="/roadmap"       element={<Roadmap />} />
             <Route path="/help"          element={<Help />} />
             <Route path="/privacy"       element={<Privacy />} />

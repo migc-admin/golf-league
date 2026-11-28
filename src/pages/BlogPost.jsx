@@ -2,6 +2,7 @@ import { Link, useParams, Navigate } from 'react-router-dom'
 import { Helmet } from 'react-helmet-async'
 import Footer from '../components/ui/Footer'
 import { getBlogPost, getRelatedPosts } from '../lib/blogPosts'
+import { AUTHOR, AUTHOR_PATH, SITE, authorPerson } from '../lib/author'
 import { parseInlineLinks } from '../lib/inlineLinks'
 import ComparisonTable from '../components/blog/ComparisonTable'
 import LeaderboardPreview from '../components/blog/LeaderboardPreview'
@@ -64,11 +65,13 @@ function Block({ block }) {
   }
   if (block.type === 'image') {
     return (
-      <figure className="my-6">
+      <figure className={`my-6 ${block.narrow ? 'mx-auto max-w-xs' : ''}`}>
         <img
           src={block.src}
           alt={block.alt}
-          className="w-full rounded-xl shadow-sm"
+          width={block.width}
+          height={block.height}
+          className="w-full h-auto rounded-xl shadow-sm"
           style={{ border: '1px solid #ebe9e4' }}
           loading="lazy"
         />
@@ -101,13 +104,12 @@ export default function BlogPost() {
           "headline": post.title,
           "description": description,
           "datePublished": post.date,
-          "author": {
-            "@type": "Person",
-            "name": "Kevin Vargas",
-            "jobTitle": "Founder, Scorify Golf",
-            "description": "Built Scorify Golf to run his own golf league's live scoring and season standings, then opened it up to other independent league directors.",
-          },
-          "publisher": { "@type": "Organization", "name": "Scorify Golf" },
+          "dateModified": post.updated ?? post.date,
+          "url": `${SITE}/blog/${post.slug}`,
+          "mainEntityOfPage": `${SITE}/blog/${post.slug}`,
+          "author": authorPerson(),
+          "publisher": { "@type": "Organization", "@id": `${SITE}/#organization`, "name": "Scorify Golf", "logo": { "@type": "ImageObject", "url": `${SITE}/logo.png` } },
+          ...(post.content.find(b => b.type === 'image') ? { "image": `${SITE}${post.content.find(b => b.type === 'image').src}` } : {}),
         })}</script>
       </Helmet>
 
@@ -126,7 +128,8 @@ export default function BlogPost() {
               {post.title}
             </h1>
             <p className="text-sm mb-8" style={{ color: '#6b7280' }}>
-              By <span className="font-semibold" style={{ color: INK }}>Kevin Vargas</span>, Founder of Scorify Golf
+              By <Link to={AUTHOR_PATH} rel="author" className="font-semibold underline underline-offset-2" style={{ color: INK }}>{AUTHOR.name}</Link>, Founder of Scorify Golf
+              {post.updated && post.updated !== post.date && <> · Updated {formatDate(post.updated)}</>}
             </p>
 
             {post.content.map((block, i) => <Block key={i} block={block} />)}

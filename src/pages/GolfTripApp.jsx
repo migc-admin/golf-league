@@ -119,6 +119,16 @@ export default function GolfTripApp() {
             stages={STAGES}
           />
 
+          {/* Product screenshot */}
+          <section className="pb-16 md:pb-20">
+            <figure className="max-w-3xl mx-auto px-4 sm:px-6">
+              <img src="/images/blog/scorify-group-code-access-steps.webp" width="1600" height="1019" loading="lazy"
+                alt="Three Scorify Golf phone screens: open the scoring link, enter the five-character group code, and tap your name to start scoring a round"
+                className="w-full h-auto rounded-2xl shadow-md" style={{ border: `1px solid ${LINE}` }} />
+              <figcaption className="text-xs text-center mt-2" style={{ color: MUTED }}>How each group starts scoring a round: open the link, enter the group code, tap your name.</figcaption>
+            </figure>
+          </section>
+
           {/* Formats */}
           <section className="py-16 md:py-20 bg-white">
             <div className="max-w-5xl mx-auto px-4 sm:px-6 grid md:grid-cols-2 gap-10">

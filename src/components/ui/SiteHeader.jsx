@@ -39,7 +39,7 @@ export default function SiteHeader() {
     <header className="sticky top-0 z-50 bg-white" style={{ borderBottom: `1px solid ${LINE}` }}>
       <div className="max-w-6xl mx-auto px-4 sm:px-6 h-14 flex items-center justify-between gap-4">
         <Link to="/" className="flex min-h-[44px] items-center gap-2.5 shrink-0">
-          <img src="/logo.png" alt="Scorify Golf" className="w-8 h-8 object-contain" />
+          <img src="/logo.png" alt="Scorify Golf" width="32" height="32" className="w-8 h-8 object-contain" />
           <span className="font-bold text-base" style={{ letterSpacing: '-0.02em', color: INK }}>Scorify Golf</span>
         </Link>
 

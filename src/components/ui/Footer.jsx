@@ -51,7 +51,7 @@ export default function Footer() {
           {/* Brand */}
           <div className="col-span-2">
             <div className="flex items-center gap-2.5 mb-4">
-              <img src="/WhiteLogo.jpg" alt="Scorify Golf" className="w-8 h-8 rounded-lg object-contain" />
+              <img src="/WhiteLogo.jpg" alt="Scorify Golf" width="32" height="32" className="w-8 h-8 rounded-lg object-contain" />
               <span className="font-bold text-white text-lg" style={{ letterSpacing: '-0.02em' }}>Scorify Golf</span>
             </div>
             <p className="text-sm leading-relaxed" style={{ color: '#86868b' }}>

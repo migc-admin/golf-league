@@ -42,6 +42,7 @@ import ResetPassword  from './pages/ResetPassword'
 import FAQ            from './pages/FAQ'
 import Blog           from './pages/Blog'
 import BlogPost       from './pages/BlogPost'
+import AuthorPage     from './pages/AuthorPage'
 import GolfLeagueSoftware from './pages/GolfLeagueSoftware'
 import GolfTournamentSoftware from './pages/GolfTournamentSoftware'
 import GolfTripApp from './pages/GolfTripApp'
@@ -214,6 +215,7 @@ export default function App() {
         <Route path="/faq"            element={<FAQ />} />
         <Route path="/blog"           element={<Blog />} />
         <Route path="/blog/:slug"     element={<BlogPost />} />
+        <Route path="/author/:slug"   element={<AuthorPage />} />
         <Route path="/roadmap"        element={<Roadmap />} />
         <Route path="/help"           element={<Help />} />
         <Route path="/privacy"        element={<Privacy />} />

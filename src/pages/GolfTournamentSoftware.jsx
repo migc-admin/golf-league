@@ -123,6 +123,16 @@ export default function GolfTournamentSoftware() {
             stages={STAGES}
           />
 
+          {/* Product screenshot */}
+          <section className="pb-16 md:pb-20">
+            <figure className="max-w-3xl mx-auto px-4 sm:px-6">
+              <img src="/images/blog/scorify-custom-scorecard.webp" width="1600" height="617" loading="lazy"
+                alt="Printed Scorify Golf tournament scorecard with player names, flights, handicaps, a QR code and group code for phone scoring, and the closest to the pin and long drive holes marked"
+                className="w-full h-auto rounded-2xl shadow-md" style={{ border: `1px solid ${LINE}` }} />
+              <figcaption className="text-xs text-center mt-2" style={{ color: MUTED }}>A printed scorecard for one group. Players scan the QR code to score on their phones.</figcaption>
+            </figure>
+          </section>
+
           {/* Formats */}
           <section className="py-16 md:py-20 bg-white">
             <div className="max-w-5xl mx-auto px-4 sm:px-6 grid md:grid-cols-2 gap-10">
