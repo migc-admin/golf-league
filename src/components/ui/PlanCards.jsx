@@ -21,7 +21,7 @@ export default function PlanCards() {
         <div className="inline-flex rounded-full p-1" style={{ background: '#f1efea' }} role="group" aria-label="Billing period">
           {[['Monthly', false], [`Yearly · save up to ${Math.round(bestSaving * 100)}%`, true]].map(([label, val]) => (
             <button key={label} type="button" onClick={() => setYearly(val)} aria-pressed={yearly === val}
-              className="px-4 py-2 rounded-full text-sm font-bold transition-colors"
+              className="min-h-[44px] px-4 rounded-full text-sm font-bold transition-colors"
               style={yearly === val ? { background: '#fff', color: INK, boxShadow: '0 1px 4px rgba(0,0,0,0.08)' } : { color: MUTED }}>
               {label}
             </button>
@@ -53,7 +53,7 @@ export default function PlanCards() {
               <p className="text-xs mt-1" style={{ color: MUTED }}>{sub}</p>
               <p className="text-sm mt-4 mb-5 md:min-h-[2.5rem]" style={{ color: '#374151' }}>{tagline}</p>
 
-              <Link to={plan.href} className="text-center px-5 py-2.5 rounded-full font-bold text-sm transition-opacity hover:opacity-90"
+              <Link to={plan.href} className="flex min-h-[44px] items-center justify-center text-center px-5 rounded-full font-bold text-sm transition-opacity hover:opacity-90"
                 style={featured ? { background: GREEN, color: '#fff' } : { border: `1.5px solid ${GREEN}`, color: GREEN }}>
                 {plan.buttonText}
               </Link>

@@ -13,6 +13,10 @@ import SiteHeader from '../components/ui/SiteHeader'
 
 const GUIDES = getHomepageGuides(6)
 
+// Founder photo (path under /public) and personal LinkedIn or X profile for the About section.
+// Each shows only once it's filled in.
+const FOUNDER = { name: 'Kevin Vargas', photo: null, profileUrl: null, profileLabel: 'Kevin on LinkedIn' }
+
 const GREEN  = '#1B4332'
 const GOLD   = '#D4AF37'
 const INK    = '#1d1d1f'
@@ -26,7 +30,7 @@ const FEATURES = [
       </svg>
     ),
     title: 'Online Registration',
-    body: 'Players sign up for events through a shareable registration link. Guest requests, notes, and GHIN numbers collected automatically.',
+    body: 'Players sign up for events through a shareable registration link and pay their entry through your own Venmo or PayPal link, so you stop chasing down league fees. Guest requests, notes, and GHIN numbers collected automatically.',
   },
   {
     icon: (
@@ -236,7 +240,7 @@ export default function Home() {
               ))}
             </div>
             <div className="mt-10 text-center">
-              <Link to="/golf-league-software" className="text-sm font-semibold" style={{ color: GREEN }}>
+              <Link to="/golf-league-software" className="inline-flex min-h-[44px] items-center text-sm font-semibold" style={{ color: GREEN }}>
                 See everything our golf league software does →
               </Link>
             </div>
@@ -248,7 +252,7 @@ export default function Home() {
           <div className="max-w-5xl mx-auto px-6">
             <PricingSection />
             <p className="text-sm text-center mt-10">
-              <Link to="/pricing" className="font-semibold" style={{ color: GREEN }}>Compare plans and pricing FAQs →</Link>
+              <Link to="/pricing" className="inline-flex min-h-[44px] items-center font-semibold" style={{ color: GREEN }}>Compare plans and pricing FAQs →</Link>
             </p>
           </div>
         </section>
@@ -311,7 +315,8 @@ export default function Home() {
                 { q: 'How does digital scoring work?', a: 'The admin creates groups before the round. On the day, each group scans a QR code or enters a group code to access their digital scorecard. Scores sync to the live leaderboard hole-by-hole in real time.' },
                 { q: 'What scoring formats are supported?', a: 'Stroke play, Stableford, Match Points, Low Putts, and Skins. Net scoring with handicap adjustments is included on all plans.' },
                 { q: 'Can Scorify calculate payouts?', a: 'Yes. Configure prize amounts for overall finishers, flights, skins, CTP, and long drive — Scorify calculates the breakdown automatically.' },
-                { q: 'Can I try it before paying?', a: 'Yes. All plans start with a free trial. No credit card required to get started.' },
+                { q: 'Is my course in the database?', a: 'Scorify uses course data including par and stroke index for handicap calculations. Search for your course by name when you set it up, and its par, stroke index, slope, and rating load for each tee. If your course is not yet listed, you can enter the details manually.' },
+                { q: 'Can I try it before paying?', a: 'Yes. Starter is free with no credit card. Pro and Club start with a 21-day free trial, and you can cancel before it ends.' },
               ].map(({ q, a }) => (
                 <div key={q} className="py-5">
                   <p className="font-semibold text-sm mb-2" style={{ color: INK }}>{q}</p>
@@ -320,7 +325,7 @@ export default function Home() {
               ))}
             </div>
             <div className="mt-8 text-center">
-              <a href="/faq" className="text-sm font-semibold" style={{ color: GREEN }}>See all FAQs →</a>
+              <a href="/faq" className="inline-flex min-h-[44px] items-center text-sm font-semibold" style={{ color: GREEN }}>See all FAQs →</a>
             </div>
           </div>
         </section>
@@ -361,7 +366,7 @@ export default function Home() {
             </div>
 
             <div className="mt-10 text-center">
-              <Link to="/blog" className="text-sm font-semibold" style={{ color: GREEN }}>See all guides →</Link>
+              <Link to="/blog" className="inline-flex min-h-[44px] items-center text-sm font-semibold" style={{ color: GREEN }}>See all guides →</Link>
             </div>
           </div>
         </section>
@@ -395,6 +400,9 @@ export default function Home() {
             <h2 className="text-3xl md:text-4xl font-bold mb-6" style={{ fontFamily: "'Manrope', sans-serif", color: INK }}>
               Built by a league director, for league directors
             </h2>
+            {FOUNDER.photo && (
+              <img src={FOUNDER.photo} alt={FOUNDER.name} className="mx-auto mb-6 h-28 w-28 rounded-full object-cover" loading="lazy" />
+            )}
             <p className="text-base leading-relaxed mb-4 text-justify" style={{ color: '#6b7280' }}>
               Scorify was built by Kevin Vargas, who spent one too many rounds stuck at the scoring table
               reconciling paper scorecards while everyone else finished up. The bottleneck was always the same
@@ -404,6 +412,15 @@ export default function Home() {
               Existing tools were either built for golf facilities, too complex for an independent organizer
               running a weekly league out of a group chat, or too expensive. Scorify is the affordable, modern
               alternative — built so any league director can run their league like a pro.
+            </p>
+            <p className="text-base leading-relaxed mb-4 text-justify" style={{ color: '#6b7280' }}>
+              Kevin's own playbook for running a league is free to read:{' '}
+              <Link to="/blog/running-a-golf-league-commissioners-handbook" style={{ color: GREEN, fontWeight: 600 }}>The Commissioner's Handbook</Link>.
+              {FOUNDER.profileUrl && (
+                <> Connect with him on{' '}
+                  <a href={FOUNDER.profileUrl} target="_blank" rel="noopener noreferrer" style={{ color: GREEN, fontWeight: 600 }}>{FOUNDER.profileLabel.replace('Kevin on ', '')}</a>.
+                </>
+              )}
             </p>
             <p className="text-base leading-relaxed mb-10 text-justify" style={{ color: '#6b7280' }}>
               Questions or feedback? Reach out directly at{' '}

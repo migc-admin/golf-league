@@ -21,6 +21,9 @@ export default function PricingSection({ eyebrow = true }) {
           Simple, transparent pricing
         </h2>
         <p className="mt-3 text-base" style={{ color: '#6b7280' }}>Start free. Upgrade when your league grows.</p>
+        <p className="mt-2 text-sm max-w-xl mx-auto" style={{ color: '#6b7280' }}>
+          Scorify is built for independent league organizers, most running 10 to 60 players — not country clubs or tournament companies.
+        </p>
       </div>
       <PlanCards />
 

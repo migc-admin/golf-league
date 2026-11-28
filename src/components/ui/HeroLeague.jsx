@@ -86,7 +86,7 @@ export default function HeroLeague() {
     <section className="relative w-full overflow-hidden bg-white flex flex-col md:block lg:min-h-[650px]">
 
       {/* Copy — stays on the page container's left edge */}
-      <div className="relative z-10 order-1 w-full max-w-6xl mx-auto px-4 sm:px-6 pt-10 md:pt-14 lg:pt-[60px] pb-10 md:pb-10 lg:pb-16">
+      <div className="relative z-10 order-1 w-full max-w-6xl mx-auto px-4 sm:px-6 pt-7 sm:pt-10 md:pt-14 lg:pt-[60px] pb-10 md:pb-10 lg:pb-16">
         <div className="md:max-w-[440px] lg:max-w-[580px] xl:max-w-[640px]">
           <p className="text-xs sm:text-sm font-bold uppercase tracking-widest mb-4" style={{ color: GOLD }}>
             Golf league management software
@@ -95,12 +95,12 @@ export default function HeroLeague() {
             <span className="lg:whitespace-nowrap">Run your golf league.</span><br />
             <span className="lg:whitespace-nowrap" style={{ color: GREEN }}>Skip the scoring table.</span>
           </h1>
-          <p className="mt-6 text-lg leading-relaxed max-w-xl" style={{ color: BODY }}>
-            Players score from any phone's browser, the leaderboard updates hole by hole, and skins, flights, and season
+          <p className="mt-4 sm:mt-6 text-base sm:text-lg leading-relaxed max-w-xl" style={{ color: BODY }}>
+            Built for league directors and commissioners. Players score from any phone's browser, the leaderboard updates hole by hole, and skins, flights, and season
             standings take care of themselves. Free for one league with up to 16 players.
           </p>
 
-          <div className="mt-8 flex flex-col sm:flex-row gap-3">
+          <div className="mt-6 sm:mt-8 flex flex-col sm:flex-row gap-3">
             <Link to="/login"
               className="inline-flex items-center justify-center gap-2 h-12 px-8 rounded-full text-sm font-bold text-white transition-opacity hover:opacity-90"
               style={{ background: GREEN }}>

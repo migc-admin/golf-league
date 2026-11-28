@@ -43,7 +43,7 @@ const FAQS = [
   },
   {
     q: 'Can I try a paid plan before I pay?',
-    a: 'Yes. Pro and Club both start with a free trial.',
+    a: 'Yes. Pro and Club both start with a 21-day free trial. Cancel before it ends and you are not charged.',
   },
   {
     q: 'I only need it for one event. Do I need a subscription?',
@@ -52,6 +52,10 @@ const FAQS = [
   {
     q: 'Does Scorify take a cut of entry fees or dues?',
     a: 'No. Players pay through your own Venmo or PayPal link, so every dollar goes straight to you.',
+  },
+  {
+    q: 'What if Scorify isn\'t a fit after I pay?',
+    a: 'Pro and Club start with a 21-day free trial, so you can run real rounds before you pay. You can cancel anytime; your plan stays active through the end of the period you paid for. If you are charged by mistake, ask within 24 hours for a full refund. On a yearly plan, cancel within the first 3 months (not counting the trial) and get 50% of the yearly price back. Monthly charges are not refunded once a billing period has started. If Scorify does not work as documented, you may get a refund or account credit regardless. The refund policy has the full terms.',
   },
   {
     q: 'Can I switch plans later?',
@@ -106,7 +110,10 @@ export default function PricingPage() {
           <section id="plans" className="py-16 md:py-20 bg-white">
             <div className="max-w-5xl mx-auto px-4 sm:px-6">
               <PricingSection eyebrow={false} />
-              <p className="text-sm text-center mt-10" style={{ color: MUTED }}>
+              <p className="text-base text-center mt-10 max-w-2xl mx-auto" style={{ color: INK }}>
+                ${pro.yearlyPrice}/yr replaces your spreadsheet, your skins math, your printable tee sheets, and your standings page — one tool instead of the stack, with no per-player fees and 0% on entry money.
+              </p>
+              <p className="text-sm text-center mt-6" style={{ color: MUTED }}>
                 Not sure which fits? See <TextLink to="/golf-league-software">leagues</TextLink>,{' '}
                 <TextLink to="/golf-tournament-software">tournaments</TextLink>, or{' '}
                 <TextLink to="/golf-trip-app">golf trips</TextLink>. Refunds are covered by our{' '}

@@ -63,16 +63,16 @@ export default function Footer() {
           {/* Menu columns */}
           {MENU_ITEMS.map(section => (
             <div key={section.title}>
-              <h3 className="text-xs font-bold uppercase tracking-widest mb-4" style={{ color: '#86868b' }}>
+              <h3 className="text-xs font-bold uppercase tracking-widest mb-1" style={{ color: '#86868b' }}>
                 {section.title}
               </h3>
-              <ul className="space-y-3">
+              <ul>
                 {section.links.map(link => (
                   <li key={link.text}>
                     {link.url.startsWith('/') ? (
                       <Link
                         to={link.url}
-                        className="text-sm transition-colors"
+                        className="inline-flex min-h-[44px] items-center text-sm transition-colors"
                         style={{ color: '#a1a1aa' }}
                         onMouseEnter={e => e.currentTarget.style.color = '#ffffff'}
                         onMouseLeave={e => e.currentTarget.style.color = '#a1a1aa'}
@@ -82,7 +82,7 @@ export default function Footer() {
                     ) : (
                       <a
                         href={link.url}
-                        className="text-sm transition-colors"
+                        className="inline-flex min-h-[44px] items-center text-sm transition-colors"
                         style={{ color: '#a1a1aa' }}
                         onMouseEnter={e => e.currentTarget.style.color = '#ffffff'}
                         onMouseLeave={e => e.currentTarget.style.color = '#a1a1aa'}
@@ -105,12 +105,12 @@ export default function Footer() {
             © 2026 Scorify Golf. All rights reserved.
           </p>
           <div className="flex gap-6">
-            <Link to="/privacy" className="text-xs transition-colors" style={{ color: '#86868b' }}
+            <Link to="/privacy" className="inline-flex min-h-[44px] items-center text-xs transition-colors" style={{ color: '#86868b' }}
               onMouseEnter={e => e.currentTarget.style.color = '#ffffff'}
               onMouseLeave={e => e.currentTarget.style.color = '#86868b'}>
               Privacy Policy
             </Link>
-            <Link to="/terms" className="text-xs transition-colors" style={{ color: '#86868b' }}
+            <Link to="/terms" className="inline-flex min-h-[44px] items-center text-xs transition-colors" style={{ color: '#86868b' }}
               onMouseEnter={e => e.currentTarget.style.color = '#ffffff'}
               onMouseLeave={e => e.currentTarget.style.color = '#86868b'}>
               Terms of Service

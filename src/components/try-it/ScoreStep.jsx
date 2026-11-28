@@ -73,14 +73,16 @@ export default function ScoreStep({ scores, setScores, onSubmit }) {
                 <p className="text-sm font-bold" style={{ color: INK }}>Wednesday Night League</p>
                 <p className="text-[11px]" style={{ color: MUTED }}>Group 2 · Sample data</p>
               </div>
-              <div className="flex gap-1.5" aria-label={`Hole ${hole.number} of ${DEMO_HOLES.length}`}>
+              <div className="flex gap-0.5" aria-label={`Hole ${hole.number} of ${DEMO_HOLES.length}`}>
                 {DEMO_HOLES.map((h, i) => {
                   const filled = DEMO_GROUP.every(p => scores[p.id]?.[h.number] != null)
                   return (
                     <button key={h.number} type="button" onClick={() => { setDone(false); goTo(i) }}
                       aria-label={`Go to hole ${h.number}`}
-                      className="h-2.5 rounded-full transition-all"
-                      style={{ width: i === holeIdx && !done ? 22 : 10, background: i === holeIdx && !done ? INK : filled ? GREEN : '#d6d4cf' }} />
+                      className="flex h-11 min-w-[22px] items-center justify-center">
+                      <span className="block h-2.5 rounded-full transition-all"
+                        style={{ width: i === holeIdx && !done ? 22 : 10, background: i === holeIdx && !done ? INK : filled ? GREEN : '#d6d4cf' }} />
+                    </button>
                   )
                 })}
               </div>
@@ -172,7 +174,7 @@ export default function ScoreStep({ scores, setScores, onSubmit }) {
                 <p className="text-[11px] mb-2 px-1" style={{ color: MUTED }} aria-live="polite">
                   {active != null ? <>Tap a score for <strong style={{ color: INK }}>{DEMO_GROUP[active].name}</strong>. It moves to the next player.</> : 'Everyone has a score for this hole.'}
                   {' '}
-                  {!holeComplete && <button type="button" onClick={fill} className="underline font-semibold" style={{ color: GREEN }}>Fill in for me</button>}
+                  {!holeComplete && <button type="button" onClick={fill} className="inline-flex min-h-[44px] items-center underline font-semibold" style={{ color: GREEN }}>Fill in for me</button>}
                 </p>
                 <div className="grid grid-cols-5 gap-1.5">
                   {[2, 3, 4, 5, 6, 7, 8, 9, 10].map(n => (

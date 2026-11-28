@@ -72,7 +72,7 @@ export default function TryIt() {
             const on = s.key === step
             return (
               <button key={s.key} role="tab" type="button" aria-selected={on} aria-controls="try-it-panel" onClick={() => setStep(s.key)}
-                className="shrink-0 flex items-center gap-2 rounded-full pl-1.5 pr-4 py-1.5 text-sm font-bold transition-colors"
+                className="shrink-0 flex min-h-[44px] items-center gap-2 rounded-full pl-2 pr-4 text-sm font-bold transition-colors"
                 style={on ? { background: '#fff', color: INK } : { background: 'rgba(255,255,255,0.1)', color: '#fff' }}>
                 <span className="flex items-center justify-center w-6 h-6 rounded-full text-xs"
                   style={on ? { background: GREEN, color: '#fff' } : { background: 'rgba(255,255,255,0.15)', color: '#fff' }}>{i + 1}</span>

@@ -27,7 +27,7 @@ const FAQS = [
       },
       {
         q: 'Can I try Scorify Golf before paying?',
-        a: 'Yes. All plans — including Pro and Club — start with a free trial.',
+        a: 'Yes. Starter is free with no credit card. Pro and Club start with a 21-day free trial, and you can cancel before it ends.',
       },
     ],
   },
@@ -41,6 +41,10 @@ const FAQS = [
       {
         q: 'What scoring formats are supported?',
         a: 'Scorify supports stroke play, Stableford, Match Points, Low Putts, and Skins. Net scoring with handicap adjustments is also supported. Additional formats are being developed for future enhancements — contact us at admin@scorifygolf.com with suggestions.',
+      },
+      {
+        q: 'Is my course in the database?',
+        a: 'Scorify uses course data including par and stroke index for handicap calculations. Search for your course by name when you set it up, and its par, stroke index, slope, and rating load for each tee. If your course is not yet listed, you can enter the details manually.',
       },
       {
         q: 'Can I run a shotgun start event?',

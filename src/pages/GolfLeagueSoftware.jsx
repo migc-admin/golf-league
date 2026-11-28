@@ -96,6 +96,10 @@ const FAQS = [
     a: 'Yes. Enter each player\'s Handicap Index and Scorify calculates course handicaps and net scores automatically, including hole-by-hole strokes for net skins. Direct GHIN integration is on the roadmap, so for now admins enter or update each index.',
   },
   {
+    q: 'Is my course in the database?',
+    a: 'Scorify uses course data including par and stroke index for handicap calculations. Search for your course by name when you set it up, and its par, stroke index, slope, and rating load for each tee. If your course is not yet listed, you can enter the details manually.',
+  },
+  {
     q: 'What formats and side games are supported?',
     a: 'Stroke play (gross and net), Stableford, Match Points, Low Putts, and Skins, plus season-long Team Play. Side games include gross and net skins, Closest to the Pin, long drive, and low putts.',
   },

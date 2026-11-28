@@ -51,7 +51,7 @@ export function LandingHero({ crumb, eyebrow, title, subtitle, primary, secondar
     <section style={{ background: `linear-gradient(135deg, #0b2318, ${GREEN})` }}>
       <div className="max-w-5xl mx-auto px-4 sm:px-6 pt-8 pb-16 md:pb-20">
         <nav aria-label="Breadcrumb" className="text-xs mb-10" style={{ color: 'rgba(255,255,255,0.6)' }}>
-          <Link to="/" className="hover:underline">Home</Link>
+          <Link to="/" className="inline-flex min-h-[44px] items-center hover:underline">Home</Link>
           <span className="mx-2">/</span>
           <span style={{ color: 'rgba(255,255,255,0.85)' }}>{crumb}</span>
         </nav>
@@ -151,7 +151,7 @@ export function FaqSection({ title, faqs }) {
           ))}
         </div>
         <p className="text-sm text-center mt-6">
-          <Link to="/faq" className="font-semibold" style={{ color: GREEN }}>See all FAQs →</Link>
+          <Link to="/faq" className="inline-flex min-h-[44px] items-center font-semibold" style={{ color: GREEN }}>See all FAQs →</Link>
         </p>
       </div>
     </section>

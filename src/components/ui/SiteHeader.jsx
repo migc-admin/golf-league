@@ -38,7 +38,7 @@ export default function SiteHeader() {
   return (
     <header className="sticky top-0 z-50 bg-white" style={{ borderBottom: `1px solid ${LINE}` }}>
       <div className="max-w-6xl mx-auto px-4 sm:px-6 h-14 flex items-center justify-between gap-4">
-        <Link to="/" className="flex items-center gap-2.5 shrink-0">
+        <Link to="/" className="flex min-h-[44px] items-center gap-2.5 shrink-0">
           <img src="/logo.png" alt="Scorify Golf" className="w-8 h-8 object-contain" />
           <span className="font-bold text-base" style={{ letterSpacing: '-0.02em', color: INK }}>Scorify Golf</span>
         </Link>
@@ -62,29 +62,29 @@ export default function SiteHeader() {
           {isLoggedIn ? (
             <>
               {isAdmin && (
-                <Link to="/admin" className="hidden sm:inline text-sm font-semibold px-3 py-1.5 rounded-full transition-colors hover:bg-[#f0fdf4]" style={{ color: GREEN }}>
+                <Link to="/admin" className="hidden sm:inline-flex min-h-[44px] items-center text-sm font-semibold px-3 rounded-full transition-colors hover:bg-[#f0fdf4]" style={{ color: GREEN }}>
                   Admin ↗
                 </Link>
               )}
               <button onClick={handleSignOut}
-                className="text-sm font-semibold px-4 py-1.5 rounded-full border transition-colors hover:border-[#1d1d1f] hover:text-[#1d1d1f]"
+                className="inline-flex min-h-[44px] items-center text-sm font-semibold px-4 rounded-full border transition-colors hover:border-[#1d1d1f] hover:text-[#1d1d1f]"
                 style={{ borderColor: '#d1d5db', color: MUTED }}>
                 Sign out
               </button>
             </>
           ) : (
             <>
-              <Link to="/login" className="hidden sm:inline text-sm font-medium transition-colors hover:text-[#1d1d1f]" style={{ color: MUTED }}>
+              <Link to="/login" className="hidden sm:inline-flex min-h-[44px] items-center text-sm font-medium transition-colors hover:text-[#1d1d1f]" style={{ color: MUTED }}>
                 Sign in
               </Link>
-              <Link to="/login" className="text-sm font-bold px-4 py-1.5 rounded-full text-white transition-opacity hover:opacity-90 whitespace-nowrap" style={{ background: GREEN }}>
+              <Link to="/login" className="inline-flex min-h-[44px] items-center text-sm font-bold px-4 rounded-full text-white transition-opacity hover:opacity-90 whitespace-nowrap" style={{ background: GREEN }}>
                 Get started
               </Link>
             </>
           )}
 
           {/* Mobile menu button */}
-          <button className="md:hidden p-1.5 rounded-full" onClick={() => setMenuOpen(v => !v)}
+          <button className="md:hidden flex h-11 w-11 items-center justify-center rounded-full" onClick={() => setMenuOpen(v => !v)}
             aria-label={menuOpen ? 'Close menu' : 'Open menu'} aria-expanded={menuOpen} style={{ color: MUTED }}>
             <svg width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24" aria-hidden="true">
               {menuOpen
@@ -97,16 +97,16 @@ export default function SiteHeader() {
 
       {/* Mobile menu */}
       {menuOpen && (
-        <nav className="md:hidden px-4 sm:px-6 py-4 flex flex-col gap-3" style={{ borderTop: `1px solid ${LINE}` }} aria-label="Main">
+        <nav className="md:hidden px-4 sm:px-6 py-4 flex flex-col gap-0" style={{ borderTop: `1px solid ${LINE}` }} aria-label="Main">
           {NAV_LINKS.map(l => (
             <Link key={l.to} to={l.to} onClick={() => setMenuOpen(false)}
-              className="text-sm py-1" style={{ color: isActive(pathname, l.to) ? INK : MUTED, fontWeight: isActive(pathname, l.to) ? 700 : 500 }}>
+              className="flex min-h-[44px] items-center text-sm" style={{ color: isActive(pathname, l.to) ? INK : MUTED, fontWeight: isActive(pathname, l.to) ? 700 : 500 }}>
               {l.label}
             </Link>
           ))}
           {isLoggedIn
-            ? isAdmin && <Link to="/admin" onClick={() => setMenuOpen(false)} className="text-sm font-semibold py-1" style={{ color: GREEN }}>Admin ↗</Link>
-            : <Link to="/login" onClick={() => setMenuOpen(false)} className="text-sm font-medium py-1" style={{ color: MUTED }}>Sign in</Link>}
+            ? isAdmin && <Link to="/admin" onClick={() => setMenuOpen(false)} className="flex min-h-[44px] items-center text-sm font-semibold" style={{ color: GREEN }}>Admin ↗</Link>
+            : <Link to="/login" onClick={() => setMenuOpen(false)} className="flex min-h-[44px] items-center text-sm font-medium" style={{ color: MUTED }}>Sign in</Link>}
         </nav>
       )}
     </header>
